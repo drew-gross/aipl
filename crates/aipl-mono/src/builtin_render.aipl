@@ -1,0 +1,82 @@
+# The AIPL implementation of the `render` builtin. The loader names this function by the
+# canonical name `__builtin_render` (see `aipl_syntax::builtin`), so a user's
+# `x.render(digits=1)` resolves through the ordinary generic machinery — the in-file name is
+# only for this file's own tests, which read exactly like user code.
+#
+# `render` is `to_str` with options, for the output that wants a say in how a float is
+# written where `to_str` always gives the one spelling that reads back as the same value.
+# With no options it is `to_str`. The options are all keywords. It is for floats: its body
+# writes one with a digit count, so another type does not compile.
+#
+# No lint steers `to_str` calls to it: nothing about `to_str` is wrong, it is the one
+# without options.
+
+import {
+    IEEE754Float32 as F32,
+    IEEE754Float64 as F64,
+    equal as ==,
+    float_add as +,
+    float_div as /,
+    len,
+    min,
+    repeat,
+    saturating_sub,
+    starts_with,
+    to_fixed,
+    to_str,
+} from builtins;
+
+# The float `self` as text. With no options that is `to_str(self)`: the shortest decimal that
+# reads back as the same value.
+#
+# - `digits`: for a float, write exactly that many digits after the point, correctly rounded
+#   from the float's exact value (halves to even: `0.25` is `0.2` to one digit, `2.5` is `2`
+#   to none), so `render(1.0 / 3.0, digits=3)` is `0.333`. A count past the 1074 digits a
+#   float's exact value has gives the rest as zeros. `NaN` and `inf` have no digits.
+pub fn render<T: any>(self: T, digits?: u64 = none) -> str {
+    let some(wanted) = digits else { return to_str(self); };
+    let shown = min(wanted, 1074);
+    let text = self.to_fixed(shown);
+    if (wanted == shown) { text } else { `{text}{"0".repeat(saturating_sub(wanted, shown))}` }
+}.test({
+    // No options is `to_str`: the shortest round trip.
+    assert(render(0.5) == "0.5");
+    assert(render(2.0) == "2.0");
+    assert(render(0.1 + 0.2) == "0.30000000000000004");
+
+    // A fixed number of digits, rounded from the exact value.
+    let third = 2.0 / 3.0;
+    assert(render(third, digits=3) == "0.667");
+    assert(render(third, digits=0) == "1");
+    assert(render(12.345, digits=1) == "12.3");
+    assert(render(0.5, digits=3) == "0.500");
+    assert(render(1.0e21, digits=2) == "1000000000000000000000.00");
+    assert(render(-0.04, digits=1) == "-0.0");
+    assert(render(-2.5, digits=0) == "-2");
+
+    // Halves go to even, and a decimal that is a little under a half is not one: 0.35 is
+    // 0.34999999999999997 as a binary64, and 0.45 is 0.45000000000000001.
+    assert(render(0.25, digits=1) == "0.2");
+    assert(render(0.75, digits=1) == "0.8");
+    assert(render(2.5, digits=0) == "2");
+    assert(render(3.5, digits=0) == "4");
+    assert(render(0.35, digits=1) == "0.3");
+    assert(render(0.45, digits=1) == "0.5");
+
+    // A 32-bit float is rounded from its own value, not from the 64-bit one.
+    let narrow_tenth: F32 = 0.1;
+    assert(render(narrow_tenth, digits=10) == "0.1000000015");
+    assert(render(narrow_tenth) == "0.1");
+
+    // `NaN` and the infinities have no digits to give.
+    let zero: F64 = 0.0;
+    assert(render(zero / zero, digits=2) == "NaN");
+    assert(render(1.0 / zero, digits=2) == "inf");
+    assert(render(-1.0 / zero, digits=2) == "-inf");
+
+    // A very large count is the exact digits and then zeros.
+    let wide = render(1.5, digits=1100);
+    assert(wide.len() == 1102);
+    assert(wide.starts_with("1.5000"));
+    assert(render(1.5, digits=1074).len() == 1076);
+})

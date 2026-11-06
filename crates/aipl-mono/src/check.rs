@@ -5326,6 +5326,25 @@ impl Cx<'_> {
             }
             return Ok(Type::Primitive(Primitive::F64));
         }
+        // `x.to_fixed(digits)`: a float written with that many digits after the point.
+        if *callee == Callee::ToFixed && args.len() == 2 {
+            let t = self.check_expr(&args[0], env, effects)?;
+            let d = self.check_expr(&args[1], env, effects)?;
+            if !is_float_ty(&t) && !is_unknown(&t) && !is_typevar(&t) {
+                return Err(Error::at(
+                    format!("\"render\" is for floats, but this is {}", tyname(&t)),
+                    args[0].span.clone(),
+                ));
+            }
+            let d = self.flex_int(&args[1], &d, &Type::Primitive(Primitive::U64))?;
+            expect(
+                &d,
+                &Type::Primitive(Primitive::U64),
+                "\"to_fixed\" digits",
+                args[1].span.clone(),
+            )?;
+            return Ok(Type::Primitive(Primitive::Str));
+        }
         if *callee == Callee::ToSet && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             // A `str` receiver gives a `#{char}`: a string *is* a sequence of

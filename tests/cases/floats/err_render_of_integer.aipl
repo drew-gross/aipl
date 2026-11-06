@@ -1,0 +1,9 @@
+import { render } from builtins;
+
+fn count(n: i64) -> str { render(n, digits=2) }
+--- check --compile ---
+error: "render" is for floats, got i64
+ --> ./tests/cases/floats/err_render_of_integer.aipl:3:48
+  |
+3 | fn count(n: i64) -> str { render(n, digits=2) }
+  |                                                ^

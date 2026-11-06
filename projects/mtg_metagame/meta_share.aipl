@@ -6,6 +6,8 @@ import {
     count_if,
     equal as ==,
     filter,
+    float_div as /,
+    float_mul as *,
     greater_than as >,
     join,
     len,
@@ -16,16 +18,15 @@ import {
     map,
     max,
     push,
+    render,
     repeat,
-    saturating_divide as /,
-    saturating_remainder as %,
     saturating_sub as -,
     sort_by,
     to_array,
+    to_float,
     to_set,
     value_or,
     wrapping_add as +,
-    wrapping_mul as *,
 } from builtins;
 import { Identifier, archetypes_of, deck_of } from "./archetypes.aipl";
 import { Deck } from "./metagame.aipl";
@@ -84,10 +85,11 @@ pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Share[] {
     assert(shares([], [landfall], true) == []);
 })
 
-# `count` out of `total` as a percentage with one decimal, rounded half up: `33.3%`.
+# `count` out of `total` as a percentage with one decimal: `33.3%`. Rounded as the
+# original's formatting is, half to even on the float's exact value.
 fn percent(count: u64, total: u64) -> str {
-    let tenths = (count * 2000 + total) / (2 * total);
-    `{tenths / 10}.{tenths % 10}%`
+    let share = count.to_float() / total.to_float();
+    `{(share * 100.0).render(digits=1)}%`
 }.test({
     assert(percent(1, 3) == "33.3%");
     assert(percent(2, 3) == "66.7%");
@@ -95,11 +97,12 @@ fn percent(count: u64, total: u64) -> str {
     assert(percent(0, 7) == "0.0%");
     assert(percent(7, 7) == "100.0%");
     assert(percent(1, 8) == "12.5%");
-    // Half up: an exact half rounds away from zero.
-    assert(percent(1, 16) == "6.3%");
-    // A tenth with a leading zero in the fraction.
+    // An exact half goes to the even digit, as it does there.
+    assert(percent(1, 16) == "6.2%");
+    assert(percent(3, 16) == "18.8%");
+    // Under a percent, and 0.15 is a little under what it reads as.
     assert(percent(1, 200) == "0.5%");
-    assert(percent(3, 2000) == "0.2%");
+    assert(percent(3, 2000) == "0.1%");
 })
 
 # `text` padded with spaces to `width`: on the left when `right`, else on the right.

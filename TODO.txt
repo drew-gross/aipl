@@ -25,7 +25,6 @@ projects:
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg metagame analyzer
     accept paths, don't do munging
-    reuse existing json parser from lib
 
 floats:
   trig operations (sine, cosine, etc. NOT sin, cos. User can import as if they want abbreviations)
@@ -953,6 +952,7 @@ formatting:
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 
 docs:
+  write some aipl syntax docs
   need better docs for builtins so we don't reimplement stuff
   make go to def and doc-on-hover work for operators
   aipl doc command should have nicer formatting, and top-level formatting.

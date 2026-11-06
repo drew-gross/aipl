@@ -402,6 +402,13 @@ const BUILTINS: &[Builtin] = &[
          literal: an annotation, a parameter, or the other operand of a float operation. \
          With nothing to say, it is `IEEE754Float64`.",
     ),
+    Builtin::aipl(Callee::Render, "builtin_render.aipl"),
+    Builtin::described(
+        Callee::ToFixed,
+        "fn to_fixed<F>(self: F, digits: u64) -> str",
+        "A float with exactly `digits` digits after the point, correctly rounded from its \
+         exact value (halves to even). The unchecked half of `render`, which is the spelling.",
+    ),
     Builtin::described(
         Callee::FloatAdd,
         "fn float_add<T: float>(a: T, b: T) -> T",

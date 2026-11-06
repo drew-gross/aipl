@@ -3628,7 +3628,7 @@ fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
 // NOTE: `all`, `grid_of`, `words`, `cartesian_product`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `collect_arms`, `as_case`, `is_case`, `collect_ok`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `parse_json`, `to_dict`, `map_to_dict`, `tuple_windows`, `union_all`, `zip`,
+// `extend_optional`, `inline_str`, `measure`, `range`, `set_map`, `parse_json`, `to_dict`, `map_to_dict`, `tuple_windows`, `union_all`, `zip`, `render`,
 // `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature: the loader
@@ -4156,6 +4156,9 @@ pub const INTERNAL_BUILTINS: &[Callee] = &[
     // `int_parse` whose position wants an unsigned integer. `int_parse` is the
     // spelling.
     Callee::IntParseUnsigned,
+    // The fixed-digit half of `render`, which knows what to do with a count that is
+    // negative or past what a float has digits for.
+    Callee::ToFixed,
 ];
 
 /// Whether `callee` is one of [`INTERNAL_BUILTINS`].

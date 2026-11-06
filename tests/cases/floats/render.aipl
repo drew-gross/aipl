@@ -1,0 +1,78 @@
+# `render` is `to_str` with options. With none it is `to_str`; with `digits` it writes a float
+# with that many digits after the point, correctly rounded from its exact value. The same list
+# is asserted and printed, so the `stdout` below pins the linked runtime to the values the
+# assertions give the in-process one. The rounding itself is checked against a by-hand rounding
+# of the exact expansion in `float_rendering_tests` (`aipl-codegen/src/lib.rs`).
+
+import {
+    IEEE754Float32 as F32,
+    IEEE754Float64 as F64,
+    equal,
+    float_div as /,
+    print,
+    render,
+} from builtins;
+
+fn rendered() -> str[] {
+    let third: F64 = 2.0 / 3.0;
+    let narrow: F32 = 0.1;
+    let zero: F64 = 0.0;
+    [
+        render(0.1),
+        render(third, digits=3),
+        render(third, digits=0),
+        render(12.345, digits=1),
+        render(0.25, digits=1),
+        render(0.35, digits=1),
+        render(0.45, digits=1),
+        render(2.5, digits=0),
+        render(3.5, digits=0),
+        render(999.96, digits=1),
+        render(-0.04, digits=1),
+        render(1.0e21, digits=2),
+        render(narrow, digits=10),
+        render(zero / zero, digits=2),
+        render(1.0 / zero, digits=2),
+    ]
+}.test({
+    assert(rendered().equal([
+        "0.1",
+        "0.667",
+        "1",
+        "12.3",
+        "0.2",
+        "0.3",
+        "0.5",
+        "2",
+        "4",
+        "1000.0",
+        "-0.0",
+        "1000000000000000000000.00",
+        "0.1000000015",
+        "NaN",
+        "inf",
+    ]));
+})
+
+fn main() !prints -> i64 {
+    for (let text : rendered()) {
+        print(text);
+    }
+    0
+}
+--- stdout ---
+0.1
+0.667
+1
+12.3
+0.2
+0.3
+0.5
+2
+4
+1000.0
+-0.0
+1000000000000000000000.00
+0.1000000015
+NaN
+inf

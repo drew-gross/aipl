@@ -566,28 +566,85 @@ extern "C" fn aipl_write_float(dst: *const u8, bits: i64, width: i64) -> *const 
 /// Returns the byte count. The AOT runtime's `fmt_float` is the same function.
 fn fmt_float(buf: &mut [u8; 48], bits: i64, width: i64) -> usize {
     use std::fmt::Write;
-    struct Cursor<'a> {
-        buf: &'a mut [u8; 48],
-        len: usize,
-    }
-    impl Write for Cursor<'_> {
-        fn write_str(&mut self, s: &str) -> std::fmt::Result {
-            let end = self.len + s.len();
-            if end > self.buf.len() {
-                return Err(std::fmt::Error);
-            }
-            self.buf[self.len..end].copy_from_slice(s.as_bytes());
-            self.len = end;
-            Ok(())
-        }
-    }
-    let mut out = Cursor { buf, len: 0 };
+    let mut out = FormatBuffer { buf, len: 0 };
     let _ = if width == 32 {
         write!(out, "{:?}", f32::from_bits(bits as u32))
     } else {
         write!(out, "{:?}", f64::from_bits(bits as u64))
     };
     out.len
+}
+
+/// The most fractional digits `aipl_write_float_fixed` writes. A binary64's exact decimal
+/// expansion ends by its 1074th fractional digit, so every one past that is a zero, which the
+/// caller (`render`) appends itself rather than have the runtime's buffer grow with the request.
+const FIXED_FLOAT_MAX_DIGITS: i64 = 1074;
+
+/// A buffer that holds the widest fixed rendering: sign, 309 integer digits (a binary64's
+/// largest), the point, and [`FIXED_FLOAT_MAX_DIGITS`].
+const FIXED_FLOAT_BUFFER: usize = 1400;
+
+/// The rendered byte length of the float with `bits` (`width` 32 or 64) written with exactly
+/// `digits` digits after the point. Must agree, byte for byte, with `aipl_write_float_fixed`.
+#[no_mangle]
+extern "C" fn aipl_float_fixed_len(bits: i64, width: i64, digits: i64) -> i64 {
+    let mut buf = [0u8; FIXED_FLOAT_BUFFER];
+    fmt_float_fixed(&mut buf, bits, width, digits) as i64
+}
+
+/// Write that rendering at `dst`; return the advanced cursor.
+#[no_mangle]
+extern "C" fn aipl_write_float_fixed(
+    dst: *const u8,
+    bits: i64,
+    width: i64,
+    digits: i64,
+) -> *const u8 {
+    let mut buf = [0u8; FIXED_FLOAT_BUFFER];
+    let len = fmt_float_fixed(&mut buf, bits, width, digits);
+    unsafe {
+        std::ptr::copy_nonoverlapping(buf.as_ptr(), dst as *mut u8, len);
+        dst.add(len)
+    }
+}
+
+/// A float with exactly `digits` digits after the point (clamped to 0..=1074), correctly
+/// rounded from its exact value, halves to even: `0.25` to one digit is `0.2`, `0.35` — which
+/// is a little under that — is `0.3`. `NaN` and `inf` have no digits to give. Returns the byte
+/// count. The AOT runtime's `fmt_float_fixed` is the same function.
+fn fmt_float_fixed(
+    buf: &mut [u8; FIXED_FLOAT_BUFFER],
+    bits: i64,
+    width: i64,
+    digits: i64,
+) -> usize {
+    use std::fmt::Write;
+    let digits = digits.clamp(0, FIXED_FLOAT_MAX_DIGITS) as usize;
+    let mut out = FormatBuffer { buf, len: 0 };
+    let _ = if width == 32 {
+        write!(out, "{:.*}", digits, f32::from_bits(bits as u32))
+    } else {
+        write!(out, "{:.*}", digits, f64::from_bits(bits as u64))
+    };
+    out.len
+}
+
+/// A fixed-size byte buffer that `write!` can fill, which stops (as an error) at its end.
+struct FormatBuffer<'a> {
+    buf: &'a mut [u8],
+    len: usize,
+}
+
+impl std::fmt::Write for FormatBuffer<'_> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        let end = self.len + s.len();
+        if end > self.buf.len() {
+            return Err(std::fmt::Error);
+        }
+        self.buf[self.len..end].copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
 }
 
 /// Format `n` in decimal into `buf[0..]`, returning the byte count.
@@ -3779,6 +3836,11 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_i64_len", aipl_i64_len as *const u8);
     jit_builder.symbol("aipl_float_len", aipl_float_len as *const u8);
     jit_builder.symbol("aipl_write_float", aipl_write_float as *const u8);
+    jit_builder.symbol("aipl_float_fixed_len", aipl_float_fixed_len as *const u8);
+    jit_builder.symbol(
+        "aipl_write_float_fixed",
+        aipl_write_float_fixed as *const u8,
+    );
     jit_builder.symbol("aipl_write_i64", aipl_write_i64 as *const u8);
     jit_builder.symbol("aipl_u64_len", aipl_u64_len as *const u8);
     jit_builder.symbol("aipl_write_u64", aipl_write_u64 as *const u8);
@@ -7384,6 +7446,10 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // rendering written at a cursor.
         "aipl_float_len" => (2, Ret::Word),
         "aipl_write_float" => (3, Ret::Word),
+        // The same with a digit count after the point: the bits, the width, the digits; and
+        // the cursor first for the write.
+        "aipl_float_fixed_len" => (3, Ret::Word),
+        "aipl_write_float_fixed" => (4, Ret::Word),
         // A constant's cache slot: the index and the byte size to give it on
         // first request.
         "aipl_const_slot" => (2, Ret::Word),
@@ -17786,6 +17852,69 @@ fn compile_call_expr_direct<M: Module>(
                 .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
+        Callee::ToFixed => {
+            // `x.to_fixed(digits)` — the float as text with that many digits after the point,
+            // built the way `to_str` builds its result: measure, allocate exactly, write, and
+            // record the length. The count is an unsigned integer in its register; the
+            // runtime clamps it to what a float has digits for.
+            let [value, digits] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
+            let ConcreteType::Primitive(p) = &t else {
+                return Err(Error::at(
+                    format!("\"render\" is for floats, got {}", type_name(&t)),
+                    value.span.clone(),
+                ));
+            };
+            if !p.is_float() {
+                return Err(Error::at(
+                    format!("\"render\" is for floats, got {}", type_name(&t)),
+                    value.span.clone(),
+                ));
+            }
+            let (d, dt) = compile_expr(module, builder, cx, scopes, digits)?;
+            expect_type(
+                &flex_int_ty(digits, &dt, &ConcreteType::Primitive(Primitive::U64)),
+                &ConcreteType::Primitive(Primitive::U64),
+                "\"to_fixed\" digits",
+                digits.span.clone(),
+            )?;
+            let width = builder
+                .ins()
+                .iconst(types::I64, if *p == Primitive::F32 { 32 } else { 64 });
+            let b = cx.builtins;
+            let len = b.call(module, builder, "aipl_float_fixed_len", &[v, width, d]);
+            let built = b.call(module, builder, "aipl_str_alloc", &[len]);
+            let start = b.call(module, builder, "aipl_str_write_ptr", &[built]);
+            b.call(
+                module,
+                builder,
+                "aipl_write_float_fixed",
+                &[start, v, width, d],
+            );
+            b.call_void(module, builder, "aipl_str_grew", &[built, len]);
+            // The runtime hands back the new `str` in its own scratch value; it is copied to a
+            // slot of ours, which is then the result and what scope exit releases.
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                str24::STR_SIZE as u32,
+                3,
+            ));
+            let out = builder.ins().stack_addr(types::I64, slot, 0);
+            copy_composite(
+                builder,
+                out,
+                built,
+                &ConcreteType::Primitive(Primitive::Str),
+                cx.structs,
+            );
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(out, &ConcreteType::Primitive(Primitive::Str)));
+            (out, ConcreteType::Primitive(Primitive::Str))
+        }
         Callee::ToFloat => {
             // `n.to_float()` — the integer as the nearest float of the type the checker
             // recorded on the call (`IEEE754Float64` when none): one rounding, by the
@@ -24829,6 +24958,118 @@ mod float_rendering_tests {
         assert!(
             checked > 58_000,
             "only {checked} finite values were sampled"
+        );
+    }
+
+    fn render_fixed(bits: i64, width: i64, digits: i64) -> String {
+        let mut buf = [0u8; super::FIXED_FLOAT_BUFFER];
+        let len = super::fmt_float_fixed(&mut buf, bits, width, digits);
+        String::from_utf8(buf[..len].to_vec()).expect("a rendering is ASCII")
+    }
+
+    /// `x` to `digits` places, rounded by hand from its complete decimal expansion: halves to
+    /// even, which is what rounding an exact value means. The expansion comes from the
+    /// standard library, but the rounding does not, so this checks the library's rounding
+    /// against the definition rather than against itself.
+    fn rounded_by_hand(x: f64, digits: usize) -> String {
+        let exact = format!("{:.1100}", x.abs());
+        let (whole, fraction) = exact.split_once('.').unwrap();
+        let (kept_fraction, rest) = fraction.split_at(digits);
+        let mut kept: Vec<u8> = whole.bytes().chain(kept_fraction.bytes()).collect();
+        let half = rest.as_bytes().first().map_or(0, |d| d - b'0');
+        let beyond_half = rest.as_bytes().iter().skip(1).any(|&d| d != b'0');
+        let last_is_odd = (kept.last().unwrap() - b'0') % 2 == 1;
+        if half > 5 || (half == 5 && (beyond_half || last_is_odd)) {
+            let mut i = kept.len();
+            loop {
+                if i == 0 {
+                    kept.insert(0, b'1');
+                    break;
+                }
+                i -= 1;
+                if kept[i] == b'9' {
+                    kept[i] = b'0';
+                } else {
+                    kept[i] += 1;
+                    break;
+                }
+            }
+        }
+        let point = kept.len() - digits;
+        let mut text = String::from_utf8(kept[..point].to_vec()).unwrap();
+        if digits > 0 {
+            text.push('.');
+            text.push_str(std::str::from_utf8(&kept[point..]).unwrap());
+        }
+        if x.is_sign_negative() {
+            text.insert(0, '-');
+        }
+        text
+    }
+
+    #[test]
+    fn fixed_digits_are_the_exact_value_rounded_half_to_even() {
+        for (x, digits, want) in [
+            (0.25f64, 1, "0.2"),
+            (0.75, 1, "0.8"),
+            (2.5, 0, "2"),
+            (3.5, 0, "4"),
+            // 0.35 is a little under, and 0.45 a little over, what they read as.
+            (0.35, 1, "0.3"),
+            (0.45, 1, "0.5"),
+            (6.25, 1, "6.2"),
+            (0.5, 3, "0.500"),
+            (-0.04, 1, "-0.0"),
+            (999.96, 1, "1000.0"),
+            (1e21, 2, "1000000000000000000000.00"),
+        ] {
+            assert_eq!(
+                render_fixed(x.to_bits() as i64, 64, digits),
+                want,
+                "{x} to {digits}"
+            );
+            assert_eq!(
+                rounded_by_hand(x, digits as usize),
+                want,
+                "{x} to {digits} by hand"
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_digits_agree_with_rounding_by_hand_for_sampled_values() {
+        for bits in bit_patterns(0xA076_1D64_78BD_642F).take(20_000) {
+            let unit = (bits >> 11) as f64 / (1u64 << 53) as f64;
+            let exponent = (bits & 0x3f) as i32 - 24;
+            let x = unit * 2f64.powi(exponent) * if bits & (1 << 40) == 0 { 1.0 } else { -1.0 };
+            let digits = ((bits >> 41) % 14) as i64;
+            assert_eq!(
+                render_fixed(x.to_bits() as i64, 64, digits),
+                rounded_by_hand(x, digits as usize),
+                "{x:e} to {digits}"
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_digits_clamp_and_give_no_digits_to_what_has_none() {
+        let one_and_a_half = 1.5f64.to_bits() as i64;
+        assert_eq!(render_fixed(one_and_a_half, 64, -4), "2");
+        assert_eq!(render_fixed(one_and_a_half, 64, 5000).len(), 1076);
+        assert_eq!(render_fixed(f64::NAN.to_bits() as i64, 64, 3), "NaN");
+        assert_eq!(render_fixed(f64::INFINITY.to_bits() as i64, 64, 3), "inf");
+        assert_eq!(
+            render_fixed(f64::NEG_INFINITY.to_bits() as i64, 64, 3),
+            "-inf"
+        );
+        // The widest rendering fits its buffer.
+        assert!(
+            render_fixed(f64::MAX.to_bits() as i64, 64, 1074).len() <= super::FIXED_FLOAT_BUFFER
+        );
+        // A 32-bit float is rounded from its own value.
+        assert_eq!(
+            render_fixed(i64::from(0.1f32.to_bits()), 32, 10),
+            "0.1000000015"
         );
     }
 

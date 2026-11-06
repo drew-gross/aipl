@@ -8612,6 +8612,8 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
         // `n.to_float()`: `IEEE754Float64`, unless the checker recorded another float on
         // the call (the end of `Mono::infer` reads the record).
         Callee::ToFloat => return Some(Type::Primitive(Primitive::F64)),
+        // `x.to_fixed(digits)` is the text of a float.
+        Callee::ToFixed => return Some(Type::Primitive(Primitive::Str)),
         // `xs.to_set()`: the set whose order the use site decides (see
         // `SetOrder::Context`), of the array's element type.
         Callee::ToSet => {

@@ -1652,28 +1652,75 @@ pub extern "C" fn aipl_write_float(dst: *const u8, bits: i64, width: i64) -> *co
 /// same function; `core::fmt` is the one implementation of shortest round-trip both use.
 fn fmt_float(buf: &mut [u8; 48], bits: i64, width: i64) -> usize {
     use core::fmt::Write;
-    struct Cursor<'a> {
-        buf: &'a mut [u8; 48],
-        len: usize,
-    }
-    impl Write for Cursor<'_> {
-        fn write_str(&mut self, s: &str) -> core::fmt::Result {
-            let end = self.len + s.len();
-            if end > self.buf.len() {
-                return Err(core::fmt::Error);
-            }
-            self.buf[self.len..end].copy_from_slice(s.as_bytes());
-            self.len = end;
-            Ok(())
-        }
-    }
-    let mut out = Cursor { buf, len: 0 };
+    let mut out = FormatBuffer { buf, len: 0 };
     let _ = if width == 32 {
         write!(out, "{:?}", f32::from_bits(bits as u32))
     } else {
         write!(out, "{:?}", f64::from_bits(bits as u64))
     };
     out.len
+}
+
+/// The most fractional digits `aipl_write_float_fixed` writes (a binary64's exact expansion
+/// ends by its 1074th). The JIT runtime's constants are the same.
+const FIXED_FLOAT_MAX_DIGITS: i64 = 1074;
+const FIXED_FLOAT_BUFFER: usize = 1400;
+
+/// The rendered byte length of the float with `bits` (`width` 32 or 64) written with exactly
+/// `digits` digits after the point, matching `aipl_write_float_fixed`.
+#[no_mangle]
+pub extern "C" fn aipl_float_fixed_len(bits: i64, width: i64, digits: i64) -> i64 {
+    let mut buf = [0u8; FIXED_FLOAT_BUFFER];
+    fmt_float_fixed(&mut buf, bits, width, digits) as i64
+}
+
+/// Write that rendering at `dst`; return the advanced cursor.
+#[no_mangle]
+pub extern "C" fn aipl_write_float_fixed(
+    dst: *const u8,
+    bits: i64,
+    width: i64,
+    digits: i64,
+) -> *const u8 {
+    unsafe {
+        let mut buf = [0u8; FIXED_FLOAT_BUFFER];
+        let len = fmt_float_fixed(&mut buf, bits, width, digits);
+        memcpy(dst as *mut c_void, buf.as_ptr() as *const c_void, len);
+        dst.add(len)
+    }
+}
+
+/// A float with exactly `digits` digits after the point (clamped to 0..=1074), correctly
+/// rounded from its exact value, halves to even. The JIT runtime's `fmt_float_fixed` is the
+/// same function.
+fn fmt_float_fixed(buf: &mut [u8; FIXED_FLOAT_BUFFER], bits: i64, width: i64, digits: i64) -> usize {
+    use core::fmt::Write;
+    let digits = digits.clamp(0, FIXED_FLOAT_MAX_DIGITS) as usize;
+    let mut out = FormatBuffer { buf, len: 0 };
+    let _ = if width == 32 {
+        write!(out, "{:.*}", digits, f32::from_bits(bits as u32))
+    } else {
+        write!(out, "{:.*}", digits, f64::from_bits(bits as u64))
+    };
+    out.len
+}
+
+/// A fixed-size byte buffer that `write!` can fill, which stops (as an error) at its end.
+struct FormatBuffer<'a> {
+    buf: &'a mut [u8],
+    len: usize,
+}
+
+impl core::fmt::Write for FormatBuffer<'_> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let end = self.len + s.len();
+        if end > self.buf.len() {
+            return Err(core::fmt::Error);
+        }
+        self.buf[self.len..end].copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
 }
 
 /// Format `n` (unsigned) into the END of `buf`, returning the start index.

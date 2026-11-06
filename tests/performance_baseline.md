@@ -205,6 +205,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_range | 2 | 120 | 120 | 840 | 2372 |
 | crates/aipl-mono/src/builtin_read_key | 22 | 992 | 1112 | 17595 | 9196 |
 | crates/aipl-mono/src/builtin_reduce | 3 | 240 | 240 | 3453 | 7184 |
+| crates/aipl-mono/src/builtin_render | 26 | 3878 | 3878 | 4235 | 8344 |
 | crates/aipl-mono/src/builtin_repeat | 22 | 1115 | 1064 | 6209 | 8908 |
 | crates/aipl-mono/src/builtin_reverse_find_map | 1 | 39 | 39 | 716 | 2168 |
 | crates/aipl-mono/src/builtin_right_fold | 7 | 592 | 592 | 2990 | 6900 |
@@ -405,6 +406,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/files/write_file | 4 | 84 | 63 | 293 | 2020 |
 | tests/cases/floats/arithmetic | 20 | 419 | 194 | 1678 | 6652 |
 | tests/cases/floats/inference | 15 | 401 | 401 | 1453 | 5884 |
+| tests/cases/floats/render | 16 | 709 | 709 | 1832 | 4204 |
 | tests/cases/floats/shortest_round_trip | 18 | 890 | 890 | 1069 | 1644 |
 | tests/cases/floats/to_float | 11 | 281 | 281 | 747 | 2964 |
 | tests/cases/floats/to_str | 14 | 483 | 483 | 1010 | 4780 |
