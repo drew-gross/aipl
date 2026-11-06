@@ -3,14 +3,8 @@
 import {
     equal as ==,
     get,
-    greater_than as >,
     join,
-    less_than as <,
-    logical_and as &&,
-    logical_not as !,
-    logical_or as ||,
     push,
-    sort_by,
     to_array,
     to_dict,
     to_set,
@@ -19,29 +13,16 @@ import {
     wrapping_add as +,
     zip_with,
 } from builtins;
+import { Counted, ranked } from "./counted.aipl";
 import { Card, Deck, all_cards } from "./metagame.aipl";
 
-# A card and the number of copies of it played, main decks and sideboards both.
-struct CardCount { name: str, count: i64 }
-
-# True when `a` goes before `b`: more copies first, and cards with as many
-# copies in name order.
-fn is_listed_before(a: CardCount, b: CardCount) -> bool {
-    a.count > b.count || (a.count == b.count && a.name < b.name)
-}.test({
-    assert(is_listed_before(CardCount { name: "b", count: 5 }, CardCount { name: "a", count: 4 }));
-    assert(!is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "b", count: 5 }));
-    assert(is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "b", count: 4 }));
-    assert(!is_listed_before(CardCount { name: "a", count: 4 }, CardCount { name: "a", count: 4 }));
-})
-
 # The copies of each card played in `decks`, most played first.
-pub fn card_counts(decks: Deck[]) -> CardCount[] {
+pub fn card_counts(decks: Deck[]) -> Counted[] {
     let cards = decks$all_cards().join();
     let distinct: #<{str} = cards$name.to_set();
     let names = distinct.to_array();
     mut positions: (str, u64)[] = [];
-    mut totals: i64[] = [];
+    mut totals: u64[] = [];
     for (let i, name : names) {
         set positions.push((name, i));
         set totals.push(0);
@@ -52,7 +33,7 @@ pub fn card_counts(decks: Deck[]) -> CardCount[] {
             set totals.try_set(i, totals[i].value_or(0) + card.count);
         };
     }
-    names.zip_with(totals, |name, count| { CardCount { name, count } }).sort_by(is_listed_before)
+    names.zip_with(totals, |name, count| { Counted { name, count } }).ranked()
 }.test({
     let deck = |main: Card[], side: Card[]| {
         Deck {
@@ -65,12 +46,12 @@ pub fn card_counts(decks: Deck[]) -> CardCount[] {
             matches: [],
         }
     };
-    let island = |n: i64| { Card { name: "Island", count: n, card_type: "Land" } };
-    let bolt = |n: i64| { Card { name: "Bolt", count: n, card_type: "Instant" } };
+    let island = |n: u64| { Card { name: "Island", count: n, card_type: "Land" } };
+    let bolt = |n: u64| { Card { name: "Bolt", count: n, card_type: "Instant" } };
     let decks = [deck([island(4), bolt(2)], [bolt(1)]), deck([island(3)], [])];
     assert(card_counts(decks) == [
-        CardCount { name: "Island", count: 7 },
-        CardCount { name: "Bolt", count: 3 },
+        Counted { name: "Island", count: 7 },
+        Counted { name: "Bolt", count: 3 },
     ]);
     assert(card_counts([]) == []);
 })

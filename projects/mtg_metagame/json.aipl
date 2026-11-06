@@ -13,6 +13,7 @@ import {
     equal as ==,
     find_map,
     int_parse,
+    narrow,
     value_or_err,
 } from builtins;
 
@@ -135,6 +136,25 @@ pub fn integer_field(self: Json, key: str) -> i64!str {
     assert(object.integer_field("n") == ok(5));
     assert(object.integer_field("t") == err(`"t" is not a whole number`));
     assert(object.integer_field("q") == err(`missing "q"`));
+})
+
+# The non-negative whole number under `key`, or why there is none.
+pub fn unsigned_field(self: Json, key: str) -> u64!str {
+    let value = self.integer_field(key)?;
+    let unsigned: u64? = value.narrow();
+    unsigned.value_or_err(`"{key}" is not a non-negative whole number`)
+}.test({
+    let object = Object([
+        Member { key: "n", value: Number("5") },
+        Member { key: "negative", value: Number("-5") },
+        Member { key: "t", value: String("5") },
+    ]);
+    assert(object.unsigned_field("n") == ok(5));
+    assert(object.unsigned_field("negative") == err(
+        `"negative" is not a non-negative whole number`,
+    ));
+    assert(object.unsigned_field("t") == err(`"t" is not a whole number`));
+    assert(object.unsigned_field("q") == err(`missing "q"`));
 })
 
 # The elements of the list under `key`, or why there is none.

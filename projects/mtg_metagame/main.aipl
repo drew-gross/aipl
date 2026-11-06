@@ -18,7 +18,8 @@ import {
     wrapping_increment as ++,
 } from builtins;
 import { load_identifiers } from "./archetypes.aipl";
-import { CardCount, card_counts } from "./card_stats.aipl";
+import { card_counts } from "./card_stats.aipl";
+import { Counted } from "./counted.aipl";
 import { optional_text_field } from "./json.aipl";
 import { share_report } from "./meta_share.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
@@ -43,8 +44,8 @@ fn data_path(index: Json, name: str) -> str {
 })
 
 # A card's line in the listing: its copies, then its name.
-fn card_line(self: CardCount) -> str { `{self.count} {self.name}` }.test({
-    assert(CardCount { name: "Island", count: 12 }.card_line() == "12 Island");
+fn card_line(self: Counted) -> str { `{self.count} {self.name}` }.test({
+    assert(Counted { name: "Island", count: 12 }.card_line() == "12 Island");
 })
 
 # The metagame `name` stands for, with `data/index.json` read to find it.

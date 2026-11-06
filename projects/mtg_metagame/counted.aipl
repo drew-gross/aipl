@@ -1,0 +1,37 @@
+# A name and how many of it there were, and the order such counts are listed in: the card
+# listing and the archetype shares both rank things this way.
+
+import {
+    equal as ==,
+    greater_than as >,
+    less_than as <,
+    logical_and as &&,
+    logical_or as ||,
+    sort_by,
+} from builtins;
+
+# `name` and its `count`.
+struct Counted { name: str, count: u64 }
+
+# `self` ranked: larger counts first, and equal counts in name order.
+pub fn ranked(self: Counted[]) -> Counted[] {
+    self.sort_by(|a, b| { a.count > b.count || (a.count == b.count && a.name < b.name) })
+}.test({
+    let counts = [
+        Counted { name: "b", count: 4 },
+        Counted { name: "c", count: 5 },
+        Counted { name: "a", count: 4 },
+        Counted { name: "a", count: 3 },
+    ];
+    assert(counts.ranked() == [
+        Counted { name: "c", count: 5 },
+        Counted { name: "a", count: 4 },
+        Counted { name: "b", count: 4 },
+        Counted { name: "a", count: 3 },
+    ]);
+
+    // Nothing ranks to nothing, and one thing to itself.
+    let nothing: Counted[] = [];
+    assert(nothing.ranked() == []);
+    assert([Counted { name: "x", count: 1 }].ranked() == [Counted { name: "x", count: 1 }]);
+})

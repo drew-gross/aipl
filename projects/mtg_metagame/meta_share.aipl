@@ -8,11 +8,8 @@ import {
     filter,
     float_div as /,
     float_mul as *,
-    greater_than as >,
     join,
     len,
-    less_than as <,
-    logical_and as &&,
     logical_not as !,
     logical_or as ||,
     map,
@@ -21,7 +18,6 @@ import {
     render,
     repeat,
     saturating_sub as -,
-    sort_by,
     to_array,
     to_float,
     to_set,
@@ -29,31 +25,19 @@ import {
     wrapping_add as +,
 } from builtins;
 import { Identifier, archetypes_of, deck_of } from "./archetypes.aipl";
+import { Counted, ranked } from "./counted.aipl";
 import { Deck } from "./metagame.aipl";
-
-# An archetype, and how many decks were it.
-struct Share { name: str, count: u64 }
-
-# Whether `a` is listed before `b`: more decks first, equal counts in name order.
-fn is_listed_before(a: Share, b: Share) -> bool {
-    a.count > b.count || (a.count == b.count && a.name < b.name)
-}.test({
-    assert(is_listed_before(Share { name: "b", count: 5 }, Share { name: "a", count: 4 }));
-    assert(!is_listed_before(Share { name: "a", count: 4 }, Share { name: "b", count: 5 }));
-    assert(is_listed_before(Share { name: "a", count: 4 }, Share { name: "b", count: 4 }));
-    assert(!is_listed_before(Share { name: "a", count: 4 }, Share { name: "a", count: 4 }));
-})
 
 # The decks of each archetype, most decks first. A deck that is none of `identifiers` is
 # `<name> (self-titled)`, which is left out unless `jank`.
-pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Share[] {
+pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Counted[] {
     let names = decks$archetypes_of(identifiers).join();
     let distinct: #<{str} = names.to_set();
     distinct
         .to_array()
         .filter(|name| jank || !name.contains("self-titled"))
-        .map(|name| { Share { name, count: names.count_if(|each| each == name) } })
-        .sort_by(is_listed_before)
+        .map(|name| { Counted { name, count: names.count_if(|each| each == name) } })
+        .ranked()
 }.test({
     let nothing: str[] = [];
     let landfall = Identifier {
@@ -74,13 +58,13 @@ pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Share[] {
     // Each archetype once per deck, most decks first. The deck that is neither is its own
     // archetype, left out unless `jank`.
     assert(shares(decks, [landfall, mono], false) == [
-        Share { name: "Landfall", count: 3 },
-        Share { name: "Mono-G", count: 2 },
+        Counted { name: "Landfall", count: 3 },
+        Counted { name: "Mono-G", count: 2 },
     ]);
     assert(shares(decks, [landfall, mono], true) == [
-        Share { name: "Landfall", count: 3 },
-        Share { name: "Mono-G", count: 2 },
-        Share { name: "Some Deck (self-titled)", count: 1 },
+        Counted { name: "Landfall", count: 3 },
+        Counted { name: "Mono-G", count: 2 },
+        Counted { name: "Some Deck (self-titled)", count: 1 },
     ]);
     assert(shares([], [landfall], true) == []);
 })

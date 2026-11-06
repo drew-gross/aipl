@@ -27,6 +27,7 @@ import {
     optional_text_field,
     scalar_text,
     text_field,
+    unsigned_field,
 } from "./json.aipl";
 
 # How one match ended, from a deck's point of view.
@@ -36,7 +37,7 @@ variant Result = Win | Loss | Draw
 struct Record { win: i64, loss: i64, draw: i64 }
 
 # One line of a decklist: a card, how many copies, and its type line category.
-struct Card { name: str, count: i64, card_type: str }
+struct Card { name: str, count: u64, card_type: str }
 
 # One round of a deck's tournament.
 struct Match { opponent_deck_id: str?, result: Result, record: Record, round: str }
@@ -121,7 +122,7 @@ fn decode_result(self: str) -> Result!str {
 fn decode_card(self: Json) -> Card!str {
     ok(Card {
         name: self.text_field("name")?,
-        count: self.integer_field("count")?,
+        count: self.unsigned_field("count")?,
         card_type: self.text_field("card_type")?,
     })
 }.test({

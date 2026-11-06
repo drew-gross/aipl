@@ -23,8 +23,10 @@ projects:
     before is just saturating sub. Maybe after can have a clamp_add?
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
-  mtg metagame analyzer
+  mtg:
+    name.contains("self-titled") shouldn't be necessary, use a variant for the deck with Meta and Jank to identify
     accept paths, don't do munging
+    archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
 
 floats:
   trig operations (sine, cosine, etc. NOT sin, cos. User can import as if they want abbreviations)
@@ -521,6 +523,7 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
+  as a general rule, avoid detecting things by string matching on strings we created. Using variants in this situation is almost always better.
   we don't have backwards compatiple users yet, we don't need to say "x is now y" in errors
   make "develop aipl project" skill that describes how currently projects are for dogfooding the compiler, working on a project should work like how it works for users, and should generate ideas for how to improve the language or dev loop, but not implement them (I'll record the suggestions for later implementation)
   make an "add lint" skill that describes how to lint against a reimplementation
@@ -720,6 +723,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    s.to_array().to_set() can be just s.
     <any array generator> -> to_dict is probably good fusion to have to avoid materializing that array
     collect_ok fusions
     make consecutive set operations fuse when all adding to the same set (e.g. union chains)
