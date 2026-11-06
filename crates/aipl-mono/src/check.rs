@@ -5976,6 +5976,21 @@ impl Cx<'_> {
         for i in literal_args {
             self.bind_field(&params[i], &atys[i], &vars, &mut map);
         }
+        // `render` is for floats. Its body writes one, so another type would fail where that is
+        // compiled, with a position inside the builtin's source; say so here, at the receiver.
+        if *callee == Callee::Render {
+            if let Some(receiver) = map.get("T").filter(|t| {
+                !is_float_ty(t)
+                    && !is_unknown(t)
+                    && !mentions_typevar(t)
+                    && !mentions_placeholder(t)
+            }) {
+                return Err(Error::at(
+                    format!("\"render\" is for floats, but this is {}", tyname(receiver)),
+                    args[0].span.clone(),
+                ));
+            }
+        }
         // An argument is held to the parameter's type with the written arguments
         // substituted — the declared position it fills — so an integer literal
         // (or an array of them) takes that type and anything else that is not it

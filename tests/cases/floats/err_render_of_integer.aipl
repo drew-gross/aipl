@@ -1,9 +1,17 @@
 import { render } from builtins;
 
 fn count(n: i64) -> str { render(n, digits=2) }
+
+fn no_options(s: str) -> str { render(s) }
 --- check --compile ---
-error: "render" is for floats, got i64
- --> ./tests/cases/floats/err_render_of_integer.aipl:3:48
+error: "render" is for floats, but this is i64
+ --> ./tests/cases/floats/err_render_of_integer.aipl:3:34
   |
 3 | fn count(n: i64) -> str { render(n, digits=2) }
-  |                                                ^
+  |                                  ^
+
+error: "render" is for floats, but this is str
+ --> ./tests/cases/floats/err_render_of_integer.aipl:5:39
+  |
+5 | fn no_options(s: str) -> str { render(s) }
+  |                                       ^
