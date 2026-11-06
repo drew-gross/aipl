@@ -25,8 +25,8 @@ Order by Metagame %
 `cards` lists every card played in a metagame, most copies first (main decks and
 sideboards together; equal counts in name order). `share` classifies each deck into
 archetypes and prints how much of the field each is. A deck counts in every archetype it
-matches, so the percentages can add up to more than 100; a deck that matches none is an
-`Other` archetype of its own, listed as `<name> (self-titled)` with the rest. The metagame is a file in
+matches, so the percentages can add up to more than 100; the decks that match none are
+one `Other` row, last whatever its size. The metagame is a file in
 `data/` without its `.json.gz`, or one of the names in `data/index.json`; `--archetypes` names
 a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this directory.
 

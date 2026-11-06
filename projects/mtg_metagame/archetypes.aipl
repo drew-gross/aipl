@@ -110,23 +110,25 @@ fn matches(self: Identifier, Holdings { main, held }) -> bool {
     assert(identifier(nothing, nothing, nothing, nothing).matches(deck));
 })
 
-# An archetype a deck is: one an identifier names (`Meta`), or, when none did, the deck's own
-# name (`Other`), which is not an archetype of the format but is what the deck was called.
+# An archetype a deck is: one an identifier names (`Meta`), or, when none did, `Other`, carrying
+# the deck's own name. Every `Other` deck is one category of the format's decks that are none
+# of its archetypes; the name is what the deck was called.
 variant Archetype = Meta(name: str) | Other(name: str)
 
-# How `self` reads in a report: an `Other` one says that is what it is.
+# How `self` reads in a report.
 pub fn label(self: Archetype) -> str {
     match (self) {
         Meta(name) => name,
-        Other(name) => `{name} (self-titled)`,
+        Other(..) => "Other",
     }
 }.test({
     assert(Meta("Landfall").label() == "Landfall");
-    assert(Other("Some Deck").label() == "Some Deck (self-titled)");
+    // However the deck was called, it is `Other` in a report.
+    assert(Other("Some Deck").label() == "Other");
 })
 
 # The archetypes `self` is, each once: the identifiers in `identifiers` it matches, by name. A
-# deck that matches none is its own, as an `Other` archetype.
+# deck that matches none is `Other`, under its own name.
 pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> Archetype[] {
     let deck_holdings = self.holdings();
     let found: #<{str} = identifiers.filter(|i| i.matches(deck_holdings))$name.to_set();
@@ -148,7 +150,7 @@ pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> Archetype[] {
     ]);
     assert(deck_of(["Forest"], []).archetypes_of([landfall, landfall]) == [Meta("Landfall")]);
 
-    // None: the deck is its own archetype, however it is called.
+    // None: `Other`, with the deck's own name.
     assert(deck_of(["Swamp"], []).archetypes_of(identifiers) == [Other("Some Deck")]);
 })
 

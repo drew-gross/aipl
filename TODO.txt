@@ -24,6 +24,8 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
+    distinct() should be a builtin utility
+    split out the logic for rendering stuff into a table
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
 
@@ -419,6 +421,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  some way to turn a json object into a native object (and error id shape doesn't match)
   refutable function call syntax i.e. fn foo(arg: some(x)) that you can call with an optional and if it's not some, it gives you none back (or something like that)
   Optionally call a function that accepts one arm of a variant, if what you have is the whole variant
   function_hits shouldn't need to exist - need some better way of expanding single-arm variants
