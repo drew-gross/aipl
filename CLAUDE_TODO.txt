@@ -89,5 +89,4 @@ mtg_metagame share report:
   a `let` closure cannot be called by name or used as `xs$name()`: test helpers became `fn`s
 render (floats):
   `render` is for floats only (its body writes a float, and a body is compiled for every instance), so `render(7)` is a compile error rather than `to_str`'s "7"; the other options TODO.txt lists (leading +, exponent form) are more keywords on it
-  an integer literal that does not fit an optional keyword's type (`render(x, digits=-3)`, `digits?: u64 = none`) reports `binding "$ceq5_$inl2_wanted": expected u64, got i64`, an inlined binding's name, instead of "integer literal -3 does not fit in u64"
 

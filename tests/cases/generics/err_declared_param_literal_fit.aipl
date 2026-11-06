@@ -1,0 +1,32 @@
+import { value_or } from builtins;
+
+// A generic function's parameter that names no type variable is declared outright, so an
+// integer literal passed for it has to fit that type: here a keyword of `u8?` and an array of
+// `u8`, with `T` free in both signatures.
+fn level<T: any>(x: T, strength?: u8 = none) -> u8 { strength.value_or(0) }
+
+fn pack<T: any>(x: T, bytes: u8[]) -> u8[] { bytes }
+
+fn too_big() -> u8 { level(1, strength=300) }
+
+fn negative() -> u8 { level(1, strength=-1) }
+
+fn array() -> u8[] { pack(1, [1, 300]) }
+--- check --compile ---
+error: integer literal 300 does not fit in u8
+  --> ./tests/cases/generics/err_declared_param_literal_fit.aipl:10:40
+   |
+10 | fn too_big() -> u8 { level(1, strength=300) }
+   |                                        ^^^
+
+error: integer literal -1 does not fit in u8
+  --> ./tests/cases/generics/err_declared_param_literal_fit.aipl:12:41
+   |
+12 | fn negative() -> u8 { level(1, strength=-1) }
+   |                                         ^^
+
+error: integer literal 300 does not fit in u8
+  --> ./tests/cases/generics/err_declared_param_literal_fit.aipl:14:30
+   |
+14 | fn array() -> u8[] { pack(1, [1, 300]) }
+   |                              ^^^^^^^^

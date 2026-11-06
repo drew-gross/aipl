@@ -1,0 +1,9 @@
+import { render } from builtins;
+
+fn bad() -> str { render(1.5, digits=-3) }
+--- check --compile ---
+error: integer literal -3 does not fit in u64
+ --> ./tests/cases/floats/err_render_negative_digits.aipl:3:38
+  |
+3 | fn bad() -> str { render(1.5, digits=-3) }
+  |                                      ^^

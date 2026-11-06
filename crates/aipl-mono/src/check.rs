@@ -6043,6 +6043,17 @@ impl Cx<'_> {
                     &format!("fn {:?} arg {i}", display(name)),
                     arg.span.clone(),
                 )?;
+            } else if !mentions_typevar(pty)
+                && !mentions_unknown(&target)
+                && !mentions_placeholder(&target)
+            {
+                // A parameter whose *declared* type names no variable (not one a variable was
+                // bound to: `value: T` is not) is declared outright, whatever else the
+                // signature is generic over, so a literal in it — alone or inside `some(..)`
+                // or an array — is fitted to it as a concrete signature fits one: it takes the
+                // type, or does not fit it, which is said here rather than found by codegen in
+                // a binding the inliner named. (Only the fit: any other mismatch is codegen's.)
+                self.flex_int(arg, &atys[i], &target)?;
             }
         }
         // Pass 2: function-typed arguments — check against the substituted type.

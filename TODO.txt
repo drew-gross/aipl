@@ -284,6 +284,7 @@ lsp:
   docs hover should work on Error, err, ok, etc.
 
 bugs:
+  err_render_of_integer caret is pointing at a weird/bad place
   lint quirk: Equivalence assumption: the ++/+= flavor matching uses the wrapping_/saturating_ name prefix instead of Rust's canonical-callee table. It is equivalent for every real import. It differs only for an absurd alias such as wrapping_add as ++.
   improve error message for unshimmed effects in tests
   set tracker = params; from inside a shim closure should work

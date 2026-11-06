@@ -1,0 +1,19 @@
+# A generic function's parameter that names no type variable is declared outright, so an
+# integer literal passed for it — alone, in an optional keyword, or in an array — takes that
+# type, as it does for a function that is not generic.
+
+import { equal as ==, value_or } from builtins;
+
+fn level<T: any>(x: T, strength?: u8 = none) -> u8 { strength.value_or(0) }
+
+fn pack<T: any>(x: T, bytes: u8[]) -> u8[] { bytes }
+
+fn wide<T: any>(x: T, count: u64) -> u64 { count }
+
+test({
+    assert(level("x") == 0);
+    assert(level("x", strength=200) == 200);
+    assert(level(true, strength=255) == 255);
+    assert(pack(1, [1, 255]) == [1, 255]);
+    assert(wide('c', 18446744073709551) == 18446744073709551);
+})

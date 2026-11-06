@@ -436,6 +436,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/generics/bare_type_param | 0 | 0 | 0 | 45 | 256 |
 | tests/cases/generics/bound_propagation | 17 | 1097 | 1097 | 3414 | 8424 |
 | tests/cases/generics/count_elements | 1 | 17 | 17 | 488 | 1116 |
+| tests/cases/generics/declared_param_literal_fit | 0 | 0 | 0 | 231 | 848 |
 | tests/cases/generics/emit_builder | 7 | 610 | 610 | 1741 | 6544 |
 | tests/cases/generics/emit_builder_multi | 10 | 857 | 857 | 2284 | 8376 |
 | tests/cases/generics/empty_array_arg | 0 | 0 | 0 | 43 | 220 |
