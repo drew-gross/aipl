@@ -45,7 +45,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-codegen/src/grammar | 654 | 72543 | 37768 | 75286 | 98416 | 73.00 | 402.74 | 1744 |
 | crates/aipl-codegen/src/grammar_aipl | 1904644 | 429177022 | 1564573 | 761528438 | 5026724 | 177389.00 | 13871.05 | 10368 |
 | crates/aipl-codegen/src/grammar_calc | 9059 | 902241 | 41588 | 3354459 | 298924 | 901.00 | 2747.07 | 2512 |
-| crates/aipl-codegen/src/grammar_json | 16685 | 1983323 | 32697 | 6720434 | 328156 | 1574.00 | 2776.18 | 2656 |
+| crates/aipl-codegen/src/grammar_json | 13188 | 1464363 | 32697 | 4974841 | 311336 | 1271.00 | 2942.34 | 2544 |
 | crates/aipl-codegen/src/grammar_sexp | 5263 | 494227 | 13320 | 1968740 | 289568 | 589.00 | 2742.66 | 2336 |
 | crates/aipl-codegen/src/highlight | 501 | 39605 | 7383 | 113852 | 82108 | 82.00 | 680.77 | 1680 |
 | crates/aipl-codegen/src/highlight_aipl | 3935 | 339067 | 111600 | 1385874 | 157208 | 579.00 | 904.95 | 2176 |
@@ -203,6 +203,7 @@ cargo test --test cases -- --ignored refresh_perfmon
 | crates/aipl-mono/src/builtin_nonempty_last | 1 | 56 | 56 | 376 | 1548 | 3.00 | 74.36 | 1456 |
 | crates/aipl-mono/src/builtin_opt_left_fold | 4 | 312 | 312 | 3310 | 7300 | 6.00 | 131.09 | 1504 |
 | crates/aipl-mono/src/builtin_opt_right_fold | 4 | 312 | 312 | 2651 | 5772 | 5.00 | 122.74 | 1488 |
+| crates/aipl-mono/src/builtin_parse_json | 3529 | 521208 | 24300 | 1745629 | 205348 | 444.00 | 1997.87 | 2144 |
 | crates/aipl-mono/src/builtin_range | 2 | 120 | 120 | 788 | 2152 | 3.00 | 68.86 | 1440 |
 | crates/aipl-mono/src/builtin_read_key | 22 | 992 | 1112 | 13604 | 7344 | 7.00 | 84.30 | 1504 |
 | crates/aipl-mono/src/builtin_reduce | 3 | 240 | 240 | 3089 | 5476 | 5.00 | 129.92 | 1504 |

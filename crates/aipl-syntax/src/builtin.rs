@@ -311,6 +311,13 @@ const BUILTINS: &[Builtin] = &[
         "builtin_read_key.aipl",
         &["Key", "Up", "Down", "Left", "Right", "Other"],
     ),
+    Builtin::aipl_exporting(
+        Callee::ParseJson,
+        "builtin_parse_json.aipl",
+        &[
+            "Json", "Member", "Null", "Bool", "Number", "String", "Array", "Object",
+        ],
+    ),
     Builtin::declared(Callee::RandomU64),
     Builtin::declared(Callee::NowNanos),
     Builtin::declared(Callee::MonotonicNow),

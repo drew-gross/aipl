@@ -68,4 +68,5 @@ less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!`
 - **variants**: is_case as_case case_of case_name same_case collect_arms
 - **grids**: grid_of grid_from grid_get grid_try_set width height is_in_bounds_of
 - **io/terminal**: read_file_to_string write_string_to_file list_files read_line read_byte read_key execute_program clear_terminal move_to
+- **json**: parse_json (`Json!str`; `Json` cases Null Bool Number String Array Object(Member[]), `Member { key, value }`; numbers stay text)
 - **misc**: min max hash now_nanos measure Measurement Span

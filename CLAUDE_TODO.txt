@@ -58,3 +58,6 @@ mtg_metagame workarounds:
   `str[i]` is a byte (invalid UTF-8 chars show as �); fine for scanning, but no char iteration by code point
   ExecResult must be imported by name just to destructure it
   floats: win rates are permille integers (also in TODO.txt)
+
+handoff:
+  a new case whose only staleness is a missing baseline row fails the first run at the scoped fill_expected step ("failed in a way no refill can fix", though it printed handoff-fill: baseline-missing); the second run adds the row and goes green. Let discovery's baseline-missing skip fill_expected and go straight to refresh_perfmon

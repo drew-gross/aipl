@@ -235,6 +235,8 @@ pub enum Callee {
     /// `read_key() -> Key?` — one key press, an arrow key decoded from the bytes
     /// `read_byte` returns (`!read_stdin_raw`).
     ReadKey,
+    /// `parse_json(text) -> Json!str` — a JSON document as a `Json` tree.
+    ParseJson,
     /// `clear_terminal()` — erase the terminal and put the cursor at its top left
     /// (`!terminal`).
     ClearTerminal,
@@ -589,6 +591,7 @@ impl Callee {
             Callee::ShimCellGet => "__builtin_shim_cell_get",
             Callee::ShimCellSet => "__builtin_shim_cell_set",
             Callee::ReadKey => "__builtin_read_key",
+            Callee::ParseJson => "__builtin_parse_json",
             Callee::RandomU64 => "__builtin_random_u64",
             Callee::RandomNext => "__random_next",
             Callee::RandomSeed => "__random_seed",

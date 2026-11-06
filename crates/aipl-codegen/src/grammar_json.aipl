@@ -1,262 +1,37 @@
-# JSON: the library's second end-to-end target, and the one that adds everything
-# S-expressions deliberately left out — several terminal classes rather than one,
-# a separated `Many` with a trailing-comma rule, an `OneOf` across six
-# alternatives, and a heterogeneous AST. Still no precedence; that arrives with
-# the calculator in `grammar_calc.aipl`.
+# What is built on the JSON grammar besides parsing it: printing, formatting, and
+# the tests of the grammar as data. The grammar, the lexer rules, the lowering and
+# `parse_json` itself are the `parse_json` builtin
+# (`aipl-mono/src/builtin_parse_json.aipl`), which programs import; this file
+# imports them the way the parser library's other consumers do.
 #
-# Complete but tiny: eight productions, one `variant Json` and its `Member`, against a rule set
-# cribbed from `lexer.aipl`'s own JSON-flavored test table.
-#
-# Two things worth reading before the grammar:
-#
-#   - **Numbers stay text.** `Number` carries the source spelling rather than a
-#     parsed value. JSON's number syntax is wider than any one AIPL type (an
-#     arbitrary-precision integer is legal JSON), so *what a number means* is the
-#     consumer's policy, exactly as it is for the lexer's `Int`/`Float`, which
-#     hand over their digits unparsed for the same reason.
-#   - **`member` is where a uniform lowering type shows its seam.** `Build<A>`
-#     pins one `A` for every production in a grammar, so the `member` production
-#     — whose natural result is a key/value *pair*, not a JSON value — has to
-#     lower to a `Json` too. It lowers to the object holding just that member, and
-#     the `object` production joins the members of its children, so `Json` has no
-#     case that only means "a member". That is the cost of one lowering type per
-#     grammar, and it is worth knowing before the grammar describes AIPL itself,
-#     where the AST has many more shapes than its expression type.
+# JSON is the library's second end-to-end target, and the one that adds
+# everything S-expressions deliberately left out — several terminal classes
+# rather than one, a separated `Many` with a trailing-comma rule, an `OneOf`
+# across six alternatives, and a heterogeneous AST. Still no precedence; that
+# arrives with the calculator in `grammar_calc.aipl`.
 
+import { equal as ==, join, map } from builtins;
 import {
-    equal as ==,
-    extend,
-    first,
-    join,
-    len,
-    map,
-    map_err,
-    map_ok,
-    to_set,
-    value_or_err,
-    wrapping_sub as -,
-} from builtins;
-import { Cst, Parts, show, span, text } from "./cst.aipl";
+    Array,
+    Bool,
+    Json,
+    Member,
+    Null,
+    Number,
+    Object,
+    String,
+    json_cst,
+    json_grammar,
+    parse_json,
+} from "../../aipl-mono/src/builtin_parse_json.aipl";
+import { show, text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import { render_cst } from "./format.aipl";
-import {
-    Const,
-    Grammar,
-    Inline,
-    Kid,
-    Kids,
-    Literal as Lit,
-    Many,
-    Maybe,
-    Named,
-    OneOf,
-    ParseError,
-    Production,
-    Rule,
-    Term,
-    Text,
-    Then,
-    Tight,
-    TryMk,
-    failure_message,
-    prod_names,
-} from "./grammar.aipl";
-import {
-    Bare,
-    CharRun,
-    Delimited,
-    Exact,
-    Float,
-    Int,
-    Keyword,
-    LexResult,
-    Of,
-    OneChar,
-    TokenRule,
-    lex,
-} from "./lexer.aipl";
-import { parse, parse_cst } from "./parse.aipl";
-import { unescape } from "./unescape.aipl";
+import { ParseError, prod_names } from "./grammar.aipl";
 
-# The token kinds: three terminal classes that carry meaning, and one bare kind
-# for the punctuation the grammar matches by `Lit`.
-#
-# `Str` keeps its delimiter-stripped contents (the lexer's `Delimited` computes
-# them), but the concrete tree holds *spans*, not values — so lowering reads the
-# quoted source text back out and strips it itself. The payload is what makes a
-# string token tell itself apart from a number, which is all `Term` needs.
-variant JsonTok = Str(str) | Num | Kw | Punct
+// ---------- the grammar as data ----------
 
-# The AST. `Number` keeps the source spelling (see the header); an `Object` keeps
-# its members in source order, a repeated key included.
-variant Json = Null | Bool(bool) | Number(str) | String(str) | Array(Json[]) | Object(Member[])
-
-# One `"key": value` pair of an object.
-struct Member { key: str, value: Json }
-
-# Whitespace is recorded as **trivia** rather than skipped, so the concrete tree
-# covers every byte of the source and reconstructs it exactly. JSON has no
-# comments, so trivia is whitespace and nothing else.
-#
-# Rule order carries two decisions. `Float` sits ahead of `Int` because a bare
-# digit run doesn't match `Float` and `1.5` would otherwise lex as `1` then a
-# stray `.`. And `Exact("-")` sits ahead of both, which makes every `-` its own
-# token and `Int` unsigned — so the sign is the *grammar's* business
-# (`Maybe(Lit("-"))` in `number`), one place, rather than split between a
-# sign the lexer swallowed and one it didn't.
-fn json_rules() -> TokenRule<JsonTok>[] {
-    let alnum: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
-    [
-        TokenRule { matcher: CharRun(" \t\r\n".to_set()), emit: Bare(Punct), trivia: true },
-        TokenRule {
-            matcher: Delimited(`"`.to_set(), escaped=`"\\/bfnrtu`.to_set()),
-            emit: Of(Str),
-        },
-        TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
-        TokenRule { matcher: Float, emit: Bare(Num) },
-        TokenRule { matcher: Int, emit: Bare(Num) },
-        TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("false", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("null", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: OneChar("{}[]:,".to_set()), emit: Bare(Punct) },
-    ]
-}
-
-// ---------- lowering ----------
-//
-// A production whose value *is* one of its constructors names the constructor
-// (`Kids(Array)`); one that is a one-liner over its text is a lambda at the
-// production, taking its parameter type from `Build`'s payload; one that is
-// whichever alternative matched is `Kid`, the pass-through. Only a
-// lowering with something to say — a key to read off a leaf — gets a name of
-// its own, and only `lower_member` has that much to say.
-
-# A member's value is its one interior child; its key is the string token in
-# front of the `:`, which is a *leaf* and so has no lowered value — the first of
-# the node's own tokens is where it is read from. It lowers to the object holding
-# just that member, which `object_of` joins with its siblings.
-fn lower_member(src: str, node: Parts, kids: Json[]) -> Json!ParseError {
-    let key = node.tokens
-        .first()
-        .value_or_err(ParseError { message: "a member has no key", span: node.span() })?;
-    let value = kids
-        .first()
-        .value_or_err(ParseError { message: "a member has no value", span: node.span() })?;
-    ok(Object([Member { key: unquote(src[key]).unescape(), value }]))
-}
-
-# The object holding every member of `members`, each a one-member object, in
-# order.
-fn object_of(members: Json[]) -> Json {
-    mut all: Member[] = [];
-    for (let m : members) {
-        match (m) {
-            Object(one) => {
-                set all.extend(one);
-            },
-            Null | Bool(..) | Number(..) | String(..) | Array(..) => {},
-        };
-    }
-    Object(all)
-}.test({
-    let a = Member { key: "a", value: Null };
-    let b = Member { key: "b", value: Bool(true) };
-    assert(object_of([Object([a]), Object([b])]) == Object([a, b]));
-    assert(object_of([]) == Object([]));
-})
-
-# `s` without its first and last byte — a string token's surrounding quotes. The
-# lexer guarantees both are there (a `Delimited` match spans them), so this needs
-# no check of its own.
-fn unquote(s: str) -> str { s[1..s.len() - 1] }
-
-# The JSON grammar, with `value` as the start rule.
-#
-# Only `value` carries an `expect_as`, so a failure anywhere inside reports as
-# "a JSON value" rather than as the six alternatives it is made of — the
-# collapse that keeps a PEG's error messages readable.
-pub fn json_grammar() -> Grammar<JsonTok, Json> {
-    let r_value: Rule<JsonTok> = OneOf([
-        Named("object"),
-        Named("array"),
-        Named("string"),
-        Named("number"),
-        Named("bool"),
-        Named("null"),
-    ]);
-
-    // `trailing: false` — strict JSON, where `[1, 2,]` is an error. Flipping the
-    // flag is the whole difference between this and the dialects that allow it,
-    // which is what that parameter exists to express. It is said twice: once to
-    // the parser, which refuses the trailing comma, and once to the printer,
-    // which never writes one.
-    //
-    // Braces read as words and take inner spaces while flat (`{ "a": 1 }`);
-    // brackets hug (`[1, 2]`). That decision belongs to the bracket pair, so it
-    // is written on the bracket pair.
-    //
-    // `sorted` is the same kind of statement: an object's members are printed
-    // in key order. A member leads with its key, so the formatter's "leading
-    // token" is exactly the key, and nothing beyond this one word is needed to
-    // say so — no comparator, no walker, no second description of what an
-    // object is. An array says nothing, because its order is its meaning.
-    let r_object: Rule<JsonTok> = Many(
-        Named("member"),
-        sep=Lit(","),
-        trailing_sep=false,
-        nested_in=(Lit("{"), Lit("}")),
-        spaced=true,
-        sorted=true,
-    );
-    let r_member: Rule<JsonTok> = Then([Term(Str), Lit(":"), Named("value")]);
-    let r_array: Rule<JsonTok> = Many(
-        Named("value"),
-        sep=Lit(","),
-        trailing_sep=false,
-        nested_in=(Lit("["), Lit("]")),
-    );
-    let r_string: Rule<JsonTok> = Term(Str);
-    let r_number: Rule<JsonTok> = Then([Maybe(Lit("-")), Term(Num)]);
-    let r_bool: Rule<JsonTok> = OneOf([Lit("true"), Lit("false")]);
-    let r_null: Rule<JsonTok> = Lit("null");
-    Grammar {
-        prods: [
-            Production {
-                name: "value",
-                rule: r_value,
-                build: Kid,
-                expect_as: "a JSON value",
-                layout: Inline,
-            },
-            Production { name: "object", rule: r_object, build: Kids(object_of), layout: Inline },
-            Production {
-                name: "member",
-                rule: r_member,
-                build: TryMk(lower_member),
-                layout: Inline,
-            },
-            Production { name: "array", rule: r_array, build: Kids(Array), layout: Inline },
-            Production {
-                name: "string",
-                rule: r_string,
-                build: Text(|t| String(unquote(t).unescape())),
-                layout: Inline,
-            },
-            // The spelling, sign included — `Text` hands over the matched tokens
-            // run together with nothing between them, which is exactly right for
-            // `-` followed by digits. And since a sign and its digits are written
-            // together, the spacing rule is not consulted at all.
-            Production { name: "number", rule: r_number, build: Text(Number), layout: Tight },
-            Production {
-                name: "bool",
-                rule: r_bool,
-                build: Text(|t| Bool(t == "true")),
-                layout: Inline,
-            },
-            Production { name: "null", rule: r_null, build: Const(Null), layout: Inline },
-        ],
-    }
-}.test({
+test({
     // The grammar as a reader would write it, derived from the same value the
     // driver parses with. A separated `Many` has no EBNF operator, so both lists render as
     // the separator longhand — and the strictness the flag encodes shows up as
@@ -287,16 +62,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
     """);
 })
 
-fn lex_json(src: str) -> LexResult<JsonTok>!ParseError {
-    src.lex(json_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
-}
-
-# The lossless concrete tree for `src` — every byte of it under exactly one
-# leaf, whitespace included. Use this when the tree is the point; `parse_json`
-# when only the `Json` is.
-pub fn json_cst(src: str) -> Cst!ParseError {
-    parse_cst(src, lex_json(src)?, json_grammar(), "value")
-}.test({
+test({
     // The concrete tree, rendered against the production names — the debug view a
     // tree assertion reads better as than a nested `Tree` literal.
     fn shown(src: str) -> str!ParseError {
@@ -327,73 +93,6 @@ pub fn json_cst(src: str) -> Cst!ParseError {
     assert(shown(" 7 ")? == "(value (number ~  7) ~ )");
     let padded = """{ "a" : [ 1 , 2 ] }""";
     assert(json_cst(padded)?.text(padded) == padded);
-})
-
-# The `Json` `src` denotes: lex, parse to a concrete tree, lower it through
-# the grammar's `build` functions.
-#
-# Numbers arrive as their source spelling (`Number("1e9")`), since JSON's
-# number syntax is wider than any one AIPL type — parsing one is the
-# consumer's policy.
-pub fn parse_json(src: str) -> Json!ParseError {
-    parse(src, lex_json(src)?, json_grammar(), "value")
-}.test({
-    // The message a failed parse reports — and a distinguishable string when it
-    // unexpectedly succeeded, so a broken assertion says which way it broke.
-    fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message() }
-
-    // ---- the terminal classes, one at a time ----
-    assert(parse_json("null")? == Null);
-    assert(parse_json("true")? == Bool(true));
-    assert(parse_json("false")? == Bool(false));
-    assert(parse_json(`"hi"`)? == String("hi"));
-    assert(parse_json("42")? == Number("42"));
-    assert(parse_json("3.14")? == Number("3.14"));
-    assert(parse_json("1e9")? == Number("1e9"));
-
-    // The sign is the grammar's, not the lexer's, so it reads back attached.
-    assert(parse_json("-7")? == Number("-7"));
-    assert(parse_json("-2.5")? == Number("-2.5"));
-
-    // Escapes are decoded on the way into the AST.
-    assert(parse_json(`"a\\nb"`)? == String("a\nb"));
-    assert(parse_json(`"q\\"q"`)? == String(`q"q`));
-
-    // ---- arrays: a separated `Many`, and the empty case ----
-    assert(parse_json("[]")? == Array([]));
-    assert(parse_json("[1]")? == Array([Number("1")]));
-    assert(parse_json("[1, true, null]")? == Array([Number("1"), Bool(true), Null]));
-    // Nesting, which is what makes the CST and the parse recursive.
-    assert(parse_json("[[1], []]")? == Array([Array([Number("1")]), Array([])]));
-
-    // ---- objects ----
-    assert(parse_json("{}")? == Object([]));
-    assert(parse_json("""{"a": 1}""")? == Object([Member { key: "a", value: Number("1") }]));
-    assert(parse_json("""{"a": 1, "b": [2]}""")? == Object([
-        Member { key: "a", value: Number("1") },
-        Member { key: "b", value: Array([Number("2")]) },
-    ]));
-    // A key with an escape in it goes through the same decoding as a value.
-    assert(parse_json("""{"a\tb": null}""")? == Object([Member { key: "a\tb", value: Null }]));
-
-    // ---- strict about trailing separators ----
-    //
-    // `trailing_sep=false` leaves the dangling comma unconsumed, so
-    // the enclosing rule is what reports it.
-    assert(msg_of("[1, 2,]") == "expected a JSON value, found `]`");
-    assert(msg_of("""{"a": 1,}""") == "expected Str, found `}`");
-
-    // ---- errors ----
-    assert(msg_of("") == "expected a JSON value, found end of input");
-    assert(
-        msg_of("[1") == "expected `,` or `]`, found end of input (`[` at line 1 is never closed)",
-    );
-    assert(msg_of("{1: 2}") == "expected Str or `}`, found `1`");
-    assert(msg_of("""{"a" 1}""") == "expected `:`, found `1`");
-    // Every token must be consumed: two documents is not one.
-    assert(msg_of("1 2") == "expected end of input, found `2`");
-    // A lex failure reports in the same shape as a parse failure.
-    assert(msg_of("@") == "unexpected character");
 })
 
 # `self` printed back as JSON source, in one canonical compact spelling: no
