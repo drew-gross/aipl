@@ -60,7 +60,6 @@ mtg_metagame workarounds:
   floats: win rates are permille integers (also in TODO.txt)
 
 handoff:
-  a new case whose only staleness is a missing baseline row fails the first run at the scoped fill_expected step ("failed in a way no refill can fix", though it printed handoff-fill: baseline-missing); the second run adds the row and goes green. Let discovery's baseline-missing skip fill_expected and go straight to refresh_perfmon
   `let (Parts { n }, rest) = f(xs);` (a struct pattern nested in a tuple pattern) over a generic `(Parts, A[])` fails in a generic caller: struct "__tuple$i64$i64" field "_1": expected i64, got i64[]; concrete callers work. The destructure lint steers people to this form, so the workaround is `#[allow]` on a plain `let (p, rest)` (tests/cases/tuples/destructure_generic_result.aipl)
 parser library perf (builtin parse_json, 10MB: lex 0.77s / parse_cst 1.1s / lower 0.7s, vs ~1s for a hand-written parser; ~10 allocations and ~8k instructions per token):
   match_* thread a Step {kids, far: Far{3 arrays}} by value through every rule: refcount traffic on Far's arrays is ~30% of the parse

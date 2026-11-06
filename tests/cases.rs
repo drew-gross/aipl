@@ -727,6 +727,16 @@ impl CaseFilter {
     }
 }
 
+/// Whether a failure's only complaint is a baseline row (see [`check_baseline`]): it prints
+/// a [`Fill`] for each baseline problem and nothing else asks for a refill.
+fn asks_only_for_baseline(failure: &str) -> bool {
+    let fills = Fill::scan(failure).0;
+    !fills.is_empty()
+        && fills
+            .iter()
+            .all(|f| matches!(f, Fill::BaselineMoved { .. } | Fill::BaselineMissing { .. }))
+}
+
 /// Entry point for the ignored [`fill_expected`] helper: one serial pass over
 /// every case, refreshing each section whose body differs from the actual output.
 /// Unlike a normal run this is a single test, so it collects results rather than
@@ -750,6 +760,12 @@ fn run_fill() {
         match run_case(path, &rel_with_prefix, out_root, *stage, true) {
             Outcome::Pass => passed += 1,
             Outcome::Filled(msg) => refreshed.push(msg),
+            // A missing or moved baseline row is not stale text for this helper to
+            // rewrite, and not a broken case either: `cargo handoff` settles it
+            // with `refresh_baseline` once everything else has. A new case reaches
+            // this check when it has nothing to fill, and must not be reported as a
+            // failure no refill can fix.
+            Outcome::Fail(msg) if asks_only_for_baseline(&msg) => passed += 1,
             Outcome::Fail(msg) => failures.push(msg),
         }
     }
@@ -1706,6 +1722,30 @@ fn a_failed_check_with_nothing_to_refill_asks_for_nothing() {
     };
     assert_eq!(Fill::scan(&message).0, vec![]);
     assert!(message.contains("the tests leaked"), "{message}");
+}
+
+#[test]
+fn a_baseline_failure_alone_is_not_a_failed_fill() {
+    let missing = Fill::BaselineMissing {
+        case: "cases/x/y.aipl".to_string(),
+    };
+    assert!(asks_only_for_baseline(&format!(
+        "[cases/x/y.aipl]: performance baseline missing\n{}",
+        missing.marker()
+    )));
+    // A failure that asks for nothing, or for more than a row, is still a failure.
+    assert!(!asks_only_for_baseline(
+        "[cases/x/y.aipl]: the tests leaked"
+    ));
+    let section = Fill::Section {
+        case: "cases/x/y.aipl".to_string(),
+        section: "stdout".to_string(),
+    };
+    assert!(!asks_only_for_baseline(&format!(
+        "{}\n{}",
+        missing.marker(),
+        section.marker()
+    )));
 }
 
 #[test]
