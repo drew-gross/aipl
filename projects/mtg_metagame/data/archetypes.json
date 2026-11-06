@@ -1,0 +1,2464 @@
+{
+ "Modern2025Q1RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Grinding Station"
+   ],
+   "maindeck_cards": [],
+   "name": "Grinding Station (Temur)",
+   "not_cards": [
+    "Orim's Chant",
+    "Overgrown Tomb",
+    "Portable Hole",
+    "Prismatic Ending",
+    "Teferi, Time Raveler",
+    "Watery Grave"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Sowing Mycospawn"
+   ],
+   "maindeck_cards": [],
+   "name": "Eldrazi Ramp",
+   "not_cards": [
+    "Urza's Tower"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Guide of Souls",
+    "Phlage, Titan of Fire's Fury"
+   ],
+   "maindeck_cards": [],
+   "name": "Boros Energy",
+   "not_cards": [
+    "Fatal Push",
+    "Scion of Draco"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Overlord of the Balemurk",
+    "Phelia, Exuberant Shepherd",
+    "Solitude"
+   ],
+   "maindeck_cards": [],
+   "name": "Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goblin Charbelcher"
+   ],
+   "maindeck_cards": [],
+   "name": "Belcher",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Abhorrent Oculus"
+   ],
+   "maindeck_cards": [],
+   "name": "Murktide",
+   "not_cards": [
+    "Archon of Cruelty"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Primeval Titan"
+   ],
+   "maindeck_cards": [],
+   "name": "Amulet Titan",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Yawgmoth, Thran Physician"
+   ],
+   "maindeck_cards": [],
+   "name": "Yawgmoth",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goryo's Vengeance"
+   ],
+   "maindeck_cards": [],
+   "name": "Goryo's Vengeance",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Scion of Draco"
+   ],
+   "maindeck_cards": [],
+   "name": "Domain Zoo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ruby Medallion"
+   ],
+   "maindeck_cards": [],
+   "name": "Ruby Storm",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Lord of Atlantis"
+   ],
+   "maindeck_cards": [],
+   "name": "Merfolk",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hedron Crab"
+   ],
+   "maindeck_cards": [],
+   "name": "Mill",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Samwise Gamgee"
+   ],
+   "maindeck_cards": [],
+   "name": "Sam Combo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Teferi, Hero of Dominaria"
+   ],
+   "maindeck_cards": [],
+   "name": "Azorius Control",
+   "not_cards": []
+  }
+ ],
+ "Modern2025Q3RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "Guide of Souls",
+    "Phlage, Titan of Fire's Fury"
+   ],
+   "maindeck_cards": [],
+   "name": "Boros Energy",
+   "not_cards": [
+    "Godless Shrine",
+    "Scion of Draco"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Cori-Steel Cutter",
+    "Lava Dart"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Counterspell",
+    "Psychic Frog"
+   ],
+   "maindeck_cards": [],
+   "name": "Murktide",
+   "not_cards": [
+    "Goryo's Vengeance"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Amulet of Vigor",
+    "Primeval Titan"
+   ],
+   "maindeck_cards": [],
+   "name": "Amulet Titan",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Sowing Mycospawn"
+   ],
+   "maindeck_cards": [],
+   "name": "Eldrazi Ramp",
+   "not_cards": [
+    "Basking Broodscale",
+    "Eldrazi Linebreaker",
+    "Urza's Tower"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ral, Monsoon Mage // Ral, Leyline Prodigy"
+   ],
+   "maindeck_cards": [],
+   "name": "Ruby Storm",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goblin Charbelcher",
+    "Hydroelectric Specimen // Hydroelectric Laboratory"
+   ],
+   "maindeck_cards": [],
+   "name": "Belcher",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Leyline of the Guildpact"
+   ],
+   "maindeck_cards": [],
+   "name": "Domain Zoo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Phelia, Exuberant Shepherd"
+   ],
+   "maindeck_cards": [],
+   "name": "Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Phelia, Exuberant Shepherd",
+    "Ragavan, Nimble Pilferer"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Ocelot Pride",
+    "Phelia, Exuberant Shepherd"
+   ],
+   "maindeck_cards": [],
+   "name": "Azorius Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Overlord of the Balemurk",
+    "Phelia, Exuberant Shepherd",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Esper Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kappa Cannoneer"
+   ],
+   "maindeck_cards": [],
+   "name": "Affinity",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Blade of the Bloodchief"
+   ],
+   "maindeck_cards": [],
+   "name": "Broodscale",
+   "not_cards": [
+    "Hardened Scales"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Blade of the Bloodchief"
+   ],
+   "maindeck_cards": [],
+   "name": "Mono G Broodscale",
+   "not_cards": [
+    "Agatha's Soul Cauldron",
+    "Writhing Chrysalis"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Blade of the Bloodchief",
+    "Writhing Chrysalis"
+   ],
+   "maindeck_cards": [],
+   "name": "Gruul Broodscale",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Living End"
+   ],
+   "maindeck_cards": [],
+   "name": "Living End",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Colossus Hammer"
+   ],
+   "maindeck_cards": [],
+   "name": "Hammertime",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goryo's Vengeance"
+   ],
+   "maindeck_cards": [],
+   "name": "Goryo's Vengeance",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ruin Crab"
+   ],
+   "maindeck_cards": [],
+   "name": "Mill",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hardened Scales"
+   ],
+   "maindeck_cards": [],
+   "name": "Hardened Scales",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Samwise Gamgee"
+   ],
+   "maindeck_cards": [],
+   "name": "Sam Combo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Neoform"
+   ],
+   "maindeck_cards": [],
+   "name": "Neoform",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Urza's Tower"
+   ],
+   "maindeck_cards": [],
+   "name": "Tron",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Birthing Ritual"
+   ],
+   "maindeck_cards": [],
+   "name": "Birthing Ritual",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Birthing Ritual",
+    "Shardless Agent"
+   ],
+   "maindeck_cards": [],
+   "name": "Simic Birthing Ritual",
+   "not_cards": [
+    "Omnath, Locus of Creation"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kappa Cannoneer",
+    "Portable Hole"
+   ],
+   "maindeck_cards": [],
+   "name": "BDang's Art of the Dodge",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Teferi, Time Raveler"
+   ],
+   "maindeck_cards": [],
+   "name": "Control",
+   "not_cards": [
+    "Goryo's Vengeance",
+    "Phelia, Exuberant Shepherd"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Orim's Chant",
+    "Teferi, Time Raveler"
+   ],
+   "maindeck_cards": [],
+   "name": "Chant Control",
+   "not_cards": [
+    "Goryo's Vengeance",
+    "Phelia, Exuberant Shepherd"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Yawgmoth, Thran Physician"
+   ],
+   "maindeck_cards": [],
+   "name": "Yawgmoth",
+   "not_cards": [
+    "Basking Broodscale"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Archon of Cruelty",
+    "Faithless Looting",
+    "Persist"
+   ],
+   "maindeck_cards": [],
+   "name": "Grixis Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Necrodominance"
+   ],
+   "maindeck_cards": [],
+   "name": "Necrodominance",
+   "not_cards": []
+  }
+ ],
+ "Modern2025Q4RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Amulet of Vigor",
+    "Primeval Titan"
+   ],
+   "maindeck_cards": [],
+   "name": "Amulet Titan",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goryo's Vengeance"
+   ],
+   "maindeck_cards": [],
+   "name": "Goryo's Vengeance",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Cori-Steel Cutter",
+    "Lava Dart"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "Guide of Souls",
+    "Phlage, Titan of Fire's Fury"
+   ],
+   "maindeck_cards": [],
+   "name": "Boros Energy",
+   "not_cards": [
+    "Godless Shrine",
+    "Scion of Draco"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Urza's Tower"
+   ],
+   "maindeck_cards": [],
+   "name": "Tron",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kappa Cannoneer"
+   ],
+   "maindeck_cards": [],
+   "name": "Affinity",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Leyline of the Guildpact"
+   ],
+   "maindeck_cards": [],
+   "name": "Domain Zoo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Overlord of the Balemurk",
+    "Phelia, Exuberant Shepherd",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Esper Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Teferi, Time Raveler"
+   ],
+   "maindeck_cards": [],
+   "name": "Control",
+   "not_cards": [
+    "Goryo's Vengeance",
+    "Phelia, Exuberant Shepherd"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Blade of the Bloodchief"
+   ],
+   "maindeck_cards": [],
+   "name": "Broodscale",
+   "not_cards": [
+    "Hardened Scales"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goblin Charbelcher",
+    "Hydroelectric Specimen // Hydroelectric Laboratory"
+   ],
+   "maindeck_cards": [],
+   "name": "Belcher",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Phelia, Exuberant Shepherd",
+    "Ragavan, Nimble Pilferer"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Sowing Mycospawn"
+   ],
+   "maindeck_cards": [],
+   "name": "Eldrazi Ramp",
+   "not_cards": [
+    "Basking Broodscale",
+    "Eldrazi Linebreaker",
+    "Urza's Tower"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ephemerate",
+    "Ocelot Pride",
+    "Phelia, Exuberant Shepherd"
+   ],
+   "maindeck_cards": [],
+   "name": "Azorius Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Counterspell",
+    "Psychic Frog"
+   ],
+   "maindeck_cards": [],
+   "name": "Murktide",
+   "not_cards": [
+    "Goryo's Vengeance"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ral, Monsoon Mage // Ral, Leyline Prodigy"
+   ],
+   "maindeck_cards": [],
+   "name": "Ruby Storm",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Yawgmoth, Thran Physician"
+   ],
+   "maindeck_cards": [],
+   "name": "Yawgmoth",
+   "not_cards": [
+    "Basking Broodscale"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Samwise Gamgee"
+   ],
+   "maindeck_cards": [],
+   "name": "Sam Combo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Archon of Cruelty",
+    "Faithless Looting",
+    "Persist"
+   ],
+   "maindeck_cards": [],
+   "name": "Grixis Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Living End"
+   ],
+   "maindeck_cards": [],
+   "name": "Living End",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ruin Crab"
+   ],
+   "maindeck_cards": [],
+   "name": "Mill",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Neoform"
+   ],
+   "maindeck_cards": [],
+   "name": "Neoform",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Birthing Ritual",
+    "Shardless Agent"
+   ],
+   "maindeck_cards": [],
+   "name": "Simic Birthing Ritual",
+   "not_cards": [
+    "Omnath, Locus of Creation"
+   ]
+  }
+ ],
+ "Modern2026Q3RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Amulet of Vigor",
+    "Primeval Titan"
+   ],
+   "maindeck_cards": [],
+   "name": "Amulet Titan",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goryo's Vengeance"
+   ],
+   "maindeck_cards": [],
+   "name": "Goryo's Vengeance",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "Goblin Bombardment",
+    "Guide of Souls"
+   ],
+   "maindeck_cards": [],
+   "name": "Boros Energy",
+   "not_cards": [
+    "Scion of Draco"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Urza's Tower"
+   ],
+   "maindeck_cards": [],
+   "name": "Tron",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kappa Cannoneer",
+    "Mox Opal"
+   ],
+   "maindeck_cards": [],
+   "name": "Affinity",
+   "not_cards": [
+    "Colossus Hammer",
+    "Craterhoof Behemoth",
+    "Fugitive Droid"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Leyline of the Guildpact",
+    "Scion of Draco"
+   ],
+   "name": "Domain Zoo",
+   "not_cards": [
+    "Crashing Footfalls",
+    "Tarmogoyf"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Blade of the Bloodchief"
+   ],
+   "maindeck_cards": [],
+   "name": "Broodscale",
+   "not_cards": [
+    "Hardened Scales"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Goblin Charbelcher",
+    "Hydroelectric Specimen // Hydroelectric Laboratory"
+   ],
+   "maindeck_cards": [],
+   "name": "Belcher",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Sowing Mycospawn"
+   ],
+   "maindeck_cards": [],
+   "name": "Eldrazi Ramp",
+   "not_cards": [
+    "Basking Broodscale",
+    "Eldrazi Linebreaker",
+    "Fight Rigging",
+    "Urza's Tower"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Counterspell",
+    "Psychic Frog"
+   ],
+   "name": "Murktide",
+   "not_cards": [
+    "Goryo's Vengeance"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Ral, Monsoon Mage // Ral, Leyline Prodigy"
+   ],
+   "maindeck_cards": [],
+   "name": "Ruby Storm",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Samwise Gamgee"
+   ],
+   "maindeck_cards": [],
+   "name": "Sam Combo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Archon of Cruelty",
+    "Faithless Looting",
+    "Persist"
+   ],
+   "maindeck_cards": [],
+   "name": "Grixis Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Living End"
+   ],
+   "maindeck_cards": [],
+   "name": "Living End",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Allosaurus Rider",
+    "Neoform"
+   ],
+   "name": "Neoform",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Birthing Ritual",
+    "Ice-Fang Coatl"
+   ],
+   "maindeck_cards": [],
+   "name": "Simic Birthing Ritual",
+   "not_cards": [
+    "Omnath, Locus of Creation"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Living End"
+   ],
+   "maindeck_cards": [],
+   "name": "Living End",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Cleansing Wildfire"
+   ],
+   "maindeck_cards": [],
+   "name": "Boros Land Destruction",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Solitude",
+    "Teferi, Time Raveler"
+   ],
+   "name": "Control",
+   "not_cards": [
+    "Atraxa, Grand Unifier",
+    "Birthing Ritual",
+    "Omnath, Locus of Creation",
+    "Phelia, Exuberant Shepherd",
+    "Psychic Frog"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Fight Rigging"
+   ],
+   "maindeck_cards": [],
+   "name": "Fight Rigging",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Cosmogoyf"
+   ],
+   "maindeck_cards": [],
+   "name": "Cosmogoyf",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Devoted Druid"
+   ],
+   "maindeck_cards": [],
+   "name": "Devoted Druid",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Phelia, Exuberant Shepherd"
+   ],
+   "name": "Blink",
+   "not_cards": [
+    "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "Scion of Draco"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Emry, Lurker of the Loch",
+    "Mox Opal"
+   ],
+   "maindeck_cards": [],
+   "name": "Mox Opal Combo",
+   "not_cards": [
+    "Kappa Cannoneer"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Overlord of the Balemurk",
+    "Phelia, Exuberant Shepherd",
+    "Quantum Riddler",
+    "Teferi, Time Raveler"
+   ],
+   "name": "Blink (Esper)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Phelia, Exuberant Shepherd",
+    "Ragavan, Nimble Pilferer"
+   ],
+   "name": "Blink (Jeskai)",
+   "not_cards": [
+    "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+    "Scion of Draco"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Ketramose, the New Dawn",
+    "Psychic Frog",
+    "Quantum Riddler",
+    "Relic of Progenitus"
+   ],
+   "name": "Ketramose",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Birthing Ritual",
+    "Omnath, Locus of Creation"
+   ],
+   "name": "Omnath Birthing Ritual",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Cori-Steel Cutter",
+    "Lava Dart"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess",
+   "not_cards": [
+    "Blood Crypt"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Boomerang Basics",
+    "Cori-Steel Cutter",
+    "Lava Dart"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess (with Boomerang Basics)",
+   "not_cards": [
+    "Blood Crypt"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Cori-Steel Cutter",
+    "Lava Dart"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess (without Boomerang Basics)",
+   "not_cards": [
+    "Blood Crypt",
+    "Boomerang Basics"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Dark Matter Manipulator"
+   ],
+   "name": "Dark Matter Manipulator",
+   "not_cards": []
+  }
+ ],
+ "Standard2025Q2RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Leyline of Resonance",
+    "Monstrous Rage"
+   ],
+   "maindeck_cards": [],
+   "name": "Rx leyline",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Monstrous Rage"
+   ],
+   "maindeck_cards": [],
+   "name": "Rx non-cutter, non-leyline",
+   "not_cards": [
+    "Cori-Steel Cutter",
+    "Leyline of Resonance"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Monstrous Rage"
+   ],
+   "maindeck_cards": [],
+   "name": "MonoR aggro (non-leyline)",
+   "not_cards": [
+    "Blackcleave Cliffs",
+    "Copperline Gorge",
+    "Leyline of Resonance",
+    "Spirebluff Canal"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Copperline Gorge",
+    "Monstrous Rage"
+   ],
+   "maindeck_cards": [],
+   "name": "Gruul Aggro (non-leyline)",
+   "not_cards": [
+    "Blackcleave Cliffs",
+    "Leyline of Resonance",
+    "Spirebluff Canal"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Spirebluff Canal",
+    "Stormchaser's Talent"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Blackcleave Cliffs",
+    "Monstrous Rage"
+   ],
+   "maindeck_cards": [],
+   "name": "Rakdos aggro",
+   "not_cards": [
+    "Copperline Gorge"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nurturing Pixie"
+   ],
+   "maindeck_cards": [],
+   "name": "Pixie",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kaito, Bane of Nightmares",
+    "Spyglass Siren"
+   ],
+   "maindeck_cards": [],
+   "name": "Dimir Midrange",
+   "not_cards": [
+    "Fear of Isolation",
+    "Nurturing Pixie"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Mosswood Dreadknight"
+   ],
+   "maindeck_cards": [],
+   "name": "Golgari Midrange",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Omniscience"
+   ],
+   "maindeck_cards": [],
+   "name": "Omniscience",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Founding the Third Path",
+    "Omniscience"
+   ],
+   "maindeck_cards": [],
+   "name": "Omniscience (Founding the Third Path)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Up the Beanstalk",
+    "Zur, Eternal Schemer"
+   ],
+   "maindeck_cards": [],
+   "name": "Domain",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Abhorrent Oculus"
+   ],
+   "maindeck_cards": [],
+   "name": "Oculus",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "No More Lies"
+   ],
+   "maindeck_cards": [],
+   "name": "Azorius Control",
+   "not_cards": [
+    "Omniscience"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Shiko, Paragon of the Way"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Control",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Carrot Cake"
+   ],
+   "maindeck_cards": [],
+   "name": "Tokens",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hopeless Nightmare",
+    "Nurturing Pixie",
+    "This Town Ain't Big Enough"
+   ],
+   "maindeck_cards": [],
+   "name": "Esper Pixie",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nurturing Pixie"
+   ],
+   "maindeck_cards": [],
+   "name": "Orzhov Pixie",
+   "not_cards": [
+    "This Town Ain't Big Enough"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Knight-Errant of Eos"
+   ],
+   "maindeck_cards": [],
+   "name": "Convoke",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Fear of Isolation",
+    "Kaito, Bane of Nightmares",
+    "This Town Ain't Big Enough"
+   ],
+   "maindeck_cards": [],
+   "name": "Non-Pixie Bounce",
+   "not_cards": [
+    "Nurturing Pixie"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Archfiend of the Dross"
+   ],
+   "maindeck_cards": [],
+   "name": "Mono-Black Demons",
+   "not_cards": [
+    "Bleachbone Verge",
+    "Blooming Marsh",
+    "Darkslick Shores"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Archfiend of the Dross",
+    "Bleachbone Verge"
+   ],
+   "maindeck_cards": [],
+   "name": "Orzhov Demons",
+   "not_cards": [
+    "Blooming Marsh",
+    "Darkslick Shores"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Amalia Benavides Aguirre"
+   ],
+   "maindeck_cards": [],
+   "name": "Amalia",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Monument to Endurance"
+   ],
+   "maindeck_cards": [],
+   "name": "Monument to Endurance",
+   "not_cards": []
+  }
+ ],
+ "Standard2026Q1RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Accumulate Wisdom",
+    "Gran-Gran"
+   ],
+   "maindeck_cards": [],
+   "name": "Lessons",
+   "not_cards": [
+    "Moonshadow",
+    "Omniscience",
+    "Ozai's Cruelty"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Accumulate Wisdom",
+    "Gran-Gran",
+    "Moonshadow",
+    "Omniscience",
+    "Willowrush Verge"
+   ],
+   "maindeck_cards": [],
+   "name": "Lessons (Temur)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Accumulate Wisdom",
+    "Gran-Gran",
+    "Three Steps Ahead"
+   ],
+   "maindeck_cards": [],
+   "name": "Lessons (Three Steps Ahead)",
+   "not_cards": [
+    "Breeding Pool",
+    "Moonshadow",
+    "Omniscience",
+    "Ozai's Cruelty",
+    "Willowrush Verge"
+   ]
+  },
+  {
+   "any_cards": [
+    "Enduring Curiosity",
+    "Floodpits Drowner"
+   ],
+   "cards": [
+    "Kaito, Bane of Nightmares"
+   ],
+   "maindeck_cards": [],
+   "name": "Dimir Midrange",
+   "not_cards": []
+  },
+  {
+   "any_cards": [
+    "Jeskai Revelation",
+    "Lightning Helix"
+   ],
+   "cards": [
+    "Day of Judgment"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Control",
+   "not_cards": [
+    "Breeding Pool",
+    "Watery Grave"
+   ]
+  },
+  {
+   "any_cards": [
+    "Kavaero, Mind-Bitten",
+    "Superior Spider-Man"
+   ],
+   "cards": [
+    "Ardyn, the Usurper",
+    "Bringer of the Last Gift"
+   ],
+   "maindeck_cards": [],
+   "name": "Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Duelist of the Mind"
+   ],
+   "maindeck_cards": [],
+   "name": "Looting",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall",
+   "not_cards": [
+    "Consult the Star Charts"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension",
+    "Plains"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (Selesnya)",
+   "not_cards": [
+    "Consult the Star Charts"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (Mono Green)",
+   "not_cards": [
+    "Consult the Star Charts",
+    "Island",
+    "Mountain",
+    "Plains"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension",
+    "Island"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (Simic)",
+   "not_cards": [
+    "Consult the Star Charts"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Spirebluff Canal",
+    "Splash Portal",
+    "Thundertrap Trainer"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Blink",
+   "not_cards": []
+  },
+  {
+   "any_cards": [
+    "Elusive Otter",
+    "Elusive Otter // Grove's Bounty"
+   ],
+   "cards": [
+    "Slickshot Show-Off"
+   ],
+   "maindeck_cards": [],
+   "name": "Izzet Prowess",
+   "not_cards": [
+    "Duelist of the Mind",
+    "Gran-Gran",
+    "Splash Portal"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Consult the Star Charts",
+    "Floodfarm Verge",
+    "Restless Anchorage"
+   ],
+   "maindeck_cards": [],
+   "name": "Azorius Control",
+   "not_cards": [
+    "Breeding Pool",
+    "Godless Shrine",
+    "Sacred Foundry",
+    "Steam Vents",
+    "Sunbillow Verge",
+    "Temple Garden"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Doc Aurlock, Grizzled Genius"
+   ],
+   "maindeck_cards": [],
+   "name": "Airbending",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "South Pole Voyager"
+   ],
+   "maindeck_cards": [],
+   "name": "Allies",
+   "not_cards": [
+    "Doc Aurlock, Grizzled Genius"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Enduring Vitality",
+    "Valley Floodcaller"
+   ],
+   "maindeck_cards": [],
+   "name": "Otters",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hired Claw"
+   ],
+   "maindeck_cards": [],
+   "name": "Red Aggro",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hired Claw",
+    "Razorkin Needlehead"
+   ],
+   "maindeck_cards": [],
+   "name": "Red Aggro (Hatebears)",
+   "not_cards": [
+    "Leyline of Resonance"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Leyline of Resonance"
+   ],
+   "maindeck_cards": [],
+   "name": "Red Aggro (Leyline)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Boros Charm",
+    "Slickshot Show-Off"
+   ],
+   "maindeck_cards": [],
+   "name": "Boros Burn",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Repurposing Bay",
+    "United Battlefront"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Artifacts",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Doomsday Excruciator"
+   ],
+   "maindeck_cards": [],
+   "name": "Excruciator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Full Bore",
+    "Mightform Harmonizer"
+   ],
+   "maindeck_cards": [],
+   "name": "Harmonizer",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Eddymurk Crab",
+    "Sunderflock"
+   ],
+   "maindeck_cards": [],
+   "name": "Spellementals",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Flamebraider"
+   ],
+   "maindeck_cards": [],
+   "name": "Ashling Elementals",
+   "not_cards": [
+    "Ardyn, the Usurper",
+    "Not Dead After All",
+    "Splash Portal"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kona, Rescue Beastie",
+    "Omniscience"
+   ],
+   "maindeck_cards": [],
+   "name": "Omniscience",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Aven Interrupter",
+    "High Noon"
+   ],
+   "maindeck_cards": [],
+   "name": "Tempo Airbending",
+   "not_cards": [
+    "Doc Aurlock, Grizzled Genius"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nurturing Pixie"
+   ],
+   "maindeck_cards": [],
+   "name": "Pixie",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Not Dead After All"
+   ],
+   "maindeck_cards": [],
+   "name": "Scam",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Magmatic Hellkite",
+    "Momo, Friendly Flier"
+   ],
+   "maindeck_cards": [],
+   "name": "Dragons",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Consult the Star Charts",
+    "Deadly Cover-Up"
+   ],
+   "maindeck_cards": [],
+   "name": "Dimir Control",
+   "not_cards": [
+    "Doomsday Excruciator"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Badgermole Cub",
+    "Craterhoof Behemoth",
+    "Nature's Rhythm",
+    "Ouroboroid"
+   ],
+   "maindeck_cards": [],
+   "name": "Simic Cub",
+   "not_cards": [
+    "Brightglass Gearhulk",
+    "Explosive Prodigy",
+    "Not Dead After All",
+    "Superior Spider-Man"
+   ]
+  },
+  {
+   "any_cards": [
+    "Brightglass Gearhulk",
+    "Explosive Prodigy",
+    "Overlord of the Balemurk",
+    "Superior Spider-Man"
+   ],
+   "cards": [
+    "Badgermole Cub"
+   ],
+   "maindeck_cards": [],
+   "name": "Cub Toolbox",
+   "not_cards": []
+  },
+  {
+   "any_cards": [
+    "Cool but Rude",
+    "Monument to Endurance"
+   ],
+   "cards": [
+    "Moonshadow"
+   ],
+   "maindeck_cards": [],
+   "name": "Rakdos Monument",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Carrot Cake"
+   ],
+   "maindeck_cards": [],
+   "name": "Tokens",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Oildeep Gearhulk"
+   ],
+   "maindeck_cards": [],
+   "name": "Oildeep Gearhulk",
+   "not_cards": [
+    "Doomsday Excruciator"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Bristly Bill, Spine Sower"
+   ],
+   "maindeck_cards": [],
+   "name": "Mono-Green Counters",
+   "not_cards": []
+  }
+ ],
+ "Standard2026Q2PTSOS": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (mono-g)",
+   "not_cards": [
+    "Hushwood Verge"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension",
+    "Hushwood Verge"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (selesnya)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Accumulate Wisdom",
+    "Gran-Gran"
+   ],
+   "maindeck_cards": [],
+   "name": "Lessons",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hearth Elemental // Stoke Genius"
+   ],
+   "maindeck_cards": [],
+   "name": "Spellementals",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Aven Interrupter",
+    "High Noon"
+   ],
+   "maindeck_cards": [],
+   "name": "Azorius Tempo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [
+    "Colorstorm Stallion",
+    "Slickshot Show-Off"
+   ],
+   "cards": [],
+   "maindeck_cards": [],
+   "name": "Prowess",
+   "not_cards": [
+    "Hearth Elemental // Stoke Genius",
+    "Molten-Core Maestro"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Jeskai Revelation"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Control",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "maindeck_cards": [],
+   "name": "Jeskai Control (Tablet)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Moonshadow"
+   ],
+   "maindeck_cards": [],
+   "name": "Mardu Discard",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Doomsday Excruciator"
+   ],
+   "maindeck_cards": [],
+   "name": "Excruciator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Omniscience"
+   ],
+   "maindeck_cards": [],
+   "name": "Omniscience",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nature's Rhythm"
+   ],
+   "maindeck_cards": [],
+   "name": "Rhythm",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nature's Rhythm",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Rhythm (Bant)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nature's Rhythm"
+   ],
+   "maindeck_cards": [],
+   "name": "Rhythm (Selesnya)",
+   "not_cards": [
+    "Quantum Riddler"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Momo, Friendly Flier",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Momo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Molten-Core Maestro"
+   ],
+   "maindeck_cards": [],
+   "name": "Maestro",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Professor Dellian Fel"
+   ],
+   "maindeck_cards": [],
+   "name": "Golgari Mid",
+   "not_cards": []
+  }
+ ],
+ "Standard2026Q2RC": [
+  {
+   "any_cards": [],
+   "cards": [
+    "Boomerang Basics",
+    "Stormchaser's Talent"
+   ],
+   "maindeck_cards": [],
+   "name": "Prowess",
+   "not_cards": [
+    "Gran-Gran"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Hearth Elemental // Stoke Genius",
+    "Sunderflock"
+   ],
+   "name": "Spellementals",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension",
+    "Erode"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (Selesnya)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Inevitable Defeat",
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "maindeck_cards": [],
+   "name": "Tablet Control (4c)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "maindeck_cards": [],
+   "name": "Tablet Control (Jeskai)",
+   "not_cards": [
+    "Inevitable Defeat"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Accumulate Wisdom",
+    "Gran-Gran"
+   ],
+   "maindeck_cards": [],
+   "name": "Lessons",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Doomsday Excruciator"
+   ],
+   "maindeck_cards": [],
+   "name": "Excruciator",
+   "not_cards": [
+    "Awaken the Honored Dead",
+    "Wistfulness"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Earthbender Ascension"
+   ],
+   "maindeck_cards": [],
+   "name": "Landfall (MonoG)",
+   "not_cards": [
+    "Erode",
+    "Season of Loss"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Momo, Friendly Flier",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Momo",
+   "not_cards": [
+    "High Noon"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hardened Academic",
+    "Moonshadow"
+   ],
+   "maindeck_cards": [],
+   "name": "Discard",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Nature's Rhythm",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Rhythm (Bant)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Doc Aurlock, Grizzled Genius"
+   ],
+   "maindeck_cards": [],
+   "name": "Airbending",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Flamebraider",
+    "Roaming Throne"
+   ],
+   "maindeck_cards": [],
+   "name": "Elementals",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Kona, Rescue Beastie"
+   ],
+   "maindeck_cards": [],
+   "name": "Kona",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Bringer of the Last Gift",
+    "Overlord of the Balemurk"
+   ],
+   "maindeck_cards": [],
+   "name": "Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Aang, Swift Savior // Aang and La, Ocean's Fury",
+    "Aven Interrupter",
+    "High Noon"
+   ],
+   "maindeck_cards": [],
+   "name": "Prison",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Brightglass Gearhulk"
+   ],
+   "maindeck_cards": [],
+   "name": "Rhythm (Selesnya)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Jeskai Revelation"
+   ],
+   "maindeck_cards": [],
+   "name": "Control No Tablet",
+   "not_cards": [
+    "Tablet of Discovery"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Maelstrom Pulse",
+    "Professor Dellian Fel"
+   ],
+   "maindeck_cards": [],
+   "name": "Golgari Midrange",
+   "not_cards": []
+  },
+  {
+   "any_cards": [
+    "Burnout Bastronaut",
+    "Hired Claw"
+   ],
+   "cards": [],
+   "maindeck_cards": [],
+   "name": "Rx Aggro",
+   "not_cards": [
+    "Stormchaser's Talent"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Molten-Core Maestro",
+    "Sorcereress's Schemes"
+   ],
+   "maindeck_cards": [],
+   "name": "Maestro Combo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Callous Sell-Sword // Burn Together",
+    "Elusive Otter // Grove's Bounty"
+   ],
+   "maindeck_cards": [],
+   "name": "Fling",
+   "not_cards": []
+  }
+ ],
+ "Standard2026Q4RC": [
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Earthbender Ascension"
+   ],
+   "name": "Landfall",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Earthbender Ascension"
+   ],
+   "name": "Landfall (Mono G)",
+   "not_cards": [
+    "Breeding Pool",
+    "Overgrown Tomb",
+    "Stomping Ground",
+    "Swamp",
+    "Temple Garden"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Superior Spider-Man",
+    "Uldaros Theorix"
+   ],
+   "name": "Uladros",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Amalia Benavides Aguirre",
+    "Hinterland Sanctifier"
+   ],
+   "name": "Lifegain",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Enduring Curiosity",
+    "Floodpits Drowner",
+    "Kaito, Bane of Nightmares"
+   ],
+   "name": "Dimir Midrange",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Consult the Star Charts",
+    "Day of Judgment",
+    "The Theorist, Jace Beleren"
+   ],
+   "name": "Azorius Control",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Cryogen Relic",
+    "Simulacrum Synthesizer",
+    "United Battlefront"
+   ],
+   "name": "Artifacts",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Sarkhan, Dragon Ascendant"
+   ],
+   "name": "Dragons",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Hearth Elemental // Stoke Genius",
+    "Sunderflock"
+   ],
+   "name": "Spellementals",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Master of Barbs"
+   ],
+   "name": "Lizards",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Pompous Battlemage // Improvised Act",
+    "Slickshot Show-Off"
+   ],
+   "maindeck_cards": [],
+   "name": "Prowess",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Inevitable Defeat",
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "name": "Teblet Control (4c)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Inevitable Defeat",
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "name": "Teblet Control (Jeskai)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Biotech Specialist",
+    "The Sackville-Bagginses"
+   ],
+   "name": "Sacrifice",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Momo, Friendly Flier",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Momo",
+   "not_cards": [
+    "High Noon"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Dwarven Mauler",
+    "Kíli the Resourceful"
+   ],
+   "name": "Dwarves",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hardened Academic",
+    "Moonshadow"
+   ],
+   "maindeck_cards": [],
+   "name": "Discard",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Stadium Headliner",
+    "Voice of Victory",
+    "Warleader's Call"
+   ],
+   "name": "Warleader Tokens",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Hired Claw",
+    "Mountain",
+    "Nova Hellkite"
+   ],
+   "name": "Mono-Red Aggro",
+   "not_cards": [
+    "Steam Vents"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Ajani Unrelenting",
+    "Ashling, Rekindled // Ashling, Rimebound",
+    "Rewrite Regrets"
+   ],
+   "name": "Ajani Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Demonic Pact",
+    "Greed's Gambit",
+    "Harmless Offering"
+   ],
+   "name": "Demonic Pact",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Aang, Swift Savior // Aang and La, Ocean's Fury ",
+    "Aven Interrupter",
+    "Floodpits Drowner"
+   ],
+   "name": "High Noon Tempo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Kona, Rescue Beastie",
+    "Omniscience"
+   ],
+   "name": "Kona Omniscience",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Bramble Familiar // Fetch Quest"
+   ],
+   "name": "Airbending",
+   "not_cards": []
+  }
+ ]
+}

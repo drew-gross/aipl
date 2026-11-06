@@ -1,0 +1,203 @@
+# The metagame share report: how much of a tournament field each archetype is. A deck
+# counts toward every archetype it matches, so the shares can add up to more than all.
+
+import {
+    contains,
+    count_if,
+    equal as ==,
+    filter,
+    greater_than as >,
+    join,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    max,
+    push,
+    repeat,
+    saturating_divide as /,
+    saturating_remainder as %,
+    saturating_sub as -,
+    sort_by,
+    to_array,
+    to_set,
+    value_or,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+import { Identifier, archetypes_of, deck_of } from "./archetypes.aipl";
+import { Deck } from "./metagame.aipl";
+
+# An archetype, and how many decks were it.
+struct Share { name: str, count: u64 }
+
+# Whether `a` is listed before `b`: more decks first, equal counts in name order.
+fn is_listed_before(a: Share, b: Share) -> bool {
+    a.count > b.count || (a.count == b.count && a.name < b.name)
+}.test({
+    assert(is_listed_before(Share { name: "b", count: 5 }, Share { name: "a", count: 4 }));
+    assert(!is_listed_before(Share { name: "a", count: 4 }, Share { name: "b", count: 5 }));
+    assert(is_listed_before(Share { name: "a", count: 4 }, Share { name: "b", count: 4 }));
+    assert(!is_listed_before(Share { name: "a", count: 4 }, Share { name: "a", count: 4 }));
+})
+
+# The decks of each archetype, most decks first. A deck that is none of `identifiers` is
+# `<name> (self-titled)`, which is left out unless `jank`.
+pub fn shares(decks: Deck[], identifiers: Identifier[], jank: bool) -> Share[] {
+    let names = decks$archetypes_of(identifiers).join();
+    let distinct: #<{str} = names.to_set();
+    distinct
+        .to_array()
+        .filter(|name| jank || !name.contains("self-titled"))
+        .map(|name| { Share { name, count: names.count_if(|each| each == name) } })
+        .sort_by(is_listed_before)
+}.test({
+    let nothing: str[] = [];
+    let landfall = Identifier {
+        name: "Landfall",
+        cards: ["Forest"],
+        not_cards: nothing,
+        any_cards: nothing,
+        maindeck_cards: nothing,
+    };
+    let mono = Identifier { ..landfall, name: "Mono-G", not_cards: ["Island"] };
+    let decks = [
+        deck_of(["Forest"], []),
+        deck_of(["Forest", "Island"], []),
+        deck_of(["Forest"], []),
+        deck_of(["Swamp"], []),
+    ];
+
+    // Each archetype once per deck, most decks first. The deck that is neither is its own
+    // archetype, left out unless `jank`.
+    assert(shares(decks, [landfall, mono], false) == [
+        Share { name: "Landfall", count: 3 },
+        Share { name: "Mono-G", count: 2 },
+    ]);
+    assert(shares(decks, [landfall, mono], true) == [
+        Share { name: "Landfall", count: 3 },
+        Share { name: "Mono-G", count: 2 },
+        Share { name: "Some Deck (self-titled)", count: 1 },
+    ]);
+    assert(shares([], [landfall], true) == []);
+})
+
+# `count` out of `total` as a percentage with one decimal, rounded half up: `33.3%`.
+fn percent(count: u64, total: u64) -> str {
+    let tenths = (count * 2000 + total) / (2 * total);
+    `{tenths / 10}.{tenths % 10}%`
+}.test({
+    assert(percent(1, 3) == "33.3%");
+    assert(percent(2, 3) == "66.7%");
+    assert(percent(1, 2) == "50.0%");
+    assert(percent(0, 7) == "0.0%");
+    assert(percent(7, 7) == "100.0%");
+    assert(percent(1, 8) == "12.5%");
+    // Half up: an exact half rounds away from zero.
+    assert(percent(1, 16) == "6.3%");
+    // A tenth with a leading zero in the fraction.
+    assert(percent(1, 200) == "0.5%");
+    assert(percent(3, 2000) == "0.2%");
+})
+
+# `text` padded with spaces to `width`: on the left when `right`, else on the right.
+fn padded(text: str, width: u64, right: bool) -> str {
+    let gap = " ".repeat(width - text.len());
+    if (right) { `{gap}{text}` } else { `{text}{gap}` }
+}.test({
+    assert(padded("ab", 5, false) == "ab   ");
+    assert(padded("ab", 5, true) == "   ab");
+    assert(padded("abcdef", 3, false) == "abcdef");
+    assert(padded("", 2, true) == "  ");
+})
+
+# A table as lines, in the grid style `tabulate` draws: a rule above, between the header
+# and the rows, and below, each cell padded to its column, the columns in `right` aligned
+# to the right.
+pub fn grid(headers: str[], rows: str[][], right: bool[]) -> str[] {
+    mut widths: u64[] = [];
+    for (let i, header : headers) {
+        mut width = header.len();
+        for (let row : rows) {
+            set width = max(width, row[i].value_or("").len());
+        }
+        set widths.push(width);
+    }
+    mut lines = [rule(widths, "-"), cells_line(headers, widths, right), rule(widths, "=")];
+    for (let row : rows) {
+        set lines.push(cells_line(row, widths, right));
+    }
+    set lines.push(rule(widths, "-"));
+    lines
+}.test({
+    assert(grid(["Name", "N"], [["ab", "1"], ["c", "10"]], [false, true]) == [
+        "+------+----+",
+        "| Name |  N |",
+        "+======+====+",
+        "| ab   |  1 |",
+        "| c    | 10 |",
+        "+------+----+",
+    ]);
+    // No rows: just the header.
+    assert(grid(["X"], [], [false]) == ["+---+", "| X |", "+===+", "+---+"]);
+})
+
+# The line of `fill` characters over each column of `widths`, joined by `+`.
+fn rule(widths: u64[], fill: str) -> str {
+    let spans = widths.map(|w| { fill.repeat(w + 2) });
+    `+{spans.join(sep="+")}+`
+}
+
+# One row's line: each cell padded to its column's width, between `|`s.
+fn cells_line(cells: str[], widths: u64[], right: bool[]) -> str {
+    mut parts: str[] = [];
+    for (let i, cell : cells) {
+        set parts.push(padded(cell, widths[i].value_or(0), right[i].value_or(false)));
+    }
+    `| {parts.join(sep=" | ")} |`
+}
+
+# The report on `decks`, loaded from the metagame `name`, as lines.
+pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[], jank: bool) -> str[] {
+    let total = decks.len();
+    let rows = shares(decks, identifiers, jank).map(|share| {
+        [share.name, percent(share.count, total), `{share.count}`]
+    });
+    [
+        `Metagame Breakdown from {name}`,
+        "Order by Metagame %",
+        ..grid(["Deck Name", "Metagame %", "Count"], rows, [false, true, true]),
+    ]
+}.test({
+    let nothing: str[] = [];
+    let landfall = Identifier {
+        name: "Landfall",
+        cards: ["Forest"],
+        not_cards: nothing,
+        any_cards: nothing,
+        maindeck_cards: nothing,
+    };
+    let decks = [deck_of(["Forest"], []), deck_of(["Swamp"], []), deck_of(["Forest"], [])];
+    assert(share_report("a_meta", decks, [landfall], false) == [
+        "Metagame Breakdown from a_meta",
+        "Order by Metagame %",
+        "+-----------+------------+-------+",
+        "| Deck Name | Metagame % | Count |",
+        "+===========+============+=======+",
+        "| Landfall  |      66.7% |     2 |",
+        "+-----------+------------+-------+",
+    ]);
+    // Shares are of all the decks, including the ones left out.
+    assert(share_report("a_meta", decks, [landfall], true) == [
+        "Metagame Breakdown from a_meta",
+        "Order by Metagame %",
+        "+-------------------------+------------+-------+",
+        "| Deck Name               | Metagame % | Count |",
+        "+=========================+============+=======+",
+        "| Landfall                |      66.7% |     2 |",
+        "| Some Deck (self-titled) |      33.3% |     1 |",
+        "+-------------------------+------------+-------+",
+    ]);
+})

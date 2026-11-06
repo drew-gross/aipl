@@ -82,3 +82,10 @@ floats (first landing: types, literals, + - * /, comparisons, to_str; conversion
   a file can import one `==`: with `float_equal as ==` every other comparison there is `equal(a, b)`; consider `==` choosing by operand type if this proves noisy
   no way to compare floats within a tolerance, no float literals in patterns, no float to int conversion (int to float is `to_float`)
   `wrapping_add(a, b)` on floats says "expected i64"; only the operator spelling names the float import
+mtg_metagame share report:
+  percentages are printed from integer counts (`(count * 2000 + total) / (2 * total)`, tenths, half up) because there is no float printing with a fixed number of decimals and no float to int; the original's `.1%` rounds half to even on the float (6.25 -> 6.2 there, 6.3 here)
+  ties in the share order are broken by name; the original keeps first-seen order of the archetypes, which is the pickle's deck order
+  the grid pads by byte length, so a non-ASCII archetype name misaligns its row
+  `xs$f` takes only a name, so `xs.map(|x| { .. })` stands in wherever a lambda is wanted (no `xs$(|x| ..)`)
+  a `let` closure cannot be called by name or used as `xs$name()`: test helpers became `fn`s
+

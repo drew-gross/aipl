@@ -35,6 +35,23 @@ pub fn field(self: Json, key: str) -> Json? {
     assert(Number("1").field("a") == none);
 })
 
+# The keys of `self`, in the order written, if it is an object (a repeated key repeats).
+pub fn keys(self: Json) -> str[]? {
+    match (self) {
+        Object(members) => some(members$key),
+        Null | Bool(..) | Number(..) | String(..) | Array(..) => none,
+    }
+}.test({
+    let object = Object([
+        Member { key: "b", value: Null },
+        Member { key: "a", value: Number("1") },
+    ]);
+    assert(object.keys() == some(["b", "a"]));
+    assert(Object([]).keys() == some([]));
+    assert(Array([]).keys() == none);
+    assert(Null.keys() == none);
+})
+
 # The elements of `self`, if it is a list.
 pub fn elements(self: Json) -> Json[]? {
     match (self) {

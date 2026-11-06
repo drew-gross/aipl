@@ -2,10 +2,34 @@
 # archetype is, and how well it does. A port of `mtg_metagame_stats`, grown one
 # piece at a time.
 
-import { Json, equal as ==, parse_json, print, read_file_to_string, value_or } from builtins;
+import {
+    Json,
+    drop_first,
+    equal as ==,
+    first,
+    len,
+    less_than as <,
+    not_equal as !=,
+    parse_json,
+    print,
+    read_file_to_string,
+    value_or,
+    value_or_err,
+    wrapping_increment as ++,
+} from builtins;
+import { load_identifiers } from "./archetypes.aipl";
 import { CardCount, card_counts } from "./card_stats.aipl";
 import { optional_text_field } from "./json.aipl";
+import { share_report } from "./meta_share.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
+
+let USAGE = """
+    usage: mtg_metagame cards <metagame>
+           mtg_metagame share <metagame> [--archetypes <config>] [--jank]
+""";
+
+# The archetype list `share` uses when `--archetypes` is not given.
+let DEFAULT_ARCHETYPES = "Standard2026Q4RC";
 
 # The file in `data/` that `name` stands for: the file `index` maps it to, or
 # `name` itself when the index does not know it.
@@ -23,22 +47,89 @@ fn card_line(self: CardCount) -> str { `{self.count} {self.name}` }.test({
     assert(CardCount { name: "Island", count: 12 }.card_line() == "12 Island");
 })
 
-# One line per card played in the metagame `name` stands for, most played first.
-fn listing(name: str) !read_files !execute_program -> str[]!str {
+# The metagame `name` stands for, with `data/index.json` read to find it.
+fn load_named(name: str) !read_files !execute_program -> Metagame!str {
     let index = parse_json(read_file_to_string("data/index.json")?)?;
-    let Metagame { decks } = load_metagame(data_path(index, name))?;
+    load_metagame(data_path(index, name))
+}
+
+# One line per card played in the metagame named by `args`, most played first.
+fn cards_listing(args: str[]) !read_files !execute_program -> str[]!str {
+    let [name] = args else { return err(USAGE); };
+    let Metagame { decks } = load_named(name)?;
     ok(card_counts(decks)$card_line())
 }
 
-# Print every card played in the metagame named on the command line, with how
-# many copies, most played first. The name is a file in `data/` (without its
-# `.json.gz`), or one of the names in `data/index.json`.
+# What `share` was asked: the metagame, the archetype list to classify its decks with, and
+# whether to list the decks that match none of them.
+struct ShareOptions { metagame: str, archetypes: str, jank: bool }
+
+# The options in `args`: one metagame, then `--archetypes <config>` and `--jank` in any order.
+fn parse_share_options(args: str[]) -> ShareOptions!str {
+    mut metagame = "";
+    mut archetypes = DEFAULT_ARCHETYPES;
+    mut jank = false;
+    mut i: u64 = 0;
+    while (i < args.len()) {
+        let arg = args[i].value_or("");
+        if (arg == "--jank") {
+            set jank = true;
+        } else {
+            if (arg == "--archetypes") {
+                set i++;
+                set archetypes = args[i].value_or_err("--archetypes needs the name of a list")?;
+            } else {
+                if (metagame != "") { return err(`unexpected argument "{arg}"`); };
+                set metagame = arg;
+            };
+        };
+        set i++;
+    }
+    if (metagame == "") { return err("share needs a metagame"); };
+    ok(ShareOptions { metagame, archetypes, jank })
+}.test({
+    assert(parse_share_options(["m"]) == ok(ShareOptions {
+        metagame: "m",
+        archetypes: "Standard2026Q4RC",
+        jank: false,
+    }));
+    assert(parse_share_options([
+        "--jank",
+        "m",
+        "--archetypes",
+        "Modern2026Q3RC",
+    ]) == ok(ShareOptions { metagame: "m", archetypes: "Modern2026Q3RC", jank: true }));
+    assert(parse_share_options([]) == err("share needs a metagame"));
+    assert(parse_share_options(["m", "n"]) == err(`unexpected argument "n"`));
+    assert(parse_share_options(["m", "--archetypes"]) == err(
+        "--archetypes needs the name of a list",
+    ));
+})
+
+# The share report for the metagame named by `args`, one line each.
+fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
+    let ShareOptions { metagame, archetypes, jank } = parse_share_options(args)?;
+    let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
+    let Metagame { decks } = load_named(metagame)?;
+    ok(share_report(metagame, decks, identifiers, jank))
+}
+
+# The lines a command line asks for, or why it asks for none.
+fn run(args: str[]) !read_files !execute_program -> str[]!str {
+    let some(command) = args.first() else { return err(USAGE); };
+    let rest = args.drop_first();
+    match (command) {
+        "cards" => cards_listing(rest),
+        "share" => share_listing(rest),
+        _ => err(USAGE),
+    }
+}
+
+# Run a command: `cards <metagame>` lists every card played, `share <metagame>` the share of
+# the field each archetype is. The metagame is a file in `data/` (without its `.json.gz`), or
+# one of the names in `data/index.json`.
 fn main(args: str[]) !prints !read_files !execute_program -> i64 {
-    let [name] = args else {
-        print("usage: mtg_metagame <metagame>");
-        return 1;
-    };
-    match (listing(name)) {
+    match (run(args)) {
         ok(lines) => {
             for (let line : lines) {
                 print(line);

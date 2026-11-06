@@ -1,0 +1,198 @@
+# Which archetypes a deck is. The original decides it from a list of identifiers per
+# format and season, each naming cards the deck must hold, must not hold, or must hold
+# one of; `data/archetypes.json` has those lists (see `tools/archetypes_to_json.py`).
+# A deck can match several identifiers and then counts in each of them.
+
+import {
+    Json,
+    all,
+    any,
+    equal as ==,
+    filter,
+    has,
+    is_empty,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    parse_json,
+    read_file_to_string,
+    to_array,
+    to_set,
+    try_map,
+    union,
+    value_or,
+    value_or_err,
+} from builtins;
+import { keys, list_field, scalar_text, text_field } from "./json.aipl";
+import { Card, Deck } from "./metagame.aipl";
+
+# What it takes for a deck to be an archetype, as its identifier in the original wrote it.
+# `cards` must all be in the main deck or the sideboard, none of `not_cards` may be, one of
+# `any_cards` must be if there are any, and `maindeck_cards` must all be in the main deck. An
+# identifier that asks for nothing matches every deck, as it does there.
+struct Identifier {
+    name: str,
+    cards: str[],
+    not_cards: str[],
+    any_cards: str[],
+    maindeck_cards: str[],
+}
+
+# The names of the cards a deck holds: in its main deck, and in its main deck or sideboard.
+struct Holdings { main: #{str}, held: #{str} }
+
+# The cards `self` holds, by name.
+fn holdings(self: Deck) -> Holdings {
+    let main = self.maindeck$name.to_set();
+    let side = self.sideboard$name.to_set();
+    Holdings { main, held: main.union(side) }
+}.test({
+    let Holdings { main, held } = deck_of(["Island"], ["Swamp"]).holdings();
+    assert(main.has("Island"));
+    assert(!main.has("Swamp"));
+    assert(held.has("Island") && held.has("Swamp"));
+})
+
+# A single copy of the card called `self`.
+fn as_card(self: str) -> Card { name: self, count: 1, card_type: "Land" }.test({
+    assert("Island".as_card().name == "Island");
+})
+
+# A deck with the named cards in its main deck and in its sideboard, for tests that need
+# one.
+pub fn deck_of(main: str[], side: str[]) -> Deck {
+    deck_id: "d",
+    name: "Some Deck",
+    pilot: "",
+    tournament: "",
+    maindeck: main$as_card(),
+    sideboard: side$as_card(),
+    matches: [],
+}.test({
+    assert(deck_of(["A"], ["B", "C"]).sideboard$name == ["B", "C"]);
+})
+
+# An identifier asking for `cards`, `not_cards`, `any_cards` and `maindeck_cards`, in that order.
+fn identifier(
+    cards: str[],
+    not_cards: str[],
+    any_cards: str[],
+    maindeck_cards: str[],
+) -> Identifier { name: "Archetype", cards, not_cards, any_cards, maindeck_cards }
+
+# Whether a deck with `Holdings { main, held }` is the archetype `self`.
+fn matches(self: Identifier, Holdings { main, held }) -> bool {
+    self.cards.all(|c| held.has(c)) && !self.not_cards.any(|c| held.has(
+        c,
+    )) && self.maindeck_cards.all(|c| main.has(
+        c,
+    )) && (self.any_cards.is_empty() || self.any_cards.any(|c| held.has(c)))
+}.test({
+    let nothing: str[] = [];
+    let deck = deck_of(["Island", "Bolt"], ["Negate"]).holdings();
+
+    // `cards` may be in either part; `maindeck_cards` only in the main deck.
+    assert(identifier(["Island", "Negate"], nothing, nothing, nothing).matches(deck));
+    assert(!identifier(["Island", "Duress"], nothing, nothing, nothing).matches(deck));
+    assert(identifier(nothing, nothing, nothing, ["Bolt"]).matches(deck));
+    assert(!identifier(nothing, nothing, nothing, ["Negate"]).matches(deck));
+
+    // A card named in `not_cards` rules the deck out, wherever it is.
+    assert(!identifier(["Island"], ["Negate"], nothing, nothing).matches(deck));
+    assert(identifier(["Island"], ["Duress"], nothing, nothing).matches(deck));
+
+    // One of `any_cards`, when there are some.
+    assert(identifier(nothing, nothing, ["Duress", "Bolt"], nothing).matches(deck));
+    assert(!identifier(nothing, nothing, ["Duress", "Thoughtseize"], nothing).matches(deck));
+
+    // Asking for nothing matches everything.
+    assert(identifier(nothing, nothing, nothing, nothing).matches(deck));
+})
+
+# The archetypes `deck` is, each once: the identifiers in `identifiers` it matches, by name.
+# A deck that matches none is its own, `<name> (self-titled)`.
+pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> str[] {
+    let deck_holdings = self.holdings();
+    let found: #<{str} = identifiers.filter(|i| i.matches(deck_holdings))$name.to_set();
+    if (found.is_empty()) { [`{self.name} (self-titled)`] } else { found.to_array() }
+}.test({
+    let landfall = Identifier { ..identifier(["Forest"], [], [], []), name: "Landfall" };
+    let mono = Identifier { ..identifier(["Forest"], ["Island"], [], []), name: "Mono-G" };
+    let control = Identifier { ..identifier(["Island"], [], [], []), name: "Control" };
+    let identifiers = [landfall, mono, control];
+
+    // Every match, once, in name order; matching twice under one name counts once.
+    assert(deck_of(["Forest"], []).archetypes_of(identifiers) == ["Landfall", "Mono-G"]);
+    assert(deck_of(["Forest", "Island"], []).archetypes_of(identifiers) == ["Control", "Landfall"]);
+    assert(deck_of(["Forest"], []).archetypes_of([landfall, landfall]) == ["Landfall"]);
+
+    // None: the deck is its own archetype.
+    assert(deck_of(["Swamp"], []).archetypes_of(identifiers) == ["Some Deck (self-titled)"]);
+})
+
+# `self` as an identifier.
+fn decode_identifier(self: Json) -> Identifier!str {
+    ok(Identifier {
+        name: self.text_field("name")?,
+        cards: self.string_list("cards")?,
+        not_cards: self.string_list("not_cards")?,
+        any_cards: self.string_list("any_cards")?,
+        maindeck_cards: self.string_list("maindeck_cards")?,
+    })
+}.test({
+    let json = parse_json("""
+        {"name":"Landfall","cards":["Forest"],"not_cards":[],"any_cards":["A","B"],
+         "maindeck_cards":["Earthbender Ascension"]}
+    """)?;
+    assert(decode_identifier(json) == ok(Identifier {
+        name: "Landfall",
+        cards: ["Forest"],
+        not_cards: [],
+        any_cards: ["A", "B"],
+        maindeck_cards: ["Earthbender Ascension"],
+    }));
+    let bad = parse_json("""{"name":"X","cards":[null]}""")?;
+    assert(decode_identifier(bad) == err(`"cards" holds something that is not text`));
+})
+
+# The text of each element of the list under `key`, or why there is none.
+fn string_list(self: Json, key: str) -> str[]!str {
+    self
+        .list_field(key)?
+        .try_map(|item| {
+            item.scalar_text().value_or_err(`"{key}" holds something that is not text`)
+        })
+}.test({
+    let json = parse_json("""{"names":["a","b"],"mixed":["a",null],"n":3}""")?;
+    assert(json.string_list("names") == ok(["a", "b"]));
+    assert(json.string_list("mixed") == err(`"mixed" holds something that is not text`));
+    assert(json.string_list("n") == err(`"n" is not a list`));
+    assert(json.string_list("q") == err(`missing "q"`));
+})
+
+# The identifiers `config` names in the file `path` of them, or why there are none.
+pub fn load_identifiers(path: str, config: str) !read_files -> Identifier[]!str {
+    let all_configs = parse_json(read_file_to_string(path)?)?;
+    let found = all_configs.list_field(config);
+    if (let err(..) = found) {
+        let names = all_configs.keys().value_or([]);
+        return err(
+            `no archetype config named "{config}"; the ones there are: {names.join(sep=", ")}`,
+        );
+    };
+    found?.try_map(decode_identifier)
+}.test({
+    let file = """
+        {"First":[{"name":"A","cards":["X"],"not_cards":[],"any_cards":[],"maindeck_cards":[]}],
+         "Second":[]}
+    """;
+    shim read_files { read_file_to_string = |path| { ok(file) } } {
+        let first = load_identifiers("archetypes.json", "First")?;
+        assert(first$name == ["A"]);
+        assert(load_identifiers("archetypes.json", "Second")? == []);
+        assert(load_identifiers("archetypes.json", "Third") == err(
+            `no archetype config named "Third"; the ones there are: First, Second`,
+        ));
+    };
+})
