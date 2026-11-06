@@ -58,7 +58,6 @@ mtg_metagame workarounds:
   `ok(Struct { f: x? })` is required: a bare field-list body can't be a `T!E` return, and `?` on `T?` in a `T!E` fn needs value_or_err
   maybe: `fn f(self: Json) -> Card!str ok({ name: .., count: .. })` as the struct-body shorthand for a `T!E` return (the `ok(..)` stays written, the `Card { }` is dropped); Drew is not convinced yet, and no implicit ok-wrapping
   `str[i]` is a byte (invalid UTF-8 chars show as �); fine for scanning, but no char iteration by code point
-  floats: win rates are permille integers (also in TODO.txt)
 
 handoff:
   `let (Parts { n }, rest) = f(xs);` (a struct pattern nested in a tuple pattern) over a generic `(Parts, A[])` fails in a generic caller: struct "__tuple$i64$i64" field "_1": expected i64, got i64[]; concrete callers work. The destructure lint steers people to this form, so the workaround is `#[allow]` on a plain `let (p, rest)` (tests/cases/tuples/destructure_generic_result.aipl)
@@ -81,5 +80,5 @@ floats (first landing: types, literals, + - * /, comparisons, to_str; conversion
   `t.0.1` (nested tuple slots) lexes `0.1` as a float: write `(t.0).1`
   a variant payload holding a float is not rejected by `==` (only struct, tuple, array, optional, set, dict, result are walked)
   a file can import one `==`: with `float_equal as ==` every other comparison there is `equal(a, b)`; consider `==` choosing by operand type if this proves noisy
-  no way to compare floats within a tolerance, no float literals in patterns, no float to int or int to float conversion
+  no way to compare floats within a tolerance, no float literals in patterns, no float to int conversion (int to float is `to_float`)
   `wrapping_add(a, b)` on floats says "expected i64"; only the operator spelling names the float import

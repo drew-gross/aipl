@@ -911,7 +911,9 @@ impl<'a> Cx<'a> {
             }
             // A float literal is built at the width it lands at, so the width is recorded
             // on the literal, and on the negation around it.
-            (Type::Primitive(p), ExprKind::Float(_)) if p.is_float() => {
+            (Type::Primitive(p), ExprKind::Float(_) | ExprKind::Call(Callee::ToFloat, ..))
+                if p.is_float() =>
+            {
                 self.lock_node(node_id(e), target);
             }
             (Type::Primitive(p), ExprKind::Neg(inner)) if p.is_float() => {
@@ -5308,6 +5310,21 @@ impl Cx<'_> {
                 ));
             }
             return Ok(Type::Optional(Box::new(Type::NoneInner)));
+        }
+        // `n.to_float()`: the integer as a float. It types as `IEEE754Float64` until a float
+        // position declares another (`flex_fit`), exactly as a literal does.
+        if *callee == Callee::ToFloat && args.len() == 1 {
+            let t = self.check_expr(&args[0], env, effects)?;
+            if !aipl_syntax::is_int_ty(&t) && !is_unknown(&t) {
+                return Err(Error::at(
+                    format!(
+                        "\"to_float\" converts an integer, but its receiver is {}",
+                        tyname(&t)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            return Ok(Type::Primitive(Primitive::F64));
         }
         if *callee == Callee::ToSet && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;

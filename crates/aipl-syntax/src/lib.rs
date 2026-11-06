@@ -2354,11 +2354,13 @@ pub fn int_signed(name: &str) -> bool {
     Primitive::from_name(name).is_some_and(Primitive::int_signed)
 }
 
-/// Whether `e` is a float literal, possibly negated: the one shape that takes the type of
-/// the float position it sits in.
+/// Whether `e` is a float literal or an integer's `to_float`, possibly negated: the shapes
+/// that take the type of the float position they sit in.
 pub fn is_float_literal(e: &ast::Expr) -> bool {
     match &e.kind {
         ast::ExprKind::Float(_) => true,
+        // `n.to_float()` is a float whose type is the position's to give, like a literal.
+        ast::ExprKind::Call(Callee::ToFloat, ..) => true,
         ast::ExprKind::Neg(inner) => is_float_literal(inner),
         _ => false,
     }
@@ -2769,6 +2771,21 @@ pub fn binop_for_builtin(canonical: &Callee) -> Option<BinOp> {
         Callee::SaturatingRemainder => BinOp::Rem,
         _ => return None,
     })
+}
+
+/// Whether `callee` is one of the IEEE 754 operations, and if so whether it yields a `bool`
+/// (a comparison) rather than a float of its operands' type (arithmetic).
+pub fn float_operation_yields_bool(callee: &Callee) -> Option<bool> {
+    match callee {
+        Callee::FloatAdd | Callee::FloatSub | Callee::FloatMul | Callee::FloatDivide => Some(false),
+        Callee::FloatEqual
+        | Callee::FloatNotEqual
+        | Callee::FloatLessThan
+        | Callee::FloatGreaterThan
+        | Callee::FloatLessThanOrEqual
+        | Callee::FloatGreaterThanOrEqual => Some(true),
+        _ => None,
+    }
 }
 
 /// A set in a generic signature's return type takes the order of the set the

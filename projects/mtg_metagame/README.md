@@ -31,8 +31,8 @@ reads binary files or decompresses yet.
 
 ## Status
 
-Loading and the card listing work. Win rates are whole permille until the
-language has floats.
+Loading and the card listing work. A record's win rate is a float, the fraction of its
+decided matches won.
 
 ## Plan, following the Python original
 

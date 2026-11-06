@@ -7982,6 +7982,25 @@ impl Mono<'_> {
                         node(ExprKind::Call(Callee::User(mangled), rargs, method_style)),
                         ret,
                     )
+                } else if let Some(yields_bool) =
+                    aipl_syntax::float_operation_yields_bool(callee).filter(|_| atys.len() == 2)
+                {
+                    // A float operation: both operands one float type, a bare float
+                    // literal (or `to_float`) taking the other's, and the result that type
+                    // for arithmetic or `bool` for a comparison — the checker's rule.
+                    let lt = aipl_syntax::flex_int_ty(&rargs[0], &atys[0], &atys[1]);
+                    let rt = aipl_syntax::flex_int_ty(&rargs[1], &atys[1], &lt);
+                    let ret = if yields_bool {
+                        Type::Primitive(Primitive::Bool)
+                    } else if matches!(&lt, Type::Primitive(p) if p.is_float()) && lt == rt {
+                        lt
+                    } else {
+                        Type::Primitive(Primitive::F64)
+                    };
+                    (
+                        node(ExprKind::Call(callee.clone(), rargs, method_style)),
+                        ret,
+                    )
                 } else if matches!(
                     callee,
                     Callee::WrappingAdd
@@ -8119,6 +8138,14 @@ impl Mono<'_> {
             // checker recorded. Left as `i64[]`, a generic callee is instantiated
             // for the wrong element type and reads the narrow storage as wide.
             Some(t) if narrows_literal_array(&expr.kind, &inferred, t) => (**t).clone(),
+            // A float conversion is the width its position gave it, which the checker
+            // recorded; the call itself can only say `IEEE754Float64`.
+            Some(t)
+                if matches!(&expr.kind, ExprKind::Call(Callee::ToFloat, ..))
+                    && matches!(&**t, Type::Primitive(p) if p.is_float()) =>
+            {
+                (**t).clone()
+            }
             // `collect_arms` is monomorphized as `T[] -> T[]`; the checker typed the
             // call as an array of the one case collected and recorded it.
             Some(t)
@@ -8582,6 +8609,9 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
         // which the checker recorded on the call. A placeholder here, so the
         // record is what the call types as (see the end of `Mono::infer`).
         Callee::Narrow => return Some(Type::Optional(Box::new(Type::NoneInner))),
+        // `n.to_float()`: `IEEE754Float64`, unless the checker recorded another float on
+        // the call (the end of `Mono::infer` reads the record).
+        Callee::ToFloat => return Some(Type::Primitive(Primitive::F64)),
         // `xs.to_set()`: the set whose order the use site decides (see
         // `SetOrder::Context`), of the array's element type.
         Callee::ToSet => {

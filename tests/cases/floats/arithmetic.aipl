@@ -82,3 +82,24 @@ test({
     let wide: F64 = 16777216.0;
     assert(to_str(wide + 1.0).equal("16777217.0"));
 })
+
+// Small functions over floats are inlined into their callers, where the call's type is
+// worked out again without the checker: negation, an operation inside an optional, and a
+// comparison all have to keep their float type through it.
+fn negate(x: F64) -> F64 { -x }
+
+fn halve(x: F64) -> F64 { x / 2.0 }
+
+fn half_if_positive(x: F64) -> F64? { if (x > 0.0) { some(x / 2.0) } else { none } }
+
+fn is_above_half(x: F64) -> bool { halve(x) > 0.5 }
+
+test({
+    assert(negate(2.5).to_str().equal("-2.5"));
+    assert(negate(negate(2.5)).to_str().equal("2.5"));
+    assert(halve(3.0).to_str().equal("1.5"));
+    assert(half_if_positive(3.0)$to_str().equal(some("1.5")));
+    assert(half_if_positive(-3.0)$to_str().equal(none));
+    assert(is_above_half(2.0));
+    assert(!is_above_half(1.0));
+})

@@ -1,0 +1,49 @@
+# `to_float` turns an integer into the nearest float, with one rounding and no failure.
+# The float type comes from where the call sits, as a literal's does: an annotation, a
+# parameter, a return, or the other operand of a float operation. With nothing to say it
+# is `IEEE754Float64`.
+
+import {
+    IEEE754Float32 as F32,
+    IEEE754Float64 as F64,
+    equal,
+    float_add as +,
+    float_div as /,
+    to_float,
+    to_str,
+    wrapping_add,
+} from builtins;
+
+fn rate(wins: i64, decided: i64) -> F64 { wins.to_float() / decided.to_float() }
+
+fn narrow(n: i64) -> F32 { n.to_float() }
+
+test({
+    assert(to_str(rate(2, 3)).equal("0.6666666666666666"));
+    assert(to_str(rate(1, 2)).equal("0.5"));
+
+    // Every integer width, and negatives.
+    let small: u8 = 200;
+    assert(to_str(small.to_float()).equal("200.0"));
+    let signed: i8 = -5;
+    assert(to_str(signed.to_float()).equal("-5.0"));
+    assert(to_str(7.to_float()).equal("7.0"));
+
+    // The type is the position's to give: a 32-bit float rounds at 24 bits, a 64-bit one
+    // at 53.
+    let narrowed: F32 = 16777217.to_float();
+    assert(to_str(narrowed).equal("16777216.0"));
+    assert(to_str(narrow(16777217)).equal("16777216.0"));
+    assert(to_str(16777217.to_float()).equal("16777217.0"));
+    let start: F32 = 0.5;
+    assert(to_str(start + 3.to_float()).equal("3.5"));
+
+    // Beyond 2^53 the nearest value (ties to even), never a failure.
+    let inexact: i64 = 9007199254740993;
+    assert(to_str(inexact.to_float()).equal("9007199254740992.0"));
+
+    // An unsigned 64-bit value is read as unsigned, not as a negative.
+    let half: u64 = 9223372036854775807;
+    let largest = wrapping_add(half, half);
+    assert(to_str(largest.to_float()).equal("1.8446744073709552e19"));
+})

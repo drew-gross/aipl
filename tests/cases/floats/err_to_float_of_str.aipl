@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64, to_float } from builtins;
+
+fn text(s: str) -> F64 { s.to_float() }
+--- check --compile ---
+error: "to_float" converts an integer, but its receiver is str
+ --> ./tests/cases/floats/err_to_float_of_str.aipl:3:26
+  |
+3 | fn text(s: str) -> F64 { s.to_float() }
+  |                          ^

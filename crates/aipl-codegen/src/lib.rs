@@ -17786,6 +17786,44 @@ fn compile_call_expr_direct<M: Module>(
                 .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
+        Callee::ToFloat => {
+            // `n.to_float()` — the integer as the nearest float of the type the checker
+            // recorded on the call (`IEEE754Float64` when none): one rounding, by the
+            // hardware's conversion. An unsigned 64-bit value is converted as unsigned, since
+            // its register holds the bits and a signed reading would make it negative; every
+            // narrower integer is canonical in the register and converts either way.
+            let [receiver] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (v, t) = compile_expr(module, builder, cx, scopes, receiver)?;
+            let ConcreteType::Primitive(from) = &t else {
+                return Err(Error::at(
+                    format!("\"to_float\" converts an integer, got {}", type_name(&t)),
+                    receiver.span.clone(),
+                ));
+            };
+            if !from.is_int() {
+                return Err(Error::at(
+                    format!("\"to_float\" converts an integer, got {}", type_name(&t)),
+                    receiver.span.clone(),
+                ));
+            }
+            let to = match &locked {
+                Some(ConcreteType::Primitive(p)) if p.is_float() => *p,
+                _ => Primitive::F64,
+            };
+            let clif = if to == Primitive::F32 {
+                types::F32
+            } else {
+                types::F64
+            };
+            let f = if *from == Primitive::U64 {
+                builder.ins().fcvt_from_uint(clif, v)
+            } else {
+                builder.ins().fcvt_from_sint(clif, v)
+            };
+            (float_to_bits(builder, f, to), ConcreteType::Primitive(to))
+        }
         Callee::Narrow => {
             // `n.narrow() -> T?` — `n` as integer type `T`, the one the checker
             // locked onto the call; `none` when its value is outside `T`.

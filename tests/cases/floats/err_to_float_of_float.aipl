@@ -1,0 +1,9 @@
+import { IEEE754Float64 as F64, to_float } from builtins;
+
+fn whole(x: F64) -> F64 { x.to_float() }
+--- check --compile ---
+error: "to_float" converts an integer, but its receiver is IEEE754Float64
+ --> ./tests/cases/floats/err_to_float_of_float.aipl:3:27
+  |
+3 | fn whole(x: F64) -> F64 { x.to_float() }
+  |                           ^

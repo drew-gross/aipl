@@ -4,19 +4,21 @@
 
 import {
     ExecResult,
+    IEEE754Float64 as Float,
     Json,
     collect_ok,
     equal as ==,
     execute_program,
+    float_div as /,
     greater_than as >,
     not_equal as !=,
     parse_json,
-    saturating_divide as /,
+    to_float,
+    to_str,
     try_map,
     value_or,
     value_or_err,
     wrapping_add as +,
-    wrapping_mul as *,
 } from builtins;
 import {
     field,
@@ -83,16 +85,18 @@ fn add_records(a: Record, b: Record) -> Record {
     ) == Record { win: 11, loss: 22, draw: 33 });
 })
 
-# The win rate of `self` in tenths of a percent (so 0.5 is 500), or `none` when
-# there is no decided match. Draws are left out of the denominator. Whole numbers
-# stand in for the original's floats until the language has them.
-fn winrate_permille(self: Record) -> i64? {
+# The share of the decided matches `self` won, as a fraction of 1 (an even record is
+# 0.5), or `none` when there is no decided match. Draws are left out of the denominator.
+fn win_rate(self: Record) -> Float? {
     let decided = self.win + self.loss;
-    if (decided > 0) { some(self.win * 1000 / decided) } else { none }
+    if (decided > 0) { some(self.win.to_float() / decided.to_float()) } else { none }
 }.test({
-    assert(Record { win: 0, loss: 0, draw: 4 }.winrate_permille() == none);
-    assert(Record { win: 1, loss: 1, draw: 0 }.winrate_permille() == some(500));
-    assert(Record { win: 2, loss: 1, draw: 9 }.winrate_permille() == some(666));
+    // Floats have no `==` of their own beside this file's, so the rate is rendered.
+    fn rendered(record: Record) -> str? { record.win_rate()$to_str() }
+    assert(rendered(Record { win: 0, loss: 0, draw: 4 }) == none);
+    assert(rendered(Record { win: 1, loss: 1, draw: 0 }) == some("0.5"));
+    assert(rendered(Record { win: 2, loss: 1, draw: 9 }) == some("0.6666666666666666"));
+    assert(rendered(Record { win: 0, loss: 3, draw: 0 }) == some("0.0"));
 })
 
 # `self` as a `Result`: `win`, `loss` or `draw`.

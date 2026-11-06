@@ -394,6 +394,15 @@ const BUILTINS: &[Builtin] = &[
          `saturating_remainder as %`.",
     ),
     Builtin::described(
+        Callee::ToFloat,
+        "fn to_float<T: int>(self: T) -> F",
+        "The integer as the nearest float: exact up to 2^53 for `IEEE754Float64` and 2^24 \
+         for `IEEE754Float32`, rounded to the nearest representable value beyond that, and \
+         never failing. Which float it is comes from where the call sits, as for a float \
+         literal: an annotation, a parameter, or the other operand of a float operation. \
+         With nothing to say, it is `IEEE754Float64`.",
+    ),
+    Builtin::described(
         Callee::FloatAdd,
         "fn float_add<T: float>(a: T, b: T) -> T",
         "Addition of IEEE 754 floats of one type; floats and integers never mix. Import it as the \
