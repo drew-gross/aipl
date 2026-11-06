@@ -38,6 +38,7 @@ import { match_value_or_err } from "./match_value_or_err.aipl";
 import { push_array_literal } from "./push_array_literal.aipl";
 import { push_loop_collect_ok } from "./push_loop_collect_ok.aipl";
 import { push_loop_pipeline } from "./push_loop_pipeline.aipl";
+import { push_loop_zip_with } from "./push_loop_zip_with.aipl";
 import { return_loop_any_all } from "./return_loop_any_all.aipl";
 import { return_loop_find_if } from "./return_loop_find_if.aipl";
 import { return_loop_find_index } from "./return_loop_find_index.aipl";
@@ -51,6 +52,7 @@ import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_imports } from "./unused_imports.aipl";
 import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
+import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 
 # Every hit the ported lints find in `program`.
 #
@@ -85,6 +87,8 @@ pub fn lint(program: Program) -> LintHit[] {
         ..eta_lambda(program),
         ..map_find_if_some(program),
         ..map_constant_repeat(program),
+        ..zip_with_pair_zip(program),
+        ..push_loop_zip_with(program),
         ..with_value_or_self(program),
         ..program.on_functions_filled(return_loop_find_index),
         ..interp_to_str(program),

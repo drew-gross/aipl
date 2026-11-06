@@ -1,0 +1,38 @@
+# The AIPL implementation of the `zip` builtin. The loader names this function by the
+# canonical name `__builtin_zip` (see `aipl_syntax::builtin`), so a user's
+# `xs.zip(ys)` specializes through the ordinary generic machinery — the in-file name
+# is only for this file's own tests, which read exactly like user code.
+#
+# `zip_with` with the pairing function left out: it is the one to reach for when the
+# pairs are what is wanted (to build a dict, to sort, to walk with a destructuring
+# `for`), and `zip_with` when each pair is only going to be combined. A lint steers a
+# `zip_with` whose function just builds the pair here (`zip_with_pair_zip`), and a
+# loop that pairs by index (`push_loop_zip_with`).
+#
+# The body is a loop rather than a `zip_with` call: the lint on that call would flag
+# the builtin that it advises.
+
+import { equal as ==, is_empty, push } from builtins;
+
+# The elements of both arrays paired up in order, stopping at the shorter one:
+# `[1, 2, 3].zip(["a", "b"])` is `[(1, "a"), (2, "b")]`. Callable as a method.
+pub fn zip<T: any, U: any>(self: T[], other: U[]) -> (T, U)[] {
+    mut out = [];
+    for (let i, x : self) {
+        let some(y) = other[i] else { return out; };
+        set out.push((x, y));
+    }
+    out
+}.test({
+    assert([1, 2, 3].zip(["a", "b", "c"]) == [(1, "a"), (2, "b"), (3, "c")]);
+    // The shorter array decides, whichever side it is.
+    assert([1, 2, 3].zip(["a"]) == [(1, "a")]);
+    assert([1].zip(["a", "b"]) == [(1, "a")]);
+    assert([1, 2].zip([""][..0]).is_empty());
+    assert([1][..0].zip(["a"]).is_empty());
+    // Free-call form.
+    assert(zip([1, 2], [true, false]) == [(1, true), (2, false)]);
+    // Reading a pair back out.
+    let pairs = [10, 20].zip(["x", "y"]);
+    assert(pairs[1] == some((20, "y")));
+})

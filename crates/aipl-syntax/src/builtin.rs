@@ -232,6 +232,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::OptLeftFold, "builtin_opt_left_fold.aipl"),
     Builtin::aipl(Callee::OptRightFold, "builtin_opt_right_fold.aipl"),
     Builtin::declared(Callee::ZipWith),
+    Builtin::aipl(Callee::Zip, "builtin_zip.aipl"),
     Builtin::declared(Callee::Trim),
     Builtin::declared(Callee::HeapStr),
     Builtin::declared(Callee::RopeStr),

@@ -7,6 +7,7 @@ lints:
 type checker:
   generic fns are only checked when reachable from a root (main/test); check them at the definition (Drew's own project)
   `set self[(0, 0)] = ..` types the tuple literal as i64, then rejects it as the index (needs a (u64, u64) annotation)
+  a `Span` cannot become an array: `[..names.range()]` fails with "__aipl_arr_reserve expects an array, got Span", so `names.zip(positions)` has no positions array; card_stats.aipl still builds (name, i) pairs by hand
 
 effects / shims:
   undeclared-effect error in a test should say to add a `shim`

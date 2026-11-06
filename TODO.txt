@@ -716,6 +716,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    <any array generator> -> to_dict is probably good fusion to have to avoid materializing that array
     collect_ok fusions
     make consecutive set operations fuse when all adding to the same set (e.g. union chains)
     extend(xs.map(f))

@@ -1,0 +1,191 @@
+# The `push_loop_zip_with` lint:
+#
+#     mut out = [];
+#     for (let i, x : xs) {
+#         if (let some(y) = ys[i]) {
+#             set out.push(f(x, y));
+#         };
+#     }
+#
+# — an array seeded empty and filled by a loop that walks one array by position and, for
+# each element the other array also has, pushes something derived from the pair. That is
+# `xs.zip_with(ys, |x, y| f(x, y))`, which says the array *is* the paired elements, and
+# `xs.zip(ys)` when what is pushed is just `(x, y)`. Both stop at the shorter array, as
+# the loop does: an `xs` longer than `ys` finds `ys[i]` missing from there on.
+#
+# The shape has to be exactly this. The `if let` is what makes the loop stop at the
+# shorter array; a `ys[i].value_or(d)` carries on past the end of `ys` with a default,
+# which `zip_with` does not do, so it is not advised. Anything else in the loop is work
+# the pipeline has nowhere to put, `ys` has to be a plain name (it is read once per
+# element here and once in the rewrite, so a call would run a different number of
+# times), and the pushed value may not read the array being built, the position, or use
+# `?`, none of which a lambda has.
+#
+# What this cannot check is that `xs` and `ys` are arrays: a `for` also walks a `str`'s
+# bytes and a dict's keys (where the "position" is the key), and which it is only becomes
+# known two passes later. Neither is an array for `zip_with` to take, and `#[allow]` is
+# the answer there, as it is for `push_loop_pipeline`.
+#
+# The hit points at the seed.
+
+import {
+    as_case,
+    collect_ok,
+    contains,
+    equal as ==,
+    is_nonempty,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+} from builtins;
+import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import { Ctor } from "../pat.aipl";
+import {
+    SeededLoop,
+    indexed_seeded_loops,
+    is_liftable,
+    pipeline_hit,
+    pushed,
+} from "./accumulation.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import {
+    LintHit,
+    UnfilledHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+} from "./lint_hit.aipl";
+import { lone_statement } from "./loop_shape.aipl";
+
+# A hit for each array the program seeds empty and fills with a loop pairing two arrays by
+# position.
+pub fn push_loop_zip_with(program: Program) -> LintHit[] {
+    let some(push) = program.items.imported_as("push") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body.indexed_seeded_loops()$zip_hit(push).collect_ok()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[], ys: i64[]) -> i64[] \{ {body} }`,
+            push_loop_zip_with,
+        )
+    }
+    // The loop the lint is about, pushing `pushed` for each pair.
+    fn pairing(pushed: str) -> str {
+        `mut out = []; for (let i, x : xs) \{ if (let some(y) = ys[i]) \{ set out.push({pushed}); }; } out`
+    }
+    // What the lint says of a loop that is `advice`.
+    fn message(advice: str) -> str {
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = {advice};" and drop the loop`
+    }
+    let all = "push, zip_with, zip";
+
+    // A derived value is a `zip_with`; the pair itself is a `zip`.
+    assert(messages(all, pairing("x * y"))? == [message("xs.zip_with(ys, |x, y| ..)")]);
+    assert(messages(all, pairing("(x, y)"))? == [message("xs.zip(ys)")]);
+
+    // An import the file lacks is named; an alias is followed.
+    assert(messages("push", pairing("x * y"))? == [
+        ```"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.zip_with(ys, |x, y| ..);" and drop the loop, importing `zip_with` from builtins```,
+    ]);
+    assert(messages("push, zip_with as pair", pairing("x * y"))? == [
+        message("xs.pair(ys, |x, y| ..)"),
+    ]);
+
+    // Not the shape: no `push` import (some other function), a plain loop, a `value_or`
+    // that carries on past the end of `ys`, a seed that holds something, a second
+    // statement in the loop, an `else`, a partner read at another position, a partner that
+    // is not a plain name, and a partner that is the array being built.
+    assert(messages("zip_with, zip", pairing("x * y"))? == []);
+    assert(messages(all, "mut out = []; for (let x : xs) { set out.push(x); } out")? == []);
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let i, x : xs) { set out.push(x * ys[i].value_or(0)); } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = [0]; for (let i, x : xs) { if (let some(y) = ys[i]) { set out.push(x * y); }; } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let i, x : xs) { g(x); if (let some(y) = ys[i]) { set out.push(x * y); }; } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let i, x : xs) { if (let some(y) = ys[i]) { set out.push(x * y); } else { g(x); }; } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let i, x : xs) { if (let some(y) = ys[0]) { set out.push(x * y); }; } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let i, x : xs) { if (let some(y) = g()[i]) { set out.push(x * y); }; } out",
+        )? == [],
+    );
+    assert(
+        messages(
+            all,
+            "mut out = []; for (let i, x : xs) { if (let some(y) = out[i]) { set out.push(x * y); }; } out",
+        )? == [],
+    );
+
+    // The pushed value uses what a lambda would not have: the position, the array being
+    // built, or `?`.
+    assert(messages(all, pairing("x * y + i"))? == []);
+    assert(messages(all, pairing("x * out.len()"))? == []);
+    assert(messages(all, pairing("g(x, y)?"))? == []);
+})
+
+# `self` as the advice for the loop it is, when it is a loop pairing two arrays by position.
+fn zip_hit(self: SeededLoop, push: str) -> UnfilledHit? {
+    let some(position) = self.index else { return none; };
+    let ArrayLit(elements) = self.seed.kind.as_case(ArrayLit)?;
+    if (elements.is_nonempty()) { return none; };
+
+    // The body is the `if let` that stops at the shorter array, with nothing else in it.
+    let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case(IfLet)?;
+    if (otherwise.kind != Unit) { return none; };
+    let Ctor("some", bindings, _) = arm.pattern else { return none; };
+    let [partner] = bindings else { return none; };
+
+    // `other[position]`, with `other` a name that is neither the array being built nor one
+    // of the loop's own bindings.
+    let Index(array, at) = scrutinee.kind.as_case(Index)?;
+    let Ident(other) = array.kind.as_case(Ident)?;
+    if (at.kind != Ident(position) || [self.name, self.variable, position].contains(other)) {
+        return none;
+    };
+
+    let added = arm.body.lone_statement()?.pushed(self.name, push)?.element;
+    if (!added.is_liftable(self.name) || added.mentions_any([position], none)) { return none; };
+    let stage = if (added.is_pair_of(self.variable, partner)) {
+        ("zip", `({other})`)
+    } else {
+        ("zip_with", `({other}, |{self.variable}, {partner}| ..)`)
+    };
+    some(self.pipeline_hit("filled by this loop and nothing else", "", [stage]))
+}
+
+# Whether `self` is the tuple of the names `first` and `second`, in that order.
+fn is_pair_of(self: Expr, first: str, second: str) -> bool {
+    let TupleLit(elements) = self.kind else { return false; };
+    let [left, right] = elements else { return false; };
+    left.kind == Ident(first) && right.kind == Ident(second)
+}

@@ -1870,6 +1870,8 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/map_find_if_some.aipl",
     "./lint/map_constant_repeat.aipl",
     "./lint/with_value_or_self.aipl",
+    "./lint/zip_with_pair_zip.aipl",
+    "./lint/push_loop_zip_with.aipl",
     "./lint/push_loop_pipeline.aipl",
     "./lint/extend_loop_map_join.aipl",
     "./lint/interpolation.aipl",

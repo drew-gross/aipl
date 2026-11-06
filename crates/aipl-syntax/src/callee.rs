@@ -129,6 +129,7 @@ pub enum Callee {
     OptLeftFold,
     OptRightFold,
     ZipWith,
+    Zip,
     Trim,
     /// The `*_str` family: the content of the argument in one **named** runtime
     /// representation (`crates/aipl-codegen/src/str24.rs`'s `buffer` / `inline` /
@@ -516,6 +517,7 @@ impl Callee {
             Callee::OptLeftFold => "__builtin_opt_left_fold",
             Callee::OptRightFold => "__builtin_opt_right_fold",
             Callee::ZipWith => "__builtin_zip_with",
+            Callee::Zip => "__builtin_zip",
             Callee::Trim => "__builtin_trim",
             Callee::HeapStr => "__builtin_heap_str",
             Callee::RopeStr => "__builtin_rope_str",

@@ -1,0 +1,110 @@
+# The `zip_with_pair_zip` lint:
+#
+#     xs.zip_with(ys, |a, b| { (a, b) })
+#
+# — a `zip_with` whose function does nothing but build the pair of its two arguments, in
+# the order it got them. That is `xs.zip(ys)`, which says the result *is* the pairs
+# instead of a function the reader has to read to find out that it combines nothing.
+#
+# Exactly this shape: a function with two parameters and a body that is the tuple of
+# those parameters, first then second. A swapped pair is a different array, and a body
+# that computes anything is a real combining function, which `zip_with` is for.
+#
+# The hit points at the function, which begins on the line the `#[allow]` would be
+# written on.
+
+import {
+    collect_ok,
+    equal as ==,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Call, Expr, Ident, Lambda, TupleLit, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function, Program } from "../item.aipl";
+import {
+    LintHit,
+    Named,
+    UnfilledHit,
+    imported_as,
+    lint_messages,
+    on_functions_filled,
+    quote,
+} from "./lint_hit.aipl";
+
+# A hit for each `zip_with` whose function only pairs its two arguments.
+pub fn zip_with_pair_zip(program: Program) -> LintHit[] {
+    let some(zip_with_name) = program.items.imported_as("zip_with") else { return []; };
+    program.on_functions_filled(|Function { body }| {
+        body
+            .descendants()
+            .map(
+                |call| {
+                    let Call(callee, arguments, _) = call.kind else { return none; };
+                    let [receiver, other, function] = arguments else { return none; };
+                    if (callee != zip_with_name || !function.only_pairs()) { return none; };
+                    some(UnfilledHit {
+                        named: [
+                            Named {
+                                text: `"{zip_with_name}" with a function that only pairs its arguments is "{receiver.quote("<items>")}.`,
+                                builtin: "zip",
+                            },
+                        ],
+                        tail: `({other.quote("<other>")})"`,
+                        span: function.span,
+                    })
+                },
+            )
+            .collect_ok()
+    })
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_messages(
+            `import \{ {imports} } from builtins; fn f(xs: i64[], ys: str[]) -> (i64, str)[] \{ {body} }`,
+            zip_with_pair_zip,
+        )
+    }
+
+    // Flagged, in method and free-call form; the parameter names do not matter.
+    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (a, b) })")? == [
+        `"zip_with" with a function that only pairs its arguments is "xs.zip(ys)"`,
+    ]);
+    assert(messages("zip_with, zip", "zip_with(xs, ys, |left, right| { (left, right) })")? == [
+        `"zip_with" with a function that only pairs its arguments is "xs.zip(ys)"`,
+    ]);
+
+    // An import the file lacks is named, and an alias is followed.
+    assert(messages("zip_with", "xs.zip_with(ys, |a, b| { (a, b) })")? == [
+        ```"zip_with" with a function that only pairs its arguments is "xs.zip(ys)", importing `zip` from builtins```,
+    ]);
+    assert(messages("zip_with as pair_up, zip", "xs.pair_up(ys, |a, b| { (a, b) })")? == [
+        `"pair_up" with a function that only pairs its arguments is "xs.zip(ys)"`,
+    ]);
+
+    // Receivers that cannot be quoted are placeholders.
+    assert(messages("zip_with, zip", "g().zip_with(h(), |a, b| { (a, b) })")? == [
+        `"zip_with" with a function that only pairs its arguments is "<items>.zip(<other>)"`,
+    ]);
+
+    // Not the shape: the pair swapped (a different array), a body that computes
+    // something, a function over one value used twice, a `zip_with` the file never
+    // imported, and another function of the same shape.
+    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (b, a) })")? == []);
+    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (a + 1, b) })")? == []);
+    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (a, a) })")? == []);
+    assert(messages("zip", "xs.zip_with(ys, |a, b| { (a, b) })")? == []);
+    assert(messages("zip_with, zip", "xs.map(|a| { (a, a) })")? == []);
+})
+
+# Whether `self` is a function of two parameters whose body is the pair of them, in order.
+fn only_pairs(self: Expr) -> bool {
+    let Lambda(parameters, body) = self.kind else { return false; };
+    let [first, second] = parameters else { return false; };
+    let TupleLit(elements) = body.kind else { return false; };
+    let [left, right] = elements else { return false; };
+    left.kind == Ident(first.name) && right.kind == Ident(second.name)
+}

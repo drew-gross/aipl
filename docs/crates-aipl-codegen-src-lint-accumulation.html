@@ -35,7 +35,7 @@ for (let x : xs) {
           </h3>
           <pre class="signature"><code>struct SeededLoop</code></pre>
 
-          <div class="doc"><p>A binding <code>name</code> seeded at <code>seed</code> (annotated as <code>annotation</code>, when it is) and filled by the loop right after it, which binds each element as <code>variable</code> and runs <code>body</code> for it.</p></div>
+          <div class="doc"><p>A binding <code>name</code> seeded at <code>seed</code> (annotated as <code>annotation</code>, when it is) and filled by the loop right after it, which binds each element as <code>variable</code> (and its position as <code>index</code>, for the two-binder form) and runs <code>body</code> for it.</p></div>
 
 
         </section>
@@ -49,7 +49,21 @@ for (let x : xs) {
           </h3>
           <pre class="signature"><code>pub fn seeded_loops(self: Expr) -&#62; SeededLoop[]</code></pre>
 
-          <div class="doc"><p>Every [<code>SeededLoop</code>] in <code>self</code> and under it. The loop has to be the very next statement: one between the two could read the binding while it is still empty, which the rewrite would reorder. An <em>indexed</em> loop is not this shape: <code>map</code> and <code>filter</code> pass each element and have no index to pass with it, so the rewrite would silently drop whatever the body did with it.</p></div>
+          <div class="doc"><p>Every [<code>SeededLoop</code>] in <code>self</code> and under it whose loop is not indexed. The loop has to be the very next statement: one between the two could read the binding while it is still empty, which the rewrite would reorder. An <em>indexed</em> loop is not this shape: <code>map</code> and <code>filter</code> pass each element and have no index to pass with it, so the rewrite would silently drop whatever the body did with it. [<code>indexed_seeded_loops</code>] has those.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-indexed_seeded_loops">
+          <h3>
+            <a class="anchor" href="#item-indexed_seeded_loops">indexed_seeded_loops</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn indexed_seeded_loops(self: Expr) -&#62; SeededLoop[]</code></pre>
+
+          <div class="doc"><p>Every [<code>SeededLoop</code>] in <code>self</code> and under it whose loop is indexed: the same shape as [<code>seeded_loops</code>], for the lints whose rewrite takes a position from somewhere other than the loop.</p></div>
 
 
         </section>
@@ -215,6 +229,20 @@ for (let x : xs) {
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-indexed_names">
+          <h3>
+            <a class="anchor" href="#item-indexed_names">indexed_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn indexed_names(src: str) -&#62; str[]!ParseError</code></pre>
+
+          <div class="doc"><p>The name of each [<code>indexed_seeded_loops</code>] the block <code>src</code> holds.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-seeded_names">

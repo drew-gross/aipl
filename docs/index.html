@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">209 files, 1855 items.</p>
+      <p class="summary">212 files, 1863 items.</p>
 
       <ul class="files">
 
@@ -1771,7 +1771,7 @@
           <p class="file-summary">What the lints on a binding seeded and then filled by the loop that follows it (<code>push_loop_pipeline</code>, <code>extend_loop_map_join</code>, <code>push_loop_collect_ok</code>, <code>union_loop_union_all</code>) share: recognising the seed and the loop, and phrasing the pipeline that loop is. For an array filled with one expression per element:</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-accumulation.html#private">5 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-accumulation.html#private">6 private</a></span>
 
 
           <ul class="items">
@@ -1783,6 +1783,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-accumulation.html#item-seeded_loops"><code>seeded_loops</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-accumulation.html#item-indexed_seeded_loops"><code>indexed_seeded_loops</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2919,6 +2924,26 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-push_loop_zip_with.html">crates/aipl-codegen/src/lint/push_loop_zip_with.aipl</a>
+
+          <p class="file-summary">The <code>push_loop_zip_with</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-push_loop_zip_with.html#private">2 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-push_loop_zip_with.html#item-push_loop_zip_with"><code>push_loop_zip_with</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-result_match.html">crates/aipl-codegen/src/lint/result_match.aipl</a>
 
           <p class="file-summary">What the lints on a <code>match</code> over a result share: recognising the two-arm <code>ok(v) =&gt; .., err(e) =&gt; ..</code> shape, and telling an arm that hands its binding straight back from one that rebuilds it.</p>
@@ -3257,6 +3282,26 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-with_value_or_self.html#item-with_value_or_self"><code>with_value_or_self</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-zip_with_pair_zip.html">crates/aipl-codegen/src/lint/zip_with_pair_zip.aipl</a>
+
+          <p class="file-summary">The <code>zip_with_pair_zip</code> lint:</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-zip_with_pair_zip.html#private">1 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-zip_with_pair_zip.html#item-zip_with_pair_zip"><code>zip_with_pair_zip</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -5653,6 +5698,24 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_words.html#item-words"><code>words</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_zip.html">crates/aipl-mono/src/builtin_zip.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>zip</code> builtin. The loader names this function by the canonical name <code>__builtin_zip</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>xs.zip(ys)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_zip.html#item-zip"><code>zip</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

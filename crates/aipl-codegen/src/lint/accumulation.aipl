@@ -22,6 +22,7 @@ import {
     collect_ok,
     drop_last,
     equal as ==,
+    filter,
     is_empty,
     is_nonempty,
     is_some,
@@ -57,24 +58,25 @@ import { Named, UnfilledHit } from "./lint_hit.aipl";
 import { is_lambda_safe, iterable_text, lone_statement } from "./loop_shape.aipl";
 
 # A binding `name` seeded at `seed` (annotated as `annotation`, when it is) and filled
-# by the loop right after it, which binds each element as `variable` and runs `body`
-# for it.
+# by the loop right after it, which binds each element as `variable` (and its position
+# as `index`, for the two-binder form) and runs `body` for it.
 struct SeededLoop {
     name: str,
     annotation: Ty?,
     seed: Expr,
     variable: str,
+    index: str?,
     iterable: Expr,
     body: Expr,
 }
 
-# Every [`SeededLoop`] in `self` and under it. The loop has to be the very next
-# statement: one between the two could read the binding while it is still empty, which
-# the rewrite would reorder. An *indexed* loop is not this shape: `map` and `filter`
-# pass each element and have no index to pass with it, so the rewrite would silently
-# drop whatever the body did with it.
+# Every [`SeededLoop`] in `self` and under it whose loop is not indexed. The loop has to
+# be the very next statement: one between the two could read the binding while it is
+# still empty, which the rewrite would reorder. An *indexed* loop is not this shape:
+# `map` and `filter` pass each element and have no index to pass with it, so the rewrite
+# would silently drop whatever the body did with it. [`indexed_seeded_loops`] has those.
 pub fn seeded_loops(self: Expr) -> SeededLoop[] {
-    self.collect_expr_cases(LetMut)$seeded_loop().collect_ok()
+    self.collect_expr_cases(LetMut)$seeded_loop().collect_ok().filter(|l| !l.index.is_some())
 }.test({
     assert(seeded_names("{ mut a = []; for (let x : xs) { g(x); } a }")? == ["a"]);
 
@@ -88,6 +90,24 @@ pub fn seeded_loops(self: Expr) -> SeededLoop[] {
     assert(seeded_names("{ mut a = []; a }")? == []);
 })
 
+# Every [`SeededLoop`] in `self` and under it whose loop is indexed: the same shape as
+# [`seeded_loops`], for the lints whose rewrite takes a position from somewhere other
+# than the loop.
+pub fn indexed_seeded_loops(self: Expr) -> SeededLoop[] {
+    self.collect_expr_cases(LetMut)$seeded_loop().collect_ok().filter(|l| l.index.is_some())
+}.test({
+    assert(indexed_names("{ mut a = []; for (let i, x : xs) { g(x); } a }")? == ["a"]);
+    // A plain loop, a statement between the seed and the loop, and no loop at all.
+    assert(indexed_names("{ mut a = []; for (let x : xs) { g(x); } a }")? == []);
+    assert(indexed_names("{ mut a = []; g(); for (let i, x : xs) { g(x); } a }")? == []);
+    assert(indexed_names("{ mut a = []; a }")? == []);
+})
+
+# The name of each [`indexed_seeded_loops`] the block `src` holds.
+fn indexed_names(src: str) -> str[]!ParseError {
+    ok(lower_aipl_block_surface(src)?.indexed_seeded_loops()$name)
+}
+
 # The name of each [`seeded_loops`] the block `src` holds.
 fn seeded_names(src: str) -> str[]!ParseError {
     ok(lower_aipl_block_surface(src)?.seeded_loops()$name)
@@ -100,8 +120,7 @@ fn seeded_loop(self: LetMut(name, annotation, seed, rest)) -> SeededLoop? {
     // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
     // from being passed as a function value.
     let For(variable, iterable, body, index) = first.kind else { return none; }; #[allow]
-    if (index.is_some()) { return none; };
-    some(SeededLoop { name, annotation, seed, variable, iterable, body })
+    some(SeededLoop { name, annotation, seed, variable, index, iterable, body })
 }
 
 # An array `name` seeded empty and filled by a loop over `iterable`, which binds each

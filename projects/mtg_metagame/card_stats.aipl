@@ -17,6 +17,7 @@ import {
     try_set,
     value_or,
     wrapping_add as +,
+    zip_with,
 } from builtins;
 import { Card, Deck } from "./metagame.aipl";
 
@@ -75,11 +76,7 @@ pub fn card_counts(decks: Deck[]) -> CardCount[] {
             set totals.try_set(i, totals[i].value_or(0) + card.count);
         };
     }
-    mut counts: CardCount[] = [];
-    for (let i, name : names) {
-        set counts.push(CardCount { name, count: totals[i].value_or(0) });
-    }
-    counts.sort_by(is_listed_before)
+    names.zip_with(totals, |name, count| { CardCount { name, count } }).sort_by(is_listed_before)
 }.test({
     let deck = |main: Card[], side: Card[]| {
         Deck {
