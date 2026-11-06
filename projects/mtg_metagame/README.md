@@ -24,7 +24,7 @@ from this directory.
 | `main.aipl` | the command line: resolve the name, load, print |
 | `metagame.aipl` | `Metagame`, `Deck`, `Card`, `Match`, `Record`; decoding them from JSON; `load_metagame` |
 | `card_stats.aipl` | `card_counts`: copies played per card |
-| `json.aipl` | a JSON parser and the accessors the decoder uses |
+| `json.aipl` | accessors over the `parse_json` builtin's tree: `field`, `text_field`, `integer_field`, `list_field` |
 
 The files are unpacked by running `gzip -dc` (`execute_program`): nothing here
 reads binary files or decompresses yet.

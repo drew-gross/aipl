@@ -2,9 +2,9 @@
 # archetype is, and how well it does. A port of `mtg_metagame_stats`, grown one
 # piece at a time.
 
-import { equal as ==, print, read_file_to_string, value_or } from builtins;
+import { Json, equal as ==, parse_json, print, read_file_to_string, value_or } from builtins;
 import { CardCount, card_counts } from "./card_stats.aipl";
-import { Json, optional_text_field, parse_json } from "./json.aipl";
+import { optional_text_field } from "./json.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
 
 # The file in `data/` that `name` stands for: the file `index` maps it to, or

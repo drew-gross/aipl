@@ -4,11 +4,13 @@
 
 import {
     ExecResult,
+    Json,
     collect_ok,
     equal as ==,
     execute_program,
     greater_than as >,
     not_equal as !=,
+    parse_json,
     saturating_divide as /,
     try_map,
     value_or,
@@ -17,12 +19,10 @@ import {
     wrapping_mul as *,
 } from builtins;
 import {
-    Json,
     field,
     integer_field,
     list_field,
     optional_text_field,
-    parse_json,
     scalar_text,
     text_field,
 } from "./json.aipl";

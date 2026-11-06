@@ -1,276 +1,27 @@
-# A JSON parser: text in, a `Json` tree out.
-#
-# Numbers stay text (`Number("12")`): what one means is the consumer's policy,
-# and `int_parse` is the way to read one as an integer. Strings are decoded for
-# the escapes JSON writes for quotes, backslashes and the usual control
-# characters; a `\u` escape is refused, since nothing here can make a character
-# from a code point yet.
+# Reading a `Json` tree: looking a field up and taking it as text, a whole number
+# or a list. The tree comes from the `parse_json` builtin.
 
 import {
+    Array,
+    Bool,
+    Json,
+    Member,
+    Null,
+    Number,
+    Object,
+    String,
     equal as ==,
     find_map,
     int_parse,
-    is_digit,
-    len,
-    logical_not as !,
-    not_equal as !=,
-    push,
-    starts_with,
     value_or_err,
-    wrapping_add as +,
-    wrapping_add_assign as +=,
-    wrapping_increment as ++,
 } from builtins;
-
-# A parsed JSON value.
-variant Json = Null | Bool(bool) | Number(str) | Text(str) | List(Json[]) | Object(Member[])
-
-# One `"key": value` pair of an object, in source order.
-struct Member { key: str, value: Json }
-
-# A value, and the position just past it.
-struct Parsed { value: Json, next: u64 }
-
-# A decoded string, and the position just past its closing quote.
-struct ParsedText { text: str, next: u64 }
-
-# `text` as JSON, or what is wrong with it and where.
-pub fn parse_json(text: str) -> Json!str {
-    let Parsed { value, next } = parse_value(text, skip_space(text, 0))?;
-    let end = skip_space(text, next);
-    if (end == text.len()) {
-        ok(value)
-    } else {
-        err(`unexpected text after the value, at byte {end}`)
-    }
-}.test({
-    assert(parse_json("null") == ok(Null));
-    assert(parse_json("  [1, true]\n") == ok(List([Number("1"), Bool(true)])));
-    assert(parse_json("""{"a": {"b": []}}""") == ok(Object([
-        Member { key: "a", value: Object([Member { key: "b", value: List([]) }]) },
-    ])));
-    assert(parse_json("[1] 2") == err("unexpected text after the value, at byte 4"));
-    assert(parse_json("") == err("expected a value at byte 0, found the end"));
-})
-
-# The position of the first byte at or after `start` that is not JSON whitespace.
-fn skip_space(text: str, start: u64) -> u64 {
-    mut i = start;
-    while (true) {
-        match (text[i]) {
-            some(' ') | some('\n') | some('\t') | some('\r') => {
-                set i++;
-            },
-            _ => {
-                return i;
-            },
-        };
-    }
-    i
-}.test({
-    assert(skip_space("  x", 0) == 2);
-    assert(skip_space("x", 0) == 0);
-    assert(skip_space(" \n\t\r", 0) == 4);
-    assert(skip_space("", 0) == 0);
-})
-
-# The value that starts at `start`, which is not whitespace.
-fn parse_value(text: str, start: u64) -> Parsed!str {
-    match (text[start]) {
-        none => err(`expected a value at byte {start}, found the end`),
-        some('{') => parse_object(text, start + 1),
-        some('[') => parse_list(text, start + 1),
-        some('"') => {
-            let t = parse_text(text, start + 1)?;
-            ok(Parsed { value: Text(t.text), next: t.next })
-        },
-        some('t') => parse_word(text, start, "true", Bool(true)),
-        some('f') => parse_word(text, start, "false", Bool(false)),
-        some('n') => parse_word(text, start, "null", Null),
-        some(_) => parse_number(text, start),
-    }
-}.test({
-    assert(parse_value("7,", 0) == ok(Parsed { value: Number("7"), next: 1 }));
-    assert(parse_value("?", 0) == err("expected a number at byte 0"));
-})
-
-# The literal `word` at `start`, standing for `value`.
-fn parse_word(text: str, start: u64, word: str, value: Json) -> Parsed!str {
-    if (text[start..].starts_with(word)) {
-        ok(Parsed { value, next: start + word.len() })
-    } else {
-        err(`expected {word} at byte {start}`)
-    }
-}.test({
-    assert(parse_word("true!", 0, "true", Bool(true)) == ok(Parsed { value: Bool(true), next: 4 }));
-    assert(parse_word("tru", 0, "true", Bool(true)) == err("expected true at byte 0"));
-})
-
-# The number at `start`: the run of characters a JSON number is written with.
-fn parse_number(text: str, start: u64) -> Parsed!str {
-    mut i = start;
-    while (true) {
-        match (text[i]) {
-            some(c) => {
-                if (!c.is_number_char()) { return finish_number(text, start, i); };
-                set i++;
-            },
-            none => {
-                return finish_number(text, start, i);
-            },
-        };
-    }
-    err("unreachable")
-}.test({
-    assert(parse_number("-12.5e3]", 0) == ok(Parsed { value: Number("-12.5e3"), next: 7 }));
-    assert(parse_number("42", 0) == ok(Parsed { value: Number("42"), next: 2 }));
-    assert(parse_number("x", 0) == err("expected a number at byte 0"));
-})
-
-# The number spelled by `text[start..end]`, which must not be empty.
-fn finish_number(text: str, start: u64, end: u64) -> Parsed!str {
-    if (end == start) {
-        err(`expected a number at byte {start}`)
-    } else {
-        ok(Parsed { value: Number(text[start..end]), next: end })
-    }
-}.test({
-    assert(finish_number("12", 0, 2) == ok(Parsed { value: Number("12"), next: 2 }));
-    assert(finish_number("12", 1, 1) == err("expected a number at byte 1"));
-})
-
-# True for a character a JSON number may contain.
-fn is_number_char(self: char) -> bool {
-    match (self) {
-        '-' | '+' | '.' | 'e' | 'E' => true,
-        _ => self.is_digit(),
-    }
-}.test({
-    assert('7'.is_number_char());
-    assert('-'.is_number_char());
-    assert('e'.is_number_char());
-    assert(!'x'.is_number_char());
-})
-
-# The string whose contents start at `start`, just past its opening quote.
-fn parse_text(text: str, start: u64) -> ParsedText!str {
-    mut out = "";
-    mut i = start;
-    mut chunk = start;
-    while (true) {
-        match (text[i]) {
-            none => {
-                return err(`unterminated string starting at byte {start}`);
-            },
-            some('"') => {
-                return ok(ParsedText { text: `{out}{text[chunk..i]}`, next: i + 1 });
-            },
-            some('\\') => {
-                let decoded = match (text[i + 1]) {
-                    some('"') => `"`,
-                    some('\\') => """\""",
-                    some('/') => "/",
-                    some('n') => "\n",
-                    some('t') => "\t",
-                    some('r') => "\r",
-                    _ => {
-                        return err(`unsupported escape at byte {i}`);
-                    },
-                };
-                set out = `{out}{text[chunk..i]}{decoded}`;
-                set i += 2;
-                set chunk = i;
-            },
-            some(_) => {
-                set i++;
-            },
-        };
-    }
-    err("unreachable")
-}.test({
-    assert(parse_text(`abc" tail`, 0) == ok(ParsedText { text: "abc", next: 4 }));
-    assert(parse_text(`a\\"b\\\\c\\n"`, 0) == ok(ParsedText { text: `a"b\\c\n`, next: 10 }));
-    // Bytes are scanned, and the slice between quotes is whole characters.
-    assert(parse_text(`é//é"`, 0) == ok(ParsedText { text: "é//é", next: 7 }));
-    assert(parse_text("open", 0) == err("unterminated string starting at byte 0"));
-    assert(parse_text(`\\x"`, 0) == err("unsupported escape at byte 0"));
-})
-
-# The elements of the list whose contents start at `start`, just past its `[`.
-fn parse_list(text: str, start: u64) -> Parsed!str {
-    mut items: Json[] = [];
-    mut i = skip_space(text, start);
-    if (text[i] == some(']')) { return ok(Parsed { value: List(items), next: i + 1 }); };
-    while (true) {
-        let Parsed { value, next } = parse_value(text, skip_space(text, i))?;
-        set items.push(value);
-        set i = skip_space(text, next);
-        match (text[i]) {
-            some(',') => {
-                set i++;
-            },
-            some(']') => {
-                return ok(Parsed { value: List(items), next: i + 1 });
-            },
-            _ => {
-                return err(`expected , or ] at byte {i}`);
-            },
-        };
-    }
-    err("unreachable")
-}.test({
-    assert(parse_list("]", 0) == ok(Parsed { value: List([]), next: 1 }));
-    assert(parse_list("1, 2 ]x", 0) == ok(Parsed {
-        value: List([Number("1"), Number("2")]),
-        next: 6,
-    }));
-    assert(parse_list("1 2]", 0) == err("expected , or ] at byte 2"));
-    assert(parse_list("1,", 0) == err("expected a value at byte 2, found the end"));
-})
-
-# The members of the object whose contents start at `start`, just past its `{`.
-fn parse_object(text: str, start: u64) -> Parsed!str {
-    mut members: Member[] = [];
-    mut i = skip_space(text, start);
-    if (text[i] == some('}')) { return ok(Parsed { value: Object(members), next: i + 1 }); };
-    while (true) {
-        set i = skip_space(text, i);
-        if (text[i] != some('"')) { return err(`expected a key at byte {i}`); };
-        let key = parse_text(text, i + 1)?;
-        set i = skip_space(text, key.next);
-        if (text[i] != some(':')) { return err(`expected : at byte {i}`); };
-        let value = parse_value(text, skip_space(text, i + 1))?;
-        set members.push(Member { key: key.text, value: value.value });
-        set i = skip_space(text, value.next);
-        match (text[i]) {
-            some(',') => {
-                set i++;
-            },
-            some('}') => {
-                return ok(Parsed { value: Object(members), next: i + 1 });
-            },
-            _ => {
-                return err(`expected , or }} at byte {i}`);
-            },
-        };
-    }
-    err("unreachable")
-}.test({
-    assert(parse_object("}", 0) == ok(Parsed { value: Object([]), next: 1 }));
-    assert(parse_object(`"a": 1, "b": null\}`, 0) == ok(Parsed {
-        value: Object([Member { key: "a", value: Number("1") }, Member { key: "b", value: Null }]),
-        next: 18,
-    }));
-    assert(parse_object("1}", 0) == err("expected a key at byte 0"));
-    assert(parse_object(`"a" 1\}`, 0) == err("expected : at byte 4"));
-})
 
 # The value stored under `key`, if `self` is an object that has one. With a key
 # repeated, the first.
 pub fn field(self: Json, key: str) -> Json? {
     match (self) {
         Object(members) => members.find_map(|m| if (m.key == key) { some(m.value) } else { none }),
-        Null | Bool(..) | Number(..) | Text(..) | List(..) => none,
+        Null | Bool(..) | Number(..) | String(..) | Array(..) => none,
     }
 }.test({
     let object = Object([
@@ -287,11 +38,11 @@ pub fn field(self: Json, key: str) -> Json? {
 # The elements of `self`, if it is a list.
 pub fn elements(self: Json) -> Json[]? {
     match (self) {
-        List(items) => some(items),
-        Null | Bool(..) | Number(..) | Text(..) | Object(..) => none,
+        Array(items) => some(items),
+        Null | Bool(..) | Number(..) | String(..) | Object(..) => none,
     }
 }.test({
-    assert(List([Null]).elements() == some([Null]));
+    assert(Array([Null]).elements() == some([Null]));
     assert(Null.elements() == none);
     assert(Object([]).elements() == none);
 })
@@ -299,27 +50,27 @@ pub fn elements(self: Json) -> Json[]? {
 # `self` as text, if it is a string or a number (written as it was).
 pub fn scalar_text(self: Json) -> str? {
     match (self) {
-        Text(t) | Number(t) => some(t),
-        Null | Bool(..) | List(..) | Object(..) => none,
+        String(t) | Number(t) => some(t),
+        Null | Bool(..) | Array(..) | Object(..) => none,
     }
 }.test({
-    assert(Text("a").scalar_text() == some("a"));
+    assert(String("a").scalar_text() == some("a"));
     assert(Number("12").scalar_text() == some("12"));
     assert(Null.scalar_text() == none);
-    assert(List([]).scalar_text() == none);
+    assert(Array([]).scalar_text() == none);
 })
 
 # `self` as a whole number, if it is a number written as one.
 pub fn integer(self: Json) -> i64? {
     match (self) {
         Number(t) => t.int_parse(),
-        Null | Bool(..) | Text(..) | List(..) | Object(..) => none,
+        Null | Bool(..) | String(..) | Array(..) | Object(..) => none,
     }
 }.test({
     assert(Number("7").integer() == some(7));
     assert(Number("-7").integer() == some(-7));
     assert(Number("1.5").integer() == none);
-    assert(Text("7").integer() == none);
+    assert(String("7").integer() == none);
 })
 
 # The text (a string, or a number as written) under `key`, or why there is none.
@@ -328,7 +79,7 @@ pub fn text_field(self: Json, key: str) -> str!str {
     value.scalar_text().value_or_err(`"{key}" is not text`)
 }.test({
     let object = Object([
-        Member { key: "a", value: Text("x") },
+        Member { key: "a", value: String("x") },
         Member { key: "n", value: Number("5") },
         Member { key: "z", value: Null },
     ]);
@@ -346,7 +97,10 @@ pub fn optional_text_field(self: Json, key: str) -> str? {
         none => none,
     }
 }.test({
-    let object = Object([Member { key: "a", value: Text("x") }, Member { key: "z", value: Null }]);
+    let object = Object([
+        Member { key: "a", value: String("x") },
+        Member { key: "z", value: Null },
+    ]);
     assert(object.optional_text_field("a") == some("x"));
     assert(object.optional_text_field("z") == none);
     assert(object.optional_text_field("q") == none);
@@ -359,7 +113,7 @@ pub fn integer_field(self: Json, key: str) -> i64!str {
 }.test({
     let object = Object([
         Member { key: "n", value: Number("5") },
-        Member { key: "t", value: Text("5") },
+        Member { key: "t", value: String("5") },
     ]);
     assert(object.integer_field("n") == ok(5));
     assert(object.integer_field("t") == err(`"t" is not a whole number`));
@@ -372,7 +126,7 @@ pub fn list_field(self: Json, key: str) -> Json[]!str {
     value.elements().value_or_err(`"{key}" is not a list`)
 }.test({
     let object = Object([
-        Member { key: "l", value: List([Null]) },
+        Member { key: "l", value: Array([Null]) },
         Member { key: "n", value: Null },
     ]);
     assert(object.list_field("l") == ok([Null]));
