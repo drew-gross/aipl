@@ -6797,12 +6797,13 @@ fn is_span(ty: &Type) -> bool {
     matches!(ty, Type::Named(n) if n == SPAN_TYPE)
 }
 
-/// Whether `ty` is a tuple, as the checker meets one: still `Type::Tuple`, or
-/// already lowered to its synthetic struct.
+/// Whether `ty` is a tuple, as the checker meets one: still `Type::Tuple`, already
+/// lowered to its synthetic struct, or that struct's template applied to element
+/// types that are not concrete yet (a generic function's `(P, A[])`).
 fn is_tuple_ty(ty: &Type) -> bool {
     match ty {
         Type::Tuple(_) => true,
-        Type::Named(n) => n.starts_with(TUPLE_TEMPLATE),
+        Type::Named(n) | Type::Generic(n, _) => n.starts_with(TUPLE_TEMPLATE),
         _ => false,
     }
 }

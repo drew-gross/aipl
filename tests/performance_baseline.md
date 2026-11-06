@@ -807,6 +807,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/tests/try_in_test | 1 | 37 | 37 | 328 | 2644 |
 | tests/cases/tuples/basic | 4 | 282 | 282 | 961 | 4960 |
 | tests/cases/tuples/destructure | 10 | 668 | 668 | 1829 | 5400 |
+| tests/cases/tuples/destructure_generic_result | 2 | 112 | 112 | 672 | 2392 |
 | tests/cases/tuples/field_access | 2 | 106 | 106 | 566 | 4456 |
 | tests/cases/tuples/for_loop_destructure | 15 | 1147 | 1147 | 2693 | 5628 |
 | tests/cases/tuples/for_loop_indexed_destructure | 61 | 4193 | 4161 | 6013 | 9596 |

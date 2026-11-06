@@ -819,6 +819,7 @@ case_tests! {
     cases_tests_try_in_test = "cases/tests/try_in_test",
     cases_tuples_basic = "cases/tuples/basic",
     cases_tuples_destructure = "cases/tuples/destructure",
+    cases_tuples_destructure_generic_result = "cases/tuples/destructure_generic_result",
     cases_tuples_err_destructure_non_tuple = "cases/tuples/err_destructure_non_tuple",
     cases_tuples_err_none_element = "cases/tuples/err_none_element",
     cases_tuples_err_to_array_mixed = "cases/tuples/err_to_array_mixed",

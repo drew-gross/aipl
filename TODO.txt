@@ -107,6 +107,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  split Type into variants that can and cannot be generic, and have the stage the resolves generics transform. This feel more sound than the current patchwork.
   merge aipl's top level doc and docs commands
   some sort of enforcement/restriction on tests with main+sections
   come up with a better strategy for constant slots
