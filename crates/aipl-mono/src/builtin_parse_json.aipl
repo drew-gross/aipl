@@ -28,10 +28,16 @@ import {
     equal as ==,
     extend,
     first,
+    join,
     len,
+    less_than as <,
+    less_than_or_equal as <=,
+    map,
     map_err,
+    measure,
     to_set,
     value_or_err,
+    wrapping_mul as *,
     wrapping_sub as -,
 } from builtins;
 import { Cst, Parts, span } from "../../aipl-codegen/src/cst.aipl";
@@ -342,4 +348,25 @@ pub fn parse_json(self: str) -> Json!str {
     assert(message_of("1 2") == "expected end of input, found `2` (at byte 2)");
     // A lex failure reports in the same shape as a parse failure.
     assert(message_of("@") == "unexpected character (at byte 0)");
+}).benchmark({
+    // What parsing costs is stated per byte of input and as a scaling, not as the exact
+    // counts: the parser is many files' code, and an exact count would move with each. A
+    // document of identical members, so a larger one is the same work again.
+    let member = """{"name":"Island","count":4,"tags":["a","b"],"ok":true,"v":-1.5}""";
+    let small = `[{(0..100).map(|_| member).join(sep=",")}]`;
+    let large = `[{(0..400).map(|_| member).join(sep=",")}]`;
+    let one = measure("100 members", small, parse_json);
+    let four = measure("400 members", large, parse_json);
+
+    // Linear: four times the document is no more than four times the work, the allocations
+    // and the memory held at once. A parse that were quadratic in anything (a rescanned
+    // prefix, an array copied per element) would fail all three.
+    assert(four.instructions <= 4 * one.instructions);
+    assert(four.allocations <= 4 * one.allocations);
+    assert(four.peak_live_bytes <= 4 * one.peak_live_bytes);
+
+    // And a ceiling on what each byte costs, set a little above where it stands, so a
+    // slowdown shows here and an improvement is a reason to lower it.
+    assert(one.instructions < 4100 * small.len());
+    assert(2 * one.allocations < 9 * small.len());
 })

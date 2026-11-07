@@ -457,6 +457,10 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_ends_with_char"
         | "aipl_str_contains"
         | "aipl_char_at"
+        // The next or previous member of a char set after a position (the set, the position),
+        // which is how a `for` over a `#{char}` steps.
+        | "aipl_charset_next"
+        | "aipl_charset_prev"
         | "aipl_str_data" => sig(2, true),
         "aipl_concat" | "aipl_str_rope" => sig(3, false),
         // The out pointer, the parts, and `join`'s three separators.

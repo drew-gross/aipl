@@ -24,6 +24,7 @@ import {
     extend,
     filter,
     first,
+    get,
     has,
     int_parse,
     is_digit,
@@ -44,6 +45,7 @@ import {
     push,
     starts_with,
     starts_with_at,
+    to_dict,
     to_set,
     value_or,
     value_or_err,
@@ -803,21 +805,111 @@ fn step_len(self: Matcher, src: str, at: u64, unterminated: str) -> u64!LexError
     }
 }
 
-# One lexing step at absolute position `at`: tries each rule of `mode` in order
-# (first match wins) and returns the winning rule's outcome — see `StepResult`.
-# Every rule is tried the same way, which is what `step_len` and `step_result`
-# are for: the first says how far this rule's matcher reaches, the second turns
-# that length into the step. Neither the loop nor the first-match-wins rule has
-# anything to say about *which* matcher it is.
+# The bytes a matcher can start a match with: any of `chars`, or, with `any`, any byte at all
+# (a matcher whose first byte is whatever the text there is). It is the question "could this
+# rule match here" asked of one byte instead of a whole scan, so it errs only on the side of
+# yes: a byte outside it can never start a match, and a byte inside may still decline.
+struct Starts { any: bool, chars: #{char} }
+
+# The bytes `self` can start a match with. `Int` and `Float` open with a digit or the `-` of a
+# signed literal; the matchers that name a spelling open with its first byte; `CharRun` opens
+# with its `first` class, which is what keeps a digit from opening an identifier; and
+# `UpToAny` opens with anything its stops do not forbid, which is any byte.
+fn starts(self: Matcher) -> Starts {
+    match (self) {
+        CharRun(_, first) => Starts { any: false, chars: first },
+        OneChar(chars) => Starts { any: false, chars },
+        Delimited(delims, _) => Starts { any: false, chars: delims },
+        Exact(spelling) | ToEol(spelling) => spelling.opening(),
+        Keyword(spelling, _) | ToEolUnless(spelling, _) => spelling.opening(),
+        Between(open, _) | Nested(open, _) => open.opening(),
+        Float | Int => Starts { any: false, chars: "-0123456789".to_set() },
+        UpToAny(..) => Starts { any: true, chars: #{} },
+    }
+}.test({
+    assert(Exact("==").starts().chars == #{'='});
+    assert(Keyword("if", #{'a'}).starts().chars == #{'i'});
+    assert(OneChar("()".to_set()).starts().chars == #{'(', ')'});
+    assert(CharRun("ab1".to_set(), first="ab".to_set()).starts().chars == #{'a', 'b'});
+    assert(CharRun("ab".to_set()).starts().chars == #{'a', 'b'});
+    assert(Delimited(`"'`.to_set()).starts().chars == #{'"', '\''});
+    assert(Between(`"""`, `"""`).starts().chars == #{'"'});
+    assert(Nested("/*", "*/").starts().chars == #{'/'});
+    assert(ToEol("//").starts().chars == #{'/'});
+    assert(ToEolUnless("#", #{'{'}).starts().chars == #{'#'});
+    assert(Int.starts().chars == "-0123456789".to_set());
+    assert(Float.starts().chars == "-0123456789".to_set());
+    // Only a run up to a stop can begin with anything.
+    assert(UpToAny(["}"], #{}).starts().any);
+    assert(!Exact("x").starts().any);
+    assert(!Int.starts().any);
+})
+
+# The one byte a spelling opens with, or any byte for an empty spelling (which no matcher
+# should have, and which is not worth being wrong about).
+fn opening(self: str) -> Starts {
+    self
+        .first()
+        .map(|c| Starts { any: false, chars: #{c} })
+        .value_or(Starts { any: true, chars: #{} })
+}
+
+# The rules that could match at a byte `c`, as indices into `rules`, in the order they are
+# tried: those whose matcher can start with it, given every rule's `firsts`. Trying a rule means
+# measuring its matcher against the text, and most rules cannot start with the byte at hand, so
+# these are the only ones worth trying. Every mode's rules are in the answer, and `lex_step`
+# passes over the ones of another mode, which is one comparison; keeping the modes apart would
+# make the answer depend on two things instead of one.
+fn candidates(firsts: Starts[], c: char) -> u64[] {
+    mut found: u64[] = [];
+    for (let i, first : firsts) {
+        if (first.any || first.chars.has(c)) { set found.push(i); };
+    }
+    found
+}.test({
+    let ws: TokenRule<Kind> = TokenRule { matcher: CharRun(#{' '}), emit: Bare(Ws) };
+    let kw: TokenRule<Kind> = TokenRule { matcher: Keyword("if", #{'a'}), emit: Bare(Kw) };
+    let id: TokenRule<Kind> = TokenRule { matcher: CharRun("afi".to_set()), emit: Bare(Kw) };
+    let digit: TokenRule<Kind> = TokenRule { matcher: Int, emit: Bare(Digits), mode: 1 };
+    let tail: TokenRule<Kind> = TokenRule {
+        matcher: UpToAny(["}"], #{}),
+        emit: Bare(Comment),
+        mode: 1,
+    };
+    let firsts = [ws, kw, id, digit, tail]$matcher$starts();
+
+    // Rules in the order they are tried, each kept for the bytes it can start with: `i`
+    // starts the keyword (rule 1) and the identifier (rule 2), a space only the first, and a
+    // byte nothing names starts nothing but the rules that start with any byte.
+    assert(candidates(firsts, 'i') == [1, 2, 4]);
+    assert(candidates(firsts, 'f') == [2, 4]);
+    assert(candidates(firsts, ' ') == [0, 4]);
+    assert(candidates(firsts, 'z') == [4]);
+
+    // A mode's rules are not set apart: the digit rule of mode 1 is there for a digit.
+    assert(candidates(firsts, '7') == [3, 4]);
+})
+
+# One lexing step at absolute position `at` in `mode`: tries each of the rules in `chosen` that
+# belong to it, in order (first match wins), and returns the winning rule's outcome — see
+# `StepResult`. `chosen` is the rules the byte at `at` can start (see `candidates`), so a rule
+# that cannot start with it is not measured against the text at all: a `{` or a `,` is tried
+# against the rules that start with one rather than against every rule there is.
 #
-# A rule of another mode is passed over rather than filtered out up front: the
-# check is one comparison inside the loop that already runs, where filtering
-# would build a new array at every position of every lex.
-fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], mode: i64) -> StepResult<K>!LexError {
-    for (let r : rules) {
-        if (r.mode == mode) {
-            let n = r.matcher.step_len(src, at, r.unterminated)?;
-            if (0 < n) { return step_result(r, src, at, n); };
+# Every rule is tried the same way, which is what `step_len` and `step_result` are for: the
+# first says how far this rule's matcher reaches, the second turns that length into the step.
+# Neither the loop nor the first-match-wins rule has anything to say about *which* matcher it
+# is. A rule of another mode is passed over rather than filtered out up front: the check is one
+# comparison inside the loop that already runs.
+fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], chosen: u64[], mode: i64) -> StepResult<
+    K
+>!LexError {
+    for (let i : chosen) {
+        if (let some(r) = rules[i]) {
+            if (r.mode == mode) {
+                let n = r.matcher.step_len(src, at, r.unterminated)?;
+                if (0 < n) { return step_result(r, src, at, n); };
+            };
         };
     }
     ok(StepResult { end: at })
@@ -940,8 +1032,25 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     // The mode stack, innermost last; empty *is* the base mode, so a rule set
     // that never mentions modes never touches this.
     mut modes: ModeFrame[] = [];
+    let firsts = rules$matcher$starts();
+
+    // The rules each byte can start, worked out the first time the byte is met: a lex of a few
+    // tokens meets a few bytes and a long one meets the same ones again and again. `met` is
+    // the entries and `cache` the same as a dict, rebuilt on each new byte, which is at most
+    // once per byte there is.
+    mut met: (char, u64[])[] = [];
+    mut cache: #{char: u64[]} = #{};
     while (pos < self.len()) {
-        let step = lex_step(self, pos, rules, modes.last()$mode.value_or(0))?;
+        let byte = self[pos].value_or(' ');
+        mut chosen: u64[] = [];
+        if (let some(known) = cache.get(byte)) {
+            set chosen = known;
+        } else {
+            set chosen = candidates(firsts, byte);
+            set met.push((byte, chosen));
+            set cache = met.to_dict();
+        };
+        let step = lex_step(self, pos, rules, chosen, modes.last()$mode.value_or(0))?;
         if (step.end == pos) {
             // No rule matched: a lex error at the offending byte (slice the
             // source with the span to show it).

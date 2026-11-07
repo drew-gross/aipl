@@ -340,6 +340,20 @@
 
 
 
+        <section class="item" id="item-Starts">
+          <h3>
+            <a class="anchor" href="#item-Starts">Starts</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Starts</code></pre>
+
+          <div class="doc"><p>The bytes a matcher can start a match with: any of <code>chars</code>, or, with <code>any</code>, any byte at all (a matcher whose first byte is whatever the text there is). It is the question &quot;could this rule match here&quot; asked of one byte instead of a whole scan, so it errs only on the side of yes: a byte outside it can never start a match, and a byte inside may still decline.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Kind">
           <h3>
             <a class="anchor" href="#item-Kind">Kind</a>
@@ -837,14 +851,56 @@
 
 
 
+        <section class="item" id="item-starts">
+          <h3>
+            <a class="anchor" href="#item-starts">starts</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn starts(self: Matcher) -&#62; Starts</code></pre>
+
+          <div class="doc"><p>The bytes <code>self</code> can start a match with. <code>Int</code> and <code>Float</code> open with a digit or the <code>-</code> of a signed literal; the matchers that name a spelling open with its first byte; <code>CharRun</code> opens with its <code>first</code> class, which is what keeps a digit from opening an identifier; and <code>UpToAny</code> opens with anything its stops do not forbid, which is any byte.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opening">
+          <h3>
+            <a class="anchor" href="#item-opening">opening</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opening(self: str) -&#62; Starts</code></pre>
+
+          <div class="doc"><p>The one byte a spelling opens with, or any byte for an empty spelling (which no matcher should have, and which is not worth being wrong about).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-candidates">
+          <h3>
+            <a class="anchor" href="#item-candidates">candidates</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn candidates(firsts: Starts[], c: char) -&#62; u64[]</code></pre>
+
+          <div class="doc"><p>The rules that could match at a byte <code>c</code>, as indices into <code>rules</code>, in the order they are tried: those whose matcher can start with it, given every rule's <code>firsts</code>. Trying a rule means measuring its matcher against the text, and most rules cannot start with the byte at hand, so these are the only ones worth trying. Every mode's rules are in the answer, and <code>lex_step</code> passes over the ones of another mode, which is one comparison; keeping the modes apart would make the answer depend on two things instead of one.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lex_step">
           <h3>
             <a class="anchor" href="#item-lex_step">lex_step</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[], mode: i64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+          <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[], chosen: u64[], mode: i64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule of <code>mode</code> in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Every rule is tried the same way, which is what <code>step_len</code> and <code>step_result</code> are for: the first says how far this rule's matcher reaches, the second turns that length into the step. Neither the loop nor the first-match-wins rule has anything to say about <em>which</em> matcher it is.</p><p>A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs, where filtering would build a new array at every position of every lex.</p></div>
+          <div class="doc"><p>One lexing step at absolute position <code>at</code> in <code>mode</code>: tries each of the rules in <code>chosen</code> that belong to it, in order (first match wins), and returns the winning rule's outcome — see <code>StepResult</code>. <code>chosen</code> is the rules the byte at <code>at</code> can start (see <code>candidates</code>), so a rule that cannot start with it is not measured against the text at all: a <code>{</code> or a <code>,</code> is tried against the rules that start with one rather than against every rule there is.</p><p>Every rule is tried the same way, which is what <code>step_len</code> and <code>step_result</code> are for: the first says how far this rule's matcher reaches, the second turns that length into the step. Neither the loop nor the first-match-wins rule has anything to say about <em>which</em> matcher it is. A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs.</p></div>
 
 
         </section>

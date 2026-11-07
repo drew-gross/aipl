@@ -500,6 +500,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  make try_left_fold and try_right_fold for use when the lambda returns an error
   add some helpers for shimming in tests maybe
   turn map into a real function that can be inlined, rather than a synthetic one, so that map/join fusion can be both normal and after mono
   make a "static_ok" method that evaluates a top-level function at compile time and fails the compile if err, then users don't have to check for err
@@ -529,9 +530,6 @@ skills:
   make "develop aipl project" skill that describes how currently projects are for dogfooding the compiler, working on a project should work like how it works for users, and should generate ideas for how to improve the language or dev loop, but not implement them (I'll record the suggestions for later implementation)
   make an "add lint" skill that describes how to lint against a reimplementation
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
-
-format:
-  exclude if expressions from being on same line as function it's result is passed to
 
 lint:
   lint against reimplementations of to_set()/distinct()
@@ -650,6 +648,13 @@ design:
   apis should express intent
 
 optimizations:
+  retain elision:
+    the arg contract being different for builtins caused problems for retain elision
+    - Make retain elision more generic, maybe it should be applied at a lower layer?
+    - make the arg contract for builtins more uniform
+    - move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
+    - allow retain elision for some builtins based on their contract
+    - should retain elision elide only the top of a structure? Is is already doing that?
   hoisting repeated code out of loops, lambdas, etc.
   exending a set with a function call that returns a set should fuse and not materialize an intermediate set
   Cache monomorphizations of the same lambda
@@ -838,6 +843,7 @@ report:
   options to dump the clif, the binary, the asm, etc.
 
 flamegraph:
+  make a deterministic version of flamegraph that works on the deterministic instructions counter
   rewrite profiling/flamegraph.sh to aipl or rust
   do something more useful on error
   collapse recursive functions
@@ -889,6 +895,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  with the nondeterministic measurements moved out of tests/performance_baseline.md, we can make the refresh run in parallel again. This should improve handoff performance in the case where at lot of tests need to be refreshed.
   dynamic work queue for running tests to balance work across shards better
   have some progress report type thingy
   maybe: fewer executables per case (reuse instrumented, or test behaviour in JIT). Need to decide if I actually want this.
@@ -916,9 +923,8 @@ optimize enumerate/reverse/right_fold with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
 make it so functions can call functions defined later in the file
 
-make try_left_fold and try_right_fold for use when the lambda returns an error
-
 lexer:
+  first byte dispatch could probably be a performance improvement for all document sizes if we optimized the storage some and/or precomputed the first sets (even at compile time maybe?)
   we probably don't need Int (and maybe float) since I think we can use CharRun with first or "minus or digit" and cont of "digit"
   "No push" is now a negative sentinel <--- don't do this, sentinels are bad. use optionals
   if Keyword boundary defaults to empty set I think we don't need a separate Exact
@@ -946,14 +952,8 @@ debugging:
   tools for debugging infinite loops
   add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
 
-the arg contract being different for builtins caused problems for retain elision
-- Make retain elision more generic, maybe it should be applied at a lower layer?
-- make the arg contract for builtins more uniform
-- move more builtins to be implemented in aipl. If they have optimizations, make those optimizations generic.
-- allow retain elision for some builtins based on their contract
-- should retain elision elide only the top of a structure? Is is already doing that?
-
 formatting:
+  exclude if expressions from being on same line as function it's result is passed to
   some way of wrapping really long string literals and template literals
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 

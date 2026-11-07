@@ -18639,6 +18639,17 @@ fn compile_call_expr_direct<M: Module>(
                     receiver.span.clone(),
                 ));
             }
+            // A set of `char` is not a block but a 256-bit bitfield held inline, so there is no
+            // block to share as the array, and reading the bitfield as one gives an empty array
+            // rather than the chars. Refused until it builds the array from the bits.
+            if is_char_set(&t) {
+                return Err(Error::at(
+                    "\"to_array\" on a set of char is not supported yet — a char set is a bitfield \
+                     and has no array to hand back; walk it with `for (let c : set)`"
+                        .to_string(),
+                    receiver.span.clone(),
+                ));
+            }
             // The set's block, under its value.
             let set_v = ptr;
             let ptr = seq_ptr(builder, ptr, &t);

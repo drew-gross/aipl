@@ -652,6 +652,7 @@ case_tests! {
     cases_sets_err_ordered_pairs = "cases/sets/err_ordered_pairs",
     cases_sets_err_ordered_struct_elem = "cases/sets/err_ordered_struct_elem",
     cases_sets_err_sets = "cases/sets/err_sets",
+    cases_sets_err_to_array_of_char_set = "cases/sets/err_to_array_of_char_set",
     cases_sets_err_to_array_unordered = "cases/sets/err_to_array_unordered",
     cases_sets_err_to_set_tuple_elem = "cases/sets/err_to_set_tuple_elem",
     cases_sets_err_to_set_tuple_mixed = "cases/sets/err_to_set_tuple_mixed",
