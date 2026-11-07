@@ -1090,17 +1090,24 @@ struct Refreshed<R> {
 /// `None` for a case it cannot measure. Every other row of `old` is carried over, and a
 /// row whose case no longer exists goes, whatever the scope: nothing else would ever
 /// remove it.
-fn refresh_rows<R: Clone>(
+///
+/// `workers` cases are measured at once. A measurement that reads the clock must pass 1,
+/// because a neighbour running beside it perturbs the number; one that counts (the
+/// baseline's) is the same however many run together.
+fn refresh_rows<R: Clone + Send>(
     cases: &[CaseFile],
     out_root: &Path,
     old: HashMap<String, R>,
-    measure: impl Fn(&Path, &str, &Path, &Spec) -> Option<R>,
+    workers: usize,
+    measure: impl Fn(&Path, &str, &Path, &Spec) -> Option<R> + Sync,
 ) -> Refreshed<R> {
     let mut filter = CaseFilter::from_env();
     let mut kept = old.clone();
     let mut existing: HashSet<String> = HashSet::new();
-    let mut measured: Vec<(String, R)> = Vec::new();
     let mut skipped = 0usize;
+    // The cases to measure, staged here one after another (it only copies files), so that
+    // the workers share nothing but the list.
+    let mut jobs: Vec<(String, PathBuf, String, PathBuf, Spec)> = Vec::new();
     for (case_path, root, prefix, stage) in cases {
         let rel = case_path.strip_prefix(root).unwrap_or(case_path);
         let rel_with_prefix = Path::new(prefix).join(rel);
@@ -1125,17 +1132,47 @@ fn refresh_rows<R: Clone>(
         let stem = case_path.file_stem().and_then(|s| s.to_str()).unwrap();
         let (src_path, case_dir) =
             stage_case_for_build(case_path, &rel_with_prefix, out_root, stem, &spec, *stage);
-        match measure(&src_path, stem, &case_dir, &spec) {
-            Some(row) => {
-                measured.push((display, row));
-                if measured.len().is_multiple_of(25) {
-                    eprintln!("measured {} case(s)...", measured.len());
-                }
-            }
+        jobs.push((display, src_path, stem.to_string(), case_dir, spec));
+    }
+    filter.assert_all_matched(cases.len());
+
+    // Each worker takes the next unmeasured job until none is left, on the big stack the
+    // case tests use (compiling recurses deeply).
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let results: std::sync::Mutex<Vec<Option<R>>> =
+        std::sync::Mutex::new((0..jobs.len()).map(|_| None).collect());
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers.clamp(1, jobs.len().max(1)))
+            .map(|_| {
+                std::thread::Builder::new()
+                    .stack_size(256 * 1024 * 1024)
+                    .spawn_scoped(scope, || loop {
+                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some((_, src_path, stem, case_dir, spec)) = jobs.get(i) else {
+                            break;
+                        };
+                        let row = measure(src_path, stem, case_dir, spec);
+                        results.lock().expect("results")[i] = row;
+                        let finished = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                        if finished.is_multiple_of(25) {
+                            eprintln!("measured {finished} case(s)...");
+                        }
+                    })
+                    .expect("spawn worker")
+            })
+            .collect();
+        for handle in handles {
+            handle.join().expect("worker panicked");
+        }
+    });
+    let mut measured: Vec<(String, R)> = Vec::new();
+    for ((display, ..), row) in jobs.into_iter().zip(results.into_inner().expect("results")) {
+        match row {
+            Some(row) => measured.push((display, row)),
             None => skipped += 1,
         }
     }
-    filter.assert_all_matched(cases.len());
 
     kept.retain(|test, _| existing.contains(test));
     let count = measured.len();
@@ -1154,7 +1191,7 @@ fn refresh_rows<R: Clone>(
 fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
     let path = trends_path();
     let old = read_trends(&path);
-    let refreshed = refresh_rows(cases, out_root, old, |src_path, stem, case_dir, spec| {
+    let refreshed = refresh_rows(cases, out_root, old, 1, |src_path, stem, case_dir, spec| {
         let (exe, build_ms) = build_case_binary(src_path, stem, case_dir).ok()?;
         let stats_path = case_dir.join("perfmon_stats.txt");
         let (mut wall_ns, mut peak_bytes) = (u64::MAX, u64::MAX);
@@ -1196,10 +1233,17 @@ fn run_perfmon_refresh(cases: &[CaseFile], out_root: &Path) {
 fn run_baseline_refresh(cases: &[CaseFile], out_root: &Path) {
     let path = metrics_path();
     let old = perf::read_baseline(&path).unwrap_or_default();
-    let refreshed = refresh_rows(cases, out_root, old, |src_path, stem, case_dir, spec| {
-        let stats = measure_case_stats(src_path, stem, case_dir, &spec.cli).ok()?;
-        Some(perf::baseline_values(&stats))
-    });
+    let workers = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let refreshed = refresh_rows(
+        cases,
+        out_root,
+        old,
+        workers,
+        |src_path, stem, case_dir, spec| {
+            let stats = measure_case_stats(src_path, stem, case_dir, &spec.cli).ok()?;
+            Some(perf::baseline_values(&stats))
+        },
+    );
     fs::write(&path, render_baseline(&refreshed.rows)).expect("write baseline file");
     eprintln!("{}", compare_baseline(&refreshed.old, &refreshed.rows));
     panic!(

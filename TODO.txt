@@ -896,7 +896,6 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
-  with the nondeterministic measurements moved out of tests/performance_baseline.md, we can make the handoff refresh run in parallel. This should improve handoff performance in the case where at lot of tests need to be refreshed.
   dynamic work queue for running tests to balance work across shards better
   have some progress report type thingy
   maybe: fewer executables per case (reuse instrumented, or test behaviour in JIT). Need to decide if I actually want this.

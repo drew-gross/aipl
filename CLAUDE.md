@@ -330,7 +330,8 @@ baseline table, which pins what every case costs.
 
 Refresh the baseline with:
 `cargo test --test cases -- --ignored refresh_baseline`
-It builds each case with the instrumented build only, rewrites
+It builds each case with the instrumented build only (the cases in parallel, one per core:
+the counts do not depend on what runs beside them), rewrites
 `tests/performance_baseline.md`, and prints the overall (summed-across-cases) change
 plus every case whose counts moved and added/removed cases, then fails intentionally
 so the summary is visible. Refresh the trends with:
