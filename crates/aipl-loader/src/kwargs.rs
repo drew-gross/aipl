@@ -516,6 +516,26 @@ fn cheap_len(e: &Expr) -> Option<Expr> {
     }
 }
 
+/// Whether `e` is a spread operand the folder (`fold_extends` in `aipl-mono`) walks rather than
+/// builds: `xs.map(f)`, `xs.filter(p)` and `xs.filter_map(p, f)`.
+fn is_walked(e: &Expr) -> bool {
+    matches!(
+        &e.kind,
+        ExprKind::Call(Callee::Map | Callee::Filter | Callee::FilterMap, ..)
+    )
+}
+
+/// How many elements a spread operand adds at most, when that can be read off a name or a
+/// literal without running anything: [`cheap_len`], and for `xs.filter(p)` / `xs.filter_map(p, f)`
+/// the length of `xs`, which they can only shorten. What a literal reserves, so it only has
+/// to be a bound; appending past it grows the array.
+fn max_len(e: &Expr) -> Option<Expr> {
+    match &e.kind {
+        ExprKind::Call(Callee::Filter | Callee::FilterMap, args, _) => cheap_len(args.first()?),
+        _ => cheap_len(e),
+    }
+}
+
 /// Whether `e` is a name or a chain of field reads rooted at one — a *place*
 /// that is read rather than computed, and so free to read again.
 fn is_name_path(e: &Expr) -> bool {
@@ -712,6 +732,23 @@ impl Expander {
         self.spreads += 1;
         let node = |kind| Expr::new(kind, span.clone());
 
+        // A literal that opens with a plain element and spreads a `map`/`filter`/`filter_map`
+        // is built in place instead: an array of the leading elements, room for the rest, and
+        // each later element written into it as a mutating call. A walked operand is then one
+        // call (`extend_map` and its siblings) that appends as it produces, where the
+        // block below would build the operand's array and copy it in.
+        //
+        // Every operand stays where it is written, in order, because each call runs in turn on
+        // the one array; nothing is hoisted, since no length is needed before the first
+        // append. The room reserved is a bound (`max_len`), and appending past it grows.
+        if !matches!(elems[0].kind, ExprKind::Spread(_))
+            && elems
+                .iter()
+                .any(|e| matches!(&e.kind, ExprKind::Spread(inner) if is_walked(inner)))
+        {
+            return self.desugar_spread_in_place(&elems, span, k);
+        }
+
         // Every spread operand is needed twice: once to size the one
         // allocation, once to copy from. Which of the two forms below is used
         // depends on whether that is free.
@@ -846,6 +883,94 @@ impl Expander {
             })
             .kind;
         kind
+    }
+
+    /// The in-place form of an array literal that spreads a walked operand (see
+    /// [`Self::desugar_spread`]):
+    ///
+    /// ```text
+    /// ["a", ..xs.map(f), "c", ..ys]
+    ///   =>  mut $s = ["a"];
+    ///       set $s.reserve(1 + len(xs) + len(ys));
+    ///       set $s.extend_map(xs, f);
+    ///       set $s.push("c");
+    ///       set $s.extend(ys);
+    ///       $s
+    /// ```
+    ///
+    /// `$s` starts as an array literal, which is what makes it a binding that grows in
+    /// place. The room is what can be read off cheaply (`max_len`); an operand with no cheap
+    /// bound adds nothing to it and the array grows when its elements arrive.
+    fn desugar_spread_in_place(&mut self, elems: &[Expr], span: Span, k: usize) -> ExprKind {
+        let node = |kind| Expr::new(kind, span.clone());
+        let acc = format!("__spread${k}");
+        let acc_ref = || node(ExprKind::Ident(acc.clone()));
+        let leading = elems
+            .iter()
+            .position(|x| matches!(x.kind, ExprKind::Spread(_)))
+            .unwrap_or(elems.len());
+        let rest = &elems[leading..];
+
+        // `set $s.<callee>(args..); rest`, the mutating-call form every writeback takes.
+        let step = |callee: Callee, args: Vec<Expr>, rest: Expr, at: &Span| {
+            let mut call_args = vec![acc_ref()];
+            call_args.extend(args);
+            let call = Expr::new(ExprKind::Call(callee, call_args, true), at.clone());
+            Expr::new(
+                ExprKind::Assign(Box::new(acc_ref()), Box::new(call), Box::new(rest)),
+                at.clone(),
+            )
+        };
+
+        let plain = rest
+            .iter()
+            .filter(|x| !matches!(x.kind, ExprKind::Spread(_)))
+            .count();
+        let mut room = node(ExprKind::Num(plain as i64));
+        for elem in rest {
+            let ExprKind::Spread(inner) = &elem.kind else {
+                continue;
+            };
+            if let Some(len) = max_len(inner) {
+                room = Expr::new(
+                    ExprKind::Call(Callee::WrappingAdd, vec![room, len], false),
+                    elem.span.clone(),
+                );
+            }
+        }
+
+        let body = rest.iter().rev().fold(acc_ref(), |next, elem| {
+            let at = &elem.span;
+            match &elem.kind {
+                ExprKind::Spread(inner) => match &inner.kind {
+                    ExprKind::Call(
+                        callee @ (Callee::Map | Callee::Filter | Callee::FilterMap),
+                        args,
+                        _,
+                    ) if matches!(
+                        (callee, args.len()),
+                        (Callee::Map, 2) | (Callee::Filter, 2) | (Callee::FilterMap, 3)
+                    ) =>
+                    {
+                        let walking = match callee {
+                            Callee::Map => Callee::ExtendMap,
+                            Callee::Filter => Callee::ExtendFilter,
+                            _ => Callee::ExtendFilterMap,
+                        };
+                        step(walking, args.clone(), next, at)
+                    }
+                    _ => step(Callee::Extend, vec![(**inner).clone()], next, at),
+                },
+                _ => step(Callee::Push, vec![elem.clone()], next, at),
+            }
+        });
+        let reserved = step(Callee::Reserve, vec![room], body, &span);
+        ExprKind::LetMut(
+            acc,
+            None,
+            Box::new(node(ExprKind::ArrayLit(elems[..leading].to_vec()))),
+            Box::new(reserved),
+        )
     }
 
     /// The type annotation to keep on a `let T { .. } = value;` scrutinee

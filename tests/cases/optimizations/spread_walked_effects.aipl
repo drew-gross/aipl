@@ -1,0 +1,47 @@
+# A spread of a `map`, `filter` or `filter_map` appends as it goes, so the elements around it
+# and the calls it makes happen in the order the literal is written: the leading element, then
+# the mapping function once per source element in turn, then the elements after.
+
+import { equal as ==, filter, len, less_than as <, map, print } from builtins;
+
+fn named(label: str) !prints -> str {
+    print(label);
+    label
+}
+
+fn noisy(self: str) !prints -> str {
+    print(`f{self}`);
+    self
+}
+
+fn keeps(self: str) !prints -> bool {
+    print(`p{self}`);
+    1 < self.len()
+}
+
+test({
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text} `;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        let xs = ["a", "bb", "c"];
+
+        // The map's calls run between the two named elements, in element order.
+        let mapped = [named("first"), ..xs.map(noisy), named("last")]; #[allow]
+        assert(mapped == ["first", "a", "bb", "c", "last"]);
+
+        // The same for a filter, whose test runs once per source element.
+        let kept = [named("first"), ..xs.filter(keeps), named("last")];
+        assert(kept == ["first", "bb", "last"]);
+
+        // And a literal with two walked operands runs them one after the other.
+        let both = [named("first"), ..xs.map(noisy), ..xs.filter(keeps)]; #[allow]
+        assert(both == ["first", "a", "bb", "c", "bb"]);
+    };
+    assert(out == "first fa fbb fc last first pa pbb pc last first fa fbb fc pa pbb pc ");
+})

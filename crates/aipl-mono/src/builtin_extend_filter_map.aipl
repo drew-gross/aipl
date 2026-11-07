@@ -1,0 +1,16 @@
+# The AIPL implementation of the `extend_filter_map` builtin. The loader names this function by
+# the canonical name `__builtin_extend_filter_map`; see `builtin_extend_map.aipl`. The `keep`
+# test runs on the source element, and `f` on the elements kept, as `filter_map` runs them.
+
+import { equal as ==, len, less_than as <, push } from builtins;
+
+# Append `f(x)` for each `x` of `xs` that satisfies `keep`, in order, onto `self`.
+pub fn extend_filter_map<T: any, U: any>(mut self: U[], xs: T[], keep: (T) -> bool, f: (T) -> U) {
+    for (let x : xs) {
+        if (keep(x)) { set self.push(f(x)); };
+    }
+}.test({
+    mut out: str[] = [];
+    set out.extend_filter_map(["x", "yy", "zzz"], |s| 1 < s.len(), |s| `<{s}>`);
+    assert(out == ["<yy>", "<zzz>"]);
+})

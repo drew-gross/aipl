@@ -1,0 +1,31 @@
+# The AIPL implementation of the `extend_map` builtin. The loader names this function by the
+# canonical name `__builtin_extend_map` (see `aipl_syntax::aipl_builtins`); the in-file name is
+# only for this file's own tests, which read exactly like the user code that never spells it.
+#
+# Internal (`INTERNAL_BUILTINS`): the spelling in a program is `set out.extend(xs.map(f))`, or
+# `..xs.map(f)` in an array literal. The folder (`fold_extends`) turns either into this call, so the
+# array `map` would have built, and the copy of it into `out`, never happen. It is a `mut self`
+# method, so the receiver grows in place and keeps the room a literal reserved for it.
+
+import { equal as ==, len, push } from builtins;
+
+# Append `f(x)` for each `x` of `xs`, in order, onto `self`.
+pub fn extend_map<T: any, U: any>(mut self: U[], xs: T[], f: (T) -> U) {
+    for (let x : xs) {
+        set self.push(f(x));
+    }
+}.test({
+    mut out = ["a"];
+    set out.extend_map(["x", "yy"], |s| `<{s}>`);
+    assert(out == ["a", "<x>", "<yy>"]);
+
+    // Nothing to map leaves the array alone.
+    let none_left: str[] = [];
+    set out.extend_map(none_left, |s| s);
+    assert(out == ["a", "<x>", "<yy>"]);
+
+    // The result type may differ from the source's.
+    mut lengths: u64[] = [];
+    set lengths.extend_map(["x", "yy", "zzz"], len);
+    assert(lengths == [1, 2, 3]);
+})

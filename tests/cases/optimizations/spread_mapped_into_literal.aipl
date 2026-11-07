@@ -1,0 +1,122 @@
+# A spread of a mapped or filtered array inside an array literal, and `extend` of one, put
+# the elements straight into the array being built: no temporary array is made for the
+# spread, and the result is sized once.
+#
+# Each function is measured against the loop that pushes the same elements into one array,
+# which is the allocation count the spread should match, and the spread of a map or filter
+# against the same literal spreading an array a function built first, which is what it
+# used to cost. The instruction claims are comparisons, so they hold as the code around
+# them changes; the spread pays a fixed overhead (the reserve and the call) that the loop does
+# not, which is what the slack covers.
+
+import {
+    equal as ==,
+    extend,
+    filter,
+    len,
+    less_than as <,
+    less_than_or_equal as <=,
+    measure,
+    push,
+    wrapping_add as +,
+} from builtins;
+
+fn wrap(self: str) -> str { `<{self}>` }
+
+fn is_long(self: str) -> bool { 1 < self.len() }
+
+// An array built by a loop, which nothing folds into its caller: the temporary a spread used
+// to make.
+fn mapped(xs: str[]) -> str[] {
+    mut out: str[] = []; #[allow]
+    for (let x : xs) {
+        set out.push(x.wrap());
+    }
+    out
+}
+
+fn kept(xs: str[]) -> str[] {
+    mut out: str[] = []; #[allow]
+    for (let x : xs) {
+        if (x.is_long()) { set out.push(x); };
+    }
+    out
+}
+
+fn built_map(xs: str[]) -> str[] { ["a", "b", ..mapped(xs), "c"] }
+
+fn built_filter(xs: str[]) -> str[] { ["a", ..kept(xs), "c"] }
+
+fn spread_map(xs: str[]) -> str[] { ["a", "b", ..xs$wrap(), "c"] }
+
+fn pushed_map(xs: str[]) -> str[] {
+    mut out = ["a", "b"];
+    for (let x : xs) {
+        set out.push(x.wrap());
+    }
+    set out.push("c");
+    out
+}
+
+fn spread_filter(xs: str[]) -> str[] { ["a", ..xs.filter(is_long), "c"] }
+
+fn pushed_filter(xs: str[]) -> str[] {
+    mut out = ["a"];
+    for (let x : xs) {
+        if (x.is_long()) { set out.push(x); };
+    }
+    set out.push("c");
+    out
+}
+
+fn extended_map(xs: str[]) -> str[] {
+    mut out = ["a"];
+    set out.extend(xs$wrap());
+    out
+}
+
+fn pushed_extended(xs: str[]) -> str[] {
+    mut out = ["a"];
+    for (let x : xs) {
+        set out.push(x.wrap());
+    }
+    out
+}
+
+test({
+    let xs = ["x", "yy", "zzz", "w"];
+    assert(spread_map(xs) == ["a", "b", "<x>", "<yy>", "<zzz>", "<w>", "c"]);
+    assert(spread_filter(xs) == ["a", "yy", "zzz", "c"]);
+    assert(extended_map(xs) == ["a", "<x>", "<yy>", "<zzz>", "<w>"]);
+    let nothing: str[] = [];
+    assert(built_map(xs) == spread_map(xs));
+    assert(built_filter(xs) == spread_filter(xs));
+    assert(spread_map(nothing) == ["a", "b", "c"]);
+    assert(spread_filter(nothing) == ["a", "c"]);
+})
+
+// The temporary array a spread used to build is gone: no more allocations than the loop, fewer
+// than the spread of a built array, and the instructions between the two.
+benchmark({
+    let xs = ["x", "yy", "zzz", "w"];
+
+    let spread = measure("spread of a map", xs, spread_map);
+    let loop = measure("push loop over a map", xs, pushed_map);
+    let built = measure("spread of a built array", xs, built_map);
+    assert(spread.allocations <= loop.allocations);
+    assert(spread.allocations < built.allocations);
+    assert(spread.instructions < built.instructions);
+    assert(spread.instructions <= loop.instructions + 200);
+
+    let spread = measure("spread of a filter", xs, spread_filter);
+    let loop = measure("push loop over a filter", xs, pushed_filter);
+    let built = measure("spread of a kept array", xs, built_filter);
+    assert(spread.allocations <= loop.allocations);
+    assert(spread.instructions <= loop.instructions + 200);
+    assert(spread.instructions < built.instructions);
+
+    let extended = measure("extend of a map", xs, extended_map);
+    let loop = measure("push loop for the extend", xs, pushed_extended);
+    assert(extended.allocations <= loop.allocations);
+    assert(extended.instructions <= loop.instructions + 200);
+})

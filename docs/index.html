@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">215 files, 1877 items.</p>
+      <p class="summary">218 files, 1880 items.</p>
 
       <ul class="files">
 
@@ -4614,6 +4614,60 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_ensure_nonempty.html#item-ensure_nonempty"><code>ensure_nonempty</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_extend_filter.html">crates/aipl-mono/src/builtin_extend_filter.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>extend_filter</code> builtin. The loader names this function by the canonical name <code>__builtin_extend_filter</code>; see <code>builtin_extend_map.aipl</code>, whose filtering sibling it is. <code>set out.extend(xs.filter(p))</code> and <code>..xs.filter(p)</code> in an array literal become this call, so the filtered array is never built.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_extend_filter.html#item-extend_filter"><code>extend_filter</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_extend_filter_map.html">crates/aipl-mono/src/builtin_extend_filter_map.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>extend_filter_map</code> builtin. The loader names this function by the canonical name <code>__builtin_extend_filter_map</code>; see <code>builtin_extend_map.aipl</code>. The <code>keep</code> test runs on the source element, and <code>f</code> on the elements kept, as <code>filter_map</code> runs them.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_extend_filter_map.html#item-extend_filter_map"><code>extend_filter_map</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_extend_map.html">crates/aipl-mono/src/builtin_extend_map.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>extend_map</code> builtin. The loader names this function by the canonical name <code>__builtin_extend_map</code> (see <code>aipl_syntax::aipl_builtins</code>); the in-file name is only for this file's own tests, which read exactly like the user code that never spells it.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_extend_map.html#item-extend_map"><code>extend_map</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

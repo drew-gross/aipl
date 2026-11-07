@@ -186,6 +186,13 @@ pub enum Callee {
     /// because `extend` reserves exactly what it is given and so reallocates on
     /// every one-element append.
     ExtendOptional,
+    /// `extend_map(mut self: U[], xs: T[], f)` — `set out.extend(xs.map(f))` without the array
+    /// `map` builds. Introduced by the folder, never written.
+    ExtendMap,
+    /// `extend_filter(mut self: T[], xs: T[], keep)`, likewise for `filter`.
+    ExtendFilter,
+    /// `extend_filter_map(mut self: U[], xs: T[], keep, f)`, likewise for `filter_map`.
+    ExtendFilterMap,
     Reserve,
     IsSome,
     IsSomeAnd,
@@ -556,6 +563,9 @@ impl Callee {
             Callee::Push => "__builtin_push",
             Callee::Extend => "__builtin_extend",
             Callee::ExtendOptional => "__builtin_extend_optional",
+            Callee::ExtendMap => "__builtin_extend_map",
+            Callee::ExtendFilter => "__builtin_extend_filter",
+            Callee::ExtendFilterMap => "__builtin_extend_filter_map",
             Callee::Reserve => "__builtin_reserve",
             Callee::IsSome => "__builtin_is_some",
             Callee::IsSomeAnd => "__builtin_is_some_and",

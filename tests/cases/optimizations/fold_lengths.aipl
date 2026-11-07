@@ -73,27 +73,28 @@ test({
     assert(`{xs.map(double).len()} {[0, ..xs.map(|n| n + 1)].len()}` == "4 5");
 })
 --- report ---
-allocations       23
-deallocations     23
+allocations       22
+deallocations     22
 reallocations     0
-bytes allocated   1202
-peak live bytes   1202
-instructions      2160
-binary size       10744 bytes (code 6812, data 700, metadata 3232)
+bytes allocated   1154
+peak live bytes   1154
+instructions      2049
+binary size       10584 bytes (code 6616, data 700, metadata 3268)
 
-function                               calls  code bytes
-__builtin_count_if$i64$lam$is_big          2         148
-__test$__test_block_1                      1        6148
-__to_str_i64                               2         204
-__to_str_u64                               8         204
-aipl_array_dec                             3    external
-aipl_array_with_cap                        2    external
-aipl_assert                                5    external
-aipl_i64_len                               4    external
-aipl_test_begin                            1    external
-aipl_test_end                              1    external
-aipl_test_summary                          1    external
-aipl_u64_len                              16    external
-aipl_write_i64                             2    external
-aipl_write_u64                             8    external
-main                                       1         108
+function                                                                 calls  code bytes
+__builtin_count_if$i64$lam$is_big                                            2         148
+__builtin_extend_map$i64$i64$lam$__test$__test_block_1$lambda1$own0          1         656
+__test$__test_block_1                                                        1        5296
+__to_str_i64                                                                 2         204
+__to_str_u64                                                                 8         204
+aipl_array_dec                                                               2    external
+aipl_array_with_cap                                                          1    external
+aipl_assert                                                                  5    external
+aipl_i64_len                                                                 4    external
+aipl_test_begin                                                              1    external
+aipl_test_end                                                                1    external
+aipl_test_summary                                                            1    external
+aipl_u64_len                                                                16    external
+aipl_write_i64                                                               2    external
+aipl_write_u64                                                               8    external
+main                                                                         1         108

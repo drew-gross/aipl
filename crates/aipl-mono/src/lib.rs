@@ -2808,6 +2808,8 @@ impl Mono<'_> {
         // function-typed parameter, also resolve which synthesized function it
         // binds to and the capture types (to shape the specialized callee).
         let mut new_args: Vec<Expr> = Vec::new();
+        // The type of each forwarded argument, for deciding which the callee may own.
+        let mut new_tys: Vec<Type> = Vec::new();
         let mut targets: Vec<Option<(String, Vec<Type>)>> = Vec::new();
         for (i, (arg, param)) in args.iter().zip(&template.params).enumerate() {
             if let Type::Fn(ptys, lret) = &param.ty {
@@ -2845,8 +2847,9 @@ impl Mono<'_> {
                 let mut cap_types = Vec::with_capacity(forwards.len());
                 for fe in forwards {
                     let (fr, ft) = self.infer(&fe, env)?;
-                    cap_types.push(ft);
+                    cap_types.push(ft.clone());
                     new_args.push(fr);
+                    new_tys.push(ft);
                     shapes.push(VShape::Seq);
                 }
                 targets.push(Some((fn_name, cap_types)));
@@ -2861,20 +2864,32 @@ impl Mono<'_> {
                     VShape::Seq
                 });
                 new_args.push(ra);
+                new_tys.push(aty);
                 targets.push(None);
             }
         }
         // The specialized callee is one template per (callee, functions); its
         // per-shape instances hang off that, as they do for any function.
+        //
+        // A `mut self` receiver it may own is handed over like any call's, so the callee
+        // grows it in place instead of copying a lent one (see `owned_for_call`).
+        let mutating_receiver = template.params.first().is_some_and(|p| p.mutable);
         let instance = |m: &mut Self, spec: &str| {
+            let owned = if mutating_receiver {
+                m.owned_for_call(spec, &[], &new_args, &new_tys)
+            } else {
+                Vec::new()
+            };
             m.enqueue_full(
                 spec,
                 ParamSpecs {
                     type_args: Vec::new(),
                     params: shapes
                         .iter()
-                        .map(|v| ParamSpec {
+                        .enumerate()
+                        .map(|(i, v)| ParamSpec {
                             variadic: *v,
+                            owned: owned.contains(&i),
                             ..ParamSpec::default()
                         })
                         .collect(),
@@ -2894,7 +2909,7 @@ impl Mono<'_> {
             let mangled = instance(self, &spec);
             return Ok((
                 Expr::new(
-                    ExprKind::Call(Callee::User(mangled), new_args, false),
+                    ExprKind::Call(Callee::User(mangled), new_args, mutating_receiver),
                     span.clone(),
                 ),
                 ret,
@@ -2961,7 +2976,7 @@ impl Mono<'_> {
         let mangled = instance(self, &spec_name);
         Ok((
             Expr::new(
-                ExprKind::Call(Callee::User(mangled), new_args, false),
+                ExprKind::Call(Callee::User(mangled), new_args, mutating_receiver),
                 span.clone(),
             ),
             ret,
@@ -7763,7 +7778,7 @@ impl Mono<'_> {
                     ExprKind::Ident(n) => self.cur_lenv.contains_key(n) || self.is_fn_ref(n, env),
                     _ => false,
                 });
-                if self.concrete.contains_key(name) && !self.mutating.contains(name) && has_fn_arg {
+                if self.concrete.contains_key(name) && has_fn_arg {
                     let template = self.concrete[name].clone();
                     let ret = self.fn_returns.get(name).cloned().unwrap_or(Type::Unit);
                     return self.specialize_call_with(
@@ -7781,7 +7796,7 @@ impl Mono<'_> {
                 // substitute them into a concrete template, then specialize that for
                 // the lambdas — the union of generic monomorphization and lambda
                 // lifting.
-                if self.generics.contains_key(name) && !self.mutating.contains(name) && has_fn_arg {
+                if self.generics.contains_key(name) && has_fn_arg {
                     return self.specialize_generic_call(
                         name,
                         args,

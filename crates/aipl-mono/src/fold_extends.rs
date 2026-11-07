@@ -114,11 +114,11 @@ pub fn fold_extends(program: &Program, scope: &Scope) -> Program {
 
 fn folded_fn(f: &Function) -> Function {
     let mut out = f.clone();
-    out.body = fold_expr(&f.body, &mut ArrayReceivers::from_params(&f.sig.params));
+    out.body = fold_expr(&f.body, &mut ArrayReceivers::of_function(f, &f.body));
     out.test_body = f
         .test_body
         .as_ref()
-        .map(|t| fold_expr(t, &mut ArrayReceivers::from_params(&f.sig.params)));
+        .map(|t| fold_expr(t, &mut ArrayReceivers::of_function(f, t)));
     out
 }
 
@@ -128,8 +128,13 @@ fn folded_fn(f: &Function) -> Function {
 /// A stack, so a name is answered for only as long as the declaration that put
 /// it there is in scope: an inner binding that shadows an array with something
 /// else takes the answer away rather than inheriting it.
+#[derive(Default)]
 struct ArrayReceivers {
     receivers: Vec<(String, bool)>,
+    /// The names declared to hold an array and bound exactly once in the function, so
+    /// that no inner binding can mean something else by the same spelling — see
+    /// [`ArrayReceivers::known_array`].
+    arrays: std::collections::HashSet<String>,
     /// Hoisted keyword arguments bound to an empty sequence.
     ///
     /// The loader fills an omitted keyword argument by binding the default once
@@ -149,7 +154,38 @@ impl ArrayReceivers {
                 .filter(|p| p.mutable)
                 .map(|p| (p.name.clone(), is_array(&p.ty)))
                 .collect(),
-            empty: Vec::new(),
+            ..ArrayReceivers::default()
+        }
+    }
+
+    /// The receivers of `f`, and the names `body` binds exactly once to an array.
+    fn of_function(f: &Function, body: &Expr) -> ArrayReceivers {
+        let mut counts = std::collections::HashMap::new();
+        let mut candidates = std::collections::HashSet::new();
+        for p in &f.sig.params {
+            *counts.entry(p.name.clone()).or_insert(0usize) += 1;
+            if is_array(&p.ty) {
+                candidates.insert(p.name.clone());
+            }
+        }
+        bound_names(body, &mut counts, &mut candidates);
+        let mut out = ArrayReceivers::from_params(&f.sig.params);
+        out.arrays = candidates
+            .into_iter()
+            .filter(|n| counts.get(n) == Some(&1))
+            .collect();
+        out
+    }
+
+    /// Whether `e` is certainly an array: a literal, or a name that is declared one and
+    /// bound nowhere else in the function. Types are not known this early, and
+    /// `xs.map(f)` over an optional is a different thing from the same spelling over
+    /// an array, so a fold that only holds for arrays asks this first.
+    fn known_array(&self, e: &Expr) -> bool {
+        match &e.kind {
+            ExprKind::ArrayLit(_) => true,
+            ExprKind::Ident(n) => self.arrays.contains(n),
+            _ => false,
         }
     }
 
@@ -162,9 +198,11 @@ impl ArrayReceivers {
             .is_some_and(|(_, yes)| *yes)
     }
 
-    fn declare(&mut self, name: &str, ty: &Option<Type>) {
-        self.receivers
-            .push((name.to_string(), ty.as_ref().is_some_and(is_array)));
+    /// A `mut` binding is an array when it says so, or when it starts as an array literal.
+    fn declare(&mut self, name: &str, ty: &Option<Type>, value: &Expr) {
+        let holds = ty.as_ref().is_some_and(is_array)
+            || (ty.is_none() && matches!(value.kind, ExprKind::ArrayLit(_)));
+        self.receivers.push((name.to_string(), holds));
     }
 
     fn undeclare(&mut self) {
@@ -199,6 +237,56 @@ impl ArrayReceivers {
     }
 }
 
+/// Count every binder in `e` by name, and note the ones bound to something that is an array
+/// (an array annotation, or an array literal / reserved array as the initializer).
+fn bound_names(
+    e: &Expr,
+    counts: &mut std::collections::HashMap<String, usize>,
+    arrays: &mut std::collections::HashSet<String>,
+) {
+    let mut bind = |name: &str| *counts.entry(name.to_string()).or_insert(0) += 1;
+    match &e.kind {
+        ExprKind::Let(n, ty, value, _) | ExprKind::LetMut(n, ty, value, _) => {
+            bind(n);
+            if ty.as_ref().is_some_and(is_array)
+                || matches!(
+                    &value.kind,
+                    ExprKind::ArrayLit(_)
+                        | ExprKind::Call(Callee::ArrReserve | Callee::WithCapacity, ..)
+                )
+            {
+                arrays.insert(n.clone());
+            }
+        }
+        ExprKind::For(n, index, ..) => {
+            for b in aipl_syntax::loop_binders(n, index) {
+                bind(&b);
+            }
+        }
+        ExprKind::Match(_, arms) => {
+            for a in arms {
+                for b in a.pattern.bindings() {
+                    bind(&b);
+                }
+            }
+        }
+        ExprKind::IfLet(arm, ..) => {
+            for b in arm.pattern.bindings() {
+                bind(&b);
+            }
+        }
+        ExprKind::Lambda(params, _) => {
+            for p in params {
+                bind(&p.name);
+            }
+        }
+        _ => {}
+    }
+    for child in crate::children(e) {
+        bound_names(child, counts, arrays);
+    }
+}
+
 fn is_array(t: &Type) -> bool {
     matches!(aipl_syntax::unrefined(t), Type::Array(_))
 }
@@ -214,7 +302,7 @@ fn fold_expr(e: &Expr, arrays: &mut ArrayReceivers) -> Expr {
     // exactly that descent.
     if let ExprKind::LetMut(name, ty, value, body) = &e.kind {
         let value = fold_expr(value, arrays);
-        arrays.declare(name, ty);
+        arrays.declare(name, ty, &value);
         let body = fold_expr(body, arrays);
         arrays.undeclare();
         return Expr::rebuilt(
@@ -403,6 +491,40 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
             // A loop's own value is an `i64`, so it is sequenced to unit.
             Some(seq(walk, unit()))
         }
+        // `xs.map(f)`, `xs.filter(p)`, `xs.filter_map(p, f)` — one call that walks `xs` and
+        // appends each kept element into `v` as it is produced, so the array the source would
+        // have built, and the copy of it into `v`, never happen (`extend_map` and its
+        // siblings; the `mut self` receiver grows in place). The same calls run in the same
+        // order; only where the results land differs.
+        //
+        // The call spelling alone does not say what `xs` is — `opt.map(f)` is an optional, and
+        // an `extend` of one is `extend_optional` — so this folds only when `xs` is known to
+        // be an array, into a receiver declared one (a `str` receiver would not take it).
+        ExprKind::Call(callee @ (Callee::Map | Callee::Filter | Callee::FilterMap), args, _) => {
+            let extending = match (callee, args.len()) {
+                (Callee::Map, 2) => Callee::ExtendMap,
+                (Callee::Filter, 2) => Callee::ExtendFilter,
+                (Callee::FilterMap, 3) => Callee::ExtendFilterMap,
+                _ => return None,
+            };
+            if !(arrays.holds_array(v) && arrays.known_array(&args[0])) {
+                return None;
+            }
+            let target = || Expr::new(ExprKind::Ident(v.to_string()), span());
+            let mut call_args = vec![target()];
+            call_args.extend(args.iter().cloned());
+            Some(Expr::new(
+                ExprKind::Assign(
+                    Box::new(target()),
+                    Box::new(Expr::new(
+                        ExprKind::Call(extending, call_args, true),
+                        span(),
+                    )),
+                    Box::new(unit()),
+                ),
+                span(),
+            ))
+        }
         // `opt.map(f).value_or([])` — the default is what says the result is a
         // sequence, and the `map` is reached *through* so that `f`'s result is
         // appended where it is produced.
@@ -520,7 +642,7 @@ mod tests {
     fn receivers(v_is_array: bool) -> ArrayReceivers {
         ArrayReceivers {
             receivers: vec![("v".to_string(), v_is_array)],
-            empty: Vec::new(),
+            ..ArrayReceivers::default()
         }
     }
 
@@ -560,6 +682,30 @@ mod tests {
             &ArrayReceivers::from_params(&[])
         )
         .is_none());
+    }
+
+    /// `xs.map(f)` spells an optional's `map` too, and `extend` of an optional is a different
+    /// shape, so a map is folded into `extend_map` only when the source is known to be an array.
+    #[test]
+    fn a_map_is_only_extended_from_a_known_array() {
+        let map = |xs: Expr| e(ExprKind::Call(Callee::Map, vec![xs, id("f")], true));
+        let mut known = array_receiver();
+        known.arrays.insert("xs".to_string());
+
+        let whole = extend_of(map(id("xs")));
+        let out = appended(extend_statement(&whole).expect("shape"), &known)
+            .expect("a known array is walked");
+        assert!(format!("{out:?}").contains("ExtendMap"), "{out:?}");
+
+        // A name nothing declared an array: it could be an optional.
+        let whole = extend_of(map(id("maybe")));
+        assert!(appended(extend_statement(&whole).expect("shape"), &known).is_none());
+
+        // A known array into a receiver that is not declared one (a `str` takes no `extend_map`).
+        let whole = extend_of(map(id("xs")));
+        let mut str_receiver = receivers(false);
+        str_receiver.arrays.insert("xs".to_string());
+        assert!(appended(extend_statement(&whole).expect("shape"), &str_receiver).is_none());
     }
 
     #[test]

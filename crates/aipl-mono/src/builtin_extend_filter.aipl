@@ -1,0 +1,21 @@
+# The AIPL implementation of the `extend_filter` builtin. The loader names this function by the
+# canonical name `__builtin_extend_filter`; see `builtin_extend_map.aipl`, whose filtering
+# sibling it is. `set out.extend(xs.filter(p))` and `..xs.filter(p)` in an array literal become
+# this call, so the filtered array is never built.
+
+import { equal as ==, len, less_than as <, push } from builtins;
+
+# Append the elements of `xs` that satisfy `keep`, in order, onto `self`.
+pub fn extend_filter<T: any>(mut self: T[], xs: T[], keep: (T) -> bool) {
+    for (let x : xs) {
+        if (keep(x)) { set self.push(x); };
+    }
+}.test({
+    mut out = ["a"];
+    set out.extend_filter(["x", "yy", "zzz"], |s| 1 < s.len());
+    assert(out == ["a", "yy", "zzz"]);
+
+    // Nothing kept leaves the array alone.
+    set out.extend_filter(["x"], |s| 1 < s.len());
+    assert(out == ["a", "yy", "zzz"]);
+})

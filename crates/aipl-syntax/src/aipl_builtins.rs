@@ -81,6 +81,10 @@ pub fn companions(present: &HashSet<Callee>, mentions_grid: bool) -> HashSet<Cal
         (has(C::Count), C::CountIsEqual),
         (has(C::Count), C::CountIsNotEqual),
         (has(C::Extend), C::ExtendOptional),
+        // The folder rewrites an `extend` or a spread of these into the `extend_*` builtins.
+        (has(C::Map), C::ExtendMap),
+        (has(C::Filter), C::ExtendFilter),
+        (has(C::FilterMap), C::ExtendFilterMap),
         (has(C::IntParse), C::IntParseUnsigned),
         (mentions_grid, C::GridFrom),
         (mentions_grid, C::GridGet),

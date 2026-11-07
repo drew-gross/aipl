@@ -23,14 +23,14 @@ test({
 --- report ---
 allocations       2
 deallocations     2
-reallocations     0
-bytes allocated   202
-peak live bytes   202
-instructions      218
-binary size       2672 bytes (code 1008, data 284, metadata 1380)
+reallocations     4
+bytes allocated   50
+peak live bytes   290
+instructions      427
+binary size       3480 bytes (code 1760, data 116, metadata 1604)
 
 function                   calls  code bytes
-__test$__test_block_1          1         696
+__test$__test_block_1          1        1448
 __to_str_u64                   1         204
 aipl_array_dec                 1    external
 aipl_assert                    1    external

@@ -4146,6 +4146,11 @@ pub const INTERNAL_BUILTINS: &[Callee] = &[
     Callee::Reserve,
     Callee::AssumeNonempty,
     Callee::ExtendOptional,
+    // What the folder turns `set out.extend(xs.map(f))` into (and its `filter` and
+    // `filter_map` siblings): never written, so never imported.
+    Callee::ExtendMap,
+    Callee::ExtendFilter,
+    Callee::ExtendFilterMap,
     // The unchecked halves of `inline_str`: `pack_inline` has no answer for
     // content past the inline capacity, and the capacity is the bound its one
     // caller checks against. `inline_str` is the spelling.
