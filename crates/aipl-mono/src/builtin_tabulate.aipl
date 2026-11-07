@@ -12,8 +12,7 @@ import {
     join,
     len,
     map,
-    max,
-    push,
+    maximum,
     repeat,
     saturating_sub as -,
     value_or,
@@ -43,10 +42,9 @@ fn rule(widths: u64[], fill: str) -> str {
 
 # One row's line: each cell padded to its column's width, between `|`s.
 fn cells_line(cells: str[], widths: u64[], right: bool[]) -> str {
-    mut parts: str[] = [];
-    for (let i, cell : cells) {
-        set parts.push(padded(cell, widths[i].value_or(0), right[i].value_or(false)));
-    }
+    let parts = (0..cells.len()).map(|i| {
+        padded(cells[i].value_or(""), widths[i].value_or(0), right[i].value_or(false))
+    });
     `| {parts.join(sep=" | ")} |`
 }.test({
     assert(cells_line(["a", "b"], [3, 2], [false, true]) == "| a   |  b |");
@@ -57,20 +55,17 @@ fn cells_line(cells: str[], widths: u64[], right: bool[]) -> str {
 # or on the left for a column `right_aligned` marks (a column it does not reach is on the
 # left). Callable as a method.
 pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> str[] {
-    mut widths: u64[] = [];
-    for (let i, header : headers) {
-        mut width = header.len();
-        for (let row : self) {
-            set width = max(width, row[i].value_or("").len());
-        }
-        set widths.push(width);
-    }
-    mut lines = [rule(widths, "-"), cells_line(headers, widths, right_aligned), rule(widths, "=")];
-    for (let row : self) {
-        set lines.push(cells_line(row, widths, right_aligned));
-    }
-    set lines.push(rule(widths, "-"));
-    lines
+    // A column is as wide as its widest cell, its header included.
+    let widths = (0..headers.len()).map(|i| {
+        [headers[i].value_or(""), ..self.map(|row| row[i].value_or(""))]$len().maximum().value_or(0)
+    });
+    [
+        rule(widths, "-"),
+        cells_line(headers, widths, right_aligned),
+        rule(widths, "="),
+        ..self.map(|row| cells_line(row, widths, right_aligned)),
+        rule(widths, "-"),
+    ]
 }.test({
     assert([["ab", "1"], ["c", "10"]].tabulate(["Name", "N"], right_aligned=[false, true]) == [
         "+------+----+",
