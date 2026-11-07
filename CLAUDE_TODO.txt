@@ -92,7 +92,6 @@ generics:
   `a.count > b.count` on a `<N: ord>` type parameter is refused in the generic body ("comparison operand: expected i64, got type parameter N"), so a generic ordering cannot be written; ord bounds only reach `sort`/`maximum`-style builtins
   an integer literal in a generic struct literal does not flex to the declared field type: `let xs: Counted<u64>[] = [Counted { name: "x", count: 1 }]` says "declared Counted<u64>[], but its value is Counted<i64>[]"
 lexer / parse_json:
-  first-byte dispatch landed (rules tried per byte are worked out the first time the byte is met): 8% fewer instructions on small documents, 4% on an 11.8 MB one, but wall-clock on that document moved by about 1% (2.9 s to 2.87 s), so the lexer is not rule-scanning bound; what is left is parse_cst (a `Step` with `Far`'s three arrays threaded by value through every rule) and lowering
   the per-byte cache and the rules' first-byte sets are rebuilt for every `lex_all`, so a source of a few tokens still pays for them (the lexer's own test case, over five-rule rule sets, costs 49% more instructions, and lex_aipl's 15%); the rules themselves are rebuilt per call too (`aipl_rules()`, `json_rules()`), and a constant cannot hold a computed value
   `to_array` on a `#<{char}` is a compile error now (it silently returned an empty array: a char set is a bitfield, not an array block); it should build the `char[]` from the bits, and the lexer's `mode_rules` would not need a loop
 
