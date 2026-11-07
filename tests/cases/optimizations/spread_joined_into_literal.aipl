@@ -1,0 +1,89 @@
+# A spread of a `join` — usually `xs.map(f).join()`, the shape `map_join` fuses to — appends each
+# piece into the literal's array as it is produced. No array holds the joined result, and none
+# holds the pieces `map` would have collected first.
+#
+# Each literal is measured against the loop that pushes the same elements into one array. The
+# instruction claim is a comparison, so it holds as the code around it changes.
+
+import {
+    equal as ==,
+    join,
+    less_than_or_equal as <=,
+    map,
+    measure,
+    print,
+    push,
+    wrapping_add as +,
+} from builtins;
+
+fn pair(n: i64) -> i64[] { [n, n + 1] }
+
+fn mapped_joined(xs: i64[]) -> i64[] { [-1, ..xs.map(pair).join(), -2] }
+
+fn joined(xss: i64[][]) -> i64[] { [-1, ..xss.join(), -2] }
+
+fn pushed(xs: i64[]) -> i64[] {
+    mut out = [-1];
+    for (let x : xs) {
+        set out.push(x);
+        set out.push(x + 1);
+    }
+    set out.push(-2);
+    out
+}
+
+fn pushed_rows(xss: i64[][]) -> i64[] {
+    mut out = [-1];
+    for (let row : xss) {
+        for (let x : row) {
+            set out.push(x);
+        }
+    }
+    set out.push(-2);
+    out
+}
+
+fn named(n: i64) !prints -> i64 {
+    print(`n{n}`);
+    n
+}
+
+fn noisy(n: i64) !prints -> i64[] {
+    print(`f{n}`);
+    [n, n + 1]
+}
+
+test({
+    assert(mapped_joined([1, 2]) == [-1, 1, 2, 2, 3, -2]);
+    assert(joined([[1], [], [2, 3]]) == [-1, 1, 2, 3, -2]);
+    let empty: i64[] = [];
+    assert(mapped_joined(empty) == [-1, -2]);
+    mut out = "";
+    shim prints {
+        print = |text| {
+            set out = `{out}{text} `;
+        },
+        put = |text| {
+            set out = `{out}{text}`;
+        },
+    } {
+        // The leading element, the mapping function once per source element, then the rest.
+        let both = [named(0), ..[1, 2].map(noisy).join(), named(9)];
+        assert(both == [0, 1, 2, 2, 3, 9]);
+    };
+    assert(out == "n0 f1 f2 n9 ");
+})
+
+benchmark({
+    let xs = [1, 2, 3, 4];
+    let literal = measure("map and join in a literal", xs, mapped_joined);
+    let loop = measure("push loop", xs, pushed);
+    assert(literal.allocations == loop.allocations);
+    assert(literal.instructions <= loop.instructions + 100);
+
+    let rows = [[1], [2, 3], [4]];
+    let literal = measure("join in a literal", rows, joined);
+    let loop = measure("push loop over rows", rows, pushed_rows);
+    assert(literal.allocations == loop.allocations);
+    assert(literal.instructions <= loop.instructions + 100);
+})

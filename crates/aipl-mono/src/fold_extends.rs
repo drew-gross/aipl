@@ -201,7 +201,11 @@ impl ArrayReceivers {
     /// A `mut` binding is an array when it says so, or when it starts as an array literal.
     fn declare(&mut self, name: &str, ty: &Option<Type>, value: &Expr) {
         let holds = ty.as_ref().is_some_and(is_array)
-            || (ty.is_none() && matches!(value.kind, ExprKind::ArrayLit(_)));
+            || (ty.is_none()
+                && matches!(
+                    value.kind,
+                    ExprKind::ArrayLit(_) | ExprKind::Call(Callee::ArrReserve, ..)
+                ));
         self.receivers.push((name.to_string(), holds));
     }
 
@@ -362,9 +366,13 @@ fn extend_statement(e: &Expr) -> Option<ExtendStatement<'_>> {
     let ExprKind::Ident(receiver) = &lhs.kind else {
         return None;
     };
-    let ExprKind::Call(Callee::Extend, args, true) = &value.kind else {
+    // `ArrConcat` is the same step on a spread literal's accumulator.
+    let ExprKind::Call(callee, args, method_style) = &value.kind else {
         return None;
     };
+    if !(matches!(callee, Callee::Extend) && *method_style || matches!(callee, Callee::ArrConcat)) {
+        return None;
+    }
     let [target, source] = args.as_slice() else {
         return None;
     };
@@ -472,9 +480,12 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
         // `xs.map(f).join()` — the fusion pass has already collapsed the pair,
         // so this is one call. Each mapped piece goes straight into `v` as it is
         // produced: the same order, and the same number of calls to `f`.
-        ExprKind::Call(Callee::MapJoin, args, _) => {
-            let [xs, f, seps @ ..] = args.as_slice() else {
-                return None;
+        ExprKind::Call(callee @ (Callee::MapJoin | Callee::Join), args, _) => {
+            let (xs, f, seps) = match (callee, args.as_slice()) {
+                (Callee::MapJoin, [xs, f, seps @ ..]) => (xs, Some(f), seps),
+                // `xss.join()`: each element of `xss` is itself the piece.
+                (Callee::Join, [xs, seps @ ..]) => (xs, None, seps),
+                _ => return None,
             };
             // A separator would have to land between the pieces; only a plain
             // join folds. The loader fills every omitted one, so `join()`
@@ -483,7 +494,11 @@ fn appends(v: &str, src: &Expr, arrays: &ArrayReceivers) -> Option<Expr> {
                 return None;
             }
             let elem = format!("$ext{}_x", aipl_syntax::fresh_id());
-            let piece = apply(f, Expr::new(ExprKind::Ident(elem.clone()), span()))?;
+            let element = Expr::new(ExprKind::Ident(elem.clone()), span());
+            let piece = match f {
+                Some(f) => apply(f, element)?,
+                None => element,
+            };
             let walk = Expr::new(
                 ExprKind::For(elem, None, Box::new(xs.clone()), Box::new(extend(&piece))),
                 span(),

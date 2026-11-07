@@ -517,11 +517,25 @@ fn cheap_len(e: &Expr) -> Option<Expr> {
 }
 
 /// Whether `e` is a spread operand the folder (`fold_extends` in `aipl-mono`) walks rather than
-/// builds: `xs.map(f)`, `xs.filter(p)` and `xs.filter_map(p, f)`.
+/// builds: `xs.map(f)`, `xs.filter(p)`, `xs.filter_map(p, f)` and `xss.join()` (with `map(f)`
+/// before it, once fused, the usual form).
+///
+/// A call with keyword parameters, which `join` has, arrives with the arguments it hoisted
+/// bound by `let`s around it; those are looked through.
 fn is_walked(e: &Expr) -> bool {
+    let mut core = e;
+    while let ExprKind::Let(name, _, _, body) = &core.kind {
+        if !name.starts_with(aipl_syntax::KWARG_ARG_PREFIX) {
+            return false;
+        }
+        core = body;
+    }
     matches!(
-        &e.kind,
-        ExprKind::Call(Callee::Map | Callee::Filter | Callee::FilterMap, ..)
+        &core.kind,
+        ExprKind::Call(
+            Callee::Map | Callee::Filter | Callee::FilterMap | Callee::Join,
+            ..
+        )
     )
 }
 
@@ -732,7 +746,7 @@ impl Expander {
         self.spreads += 1;
         let node = |kind| Expr::new(kind, span.clone());
 
-        // A literal that opens with a plain element and spreads a `map`/`filter`/`filter_map`
+        // A literal that opens with a plain element and spreads a `map`/`filter`/`filter_map`/`join`
         // is built in place instead: an array of the leading elements, room for the rest, and
         // each later element written into it as a mutating call. A walked operand is then one
         // call (`extend_map` and its siblings) that appends as it produces, where the

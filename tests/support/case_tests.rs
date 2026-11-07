@@ -602,6 +602,7 @@ case_tests! {
     cases_optimizations_split_len_fusion = "cases/optimizations/split_len_fusion",
     cases_optimizations_split_len_fusion_effects = "cases/optimizations/split_len_fusion_effects",
     cases_optimizations_split_map_fusion = "cases/optimizations/split_map_fusion",
+    cases_optimizations_spread_joined_into_literal = "cases/optimizations/spread_joined_into_literal",
     cases_optimizations_spread_mapped_into_literal = "cases/optimizations/spread_mapped_into_literal",
     cases_optimizations_spread_walked_effects = "cases/optimizations/spread_walked_effects",
     cases_optimizations_struct_move_in = "cases/optimizations/struct_move_in",
