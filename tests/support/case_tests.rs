@@ -541,6 +541,7 @@ case_tests! {
     cases_methods_mutating_recursive_receiver = "cases/methods/mutating/recursive_receiver",
     cases_methods_mutating_set_writeback_form = "cases/methods/mutating/set_writeback_form",
     cases_optimizations_appending_variant = "cases/optimizations/appending_variant",
+    cases_optimizations_appending_variant_accumulator = "cases/optimizations/appending_variant_accumulator",
     cases_optimizations_appending_variant_not_minted = "cases/optimizations/appending_variant_not_minted",
     cases_optimizations_borrowed_bindings = "cases/optimizations/borrowed_bindings",
     cases_optimizations_builds_into_struct_stays_in_place = "cases/optimizations/builds_into_struct_stays_in_place",

@@ -1,0 +1,87 @@
+# A producer that builds one array in a loop and returns it. Its appending variant needs no copy
+# of that array into the caller's: the loop's pushes are made to the caller's array directly.
+#
+# `evens` is the shape, `gather` the call that appends its results, and `spread` the same call
+# inside a literal. `either` builds two arrays and returns one, which the variant cannot retarget:
+# it ends in a single `extend`, the copy the caller would have made anyway.
+#
+# The benchmark compares against one loop that pushes straight into one array.
+
+import {
+    equal as ==,
+    extend,
+    less_than as <,
+    less_than_or_equal as <=,
+    measure,
+    push,
+    saturating_remainder as %,
+    wrapping_add as +,
+} from builtins;
+
+fn is_even(self: i64) -> bool { self % 2 == 0 }
+
+fn evens(xs: i64[]) -> i64[] {
+    mut out: i64[] = []; #[allow]
+    for (let x : xs) {
+        if (x.is_even()) { set out.push(x); };
+    }
+    out
+}
+
+fn either(xs: i64[], first: bool) -> i64[] {
+    mut low: i64[] = [];
+    mut high: i64[] = [];
+    for (let x : xs) {
+        if (x < 10) {
+            set low.push(x);
+        } else {
+            set high.push(x);
+        };
+    }
+    if (first) { low } else { high }
+}
+
+fn gather(groups: i64[][]) -> i64[] {
+    mut all: i64[] = []; #[allow]
+    for (let g : groups) {
+        set all.extend(evens(g));
+    }
+    all
+}
+
+fn gather_either(groups: i64[][]) -> i64[] {
+    mut all: i64[] = [0];
+    for (let g : groups) {
+        set all.extend(either(g, false));
+    }
+    all
+}
+
+fn pushed(groups: i64[][]) -> i64[] {
+    mut all: i64[] = [];
+    for (let g : groups) {
+        for (let x : g) {
+            if (x.is_even()) { set all.push(x); };
+        }
+    }
+    all
+}
+
+fn spread(xs: i64[]) -> i64[] { [-1, ..evens(xs), -2] }
+
+test({
+    assert(gather([[1, 2, 3, 4], [], [6, 7, 8]]) == [2, 4, 6, 8]);
+    assert(gather_either([[1, 20, 3, 30], [40]]) == [0, 20, 30, 40]);
+    assert(spread([1, 2, 3, 4]) == [-1, 2, 4, -2]);
+    assert(spread([]) == [-1, -2]);
+})
+
+// The array `evens` builds per group is gone: one allocation, the result's, as the single loop
+// makes. The instruction slack is the call per group the variant still costs.
+benchmark({
+    let groups = [[1, 2, 3, 4], [], [6, 7, 8, 30], [10, 12]];
+    let gathered = measure("gather", groups, gather);
+    let loop = measure("one loop", groups, pushed);
+    assert(gathered.allocations == loop.allocations);
+    assert(gathered.instructions <= loop.instructions + 600);
+})

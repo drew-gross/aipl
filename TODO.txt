@@ -113,6 +113,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  in tabulate cells_line() could be a self method
   in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
   optional_of_test looks like it can use string comparison rather than print for assertions
   need a better way to avoid dispatching code on the wrong representation
@@ -329,6 +330,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  right now attempting to spread an optional into an array leaks internal names
   effects in functions called for top level consts should get a more specific error message
   error: cannot infer a type for "T" in generic "__builtin_grid_get" should not reference the builtin name
   make "did you mean?" errors that look for nearby words instead of displaying all possibilities
@@ -359,6 +361,8 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  spread optionals into arrays to make tabulate's widths computation simpler
+  arr$[i] syntax for getting all items at specified index
   lets make it allowed to ignore fields when destructuring, so that let Expr { kind, span, value_span as _, name_span as _ } = body; can just be let Expr { kind, span } = body;.
   make HOFs able to treat their predicates as self methods.
   destructuring structs should be allowed to ignore fields

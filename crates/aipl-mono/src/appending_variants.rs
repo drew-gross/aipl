@@ -46,11 +46,13 @@
 //!
 //! # Minting only when it pays
 //!
-//! A variant the folder cannot take apart is strictly worse than the call it
-//! replaced: the same array, built and then copied into the receiver, now behind
-//! one more call and one more function in the binary. So a candidate is minted
-//! only if [`fold_extends`] can fold at least one of the `extend`s it just
-//! introduced — and if not, the call site is left exactly as written.
+//! A variant the folder cannot take apart ends in `set self.extend(result)`: the
+//! array built and then copied into the receiver, behind one more call and one
+//! more function. On a small producer that measured worse than leaving the call
+//! for the inliner. So a candidate is minted only if [`fold_extends`] can fold at
+//! least one of the `extend`s it just introduced, or if its body builds a single
+//! accumulator that [`promote_accumulator`] can retarget at the receiver, which
+//! removes the copy outright.
 //!
 //! # What makes it safe
 //!
@@ -185,7 +187,8 @@ fn appending_call(whole: &Expr, cx: &mut Cx) -> Option<Expr> {
     let ExprKind::Ident(receiver) = &lhs.kind else {
         return None;
     };
-    let ExprKind::Call(Callee::Extend, extend_args, _) = &value.kind else {
+    // `extend` as written, or the concatenation step of a spread literal's accumulator.
+    let ExprKind::Call(Callee::Extend | Callee::ArrConcat, extend_args, _) = &value.kind else {
         return None;
     };
     let [target, source] = extend_args.as_slice() else {
@@ -237,11 +240,22 @@ fn mint(f: &Function, variant: &str) -> Option<Function> {
     if lambda_returns(&f.body) || mentions_receiver(&f.body) {
         return None;
     }
-    let body = appended_body(&f.body)?;
-    // A variant the folder cannot take apart is worse than the call it replaced.
-    if !fold_extends::folds_anything(&body) {
-        return None;
-    }
+    // A body that builds one accumulator and hands it back writes into the receiver directly,
+    // which is an improvement whatever else the folder finds.
+    let body = match promote_accumulator(&f.body) {
+        Some(promoted) => promoted,
+        None => {
+            let body = appended_body(&f.body)?;
+            // Otherwise the variant ends in the copy its caller would have made, behind one more
+            // call: only worth it if the folder can take the body apart. Minting every producer
+            // measured worse on small ones (`optimizations/fold_extends`: +7% instructions, +4%
+            // code), which the inliner would have folded into the caller.
+            if !fold_extends::folds_anything(&body) {
+                return None;
+            }
+            body
+        }
+    };
     let receiver = Param {
         name_span: Default::default(),
         name: RECEIVER.to_string(),
@@ -361,4 +375,163 @@ fn append_stmt(value: &Expr) -> Expr {
         ),
         span(),
     )
+}
+
+/// The callees that only add elements to their receiver, so a `set acc.<call>(..)` on an
+/// accumulator can be pointed at another array without changing what the call does.
+fn is_appender(callee: &Callee) -> bool {
+    matches!(
+        callee,
+        Callee::Push
+            | Callee::Extend
+            | Callee::ExtendMap
+            | Callee::ExtendFilter
+            | Callee::ExtendFilterMap
+            | Callee::ArrAppend
+            | Callee::ArrConcat
+    )
+}
+
+/// `body` with its accumulator promoted into the receiver: when it declares `mut acc = []`,
+/// only ever adds to it, and hands it back, the declaration goes and every addition is made to
+/// the receiver instead. The receiver already holds the caller's elements, and the producer's
+/// own come after them, so the array the producer would have built and the copy of it into the
+/// caller's array never exist.
+///
+/// ```text
+/// fn evens(xs: i64[]) -> i64[] {            fn evens$into(mut self: i64[], xs: i64[]) {
+///     mut out: i64[] = [];                      for (let x : xs) {
+///     for (let x : xs) {                  →         if (is_even(x)) { set self.push(x); };
+///         if (is_even(x)) { set out.push(x); };  }
+///     }                                     }
+///     out
+/// }
+/// ```
+///
+/// `None` when any of these fails, and the caller then appends the result as a whole:
+/// - The declaration is the body's own — at its root, or under `let`s and statements — with an
+///   empty seed, and the name is bound nowhere else in the body.
+/// - Every use is an addition (`push`, `extend` and the like) whose operands do not read it, or a
+///   result position: the body's value, or a `return`. Anything else reads it, and what it
+///   would read now includes the caller's elements.
+/// - Every result position is the accumulator. A different array there (a second accumulator, an
+///   early `return []` after some pushes) is not something to retarget.
+fn promote_accumulator(body: &Expr) -> Option<Expr> {
+    match &body.kind {
+        ExprKind::LetMut(acc, _, seed, rest) if matches!(&seed.kind, ExprKind::ArrayLit(elems) if elems.is_empty()) => {
+            promote(rest, acc, true)
+        }
+        ExprKind::Let(name, ty, value, rest) => Some(Expr::rebuilt(
+            ExprKind::Let(
+                name.clone(),
+                ty.clone(),
+                value.clone(),
+                Box::new(promote_accumulator(rest)?),
+            ),
+            body,
+        )),
+        ExprKind::Seq(first, rest) => Some(Expr::rebuilt(
+            ExprKind::Seq(first.clone(), Box::new(promote_accumulator(rest)?)),
+            body,
+        )),
+        _ => None,
+    }
+}
+
+/// [`promote_accumulator`]'s walk over what follows the declaration: `e` with `acc` retargeted,
+/// where `tail` says `e`'s value is the function's.
+fn promote(e: &Expr, acc: &str, tail: bool) -> Option<Expr> {
+    let unit = || Expr::rebuilt(ExprKind::Unit, e);
+    let rebuilt = |kind| Some(Expr::rebuilt(kind, e));
+    match &e.kind {
+        // The accumulator as the function's value: the elements are already in the receiver.
+        ExprKind::Ident(name) if name == acc => tail.then(unit),
+        ExprKind::Return(value) => match &value.kind {
+            ExprKind::Ident(name) if name == acc => rebuilt(ExprKind::Return(Box::new(unit()))),
+            _ => None,
+        },
+        ExprKind::Assign(lhs, value, rest) if matches!(&lhs.kind, ExprKind::Ident(n) if n == acc) =>
+        {
+            let ExprKind::Call(callee, args, method_style) = &value.kind else {
+                return None;
+            };
+            let [target, operands @ ..] = args.as_slice() else {
+                return None;
+            };
+            if !is_appender(callee)
+                || !crate::is_receiver(target, acc)
+                || operands.iter().any(|o| crate::sink::mentions_free(o, acc))
+            {
+                return None;
+            }
+            let receiver = || Expr::rebuilt(ExprKind::Ident(RECEIVER.to_string()), lhs);
+            let mut call_args = vec![receiver()];
+            call_args.extend(operands.iter().cloned());
+            let call = Expr::rebuilt(
+                ExprKind::Call(callee.clone(), call_args, *method_style),
+                value,
+            );
+            rebuilt(ExprKind::Assign(
+                Box::new(receiver()),
+                Box::new(call),
+                Box::new(promote(rest, acc, tail)?),
+            ))
+        }
+        ExprKind::Let(name, ty, value, rest) => {
+            if name == acc {
+                return None;
+            }
+            rebuilt(ExprKind::Let(
+                name.clone(),
+                ty.clone(),
+                Box::new(promote(value, acc, false)?),
+                Box::new(promote(rest, acc, tail)?),
+            ))
+        }
+        ExprKind::LetMut(name, ty, value, rest) => {
+            if name == acc {
+                return None;
+            }
+            rebuilt(ExprKind::LetMut(
+                name.clone(),
+                ty.clone(),
+                Box::new(promote(value, acc, false)?),
+                Box::new(promote(rest, acc, tail)?),
+            ))
+        }
+        ExprKind::Seq(first, rest) => rebuilt(ExprKind::Seq(
+            Box::new(promote(first, acc, false)?),
+            Box::new(promote(rest, acc, tail)?),
+        )),
+        ExprKind::If(cond, then, otherwise) => rebuilt(ExprKind::If(
+            Box::new(promote(cond, acc, false)?),
+            Box::new(promote(then, acc, tail)?),
+            Box::new(promote(otherwise, acc, tail)?),
+        )),
+        ExprKind::Match(scrutinee, arms) => {
+            let mut promoted = Vec::with_capacity(arms.len());
+            for arm in arms {
+                if arm.pattern.bindings().iter().any(|b| b == acc) {
+                    return None;
+                }
+                let mut arm = arm.clone();
+                arm.body = promote(&arm.body, acc, tail)?;
+                promoted.push(arm);
+            }
+            rebuilt(ExprKind::Match(
+                Box::new(promote(scrutinee, acc, false)?),
+                promoted,
+            ))
+        }
+        // A closure that mentions the accumulator would capture a copy of it, not the receiver.
+        ExprKind::Lambda(..) => (!crate::sink::mentions_free(e, acc)).then(|| e.clone()),
+        ExprKind::For(name, index, ..) if aipl_syntax::for_binds(name, index, acc) => None,
+        _ => {
+            let mut out = e.clone();
+            for child in crate::children_mut(&mut out) {
+                *child = promote(child, acc, false)?;
+            }
+            Some(out)
+        }
+    }
 }

@@ -578,6 +578,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/methods/mutating/recursive_receiver | 31 | 1202 | 132 | 12929 | 15124 |
 | tests/cases/methods/mutating/set_writeback_form | 3 | 128 | 144 | 933 | 2232 |
 | tests/cases/optimizations/appending_variant | 404 | 24508 | 24730 | 60172 | 10916 |
+| tests/cases/optimizations/appending_variant_accumulator | 6 | 368 | 376 | 3632 | 6356 |
 | tests/cases/optimizations/appending_variant_not_minted | 12 | 556 | 452 | 886 | 3260 |
 | tests/cases/optimizations/borrowed_bindings | 46 | 3191 | 3191 | 8252 | 19100 |
 | tests/cases/optimizations/builds_into_struct_stays_in_place | 4 | 256 | 64 | 2894 | 5748 |
