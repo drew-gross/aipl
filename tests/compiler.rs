@@ -32,6 +32,8 @@ mod lsp;
 mod mono;
 #[path = "suites/parser.rs"]
 mod parser;
+#[path = "suites/pin.rs"]
+mod pin;
 #[path = "suites/projects.rs"]
 mod projects;
 #[path = "suites/report.rs"]

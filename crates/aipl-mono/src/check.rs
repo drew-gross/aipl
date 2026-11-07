@@ -7006,7 +7006,7 @@ fn check_float_operands(
 /// the receiver's `T[]` and the result's `U[]` read as `T?` and `U?`. Derived
 /// from the declaration rather than written out, so the parameter names, the
 /// type variables and the lambda's shape stay whatever the declaration says.
-fn optional_map_signature(array_form: &Signature) -> Signature {
+pub(crate) fn optional_map_signature(array_form: &Signature) -> Signature {
     let as_optional = |t: &Type| match t {
         Type::Array(inner) => Type::Optional(inner.clone()),
         other => other.clone(),
@@ -7029,7 +7029,7 @@ fn optional_map_signature(array_form: &Signature) -> Signature {
 /// where the receiver's shape is what the result has to mirror.
 ///
 /// [`Span`]: aipl_syntax::Span
-fn span_map_signature(array_form: &Signature) -> Signature {
+pub(crate) fn span_map_signature(array_form: &Signature) -> Signature {
     let mut sig = array_form.clone();
     if let Some(receiver) = sig.params.first_mut() {
         receiver.ty = Type::Named(SPAN_TYPE.to_string());

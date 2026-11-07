@@ -368,6 +368,7 @@ mod children;
 pub use children::{Children, ChildrenMut};
 pub mod rename;
 pub mod resolution;
+pub mod typed;
 pub use rename::{
     distinct_binders, fresh_id, fresh_local, fresh_temp, rename_params, rename_scoped,
 };
