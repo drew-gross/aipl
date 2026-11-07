@@ -13,14 +13,9 @@ import {
     len,
     less_than as <,
     map,
-    max,
-    push,
     render,
-    repeat,
-    saturating_sub as -,
+    tabulate,
     to_float,
-    value_or,
-    wrapping_add as +,
 } from builtins;
 import { Identifier, Meta, Other, archetypes_of, deck_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
@@ -113,63 +108,6 @@ fn percent(count: u64, total: u64) -> str {
     assert(percent(3, 2000) == "0.1%");
 })
 
-# `text` padded with spaces to `width`: on the left when `right`, else on the right.
-fn padded(text: str, width: u64, right: bool) -> str {
-    let gap = " ".repeat(width - text.len());
-    if (right) { `{gap}{text}` } else { `{text}{gap}` }
-}.test({
-    assert(padded("ab", 5, false) == "ab   ");
-    assert(padded("ab", 5, true) == "   ab");
-    assert(padded("abcdef", 3, false) == "abcdef");
-    assert(padded("", 2, true) == "  ");
-})
-
-# A table as lines, in the grid style `tabulate` draws: a rule above, between the header
-# and the rows, and below, each cell padded to its column, the columns in `right` aligned
-# to the right.
-pub fn grid(headers: str[], rows: str[][], right: bool[]) -> str[] {
-    mut widths: u64[] = [];
-    for (let i, header : headers) {
-        mut width = header.len();
-        for (let row : rows) {
-            set width = max(width, row[i].value_or("").len());
-        }
-        set widths.push(width);
-    }
-    mut lines = [rule(widths, "-"), cells_line(headers, widths, right), rule(widths, "=")];
-    for (let row : rows) {
-        set lines.push(cells_line(row, widths, right));
-    }
-    set lines.push(rule(widths, "-"));
-    lines
-}.test({
-    assert(grid(["Name", "N"], [["ab", "1"], ["c", "10"]], [false, true]) == [
-        "+------+----+",
-        "| Name |  N |",
-        "+======+====+",
-        "| ab   |  1 |",
-        "| c    | 10 |",
-        "+------+----+",
-    ]);
-    // No rows: just the header.
-    assert(grid(["X"], [], [false]) == ["+---+", "| X |", "+===+", "+---+"]);
-})
-
-# The line of `fill` characters over each column of `widths`, joined by `+`.
-fn rule(widths: u64[], fill: str) -> str {
-    let spans = widths.map(|w| { fill.repeat(w + 2) });
-    `+{spans.join(sep="+")}+`
-}
-
-# One row's line: each cell padded to its column's width, between `|`s.
-fn cells_line(cells: str[], widths: u64[], right: bool[]) -> str {
-    mut parts: str[] = [];
-    for (let i, cell : cells) {
-        set parts.push(padded(cell, widths[i].value_or(0), right[i].value_or(false)));
-    }
-    `| {parts.join(sep=" | ")} |`
-}
-
 # The report on `decks`, loaded from the metagame `name`, as lines.
 pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[] {
     let total = decks.len();
@@ -179,7 +117,7 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[
     [
         `Metagame Breakdown from {name}`,
         "Order by Metagame %",
-        ..grid(["Deck Name", "Metagame %", "Count"], rows, [false, true, true]),
+        ..rows.tabulate(["Deck Name", "Metagame %", "Count"], right_aligned=[false, true, true]),
     ]
 }.test({
     let nothing: str[] = [];

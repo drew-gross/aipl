@@ -1,0 +1,102 @@
+# The AIPL implementation of the `tabulate` builtin. The loader names this function by the
+# canonical name `__builtin_tabulate` (see `aipl_syntax::builtin`), so a user's
+# `rows.tabulate(headers)` specializes through the ordinary generic machinery — the in-file
+# name is only for this file's own tests, which read exactly like user code.
+#
+# No lint steers the longhand here: a hand-drawn table is built from so many different pieces
+# (separators, padding, borders) that no shape could be advised precisely, and a mis-advised
+# lint is worse than none.
+
+import {
+    equal as ==,
+    join,
+    len,
+    map,
+    max,
+    push,
+    repeat,
+    saturating_sub as -,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+
+# `text` padded with spaces to `width`: on the left when `right`, else on the right. Text
+# already wider than `width` is left as it is.
+fn padded(text: str, width: u64, right: bool) -> str {
+    let gap = " ".repeat(width - text.len());
+    if (right) { `{gap}{text}` } else { `{text}{gap}` }
+}.test({
+    assert(padded("ab", 5, false) == "ab   ");
+    assert(padded("ab", 5, true) == "   ab");
+    assert(padded("abcdef", 3, false) == "abcdef");
+    assert(padded("", 2, true) == "  ");
+})
+
+# The line of `fill` characters over each column of `widths`, joined by `+`.
+fn rule(widths: u64[], fill: str) -> str {
+    let spans = widths.map(|w| { fill.repeat(w + 2) });
+    `+{spans.join(sep="+")}+`
+}.test({
+    assert(rule([1, 3], "-") == "+---+-----+");
+    assert(rule([2], "=") == "+====+");
+})
+
+# One row's line: each cell padded to its column's width, between `|`s.
+fn cells_line(cells: str[], widths: u64[], right: bool[]) -> str {
+    mut parts: str[] = [];
+    for (let i, cell : cells) {
+        set parts.push(padded(cell, widths[i].value_or(0), right[i].value_or(false)));
+    }
+    `| {parts.join(sep=" | ")} |`
+}.test({
+    assert(cells_line(["a", "b"], [3, 2], [false, true]) == "| a   |  b |");
+})
+
+# `rows` drawn as a table, as lines: a rule above, `headers` and a heavier rule under them,
+# the rows, and a rule below. Each column is as wide as its widest cell, padded on the right,
+# or on the left for a column `right_aligned` marks (a column it does not reach is on the
+# left). Callable as a method.
+pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> str[] {
+    mut widths: u64[] = [];
+    for (let i, header : headers) {
+        mut width = header.len();
+        for (let row : self) {
+            set width = max(width, row[i].value_or("").len());
+        }
+        set widths.push(width);
+    }
+    mut lines = [rule(widths, "-"), cells_line(headers, widths, right_aligned), rule(widths, "=")];
+    for (let row : self) {
+        set lines.push(cells_line(row, widths, right_aligned));
+    }
+    set lines.push(rule(widths, "-"));
+    lines
+}.test({
+    assert([["ab", "1"], ["c", "10"]].tabulate(["Name", "N"], right_aligned=[false, true]) == [
+        "+------+----+",
+        "| Name |  N |",
+        "+======+====+",
+        "| ab   |  1 |",
+        "| c    | 10 |",
+        "+------+----+",
+    ]);
+    // No rows: just the header.
+    let nothing: str[][] = [];
+    assert(nothing.tabulate(["X"]) == ["+---+", "| X |", "+===+", "+---+"]);
+    // Alignment is optional, and the free-call form is the same.
+    assert(tabulate([["7"]], ["Count"]) == [
+        "+-------+",
+        "| Count |",
+        "+=======+",
+        "| 7     |",
+        "+-------+",
+    ]);
+    // A cell wider than its header widens the column.
+    assert([["long"]].tabulate(["h"]) == [
+        "+------+",
+        "| h    |",
+        "+======+",
+        "| long |",
+        "+------+",
+    ]);
+})

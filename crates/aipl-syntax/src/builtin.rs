@@ -404,6 +404,7 @@ const BUILTINS: &[Builtin] = &[
     ),
     Builtin::aipl(Callee::Render, "builtin_render.aipl"),
     Builtin::aipl(Callee::Distinct, "builtin_distinct.aipl"),
+    Builtin::aipl(Callee::Tabulate, "builtin_tabulate.aipl"),
     Builtin::described(
         Callee::ToFixed,
         "fn to_fixed<F>(self: F, digits: u64) -> str",

@@ -113,6 +113,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
   optional_of_test looks like it can use string comparison rather than print for assertions
   need a better way to avoid dispatching code on the wrong representation
   split Type into variants that can and cannot be generic, and have the stage the resolves generics transform. This feel more sound than the current patchwork.

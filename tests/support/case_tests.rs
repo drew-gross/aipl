@@ -1097,6 +1097,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_set_map = "crates/aipl-mono/src/builtin_set_map",
     crates_aipl_mono_src_builtin_sort_by = "crates/aipl-mono/src/builtin_sort_by",
     crates_aipl_mono_src_builtin_split_map = "crates/aipl-mono/src/builtin_split_map",
+    crates_aipl_mono_src_builtin_tabulate = "crates/aipl-mono/src/builtin_tabulate",
     crates_aipl_mono_src_builtin_to_dict = "crates/aipl-mono/src/builtin_to_dict",
     crates_aipl_mono_src_builtin_trim_while = "crates/aipl-mono/src/builtin_trim_while",
     crates_aipl_mono_src_builtin_try_map = "crates/aipl-mono/src/builtin_try_map",

@@ -215,6 +215,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_set_map | 50 | 1866 | 1738 | 5288 | 14640 |
 | crates/aipl-mono/src/builtin_sort_by | 33 | 1816 | 1216 | 15616 | 23752 |
 | crates/aipl-mono/src/builtin_split_map | 39 | 3153 | 3153 | 3899 | 8228 |
+| crates/aipl-mono/src/builtin_tabulate | 143 | 8538 | 5820 | 23903 | 15660 |
 | crates/aipl-mono/src/builtin_to_dict | 12 | 896 | 992 | 2222 | 7368 |
 | crates/aipl-mono/src/builtin_trim_while | 0 | 0 | 0 | 1255 | 3868 |
 | crates/aipl-mono/src/builtin_try_map | 42 | 2365 | 2163 | 6550 | 21280 |
