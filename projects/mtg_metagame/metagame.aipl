@@ -5,14 +5,12 @@
 import {
     ExecResult,
     IEEE754Float64 as Float,
-    Json,
     collect_ok,
     equal as ==,
     execute_program,
     float_div as /,
     greater_than as >,
     not_equal as !=,
-    parse_json,
     to_float,
     to_str,
     try_map,
@@ -29,6 +27,7 @@ import {
     text_field,
     unsigned_field,
 } from "./json.aipl";
+import { Json, parse } from json;
 
 # How one match ended, from a deck's point of view.
 variant Result = Win | Loss | Draw
@@ -126,9 +125,9 @@ fn decode_card(self: Json) -> Card!str {
         card_type: self.text_field("card_type")?,
     })
 }.test({
-    let json = parse_json("""{"name":"Island","count":4,"card_type":"Land"}""")?;
+    let json = parse("""{"name":"Island","count":4,"card_type":"Land"}""")?;
     assert(decode_card(json) == ok(Card { name: "Island", count: 4, card_type: "Land" }));
-    let bad = parse_json("""{"name":"Island"}""")?;
+    let bad = parse("""{"name":"Island"}""")?;
     assert(decode_card(bad) == err(`missing "count"`));
 })
 
@@ -140,7 +139,7 @@ fn decode_record(self: Json) -> Record!str {
         draw: self.integer_field("draw")?,
     })
 }.test({
-    let json = parse_json("""{"win":2,"loss":1,"draw":0}""")?;
+    let json = parse("""{"win":2,"loss":1,"draw":0}""")?;
     assert(decode_record(json) == ok(Record { win: 2, loss: 1, draw: 0 }));
 })
 
@@ -155,7 +154,7 @@ fn decode_match(self: Json) -> Match!str {
         round: self.optional_text_field("round").value_or(""),
     })
 }.test({
-    let json = parse_json(
+    let json = parse(
         """{"opponent_deck_id":7,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"Round 1"}""",
     )?;
     assert(decode_match(json) == ok(Match {
@@ -178,7 +177,7 @@ fn decode_deck(self: Json) -> Deck!str {
         matches: self.list_field("match_history")?.try_map(decode_match)?,
     })
 }.test({
-    let json = parse_json("""
+    let json = parse("""
         {"deck_id":"d1","name":null,"pilot":"Ana","tournament":5,
          "maindeck":[{"name":"Island","count":4,"card_type":"Land"}],
          "sideboard":[],"match_history":[]}
@@ -202,7 +201,7 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
         decks: self.list_field("decks")?.try_map(decode_deck)?,
     })
 }.test({
-    let json = parse_json("""{"name":"m","tournament_ids":[1,"b"],"decks":[]}""")?;
+    let json = parse("""{"name":"m","tournament_ids":[1,"b"],"decks":[]}""")?;
     assert(decode_metagame(json) == ok(Metagame {
         name: "m",
         tournament_ids: ["1", "b"],
@@ -215,5 +214,5 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
 pub fn load_metagame(path: str) !execute_program -> Metagame!str {
     let ExecResult { stdout, stderr, exit_code } = "gzip".execute_program(args=["-dc", path])?;
     if (exit_code != 0) { return err(`gzip {path}: {stderr}`); };
-    parse_json(stdout)?.decode_metagame()
+    parse(stdout)?.decode_metagame()
 }

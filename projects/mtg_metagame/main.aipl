@@ -3,14 +3,12 @@
 # piece at a time.
 
 import {
-    Json,
     drop_first,
     equal as ==,
     first,
     len,
     less_than as <,
     not_equal as !=,
-    parse_json,
     print,
     read_file_to_string,
     starts_with,
@@ -24,6 +22,7 @@ import { Counted } from "./counted.aipl";
 import { optional_text_field } from "./json.aipl";
 import { share_report } from "./meta_share.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
+import { Json, parse } from json;
 
 let USAGE = """
     usage: mtg_metagame cards <metagame>
@@ -39,7 +38,7 @@ fn data_path(index: Json, name: str) -> str {
     let target = index.optional_text_field(name).value_or(name);
     `data/{target}.json.gz`
 }.test({
-    let index = parse_json("""{"standard_26Q2_rc_japan": "metagame_410903"}""")?;
+    let index = parse("""{"standard_26Q2_rc_japan": "metagame_410903"}""")?;
     assert(data_path(index, "standard_26Q2_rc_japan") == "data/metagame_410903.json.gz");
     assert(data_path(index, "metagame_1") == "data/metagame_1.json.gz");
 })
@@ -51,7 +50,7 @@ fn card_line(self: Counted) -> str { `{self.count} {self.name}` }.test({
 
 # The metagame `name` stands for, with `data/index.json` read to find it.
 fn load_named(name: str) !read_files !execute_program -> Metagame!str {
-    let index = parse_json(read_file_to_string("data/index.json")?)?;
+    let index = parse(read_file_to_string("data/index.json")?)?;
     load_metagame(data_path(index, name))
 }
 

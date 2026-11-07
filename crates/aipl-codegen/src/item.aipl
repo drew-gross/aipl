@@ -22,7 +22,9 @@ import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
 # `name_span` is where the parameter's name is written in the `<..>` list.
 struct TypeParam { name: str, bound: Bound, default: Ty?, name_span: Span = 0..0 }
 
-variant ImportSource = Path(path: str) | Builtins
+# Where an import takes its names from: another file, the main builtin library (`from
+# builtins`), or one of the other builtin libraries (`from json`).
+variant ImportSource = Path(path: str) | Builtins | Library(name: str)
 
 struct ImportName { name: str, alias: str?, span: Span }
 
@@ -303,5 +305,6 @@ fn show_import_source(self: ImportSource) -> str {
     match (self) {
         Path(path) => `"{path}"`,
         Builtins => "builtins",
+        Library(name) => name,
     }
 }

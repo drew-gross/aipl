@@ -5771,9 +5771,9 @@ impl Cx<'_> {
                 }
             }
             let mut msg = format!("call to undefined fn {:?}", display(name));
-            if Callee::importable(name).is_some() {
+            if let Some(import) = aipl_syntax::builtin::Builtin::import_statement(name) {
                 msg.push_str(&format!(
-                    " — \"{name}\" is a builtin; import it with `import {{ {name} }} from builtins;`"
+                    " — \"{name}\" is a builtin; import it with `{import}`"
                 ));
             } else if self.is_ctor_name(name) {
                 msg.push_str(&format!(

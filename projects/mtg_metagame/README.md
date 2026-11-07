@@ -39,8 +39,8 @@ a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this 
 | `counted.aipl` | `Counted` (a name and a count) and `ranked`, the order the listings share |
 | `card_stats.aipl` | `card_counts`: copies played per card |
 | `archetypes.aipl` | the classifier: `Identifier`, `archetypes_of`, `load_identifiers` |
-| `meta_share.aipl` | `shares`, the percentage, `share_report` (the table itself is the `tabulate` builtin) |
-| `json.aipl` | accessors over the `parse_json` builtin's tree: `field`, `text_field`, `integer_field`, `list_field` |
+| `meta_share.aipl` | `shares`, the percentage, `share_report` (the table itself is the `tabulate` library) |
+| `json.aipl` | accessors over the tree `parse` from the `json` library builds: `field`, `text_field`, `integer_field`, `list_field` |
 
 The files are unpacked by running `gzip -dc` (`execute_program`): nothing here
 reads binary files or decompresses yet.

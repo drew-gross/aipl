@@ -86,6 +86,14 @@ Run it in a second: `cargo run -q -- check crates/aipl-mono/src/builtin_<name>.a
 | `crates/aipl-syntax/src/builtin.rs` | `Builtin::aipl(Callee::<Name>, "builtin_<name>.aipl")` in `BUILTINS` — the one table of everything about a builtin: which callee, and where its signature and docs are |
 | `crates/aipl-syntax/src/lib.rs` | `<name>` in the `// NOTE:` list of AIPL-implemented builtins in `BUILTIN_SIGNATURES` |
 
+**A builtin may live in a library of its own** (`import { parse } from json;`, a bare word
+where a path is quoted): construct it with `Builtin::aipl_in_library(callee, file, library,
+public_name, exports)` instead of `Builtin::aipl`. The library is the namespace (DESIGN_PRINCIPLES.md §3), so
+`public_name` is the plain name there — `parse_json` is `parse` in `json` — and the file's `pub fn`
+is spelled that way, while the callee and `__builtin_<callee name>` stay as they are. Group a builtin
+into a library when it comes with related names (a type, its cases, a function family); a lone
+utility stays in `builtins`.
+
 **Do not add a signature to `BUILTIN_SIGNATURES`** — that list is for builtins
 whose body lives in Rust; the `.aipl` file is the source of the signature for
 these.

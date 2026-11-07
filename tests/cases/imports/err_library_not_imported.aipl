@@ -1,0 +1,11 @@
+# Calling a library's function without importing it says which library to import it from.
+
+import { len } from builtins;
+
+fn main() -> u64 { [["1"]].tabulate(["N"]).len() }
+--- check --compile ---
+error: call to undefined fn "tabulate" — "tabulate" is a builtin; import it with `import { tabulate } from tabulate;`
+ --> ./tests/cases/imports/err_library_not_imported.aipl:5:20
+  |
+5 | fn main() -> u64 { [["1"]].tabulate(["N"]).len() }
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^

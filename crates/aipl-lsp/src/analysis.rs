@@ -198,18 +198,15 @@ impl Analyses {
                 builtin: false,
             });
         }
-        let builtin_name = match file.import_of(name) {
-            Some(import) if import.from.is_none() => &import.name,
+        let import = match file.import_of(name) {
+            Some(import) if import.from.is_none() => import,
             Some(_) => return None,
-            None => {
-                &file
-                    .imports
-                    .iter()
-                    .find(|i| i.from.is_none() && i.name == name && i.span.contains(&offset))?
-                    .name
-            }
+            None => file
+                .imports
+                .iter()
+                .find(|i| i.from.is_none() && i.name == name && i.span.contains(&offset))?,
         };
-        let found = aipl_index::builtin(builtin_name)?;
+        let found = aipl_index::builtin(import.library.as_deref()?, &import.name)?;
         Some(Resolved {
             symbol: found.symbol,
             file: found.file,

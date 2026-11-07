@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">215 files, 1876 items.</p>
+      <p class="summary">215 files, 1877 items.</p>
 
       <ul class="files">
 
@@ -1131,7 +1131,7 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-grammar_json.html">crates/aipl-codegen/src/grammar_json.aipl</a>
 
-          <p class="file-summary">What is built on the JSON grammar besides parsing it: printing, formatting, and the tests of the grammar as data. The grammar, the lexer rules, the lowering and <code>parse_json</code> itself are the <code>parse_json</code> builtin (<code>aipl-mono/src/builtin_parse_json.aipl</code>), which programs import; this file imports them the way the parser library's other consumers do.</p>
+          <p class="file-summary">What is built on the JSON grammar besides parsing it: printing, formatting, and the tests of the grammar as data. The grammar, the lexer rules, the lowering and <code>parse</code> itself are the <code>parse</code> builtin of the <code>json</code> library (<code>aipl-mono/src/builtin_parse_json.aipl</code>), which programs import; this file imports them the way the parser library's other consumers do.</p>
 
 
           <span class="private-count"><a href="crates-aipl-codegen-src-grammar_json.html#private">3 private</a></span>
@@ -5302,7 +5302,7 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_parse_json.html">crates/aipl-mono/src/builtin_parse_json.aipl</a>
 
-          <p class="file-summary">The AIPL implementation of the <code>parse_json</code> builtin. The loader names this function by the canonical name <code>__builtin_parse_json</code> (see <code>aipl_syntax::aipl_builtins</code>). The file also defines <code>Json</code> and <code>Member</code>, and <code>Json</code>'s cases, which a program imports from builtins beside <code>parse_json</code>.</p>
+          <p class="file-summary">The AIPL implementation of the <code>parse</code> builtin of the <code>json</code> library. The loader names this function by the canonical name <code>__builtin_parse_json</code> (see <code>aipl_syntax::aipl_builtins</code>). The file also defines <code>Json</code> and <code>Member</code>, and <code>Json</code>'s cases, which a program imports from <code>json</code> beside <code>parse</code>.</p>
 
 
           <span class="private-count"><a href="crates-aipl-mono-src-builtin_parse_json.html#private">6 private</a></span>
@@ -5336,7 +5336,7 @@
             </li>
 
             <li>
-              <a href="crates-aipl-mono-src-builtin_parse_json.html#item-parse_json"><code>parse_json</code></a>
+              <a href="crates-aipl-mono-src-builtin_parse_json.html#item-parse"><code>parse</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

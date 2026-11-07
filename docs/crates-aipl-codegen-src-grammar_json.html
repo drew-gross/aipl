@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_json.aipl</code></h1>
 
-      <div class="module-doc"><p>What is built on the JSON grammar besides parsing it: printing, formatting, and the tests of the grammar as data. The grammar, the lexer rules, the lowering and <code>parse_json</code> itself are the <code>parse_json</code> builtin (<code>aipl-mono/src/builtin_parse_json.aipl</code>), which programs import; this file imports them the way the parser library's other consumers do.</p><p>JSON is the library's second end-to-end target, and the one that adds everything S-expressions deliberately left out — several terminal classes rather than one, a separated <code>Many</code> with a trailing-comma rule, an <code>OneOf</code> across six alternatives, and a heterogeneous AST. Still no precedence; that arrives with the calculator in <code>grammar_calc.aipl</code>.</p></div>
+      <div class="module-doc"><p>What is built on the JSON grammar besides parsing it: printing, formatting, and the tests of the grammar as data. The grammar, the lexer rules, the lowering and <code>parse</code> itself are the <code>parse</code> builtin of the <code>json</code> library (<code>aipl-mono/src/builtin_parse_json.aipl</code>), which programs import; this file imports them the way the parser library's other consumers do.</p><p>JSON is the library's second end-to-end target, and the one that adds everything S-expressions deliberately left out — several terminal classes rather than one, a separated <code>Many</code> with a trailing-comma rule, an <code>OneOf</code> across six alternatives, and a heterogeneous AST. Still no precedence; that arrives with the calculator in <code>grammar_calc.aipl</code>.</p></div>
 
 
 
@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn render_json(self: Json) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse_json</code> — <code>parse_json(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p></div>
+          <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse</code> — <code>parse(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p></div>
 
 
         </section>

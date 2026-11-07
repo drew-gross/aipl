@@ -14,12 +14,12 @@ import {
     less_than as <,
     map,
     render,
-    tabulate,
     to_float,
 } from builtins;
 import { Identifier, Meta, Other, archetypes_of, deck_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
 import { Deck } from "./metagame.aipl";
+import { tabulate } from tabulate;
 
 # The decks of each archetype, most decks first, then the decks that are none of `identifiers`
 # as one `Other` row at the end, whatever its count (and not at all when there are none).

@@ -558,6 +558,10 @@ pub mod ast {
         /// Every builtin must be imported before use, exactly like a
         /// user item, so user idents never silently shadow them.
         Builtins,
+        /// `from json` — one of the other builtin libraries: a single word, where
+        /// a path is quoted. Its names are those the library lists
+        /// ([`builtin::Builtin::library`]).
+        Library(String),
     }
 
     /// A constraint on a declared type variable, restricting which concrete

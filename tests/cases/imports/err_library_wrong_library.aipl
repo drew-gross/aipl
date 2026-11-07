@@ -1,0 +1,16 @@
+# A name imported from the wrong library is sent to the one that holds it.
+
+import { parse } from builtins;
+
+fn main() -> i64 {
+    match (parse("1")) {
+        ok(..) => 0,
+        err(..) => 1,
+    }
+}
+--- check --compile ---
+error: "parse" is not in the builtins library; import it from json: `import { parse } from json;`
+ --> ./tests/cases/imports/err_library_wrong_library.aipl:3:10
+  |
+3 | import { parse } from builtins;
+  |          ^^^^^

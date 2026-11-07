@@ -1,21 +1,8 @@
 # Reading a `Json` tree: looking a field up and taking it as text, a whole number
-# or a list. The tree comes from the `parse_json` builtin.
+# or a list. The tree comes from `parse` in the `json` library.
 
-import {
-    Array,
-    Bool,
-    Json,
-    Member,
-    Null,
-    Number,
-    Object,
-    String,
-    equal as ==,
-    find_map,
-    int_parse,
-    narrow,
-    value_or_err,
-} from builtins;
+import { equal as ==, find_map, int_parse, narrow, value_or_err } from builtins;
+import { Array, Bool, Json, Member, Null, Number, Object, String } from json;
 
 # The value stored under `key`, if `self` is an object that has one. With a key
 # repeated, the first.

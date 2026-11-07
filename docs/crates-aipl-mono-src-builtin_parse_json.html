@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_parse_json.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>parse_json</code> builtin. The loader names this function by the canonical name <code>__builtin_parse_json</code> (see <code>aipl_syntax::aipl_builtins</code>). The file also defines <code>Json</code> and <code>Member</code>, and <code>Json</code>'s cases, which a program imports from builtins beside <code>parse_json</code>.</p><p>It is the parser library's end-to-end JSON target: a lexer rule table, eight productions and the lowering that builds a <code>Json</code>, driven by <code>parse</code>. The library lives in <code>aipl-codegen/src/</code>, and a program that calls <code>parse_json</code> loads the part of it this file imports. <code>grammar_json.aipl</code> holds what is built on this grammar besides parsing: printing, formatting, and the tests of the grammar as data.</p><p><strong>No lint.</strong> Nothing is being reimplemented: there is no longhand to match.</p><p>Numbers stay text. <code>Number</code> carries the source spelling rather than a parsed value, because JSON's number syntax is wider than any one AIPL type (an arbitrary-precision integer is legal JSON), so <em>what a number means</em> is the consumer's policy, exactly as it is for the lexer's <code>Int</code>/<code>Float</code>, which hand over their digits unparsed for the same reason.</p><p><strong><code>member</code> lowers to a one-member object.</strong> <code>Build&lt;A&gt;</code> pins one <code>A</code> for every production in a grammar, so the <code>member</code> production — whose natural result is a key/value pair, not a JSON value — has to lower to a <code>Json</code> too. It lowers to the object holding just that member, and the <code>object</code> production joins the members of its children, so <code>Json</code> has no case that only means &quot;a member&quot;.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>parse</code> builtin of the <code>json</code> library. The loader names this function by the canonical name <code>__builtin_parse_json</code> (see <code>aipl_syntax::aipl_builtins</code>). The file also defines <code>Json</code> and <code>Member</code>, and <code>Json</code>'s cases, which a program imports from <code>json</code> beside <code>parse</code>.</p><p>It is the parser library's end-to-end JSON target: a lexer rule table, eight productions and the lowering that builds a <code>Json</code>, driven by <code>lower_with</code>. The library lives in <code>aipl-codegen/src/</code>, and a program that calls <code>parse</code> loads the part of it this file imports. <code>grammar_json.aipl</code> holds what is built on this grammar besides parsing: printing, formatting, and the tests of the grammar as data.</p><p><strong>No lint.</strong> Nothing is being reimplemented: there is no longhand to match.</p><p>Numbers stay text. <code>Number</code> carries the source spelling rather than a parsed value, because JSON's number syntax is wider than any one AIPL type (an arbitrary-precision integer is legal JSON), so <em>what a number means</em> is the consumer's policy, exactly as it is for the lexer's <code>Int</code>/<code>Float</code>, which hand over their digits unparsed for the same reason.</p><p><strong><code>member</code> lowers to a one-member object.</strong> <code>Build&lt;A&gt;</code> pins one <code>A</code> for every production in a grammar, so the <code>member</code> production — whose natural result is a key/value pair, not a JSON value — has to lower to a <code>Json</code> too. It lowers to the object holding just that member, and the <code>object</code> production joins the members of its children, so <code>Json</code> has no case that only means &quot;a member&quot;.</p></div>
 
 
 
@@ -143,19 +143,19 @@
           </h3>
           <pre class="signature"><code>pub fn json_cst(src: str) -&#62; Cst!ParseError</code></pre>
 
-          <div class="doc"><p>The lossless concrete tree for <code>src</code> — every byte of it under exactly one leaf, whitespace included. Use this when the tree is the point; <code>parse_json</code> when only the <code>Json</code> is.</p></div>
+          <div class="doc"><p>The lossless concrete tree for <code>src</code> — every byte of it under exactly one leaf, whitespace included. Use this when the tree is the point; <code>parse</code> when only the <code>Json</code> is.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-parse_json">
+        <section class="item" id="item-parse">
           <h3>
-            <a class="anchor" href="#item-parse_json">parse_json</a>
+            <a class="anchor" href="#item-parse">parse</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn parse_json(self: str) -&#62; Json!str</code></pre>
+          <pre class="signature"><code>pub fn parse(self: str) -&#62; Json!str</code></pre>
 
           <div class="doc"><p>The JSON <code>self</code> denotes: <code>ok(json)</code>, or <code>err(message)</code> saying what was expected, what was found and where (the message ends <code>(at byte N)</code>).</p><p>Strict JSON: no trailing commas, no comments, and one value per document. Numbers arrive as their source spelling (<code>Number(&quot;1e9&quot;)</code>), since JSON's number syntax is wider than any one AIPL type — reading one is the consumer's policy (<code>int_parse</code>). Strings are decoded for their escapes.</p></div>
 

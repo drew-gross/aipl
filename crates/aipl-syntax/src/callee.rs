@@ -236,7 +236,7 @@ pub enum Callee {
     /// `read_key() -> Key?` — one key press, an arrow key decoded from the bytes
     /// `read_byte` returns (`!read_stdin_raw`).
     ReadKey,
-    /// `parse_json(text) -> Json!str` — a JSON document as a `Json` tree.
+    /// `parse(text) -> Json!str` of the `json` library — a JSON document as a `Json` tree.
     ParseJson,
     /// `clear_terminal()` — erase the terminal and put the cursor at its top left
     /// (`!terminal`).

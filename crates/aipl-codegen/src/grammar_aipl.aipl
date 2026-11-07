@@ -265,6 +265,7 @@ import {
     ImportDecl,
     ImportName,
     Item,
+    Library,
     One,
     OneOrMore,
     Param,
@@ -441,7 +442,9 @@ fn items() -> Production<AiplTok, Ast>[] {
         ]),
     ]);
 
-    // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`.
+    // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`, or from
+    // another builtin library (`from json`): a library is one bare word where a path is
+    // quoted.
     //
     // The names are `sorted`: the formatter prints them in `str` order of the
     // name each one leads with — the *imported* name, so `wrapping_add as +`
@@ -453,7 +456,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("import"),
         Many(Named("import_name"), sep=Lit(","), nested_in=braces(), spaced=true, sorted=true),
         Expect(Lit("from")),
-        OneOf([Term(StrLit), Lit("builtins")]),
+        OneOf([Term(StrLit), Lit("builtins"), Term(Name)]),
         Expect(Lit(";")),
     ]);
 
@@ -3532,7 +3535,15 @@ fn lower_import_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     if (text == "builtins") {
         return ok(AImport(ImportDecl { names, source: Builtins, source_span: span }));
     };
-    ok(AImport(ImportDecl { names, source: Path(str_lit_value(text)), source_span: span }))
+    // A quoted source is a path; a bare word is a builtin library.
+    if (text.starts_with('"')) {
+        return ok(AImport(ImportDecl {
+            names,
+            source: Path(str_lit_value(text)),
+            source_span: span,
+        }));
+    };
+    ok(AImport(ImportDecl { names, source: Library(text), source_span: span }))
 }
 
 # What refusing a bare operator import says: the operator, and the aliased
@@ -5522,6 +5533,9 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
             "import { a, b as c, equal as == } from builtins;",
         ) == "import [a, b as c, equal as ==] from builtins",
     );
+    // A bare word other than `builtins` is another builtin library, where a path is quoted.
+    assert(program_dump("import { parse } from json;") == "import [parse] from json");
+    assert(program_dump("""import { a } from "./a.aipl";""") == `import [a] from "./a.aipl"`);
     assert(
         program_dump(
             "import { a, - } from builtins;",

@@ -228,7 +228,7 @@ pub fn bound_to(self: Item[], local: str) -> str? {
 fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> str[] {
     match (source) {
         Builtins => names.filter(|n| n.local() == local)$name,
-        Path(..) => [],
+        Path(..) | Library(..) => [],
     }
 }
 
@@ -265,7 +265,7 @@ pub fn imported_locals(self: Item[]) -> str[] {
 fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
     match (source) {
         Builtins => names$local(),
-        Path(..) => [],
+        Path(..) | Library(..) => [],
     }
 }
 
@@ -273,7 +273,7 @@ fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
 fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
     match (source) {
         Builtins => names.filter(|n| n.name == name)$local(),
-        Path(..) => [],
+        Path(..) | Library(..) => [],
     }
 }
 

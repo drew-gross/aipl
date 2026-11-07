@@ -1,0 +1,24 @@
+# A builtin that lives in its own library is imported from it by name: `parse` from `json`
+# (with the `Json` type and its cases), `tabulate` from `tabulate`. A library is a bare word,
+# where a path is quoted, and the same library may be imported on more than one line.
+
+import { equal as ==, len } from builtins;
+import { Number, Object, parse } from json;
+import { tabulate } from tabulate;
+
+fn count_of(self: str) -> str {
+    match (parse(self)) {
+        ok(Object(members)) => `{members.len()} member(s)`,
+        ok(Number(text)) => text,
+        ok(..) => "other",
+        err(..) => "bad",
+    }
+}.test({
+    assert(count_of("42") == "42");
+    assert(count_of("true") == "other");
+    assert(count_of("nope") == "bad");
+})
+
+fn boxed(rows: str[][]) -> str[] { rows.tabulate(["N"]) }.test({
+    assert(boxed([["1"]]) == ["+---+", "| N |", "+===+", "| 1 |", "+---+"]);
+})

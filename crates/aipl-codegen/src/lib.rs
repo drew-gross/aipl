@@ -24890,11 +24890,9 @@ fn display_name(name: &str) -> &str {
 /// importable builtin, nudge the user toward the missing import rather
 /// than leaving them puzzled.
 fn undefined_fn(name: &str, span: Span) -> Error {
-    if Callee::importable(name).is_some() {
+    if let Some(import) = aipl_syntax::builtin::Builtin::import_statement(name) {
         Error::at(
-            format!(
-                "\"{name}\" is a builtin; import it with \"import {{ {name} }} from builtins;\""
-            ),
+            format!("\"{name}\" is a builtin; import it with \"{import}\""),
             span.clone(),
         )
     } else {

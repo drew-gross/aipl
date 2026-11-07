@@ -1,11 +1,11 @@
-# The AIPL implementation of the `parse_json` builtin. The loader names this
+# The AIPL implementation of the `parse` builtin of the `json` library. The loader names this
 # function by the canonical name `__builtin_parse_json` (see
 # `aipl_syntax::aipl_builtins`). The file also defines `Json` and `Member`, and
-# `Json`'s cases, which a program imports from builtins beside `parse_json`.
+# `Json`'s cases, which a program imports from `json` beside `parse`.
 #
 # It is the parser library's end-to-end JSON target: a lexer rule table, eight
-# productions and the lowering that builds a `Json`, driven by `parse`. The
-# library lives in `aipl-codegen/src/`, and a program that calls `parse_json`
+# productions and the lowering that builds a `Json`, driven by `lower_with`. The
+# library lives in `aipl-codegen/src/`, and a program that calls `parse`
 # loads the part of it this file imports. `grammar_json.aipl` holds what is built
 # on this grammar besides parsing: printing, formatting, and the tests of the
 # grammar as data.
@@ -75,7 +75,7 @@ import {
     TokenRule,
     lex,
 } from "../../aipl-codegen/src/lexer.aipl";
-import { parse, parse_cst } from "../../aipl-codegen/src/parse.aipl";
+import { parse as lower_with, parse_cst } from "../../aipl-codegen/src/parse.aipl";
 import { unescape } from "../../aipl-codegen/src/unescape.aipl";
 
 # The token kinds: three terminal classes that carry meaning, and one bare kind
@@ -263,7 +263,7 @@ fn lex_json(src: str) -> LexResult<JsonTok>!ParseError {
 }
 
 # The lossless concrete tree for `src` — every byte of it under exactly one
-# leaf, whitespace included. Use this when the tree is the point; `parse_json`
+# leaf, whitespace included. Use this when the tree is the point; `parse`
 # when only the `Json` is.
 pub fn json_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_json(src)?, json_grammar(), "value")
@@ -272,7 +272,7 @@ pub fn json_cst(src: str) -> Cst!ParseError {
 # The `Json` `src` denotes: lex, parse to a concrete tree, lower it through the
 # grammar's `build` functions.
 fn parse_document(src: str) -> Json!ParseError {
-    parse(src, lex_json(src)?, json_grammar(), "value")
+    lower_with(src, lex_json(src)?, json_grammar(), "value")
 }
 
 # The JSON `self` denotes: `ok(json)`, or `err(message)` saying what was
@@ -282,51 +282,51 @@ fn parse_document(src: str) -> Json!ParseError {
 # Numbers arrive as their source spelling (`Number("1e9")`), since JSON's number
 # syntax is wider than any one AIPL type — reading one is the consumer's policy
 # (`int_parse`). Strings are decoded for their escapes.
-pub fn parse_json(self: str) -> Json!str {
+pub fn parse(self: str) -> Json!str {
     parse_document(self).map_err(|e| `{e.message} (at byte {e.span.start})`)
 }.test({
     // The message a failed parse reports — and a distinguishable string when it
     // unexpectedly succeeded, so a broken assertion says which way it broke.
     fn message_of(src: str) -> str {
-        match (parse_json(src)) {
+        match (parse(src)) {
             ok(..) => "parsed",
             err(message) => message,
         }
     }
 
     // ---- the terminal classes, one at a time ----
-    assert(parse_json("null")? == Null);
-    assert(parse_json("true")? == Bool(true));
-    assert(parse_json("false")? == Bool(false));
-    assert(parse_json(`"hi"`)? == String("hi"));
-    assert(parse_json("42")? == Number("42"));
-    assert(parse_json("3.14")? == Number("3.14"));
-    assert(parse_json("1e9")? == Number("1e9"));
+    assert(parse("null")? == Null);
+    assert(parse("true")? == Bool(true));
+    assert(parse("false")? == Bool(false));
+    assert(parse(`"hi"`)? == String("hi"));
+    assert(parse("42")? == Number("42"));
+    assert(parse("3.14")? == Number("3.14"));
+    assert(parse("1e9")? == Number("1e9"));
 
     // The sign is the grammar's, not the lexer's, so it reads back attached.
-    assert(parse_json("-7")? == Number("-7"));
-    assert(parse_json("-2.5")? == Number("-2.5"));
+    assert(parse("-7")? == Number("-7"));
+    assert(parse("-2.5")? == Number("-2.5"));
 
     // Escapes are decoded on the way into the AST.
-    assert(parse_json(`"a\\nb"`)? == String("a\nb"));
-    assert(parse_json(`"q\\"q"`)? == String(`q"q`));
+    assert(parse(`"a\\nb"`)? == String("a\nb"));
+    assert(parse(`"q\\"q"`)? == String(`q"q`));
 
     // ---- arrays: a separated `Many`, and the empty case ----
-    assert(parse_json("[]")? == Array([]));
-    assert(parse_json("[1]")? == Array([Number("1")]));
-    assert(parse_json("[1, true, null]")? == Array([Number("1"), Bool(true), Null]));
+    assert(parse("[]")? == Array([]));
+    assert(parse("[1]")? == Array([Number("1")]));
+    assert(parse("[1, true, null]")? == Array([Number("1"), Bool(true), Null]));
     // Nesting, which is what makes the CST and the parse recursive.
-    assert(parse_json("[[1], []]")? == Array([Array([Number("1")]), Array([])]));
+    assert(parse("[[1], []]")? == Array([Array([Number("1")]), Array([])]));
 
     // ---- objects ----
-    assert(parse_json("{}")? == Object([]));
-    assert(parse_json("""{"a": 1}""")? == Object([Member { key: "a", value: Number("1") }]));
-    assert(parse_json("""{"a": 1, "b": [2]}""")? == Object([
+    assert(parse("{}")? == Object([]));
+    assert(parse("""{"a": 1}""")? == Object([Member { key: "a", value: Number("1") }]));
+    assert(parse("""{"a": 1, "b": [2]}""")? == Object([
         Member { key: "a", value: Number("1") },
         Member { key: "b", value: Array([Number("2")]) },
     ]));
     // A key with an escape in it goes through the same decoding as a value.
-    assert(parse_json("""{"a\tb": null}""")? == Object([Member { key: "a\tb", value: Null }]));
+    assert(parse("""{"a\tb": null}""")? == Object([Member { key: "a\tb", value: Null }]));
 
     // ---- strict about trailing separators ----
     //
@@ -355,8 +355,8 @@ pub fn parse_json(self: str) -> Json!str {
     let member = """{"name":"Island","count":4,"tags":["a","b"],"ok":true,"v":-1.5}""";
     let small = `[{(0..100).map(|_| member).join(sep=",")}]`;
     let large = `[{(0..400).map(|_| member).join(sep=",")}]`;
-    let one = measure("100 members", small, parse_json);
-    let four = measure("400 members", large, parse_json);
+    let one = measure("100 members", small, parse);
+    let four = measure("400 members", large, parse);
 
     // Linear: four times the document is no more than four times the work, the allocations
     // and the memory held at once. A parse that were quadratic in anything (a rescanned

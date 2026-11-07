@@ -311,6 +311,7 @@ fn import_source(v: &FfiValue) -> R<ast::ImportSource> {
     Ok(match case {
         "Path" => ast::ImportSource::Path(text(at(payload, 0, case)?)?),
         "Builtins" => ast::ImportSource::Builtins,
+        "Library" => ast::ImportSource::Library(text(at(payload, 0, case)?)?),
         other => return Err(unknown("ImportSource", other)),
     })
 }

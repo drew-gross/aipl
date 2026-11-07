@@ -58,7 +58,19 @@ pub struct Builtin {
     /// the cases of a variant among them. Importing any of them loads the
     /// source, as importing the builtin does.
     pub exports: &'static [&'static str],
+    /// The library an import takes it from: `import { len } from builtins;` is the
+    /// [`MAIN_LIBRARY`], `import { parse } from json;` another. A library is only a
+    /// way to group what is imported; a program sees the same builtin whichever
+    /// library holds it.
+    pub library: &'static str,
+    /// The name its library spells it with, when that is not the callee's own: a
+    /// library is the namespace, so `parse_json` is `parse` in `json`.
+    pub public_name: Option<&'static str>,
 }
+
+/// The library `import { .. } from builtins;` names: everything not grouped into a library of its
+/// own.
+pub const MAIN_LIBRARY: &str = "builtins";
 
 /// The directory the AIPL sources live in, `aipl-mono/src/`: resolved at
 /// compile time but *read at run time*. `include_str!` would make every edit to
@@ -73,6 +85,8 @@ impl Builtin {
             callee,
             definition: Definition::Aipl { file },
             exports: &[],
+            library: MAIN_LIBRARY,
+            public_name: None,
         }
     }
 
@@ -87,6 +101,8 @@ impl Builtin {
             callee,
             definition: Definition::Aipl { file },
             exports,
+            library: MAIN_LIBRARY,
+            public_name: None,
         }
     }
 
@@ -95,6 +111,8 @@ impl Builtin {
             callee,
             definition: Definition::Declared,
             exports: &[],
+            library: MAIN_LIBRARY,
+            public_name: None,
         }
     }
 
@@ -103,6 +121,26 @@ impl Builtin {
             callee,
             definition: Definition::Described { signature, doc },
             exports: &[],
+            library: MAIN_LIBRARY,
+            public_name: None,
+        }
+    }
+
+    /// Written in AIPL, in the file `file`, and importable from `library` under `public_name`
+    /// (the callee's own name when `None`) rather than from the main library.
+    const fn aipl_in_library(
+        callee: Callee,
+        file: &'static str,
+        library: &'static str,
+        public_name: Option<&'static str>,
+        exports: &'static [&'static str],
+    ) -> Builtin {
+        Builtin {
+            callee,
+            definition: Definition::Aipl { file },
+            exports,
+            library,
+            public_name,
         }
     }
 
@@ -122,12 +160,68 @@ impl Builtin {
     /// The builtin an import list spells `name` — the bare `len`, not
     /// `__builtin_len` — or `None`.
     pub fn named(name: &str) -> Option<&'static Builtin> {
-        BUILTINS.iter().find(|b| b.name() == name)
+        Builtin::named_in(MAIN_LIBRARY, name)
+    }
+
+    /// The builtin `library` spells `name`, or `None`.
+    pub fn named_in(library: &str, name: &str) -> Option<&'static Builtin> {
+        BUILTINS
+            .iter()
+            .find(|b| b.library == library && b.name() == name)
     }
 
     /// The builtin whose source exports `name` — a type or a case — or `None`.
     pub fn exporting_name(name: &str) -> Option<&'static Builtin> {
-        BUILTINS.iter().find(|b| b.exports.contains(&name))
+        Builtin::exporting_name_in(MAIN_LIBRARY, name)
+    }
+
+    /// The builtin of `library` whose source exports `name`, or `None`.
+    pub fn exporting_name_in(library: &str, name: &str) -> Option<&'static Builtin> {
+        BUILTINS
+            .iter()
+            .find(|b| b.library == library && b.exports.contains(&name))
+    }
+
+    /// The library that holds `name` as a builtin or an export, if any does: where to send
+    /// someone who imported it from the wrong one.
+    pub fn library_of(name: &str) -> Option<&'static str> {
+        BUILTINS
+            .iter()
+            .find(|b| b.name() == name || b.exports.contains(&name))
+            .map(|b| b.library)
+    }
+
+    /// The import that brings the builtin spelled `name` into scope — `import { len } from
+    /// builtins;` — or `None` when no builtin has that name in any library.
+    pub fn import_statement(name: &str) -> Option<String> {
+        let found = BUILTINS.iter().find(|b| b.name() == name)?;
+        Some(format!("import {{ {name} }} from {};", found.library))
+    }
+
+    /// Whether `name` is a library an import may name: the main one, or one that holds a
+    /// builtin.
+    pub fn is_library(name: &str) -> bool {
+        name == MAIN_LIBRARY || BUILTINS.iter().any(|b| b.library == name)
+    }
+
+    /// Every library, the main one first.
+    pub fn libraries() -> Vec<&'static str> {
+        let mut out = vec![MAIN_LIBRARY];
+        for b in BUILTINS {
+            if !out.contains(&b.library) {
+                out.push(b.library);
+            }
+        }
+        out
+    }
+
+    /// The builtin whose AIPL source is the file at `path` and whose library spelling is
+    /// `name`: what a builtin's file means by its `pub fn`.
+    pub fn implemented_by(path: &std::path::Path, name: &str) -> Option<&'static Builtin> {
+        let file = path.file_name()?.to_str()?;
+        BUILTINS.iter().find(|b| {
+            b.name() == name && matches!(b.definition, Definition::Aipl { file: f } if f == file)
+        })
     }
 
     /// The builtin whose AIPL source is the file at `path`, judged by its file
@@ -141,7 +235,8 @@ impl Builtin {
 
     /// The spelling an import list uses.
     pub fn name(&self) -> &str {
-        self.callee.import_name()
+        self.public_name
+            .unwrap_or_else(|| self.callee.import_name())
     }
 
     /// Whether it is written in AIPL.
@@ -312,9 +407,11 @@ const BUILTINS: &[Builtin] = &[
         "builtin_read_key.aipl",
         &["Key", "Up", "Down", "Left", "Right", "Other"],
     ),
-    Builtin::aipl_exporting(
+    Builtin::aipl_in_library(
         Callee::ParseJson,
         "builtin_parse_json.aipl",
+        "json",
+        Some("parse"),
         &[
             "Json", "Member", "Null", "Bool", "Number", "String", "Array", "Object",
         ],
@@ -404,7 +501,7 @@ const BUILTINS: &[Builtin] = &[
     ),
     Builtin::aipl(Callee::Render, "builtin_render.aipl"),
     Builtin::aipl(Callee::Distinct, "builtin_distinct.aipl"),
-    Builtin::aipl(Callee::Tabulate, "builtin_tabulate.aipl"),
+    Builtin::aipl_in_library(Callee::Tabulate, "builtin_tabulate.aipl", "tabulate", None, &[]),
     Builtin::described(
         Callee::ToFixed,
         "fn to_fixed<F>(self: F, digits: u64) -> str",

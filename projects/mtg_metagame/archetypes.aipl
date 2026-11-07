@@ -4,7 +4,6 @@
 # A deck can match several identifiers and then counts in each of them.
 
 import {
-    Json,
     all,
     any,
     equal as ==,
@@ -15,7 +14,6 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
-    parse_json,
     read_file_to_string,
     to_array,
     to_set,
@@ -26,6 +24,7 @@ import {
 } from builtins;
 import { keys, list_field, scalar_text, text_field } from "./json.aipl";
 import { Card, Deck } from "./metagame.aipl";
+import { Json, parse } from json;
 
 # What it takes for a deck to be an archetype, as its identifier in the original wrote it.
 # `cards` must all be in the main deck or the sideboard, none of `not_cards` may be, one of
@@ -164,7 +163,7 @@ fn decode_identifier(self: Json) -> Identifier!str {
         maindeck_cards: self.string_list("maindeck_cards")?,
     })
 }.test({
-    let json = parse_json("""
+    let json = parse("""
         {"name":"Landfall","cards":["Forest"],"not_cards":[],"any_cards":["A","B"],
          "maindeck_cards":["Earthbender Ascension"]}
     """)?;
@@ -175,7 +174,7 @@ fn decode_identifier(self: Json) -> Identifier!str {
         any_cards: ["A", "B"],
         maindeck_cards: ["Earthbender Ascension"],
     }));
-    let bad = parse_json("""{"name":"X","cards":[null]}""")?;
+    let bad = parse("""{"name":"X","cards":[null]}""")?;
     assert(decode_identifier(bad) == err(`"cards" holds something that is not text`));
 })
 
@@ -187,7 +186,7 @@ fn string_list(self: Json, key: str) -> str[]!str {
             item.scalar_text().value_or_err(`"{key}" holds something that is not text`)
         })
 }.test({
-    let json = parse_json("""{"names":["a","b"],"mixed":["a",null],"n":3}""")?;
+    let json = parse("""{"names":["a","b"],"mixed":["a",null],"n":3}""")?;
     assert(json.string_list("names") == ok(["a", "b"]));
     assert(json.string_list("mixed") == err(`"mixed" holds something that is not text`));
     assert(json.string_list("n") == err(`"n" is not a list`));
@@ -196,7 +195,7 @@ fn string_list(self: Json, key: str) -> str[]!str {
 
 # The identifiers `config` names in the file `path` of them, or why there are none.
 pub fn load_identifiers(path: str, config: str) !read_files -> Identifier[]!str {
-    let all_configs = parse_json(read_file_to_string(path)?)?;
+    let all_configs = parse(read_file_to_string(path)?)?;
     let found = all_configs.list_field(config);
     if (let err(..) = found) {
         let names = all_configs.keys().value_or([]);

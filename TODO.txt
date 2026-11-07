@@ -959,6 +959,7 @@ formatting:
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 
 docs:
+  puts some tree structure in the generated docs that mirrors the fs hierarchy tree structure
   write some aipl syntax docs
   need better docs for builtins so we don't reimplement stuff
   make go to def and doc-on-hover work for operators

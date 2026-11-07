@@ -1,6 +1,6 @@
 # What is built on the JSON grammar besides parsing it: printing, formatting, and
 # the tests of the grammar as data. The grammar, the lexer rules, the lowering and
-# `parse_json` itself are the `parse_json` builtin
+# `parse` itself are the `parse` builtin of the `json` library
 # (`aipl-mono/src/builtin_parse_json.aipl`), which programs import; this file
 # imports them the way the parser library's other consumers do.
 #
@@ -22,7 +22,7 @@ import {
     String,
     json_cst,
     json_grammar,
-    parse_json,
+    parse,
 } from "../../aipl-mono/src/builtin_parse_json.aipl";
 import { show, text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
@@ -98,7 +98,7 @@ test({
 # `self` printed back as JSON source, in one canonical compact spelling: no
 # spaces, no trailing separators, strings escaped.
 #
-# Round-trips with `parse_json` — `parse_json(render_json(v)) == v` for every
+# Round-trips with `parse` — `parse(render_json(v)) == v` for every
 # `v` a parse produced — which is what makes the pair a usable end-to-end check
 # of the library.
 #
@@ -114,22 +114,22 @@ pub fn render_json(self: Json) -> str {
 }.test({
     // ---- round trip: parse -> lower -> render -> parse ----
     let src = """{"name":"ada","tags":["x","y"],"n":-1.5,"ok":true,"nil":null}""";
-    let v = parse_json(src)?;
+    let v = parse(src)?;
     // Rendering is canonical, and this source is already in that spelling.
     assert(v.render_json() == src);
-    assert(parse_json(v.render_json())? == v);
+    assert(parse(v.render_json())? == v);
 
     // ... and from a source `render_json` would never have written.
     let messy = """{ "a" : [ 1 , 2 ] , "b" : { } }""";
-    let mv = parse_json(messy)?;
+    let mv = parse(messy)?;
     assert(mv.render_json() == """{"a":[1,2],"b":{}}""");
-    assert(parse_json(mv.render_json())? == mv);
+    assert(parse(mv.render_json())? == mv);
 
     // Escapes survive the round trip: decoded into the AST, re-escaped on the
     // way out, decoded again by the second parse.
-    let esc = parse_json("""{"a\"b": "c\nd"}""")?;
+    let esc = parse("""{"a\"b": "c\nd"}""")?;
     assert(esc.render_json() == """{"a\"b":"c\nd"}""");
-    assert(parse_json(esc.render_json())? == esc);
+    assert(parse(esc.render_json())? == esc);
 
     assert(render_json(Array([])) == "[]");
     assert(render_json(Object([])) == "{}");
@@ -217,7 +217,7 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
     // members sorted.
     let messy = `  \{"b" : [ 1,2 ] , "a":null \}  `;
     let tidy = """{"a":null,"b":[1,2]}""";
-    assert(parse_json(format_json(messy, 80)?)? == parse_json(tidy)?);
+    assert(parse(format_json(messy, 80)?)? == parse(tidy)?);
     let once = format_json(messy, 80)?;
     assert(format_json(once, 80)? == once);
     let narrow = format_json(messy, 12)?;

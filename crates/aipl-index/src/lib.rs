@@ -114,8 +114,10 @@ pub struct Import {
     /// The name as *this* file spells it: the alias when there is one
     /// (`equal as ==` binds `==`), otherwise the same as `name`.
     pub local: String,
-    /// The file it came from, or `None` for `from builtins`.
+    /// The file it came from, or `None` for a builtin library.
     pub from: Option<String>,
+    /// The builtin library it came from (`builtins`, `json`), or `None` for a file.
+    pub library: Option<String>,
     pub span: Span,
 }
 
@@ -256,7 +258,7 @@ pub struct Builtin {
     pub symbol: Symbol,
 }
 
-/// The builtin an import list spells `name` (`len`, not `__builtin_len`).
+/// The builtin `library` spells `name` (`len`, not `__builtin_len`; `parse` in `json`).
 ///
 /// One implemented in AIPL is read from its own source file, so the signature
 /// and docs are the ones in the file and the definition is a place in it. Any
@@ -267,8 +269,22 @@ pub struct Builtin {
 ///
 /// **The caller must have installed the parser hooks**, as for
 /// [`FileIndex::parse`].
-pub fn builtin(name: &str) -> Option<Builtin> {
-    let found = aipl_syntax::builtin::Builtin::named(name)?;
+pub fn builtin(library: &str, name: &str) -> Option<Builtin> {
+    builtin_definition(aipl_syntax::builtin::Builtin::named_in(library, name)?)
+}
+
+/// As [`builtin`], for a builtin named by its canonical name less the `__builtin_` prefix
+/// (`parse_json` for the `json` library's `parse`), which is how a resolved call or import names it.
+pub fn builtin_canonical(name: &str) -> Option<Builtin> {
+    builtin_definition(
+        aipl_syntax::builtin::Builtin::all()
+            .iter()
+            .find(|b| b.callee.import_name() == name)?,
+    )
+}
+
+fn builtin_definition(found: &'static aipl_syntax::builtin::Builtin) -> Option<Builtin> {
+    let name = found.name();
     match found.definition {
         aipl_syntax::builtin::Definition::Aipl { .. } => {
             let path = found.source_path()?;
@@ -281,7 +297,7 @@ pub fn builtin(name: &str) -> Option<Builtin> {
             })
         }
         aipl_syntax::builtin::Definition::Declared => {
-            let declaration = format!("__builtin_{name}");
+            let declaration = format!("__builtin_{}", found.callee.import_name());
             let mut symbol = declarations()?.define(&declaration)?.clone();
             // The declaration is spelled under the reserved canonical name,
             // which no program can write; show the name an import list does.
@@ -570,15 +586,19 @@ fn imports(program: &Program) -> Vec<Import> {
     let mut out = Vec::new();
     for item in &program.items {
         let Item::Import(decl) = item else { continue };
-        let from = match &decl.source {
-            aipl_syntax::ast::ImportSource::Path(path) => Some(path.clone()),
-            aipl_syntax::ast::ImportSource::Builtins => None,
+        let (from, library) = match &decl.source {
+            aipl_syntax::ast::ImportSource::Path(path) => (Some(path.clone()), None),
+            aipl_syntax::ast::ImportSource::Builtins => {
+                (None, Some(aipl_syntax::builtin::MAIN_LIBRARY.to_string()))
+            }
+            aipl_syntax::ast::ImportSource::Library(name) => (None, Some(name.clone())),
         };
         for n in &decl.names {
             out.push(Import {
                 name: n.name.clone(),
                 local: n.alias.clone().unwrap_or_else(|| n.name.clone()),
                 from: from.clone(),
+                library: library.clone(),
                 span: n.span.clone(),
             });
         }
@@ -838,7 +858,7 @@ fn helper(n: i64) !prints -> i64 {
     #[test]
     fn an_aipl_implemented_builtin_is_read_from_its_own_file() {
         hosted();
-        let first = builtin("first").expect("`first` is a builtin");
+        let first = builtin("builtins", "first").expect("`first` is a builtin");
         let (path, source) = first.file.expect("`first` is written in AIPL");
         assert!(path.ends_with("builtin_first.aipl"), "{path:?}");
         assert_eq!(first.symbol.detail, "pub fn first<T: any>(self: T[]) -> T?");
@@ -854,7 +874,8 @@ fn helper(n: i64) !prints -> i64 {
         hosted();
         for each in aipl_syntax::builtin::Builtin::all() {
             let name = each.name();
-            let found = builtin(name).unwrap_or_else(|| panic!("`{name}` has no definition"));
+            let found =
+                builtin(each.library, name).unwrap_or_else(|| panic!("`{name}` has no definition"));
             assert_eq!(found.file.is_some(), each.is_aipl_implemented(), "`{name}`");
             assert_eq!(found.symbol.name, name);
             assert!(
@@ -872,7 +893,7 @@ fn helper(n: i64) !prints -> i64 {
     #[test]
     fn a_builtin_the_compiler_expands_has_a_signature_and_no_place() {
         hosted();
-        let len = builtin("len").expect("`len` is a builtin");
+        let len = builtin("builtins", "len").expect("`len` is a builtin");
         assert_eq!(len.file, None);
         assert_eq!(len.symbol.detail, "fn len<T: any>(self: T[]) -> u64");
         assert!(len.symbol.doc.is_some());
@@ -881,9 +902,9 @@ fn helper(n: i64) !prints -> i64 {
     #[test]
     fn a_name_that_is_no_builtin_is_none() {
         hosted();
-        assert_eq!(builtin("no_such_builtin"), None);
+        assert_eq!(builtin("builtins", "no_such_builtin"), None);
         // The canonical spelling is not what an import list writes.
-        assert_eq!(builtin("__builtin_len"), None);
+        assert_eq!(builtin("builtins", "__builtin_len"), None);
     }
 
     #[test]

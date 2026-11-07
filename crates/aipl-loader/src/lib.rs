@@ -228,9 +228,9 @@ struct LoadedFile {
     /// `import { ... } from "./other"` declarations. `from` resolved to
     /// a canonical path.
     imports: Vec<ResolvedImport>,
-    /// `import { ... } from builtins;` — the builtin names this file
-    /// brings into scope (each possibly aliased).
-    builtin_imports: Vec<ImportName>,
+    /// `import { ... } from builtins;` or from another builtin library — the
+    /// builtin names this file brings into scope (each possibly aliased).
+    builtin_imports: Vec<LibraryImport>,
     /// Whether the file writes a grid type, which makes grid operations of its
     /// indexes and literals (see [`aipl_syntax::aipl_builtins::companions`]).
     mentions_grid: bool,
@@ -239,6 +239,15 @@ struct LoadedFile {
     syntax_builtins: Vec<Callee>,
     /// Every token written inside a type annotation, from the parser.
     type_uses: Vec<Span>,
+}
+
+/// One name imported from a builtin library, and the library it came from.
+struct LibraryImport {
+    library: String,
+    name: ImportName,
+    /// Where the library is named (`builtins`, `json`), for a diagnostic about the import as
+    /// a whole.
+    source_span: Span,
 }
 
 struct ResolvedImport {
@@ -329,7 +338,7 @@ impl Loader {
         path: &Path,
         src: &str,
         mut resolve: impl FnMut(&str, Span) -> Result<PathBuf, Error>,
-    ) -> Result<(Vec<Item>, Vec<ResolvedImport>, Vec<ImportName>), Vec<Error>> {
+    ) -> Result<(Vec<Item>, Vec<ResolvedImport>, Vec<LibraryImport>), Vec<Error>> {
         bake::reserved_names_not_bound(&program)?;
         bake::bake(
             &mut program.items,
@@ -351,7 +360,20 @@ impl Loader {
                         let from = resolve(&from, source_span)?;
                         imports.push(ResolvedImport { names, from });
                     }
-                    ImportSource::Builtins => builtin_imports.extend(names),
+                    ImportSource::Builtins => {
+                        builtin_imports.extend(names.into_iter().map(|name| LibraryImport {
+                            library: aipl_syntax::builtin::MAIN_LIBRARY.to_string(),
+                            name,
+                            source_span: source_span.clone(),
+                        }))
+                    }
+                    ImportSource::Library(library) => {
+                        builtin_imports.extend(names.into_iter().map(|name| LibraryImport {
+                            library: library.clone(),
+                            name,
+                            source_span: source_span.clone(),
+                        }))
+                    }
                 },
                 other => items.push(other),
             }
@@ -367,7 +389,7 @@ impl Loader {
         src: &str,
         items: Vec<Item>,
         imports: Vec<ResolvedImport>,
-        builtin_imports: Vec<ImportName>,
+        builtin_imports: Vec<LibraryImport>,
         type_uses: Vec<Span>,
     ) -> bool {
         let index = self.next_index;
@@ -409,10 +431,14 @@ impl Loader {
                 .values()
                 .flat_map(|f| &f.builtin_imports)
                 .filter_map(|n| {
-                    Callee::importable(&n.name).or_else(|| {
-                        aipl_syntax::builtin::Builtin::exporting_name(&n.name)
-                            .map(|b| b.callee.clone())
-                    })
+                    aipl_syntax::builtin::Builtin::named_in(&n.library, &n.name.name)
+                        .or_else(|| {
+                            aipl_syntax::builtin::Builtin::exporting_name_in(
+                                &n.library,
+                                &n.name.name,
+                            )
+                        })
+                        .map(|b| b.callee.clone())
                 })
                 .chain(
                     self.files
@@ -570,7 +596,8 @@ impl Loader {
                 // or the file's own tests — resolves to it through this view.
                 let canonical = match item {
                     Item::Fn(f) if self.builtin_files.contains(path) && f.is_pub => {
-                        Callee::importable(&name).map(|c| c.name().to_string())
+                        aipl_syntax::builtin::Builtin::implemented_by(path, &name)
+                            .map(|b| b.callee.name().to_string())
                     }
                     _ => None,
                 };
@@ -716,8 +743,23 @@ impl Loader {
             // (e.g. `len` -> `__builtin_len`), which codegen recognizes.
             // Validate each name is actually a builtin and doesn't clash
             // with a local item or another import.
-            for n in &file.builtin_imports {
+            for import in &file.builtin_imports {
+                let n = &import.name;
                 let local = n.local();
+                let library = import.library.as_str();
+                if !aipl_syntax::builtin::Builtin::is_library(library) {
+                    return Err(self.attribute(
+                        path,
+                        root,
+                        Error::at(
+                            format!(
+                                "there is no builtin library named \"{library}\"; the libraries are {}",
+                                aipl_syntax::builtin::Builtin::libraries().join(", ")
+                            ),
+                            import.source_span.clone(),
+                        ),
+                    ));
+                }
                 // Operator imports resolve into the view like any other name,
                 // so the duplicate-import conflict check below covers them too
                 // (including an operator imported both from builtins and as a
@@ -730,7 +772,7 @@ impl Loader {
                 // aliases to write instead (`bare_operator_import` in
                 // `grammar_aipl.aipl`), so `n.name` is always a name.
                 let canonical = if let Some(builtin) =
-                    aipl_syntax::builtin::Builtin::exporting_name(&n.name)
+                    aipl_syntax::builtin::Builtin::exporting_name_in(library, &n.name)
                 {
                     // A type or case the builtin's source defines: the name it has
                     // in that file, which is loaded because this file imports it.
@@ -752,7 +794,10 @@ impl Loader {
                             ))
                         }
                     }
-                } else if let Some((_op, canonical_impl)) = aipl_syntax::operator_builtin(&n.name) {
+                } else if let (true, Some((_op, canonical_impl))) = (
+                    library == aipl_syntax::builtin::MAIN_LIBRARY,
+                    aipl_syntax::operator_builtin(&n.name),
+                ) {
                     // A named operator builtin can be aliased to any operator
                     // name, though aliasing to a different operator than the one
                     // it provides is confusing and generally a bad idea. The view
@@ -768,7 +813,10 @@ impl Loader {
                     // `equal as ==`, because gating looks up the operator's
                     // spelling in the view and a bare import adds only its name.
                     canonical_impl.to_string()
-                } else if let Some(builtin) = Callee::importable(&n.name) {
+                } else if let Some(builtin) =
+                    aipl_syntax::builtin::Builtin::named_in(library, &n.name)
+                        .map(|b| b.callee.clone())
+                {
                     // Reserved for the builtins' own implementations until
                     // it is decided whether programs get it.
                     if aipl_syntax::is_internal_builtin(&builtin)
@@ -788,14 +836,22 @@ impl Loader {
                         ));
                     }
                     builtin.name().to_string()
-                } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
+                } else if let (true, Some(canonical)) = (
+                    library == aipl_syntax::builtin::MAIN_LIBRARY,
+                    aipl_syntax::builtin_type_canonical(&n.name),
+                ) {
                     canonical
                 } else {
-                    return Err(self.attribute(
-                        path,
-                        root,
-                        Error::at(format!("\"{}\" is not a builtin", n.name), n.span.clone()),
-                    ));
+                    // Imported from the wrong library: say which one holds it.
+                    let message = match aipl_syntax::builtin::Builtin::library_of(&n.name) {
+                        Some(elsewhere) if elsewhere != library => format!(
+                            "\"{}\" is not in the {library} library; import it from {elsewhere}: \
+                             `import {{ {} }} from {elsewhere};`",
+                            n.name, n.name
+                        ),
+                        _ => format!("\"{}\" is not a builtin", n.name),
+                    };
+                    return Err(self.attribute(path, root, Error::at(message, n.span.clone())));
                 };
                 import_sites
                     .entry(path.clone())

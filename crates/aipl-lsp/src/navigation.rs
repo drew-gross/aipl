@@ -407,7 +407,7 @@ fn written(span: &Span) -> bool {
 
 /// A builtin written in AIPL is a place to jump to; a native one is not.
 fn builtin_found(name: &str, sources: &mut HashMap<PathBuf, String>) -> Option<Found> {
-    let builtin = aipl_index::builtin(name)?;
+    let builtin = aipl_index::builtin_canonical(name)?;
     Some(match builtin.file {
         Some((file, source)) => {
             let file = resolved(&file);

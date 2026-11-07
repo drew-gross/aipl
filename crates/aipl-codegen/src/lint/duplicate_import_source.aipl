@@ -62,5 +62,6 @@ fn message(self: ImportSource) -> str {
     match (self) {
         Path(path) => `duplicate import from "{path}"; merge the names into the first \`import \{ .. } from "{path}";\``,
         Builtins => """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
+        Library(name) => `duplicate import from "{name}"; merge the names into the first \`import \{ .. } from {name};\``,
     }
 }
