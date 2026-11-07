@@ -97,10 +97,10 @@ fn triple(x: i64) -> i64 { x * 3 }.benchmark({
     assert(named.allocations == 0);
     assert(filtered.allocations == 0);
     assert(chained.allocations == 0);
-    assert(mapped.instructions == 4066);
-    assert(named.instructions == 4066);
-    assert(filtered.instructions == 4264);
-    assert(chained.instructions == 4464);
+    assert(mapped.instructions == 2448);
+    assert(named.instructions == 2448);
+    assert(filtered.instructions == 3050);
+    assert(chained.instructions == 3250);
 
     // The same loop over an array that has to exist — it is read again afterwards —
     // is what it saves: the block (1,624 bytes) and a second pass over it.
@@ -118,7 +118,7 @@ fn triple(x: i64) -> i64 { x * 3 }.benchmark({
     );
     assert(allocations == 1);
     assert(bytes_allocated == 1624);
-    assert(instructions == 8984);
+    assert(instructions == 6560);
 })
 
 test({
@@ -188,12 +188,12 @@ deallocations     30
 reallocations     7
 bytes allocated   1887
 peak live bytes   3919
-instructions      28290
-binary size       10080 bytes (code 6816, data 298, metadata 2966)
+instructions      20596
+binary size       9912 bytes (code 6644, data 298, metadata 2970)
 
 function                                 calls  code bytes
 __aipl_const_teardown                        1          92
-__test$__test_block_1                        1        3644
+__test$__test_block_1                        1        3472
 __test$__test_block_1$shim_closure0          0        1384
 __test$__test_block_1$shim_closure1         10        1384
 __to_str_i64                                10         204

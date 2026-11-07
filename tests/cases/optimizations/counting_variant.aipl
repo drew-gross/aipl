@@ -67,8 +67,8 @@ deallocations     389
 reallocations     0
 bytes allocated   23820
 peak live bytes   23820
-instructions      21154
-binary size       11568 bytes (code 7392, data 495, metadata 3681)
+instructions      19610
+binary size       11552 bytes (code 7376, data 495, metadata 3681)
 
 function                   calls  code bytes
 __arr_drop_Rule               59         148
@@ -89,4 +89,4 @@ aipl_u64_len                  20    external
 aipl_write_u64                10    external
 deep                         179         728
 main                           1         108
-styles$len                   306         300
+styles$len                   306         284

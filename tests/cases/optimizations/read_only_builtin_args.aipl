@@ -42,8 +42,8 @@ deallocations     14
 reallocations     8
 bytes allocated   492
 peak live bytes   395
-instructions      3621
-binary size       10696 bytes (code 6556, data 634, metadata 3506)
+instructions      3589
+binary size       10664 bytes (code 6528, data 634, metadata 3502)
 
 function                   calls  code bytes
 __test$__test_block_1          1        3052
@@ -60,4 +60,4 @@ aipl_write_bytes              24    external
 aipl_write_i64                20    external
 join$own0$own1                 2         928
 main                           1         108
-merge$own0$own1                2        1196
+merge$own0$own1                2        1168

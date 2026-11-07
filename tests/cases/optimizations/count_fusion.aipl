@@ -29,17 +29,17 @@ fn many() -> i64[] { [2].repeat(201) }.benchmark({
 
     // Each comparison is decided at the second or third match, and stops there:
     // about a hundred instructions.
-    assert(measure("count < 3", xs, |v| v.count(2) < 3).instructions == 133);
-    assert(measure("count > 2", xs, |v| v.count(2) > 2).instructions == 127);
-    assert(measure("count >= 2", xs, |v| v.count(2) >= 2).instructions == 102);
-    assert(measure("count != 2", xs, |v| v.count(2) != 2).instructions == 127);
+    assert(measure("count < 3", xs, |v| v.count(2) < 3).instructions == 99);
+    assert(measure("count > 2", xs, |v| v.count(2) > 2).instructions == 93);
+    assert(measure("count >= 2", xs, |v| v.count(2) >= 2).instructions == 78);
+    assert(measure("count != 2", xs, |v| v.count(2) != 2).instructions == 93);
     // The bound on the left is the same claim, and costs the same.
-    assert(measure("3 > count", xs, |v| 3 > v.count(2)).instructions == 133);
+    assert(measure("3 > count", xs, |v| 3 > v.count(2)).instructions == 99);
 
     // Counting them all is what they avoid: a bound the count never reaches cannot
     // stop early, and walking all 201 elements costs sixty times as much.
     let Measurement { instructions } = measure("count < 500", xs, |v| v.count(2) < 500);
-    assert(instructions == 6286);
+    assert(instructions == 4268);
 })
 
 fn small() -> i64[] { [1, 2, 2, 3, 2] }

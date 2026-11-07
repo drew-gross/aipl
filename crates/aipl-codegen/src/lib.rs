@@ -93,7 +93,7 @@ use cranelift::{
     },
     prelude::{
         settings, types, AbiParam, Configurable, FloatCC, FunctionBuilder, FunctionBuilderContext,
-        InstBuilder, IntCC, MemFlagsData, StackSlotData, StackSlotKind, Value,
+        InstBuilder, IntCC, MemFlagsData, StackSlotData, StackSlotKind, Value, Variable,
     },
 };
 use cranelift_jit::{JITBuilder, JITModule};
@@ -6352,6 +6352,7 @@ fn env_binding_type(b: &EnvBinding) -> ConcreteType {
     match b {
         EnvBinding::Immut(_, t) => t.clone(),
         EnvBinding::Mut(_, t, _) => t.borrow().clone(),
+        EnvBinding::Var(_, t) => t.clone(),
     }
 }
 
@@ -7824,6 +7825,10 @@ enum EnvBinding {
     /// set when static analysis proved the binding's array is never aliased, so
     /// `push` may mutate it in place. Always false for non-array bindings.
     Mut(StackSlot, Rc<RefCell<ConcreteType>>, bool),
+    /// A mutable scalar (see [`is_register_scalar`]) held as an SSA variable:
+    /// nothing takes its address, so it needs no stack slot, and the loads and
+    /// stores a slot costs on every read and `set` become register moves.
+    Var(Variable, ConcreteType),
 }
 
 type Env = HashMap<String, EnvBinding>;
@@ -7843,6 +7848,7 @@ fn env_load(
         .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span.clone()))?;
     Ok(match binding {
         EnvBinding::Immut(v, t) => (*v, t.clone()),
+        EnvBinding::Var(var, t) => (builder.use_var(*var), t.clone()),
         EnvBinding::Mut(slot, t, _) => {
             let ty = t.borrow().clone();
             // Reading a `mut` binding yields a **snapshot**, and under the wide
@@ -7865,6 +7871,32 @@ fn env_load(
             (v, ty)
         }
     })
+}
+
+/// Whether a `mut` binding of type `ty` is one machine word that nothing refers to by
+/// address: an integer, `bool`, `char` or float. Such a binding is an SSA variable
+/// ([`EnvBinding::Var`]); every other type keeps a stack slot, because its mutation
+/// paths write through the slot's address.
+fn is_register_scalar(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Primitive(p) if *p != Primitive::Str)
+}
+
+/// Declare an SSA variable holding `v` (as the word a slot would hold).
+fn declare_scalar(builder: &mut FunctionBuilder, v: Value) -> Variable {
+    let var = builder.declare_var(types::I64);
+    set_scalar(builder, var, v);
+    var
+}
+
+/// Assign `v` to `var`, widened to the word every reader expects.
+fn set_scalar(builder: &mut FunctionBuilder, var: Variable, v: Value) {
+    let ty = builder.func.dfg.value_type(v);
+    let word = if ty == types::I64 {
+        v
+    } else {
+        builder.ins().uextend(types::I64, v)
+    };
+    builder.def_var(var, word);
 }
 
 /// Whether a value of type `actual` may flow where `expected` is wanted.
@@ -10639,6 +10671,10 @@ fn mut_receiver_slot(
     };
     match env.get(var) {
         Some(EnvBinding::Mut(slot, cell, excl)) => Ok((*slot, cell.clone(), *excl)),
+        Some(EnvBinding::Var(_, t)) => Err(Error::at(
+            format!("\"{what}\" requires a {kind}, got {}", type_name(t)),
+            receiver.span.clone(),
+        )),
         Some(EnvBinding::Immut(_, _)) => Err(Error::at(
             format!("cannot \"{what}\" to immutable binding {var:?}; declare it with \"mut\""),
             receiver.span.clone(),
@@ -19834,6 +19870,7 @@ fn compile_call_expr_direct<M: Module>(
                     }
                     (*v, t.clone())
                 }
+                EnvBinding::Var(..) => env_load(builder, name, env, structs, span.clone())?,
                 EnvBinding::Mut(slot, ty_cell, owns_buffer) => {
                     let t = ty_cell.borrow().clone();
                     if is_str_shaped(&t) {
@@ -20745,7 +20782,17 @@ fn compile_call_expr_direct<M: Module>(
                     receiver.span.clone(),
                 ));
             };
+            if let Some(EnvBinding::Var(register, _)) = env.get(var) {
+                // A scalar receiver has no reference to manage: the call's result
+                // is the new value.
+                let register = *register;
+                let (new_self, _) =
+                    compile_call(module, builder, cx, scopes, name, &info, args, span.clone())?;
+                set_scalar(builder, register, new_self);
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+            }
             let (slot, ty_cell) = match env.get(var) {
+                Some(EnvBinding::Var(..)) => unreachable!("a register scalar is stored above"),
                 Some(EnvBinding::Mut(slot, cell, _)) => (*slot, cell.clone()),
                 Some(EnvBinding::Immut(_, _)) => {
                     return Err(Error::at(
@@ -22296,6 +22343,25 @@ fn compile_expr_inner<M: Module>(
             // (see `coerce_empty_to_char_array`); bindings did not.
             let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
+            if is_register_scalar(&t) {
+                let var = declare_scalar(builder, v);
+                cx.bindings
+                    .borrow_mut()
+                    .push((name.clone(), format!("var{}", var.as_u32())));
+                let mut new_env = env.clone();
+                new_env.insert(name.clone(), EnvBinding::Var(var, t));
+                return compile_expr(
+                    module,
+                    builder,
+                    Cx {
+                        env: &new_env,
+                        tail,
+                        ..cx
+                    },
+                    scopes,
+                    body,
+                );
+            }
             // Which storage the binding gets is `lives_in_slot`'s answer, asked
             // in one place so the sizing cannot disagree with the store and the
             // load. Broadening it to *every* composite is what silently
@@ -22365,8 +22431,11 @@ fn compile_expr_inner<M: Module>(
             // through to the non-exclusive arm below gives the new binding its
             // own reference, which is what a second owner needs.
             let owned_move = matches!(&value.kind, ExprKind::Ident(n)
-                if cx.owned_params.contains(n)
-                    && !matches!(cx.env.get(n.as_str()), Some(EnvBinding::Mut(..))));
+            if cx.owned_params.contains(n)
+                && !matches!(
+                    cx.env.get(n.as_str()),
+                    Some(EnvBinding::Mut(..) | EnvBinding::Var(..))
+                ));
             // Owning the reference is not the same as owning the block. The
             // caller moved the parameter in because its argument looked fresh —
             // a call result — but a callee may return one of its own borrowed
@@ -22604,7 +22673,16 @@ fn compile_expr_inner<M: Module>(
             let binding = env.get(name).cloned().ok_or_else(|| {
                 Error::at(format!("set: undeclared variable {name:?}"), span.clone())
             })?;
+            if let EnvBinding::Var(var, expected_ty) = &binding {
+                let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
+                // A bare literal takes the binding's int type.
+                let t = flex_int_ty(value, &t, expected_ty);
+                expect_value_type(&t, expected_ty, "set", value.span.clone())?;
+                set_scalar(builder, *var, v);
+                return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
+            }
             let (slot, ty_cell, expected_ty, exclusive) = match binding {
+                EnvBinding::Var(..) => unreachable!("a register scalar is assigned above"),
                 EnvBinding::Mut(slot, ty, excl) => (slot, ty.clone(), ty.borrow().clone(), excl),
                 EnvBinding::Immut(_, _) => {
                     return Err(Error::at(
@@ -23007,11 +23085,7 @@ fn compile_expr_inner<M: Module>(
             // it walking backwards — initialized to 0, or to the length. A split
             // cursor carries its own position, so on that path nothing here is
             // written, stepped, or read.
-            let slot = builder.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                8,
-                3,
-            ));
+            let index = builder.declare_var(types::I64);
             if split_cursor.is_none() {
                 let start = if is_char_set(&it_ty) {
                     // The cursor is a char index, not an element index: the scan
@@ -23023,7 +23097,7 @@ fn compile_expr_inner<M: Module>(
                 } else {
                     builder.ins().iconst(types::I64, 0)
                 };
-                builder.ins().stack_store(types::I64, start, slot, 0);
+                builder.def_var(index, start);
             }
 
             let header = builder.create_block();
@@ -23039,7 +23113,7 @@ fn compile_expr_inner<M: Module>(
             // index to load on that path — and none to step at the foot of the
             // body either.
             let i = if split_cursor.is_none() {
-                Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
+                Some(builder.use_var(index))
             } else {
                 None
             };
@@ -23201,7 +23275,7 @@ fn compile_expr_inner<M: Module>(
                     1
                 };
                 let next = builder.ins().iadd_imm_s(cursor, step);
-                builder.ins().stack_store(types::I64, next, slot, 0);
+                builder.def_var(index, next);
             }
             builder.ins().jump(header, &[]);
             builder.seal_block(header);

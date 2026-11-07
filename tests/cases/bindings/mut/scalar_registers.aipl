@@ -1,0 +1,50 @@
+# A `mut` scalar (integer, `bool`, `char`, float) is an SSA variable rather than a stack
+# slot: each kind is read, reassigned in a branch and a loop, and handed to a `mut self`
+# method that writes the new value back.
+
+import {
+    IEEE754Float64 as Float,
+    equal as ==,
+    float_add as +,
+    float_less_than as <,
+    float_mul as *,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
+
+fn bump(mut self: i64, by: i64) {
+    set self += by;
+}.test({
+    mut n: i64 = 1;
+    set n.bump(4);
+    assert(n == 5);
+})
+
+fn run() -> (i64, bool, char, u8) {
+    mut count: i64 = 0;
+    mut seen = false;
+    mut last = 'a';
+    mut small: u8 = 250;
+    for (let c : "xyz") {
+        set count++;
+        set last = c;
+        if (c == 'y') { set seen = true; };
+    }
+    set small += 3;
+    set count.bump(10);
+    (count, seen, last, small)
+}.test({
+    assert(run() == (13, true, 'z', 253));
+})
+
+fn halvings(start: Float) -> i64 {
+    mut x = start;
+    mut steps: i64 = 0;
+    while (1.0 < x) {
+        set x = x + -0.5 * x;
+        set steps++;
+    }
+    steps
+}.test({
+    assert(halvings(1000.0) == 10);
+})

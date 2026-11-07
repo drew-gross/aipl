@@ -38,16 +38,16 @@ fn triangle() -> i64 {
     let first = measure("first", 0, |_| triangle());
     let again = measure("again", 0, |_| triangle());
     assert(first.instructions == again.instructions);
-    assert(first.instructions == 620);
+    assert(first.instructions == 466);
 
     // *Executed* instructions: a loop body counts once per iteration, so more
     // iterations cost more, from nothing at all up.
     let empty = measure("no iterations", "", sum_over);
     let ten = measure("ten iterations", "0123456789", sum_over);
     let twenty = measure("twenty iterations", "01234567890123456789", sum_over);
-    assert(empty.instructions == 56);
-    assert(ten.instructions == 611);
-    assert(twenty.instructions == 1171);
+    assert(empty.instructions == 42);
+    assert(ten.instructions == 457);
+    assert(twenty.instructions == 877);
 })
 
 test({

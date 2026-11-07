@@ -55,12 +55,12 @@ fn filled(n: i64, x: i64) -> i64[] {
     assert(allocations == 1);
     assert(bytes_allocated == 64);
     assert(peak_live_bytes == 1552);
-    assert(instructions == 2748);
+    assert(instructions == 2142);
     let three_times = measure("build 300", 300, |n| filled(n, 7));
     assert(three_times.allocations == 1);
     assert(three_times.bytes_allocated == 64);
     assert(three_times.peak_live_bytes == 3088);
-    assert(three_times.instructions == 7948);
+    assert(three_times.instructions == 6142);
 })
 
 // Counting stops once the answer is settled, so it costs the same on ten elements
@@ -74,7 +74,7 @@ fn decided_early(xs: i64[]) -> bool { xs.count(2) < 3 }.benchmark({
     assert(at_ten.allocations == 0);
     assert(at_ten_thousand.allocations == 0);
     assert(at_ten.instructions == at_ten_thousand.instructions);
-    assert(at_ten.instructions == 133);
+    assert(at_ten.instructions == 99);
 })
 
 // A value small enough to live in the value's own words needs no allocation:

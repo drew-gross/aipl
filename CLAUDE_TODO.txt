@@ -68,7 +68,6 @@ parser library perf (builtin parse_json, 10MB: lex 0.77s / parse_cst 1.1s / lowe
 
 language perf (from the parse_json investigation; counts are IR instructions via `aipl report`, tiny.json):
   structs with N refcounted fields cost N retains + N releases per copy (`Step{..s}` 4 inc/level; a move ~0.1): box a struct of 3+ refcounted fields behind one refcount with COW (recursive types already have the runtime). Measured: boxing Far alone via `boxed: Far? = none` took parse_cst 117M -> 83M (-29%)
-  loop-carried scalars (`mut` locals, hidden for-index) live in stack slots with load/store per use: `for (i, c : str)` ~59 IR instr/char, `for` over u64[] ~28/element vs ~5 ideal; use SSA variables for non-address-taken scalars
   spread `T { ..s, f: x }` from a single-use temp retains every field then releases the temp: treat the desugared `tmp.f` reads as moves (move_last_use.rs)
   `mut t = f(); set t.field++; t` forks the struct (16 retain/release pairs, ~480 instr) vs ~4 for the spread: move the dead call result into the `mut`
   `[x].repeat(n)` ~37 IR instr/element: bulk fill

@@ -117,6 +117,7 @@ case_tests! {
     cases_bindings_mut_incr = "cases/bindings/mut/incr",
     cases_bindings_mut_incr_saturating = "cases/bindings/mut/incr_saturating",
     cases_bindings_mut_mut_set_basic = "cases/bindings/mut/mut_set_basic",
+    cases_bindings_mut_scalar_registers = "cases/bindings/mut/scalar_registers",
     cases_bindings_mut_set_read_then_write = "cases/bindings/mut/set_read_then_write",
     cases_booleans_bool_equality = "cases/booleans/bool_equality",
     cases_booleans_bool_equality_in_if = "cases/booleans/bool_equality_in_if",
