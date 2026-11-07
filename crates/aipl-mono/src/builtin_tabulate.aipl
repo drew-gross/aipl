@@ -5,18 +5,21 @@
 #
 # No lint steers the longhand here: a hand-drawn table is built from so many different pieces
 # (separators, padding, borders) that no shape could be advised precisely, and a mis-advised
-# lint is worse than none.
+# lint is worse than ntwo.
 
 import {
     equal as ==,
     join,
     len,
+    less_than as <,
     map,
     maximum,
+    measure,
     repeat,
     saturating_sub as -,
     value_or,
     wrapping_add as +,
+    wrapping_mul as *,
 } from builtins;
 
 # `text` padded with spaces to `width`: on the left when `right`, else on the right. Text
@@ -94,4 +97,36 @@ pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> st
         "| long |",
         "+------+",
     ]);
+}).benchmark({
+    let headers = ["Name", "Count", "Share"];
+    let few = [["ab", "1", "10%"], ["c", "10", "5%"]];
+    let many = [
+        ["ab", "1", "10%"],
+        ["c", "10", "5%"],
+        ["def", "100", "1%"],
+        ["g", "1000", "50%"],
+        ["hi", "7", "3%"],
+        ["j", "8", "9%"],
+        ["klm", "9", "2%"],
+        ["n", "11", "4%"],
+    ];
+    let two = measure(
+        "two rows",
+        few,
+        |rows| { rows.tabulate(headers, right_aligned=[false, true, true]) },
+    );
+    let eight = measure(
+        "eight rows",
+        many,
+        |rows| { rows.tabulate(headers, right_aligned=[false, true, true]) },
+    );
+
+    // Allocations are exact: the widths, the three rules and the header line are the fixed part, and
+    // each row adds one line, so a temporary array optimized away shows up here.
+    assert(two.allocations == 56);
+    assert(eight.allocations == 134);
+
+    // Four times the rows costs under three times the instructions: the fixed part is shared and
+    // nothing in a row's line depends on the number of rows.
+    assert(eight.instructions < 3 * two.instructions);
 })

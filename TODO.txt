@@ -503,6 +503,8 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  join() should get leading_sep and trailing_sep and then tabulate's rule() can get simpler
+  spreading optionals should make tabulate()'s widths computation simpler
   make try_left_fold and try_right_fold for use when the lambda returns an error
   add some helpers for shimming in tests maybe
   turn map into a real function that can be inlined, rather than a synthetic one, so that map/join fusion can be both normal and after mono
@@ -730,7 +732,8 @@ optimizations:
           set depth = depth - 1;
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
-  operation
+  operation fusion:
+    extend_map, extend_filter, and extend_filter_map should all get fusions
     foo.to_array().map() and other .to_array().* fusions sound useful
     s.to_array().to_set() can be just s.
     <any array generator> -> to_dict is probably good fusion to have to avoid materializing that array
@@ -886,6 +889,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  cells_line in tabulate doesn't support go-to-def
   autocomplete
   go to definition should work for destructurings (types and fields)
   go to def should work on _some_ documents that fail to compile e.g. if it has unused imports, or fails lint
