@@ -148,27 +148,27 @@ lowering half (everything before `check_resolved`) is callable on its own.
   erroring; ambiguous *generic* variables still error.
 - Size: ~2,000 `ExprKind::` sites across `aipl-mono`.
 
-## Unrelated follow-ups noticed on the way
-
-- `arrays/extend/extend_reserves_once` regressed 218 -> 427 instructions in the destination-passing Round 1; not
-  yet investigated.
-- `$into` variants for optional and result producers; leading-spread literals (`[..xs.map(f).join(), b]`) still
-  build-then-copy; unchecked push (Round 3).
-- Spreading an optional into an array gives a leaked `len expects an array, got i64?` message.
-
 ## Status / notes
 
-- Session 1: stage 0 done. Stage 1 started: `pin.rs` (~1,600 lines) and `tests/suites/pin.rs` (the oracle report,
-  `#[ignore]`d author helper). Whole-corpus coverage when last measured: ~88% of function bodies pin (54.6k
-  pinned / 6.1k gap / 1.4k rejected-though-accepted by the checker, counted per program, so read the ranking).
-  Before the last fixes the ranking was:
-  gaps: nested/array/literal patterns (3.2k), unnamed expression forms (2k: Shim, Lambda outside an argument,
-  Spread-free remnants; extend `form_name` to see them), annotated closure parameters (800), `to_array`/`to_set` on
-  tuples (80).
-  rejections: constructor references used as `Case<V>` (fixed since, unmeasured), `if let` with no else (fixed since).
-  Next: re-run the whole corpus, then work the ranking down; then the reject direction (split `frontend`);
-  then diagnostics (every rule the checker enforces that the pinner does not: `ord` bounds, effects, `mut`
-  discipline, exhaustiveness, `no_outer_assign`, unused results, ...). The pinner accepts MORE than the checker
-  today — that direction is unmeasured and is the main remaining risk of stage 1.
-  Test bodies (`.test`) are not pinned yet (`TFunction::test_body` is `None`); parameter defaults and struct field
-  defaults are not pinned (`default: None`).
+- Session 1: stage 0 done. Stage 1 started: `pin.rs` (~2,200 lines) and `tests/suites/pin.rs` (the oracle report,
+  `#[ignore]`d author helper); `aipl_codegen::lowered_for_check` is `frontend`'s first half, exposed so the pinner
+  can be run on programs the checker rejects.
+- Session 2: burned down the accept direction. Whole corpus, per program (read as a ranking): 62,128 function
+  bodies pin, 13 gap (a non-argument closure, calls through function-typed fields, `to_set` on a struct tuple),
+  23 are rejected though the checker accepts (mostly `err_*` cases the pinner is rightly stricter on; the rest
+  are int-width cases such as `takes_u64(x)` where a narrowed value is passed, and `i64[][]` vs `i64[,]`).
+  Forms now typed: patterns of every kind, tuple literals (`TExprKind::TupleLit`, lowered by mono), `shim`,
+  diverging branches (`aipl_syntax::diverges`), annotated closure parameters, tuple fields/`to_set`/`to_array`.
+- **Reject direction (the remaining stage-1 work).** Of the 128 programs the checker rejects, the pinner rejects
+  54 and *accepts 74*. They are the diagnostics not ported yet; the oracle prints the list under "the pinner
+  accepts what the checker rejects". By family: effects (undeclared, shim coverage/signature, `random`), `ord`
+  and int bounds, float operand rules, integer literal range and mixed widths, exhaustiveness/unreachable/
+  wildcard rules for `match`, `no_outer_assign` (an expression `if`/`match`/`if let`/`shim` that mutates),
+  statement/expression `match` use, unused results, set/dict element validity, refinements (`err_nonempty`),
+  unknown types in signatures, unimported builtins (several are hidden behind a gap), explicit type args and type
+  parameter defaults, generic inference failures (`err_generic_cannot_infer`, `err_return_only_type_param`).
+  Port each from `check.rs` (search the message text of the matching `err_*` case's `--- check --compile ---`).
+- Not pinned yet: `.test` bodies (`TFunction::test_body` is `None`), parameter defaults and struct field defaults
+  (`default: None`), and `Return` has a fresh-variable type rather than a `Never`.
+- Stage 1 is done when the oracle prints zero gaps, zero false rejections and an empty "accepts what the checker
+  rejects" list over the whole corpus, then it becomes a real assertion (drop the `#[ignore]`).

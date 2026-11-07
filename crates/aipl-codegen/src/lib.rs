@@ -2886,18 +2886,11 @@ pub struct Frontend {
     pub resolutions: Vec<aipl_syntax::resolution::Resolution>,
 }
 
-/// Everything from a loaded [`Program`] up to and including the type check:
-/// generic resolution, tuple lowering, constructor-reference lowering, the
-/// builtin declarations the checker resolves calls through, and
-/// [`aipl_mono::check`] itself. No monomorphization, no optimization, no
-/// Cranelift.
-///
-/// [`compile_program`] runs this first and then compiles what comes back, so a
-/// caller that only wants to know whether a program is well-typed — a language
-/// server recomputing diagnostics on a keystroke, say — can stop here and pay
-/// for the frontend alone. It reports every finding the checker collected, not
-/// just the first.
-pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
+/// The first half of [`frontend`]: the program lowered the way the checker sees it. Returns the
+/// lowered program (what compilation continues from) and the checker's view of it (the native
+/// builtin declarations followed by the lowered program). Exposed so the pinner can be run on
+/// programs the checker rejects.
+pub fn lowered_for_check(program: &Program) -> Result<(Program, Program), Vec<Error>> {
     // A nested literal where a grid is expected becomes a call to `grid_from`.
     // First, so the demand scan below sees the builtin it introduces.
     let program = &aipl_mono::lower_grid_literals(program).map_err(|e| vec![e])?;
@@ -2973,6 +2966,23 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
         sources: program.sources.clone(),
         doc: program.doc.clone(),
     };
+    Ok((program.clone(), check_program))
+}
+
+/// Everything from a loaded [`Program`] up to and including the type check:
+/// generic resolution, tuple lowering, constructor-reference lowering, the
+/// builtin declarations the checker resolves calls through, and
+/// [`aipl_mono::check`] itself. No monomorphization, no optimization, no
+/// Cranelift.
+///
+/// [`compile_program`] runs this first and then compiles what comes back, so a
+/// caller that only wants to know whether a program is well-typed — a language
+/// server recomputing diagnostics on a keystroke, say — can stop here and pay
+/// for the frontend alone. It reports every finding the checker collected, not
+/// just the first.
+pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
+    let (program, check_program) = lowered_for_check(program)?;
+    let program = &program;
     // `check` hands back the program with the types of context-dependent
     // expressions stamped in (`Expr::ty`) — a bare `none`, an empty `[]`, a
     // generic constructor. Everything downstream runs on *that*, because the

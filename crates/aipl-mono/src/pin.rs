@@ -714,7 +714,14 @@ impl Pinner<'_> {
                 self.agree(x, y)
             }
             (It::Set(x, ox), It::Set(y, oy)) => {
-                self.table.unify_order(*ox, *oy)?;
+                // A parameter that promises no order takes a set that promises one.
+                let given = self.table.order(*ox);
+                let wanted = self.table.order(*oy);
+                let widening = matches!(given, Ord::Known(PinnedOrder::Asc | PinnedOrder::Desc))
+                    && wanted == Ord::Known(PinnedOrder::Unordered);
+                if !widening {
+                    self.table.unify_order(*ox, *oy)?;
+                }
                 self.agree(x, y)
             }
             (It::Dict(k1, v1), It::Dict(k2, v2)) | (It::Res(k1, v1), It::Res(k2, v2)) => {
@@ -822,15 +829,19 @@ impl Pinner<'_> {
                 }
                 self.node(K::ArrayLit(out), It::Arr(Box::new(elem)), e)
             }
-            ExprKind::If(c, a, b) => {
+            ExprKind::If(c, ta, tb) => {
                 let c = self.expr(c)?;
                 self.coerce(&c.ty, &bool_ty, &c.span, "an `if` condition")?;
-                let a = self.expr(a)?;
-                let b = self.expr(b)?;
-                self.agree(&a.ty, &b.ty).or_else(|m| {
-                    reject(format!("the branches of an `if` disagree ({m})"), &e.span)
-                })?;
-                let ty = a.ty.clone();
+                let a = self.expr(ta)?;
+                let b = self.expr(tb)?;
+                let (da, db) = (aipl_syntax::diverges(ta), aipl_syntax::diverges(tb));
+                // A branch that leaves the function has no value to agree with.
+                if !da && !db {
+                    self.agree(&a.ty, &b.ty).or_else(|m| {
+                        reject(format!("the branches of an `if` disagree ({m})"), &e.span)
+                    })?;
+                }
+                let ty = if da { b.ty.clone() } else { a.ty.clone() };
                 self.node(K::If(Box::new(c), Box::new(a), Box::new(b)), ty, e)
             }
             ExprKind::While(c, body) => {
@@ -1055,6 +1066,24 @@ impl Pinner<'_> {
                 let pinned = PinnedOrder::of(*order).unwrap_or(PinnedOrder::Unordered);
                 self.node(K::SetLit(out, pinned), It::Set(Box::new(elem), ord), e)
             }
+            ExprKind::TupleLit(items) => {
+                let mut out = Vec::new();
+                for item in items {
+                    out.push(self.expr(item)?);
+                }
+                let tys: Vec<It> = out.iter().map(|i| i.ty.clone()).collect();
+                let template = format!("{}{}", crate::check::TUPLE_TEMPLATE, tys.len());
+                self.node(K::TupleLit(out), It::Gen(template, tys), e)
+            }
+            ExprKind::Shim(effect, bindings, body) => {
+                let body = self.expr(body)?;
+                let ty = body.ty.clone();
+                self.node(
+                    K::Shim(effect.clone(), bindings.clone(), Box::new(body)),
+                    ty,
+                    e,
+                )
+            }
             ExprKind::DictLit(pairs) => {
                 let (k, v) = (self.fresh(), self.fresh());
                 let mut out = Vec::new();
@@ -1068,15 +1097,19 @@ impl Pinner<'_> {
                 }
                 self.node(K::DictLit(out), It::Dict(Box::new(k), Box::new(v)), e)
             }
-            ExprKind::IfLet(arm, scrut, otherwise) => {
+            ExprKind::IfLet(arm, scrut, else_src) => {
                 let scrut = self.expr(scrut)?;
                 let st = self.known(&scrut.ty, &scrut.span)?;
                 let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
                 let (saved, body) = self.scoped(binds, |p| p.expr(&arm.body))?;
                 self.restore(saved);
-                let otherwise = self.expr(otherwise)?;
+                let otherwise = self.expr(else_src)?;
                 // An `if let` with no `else` has a unit one, and is run for effect.
-                let ty = if matches!(self.table.shallow(&otherwise.ty), It::Unit) {
+                let ty = if aipl_syntax::diverges(&arm.body) {
+                    otherwise.ty.clone()
+                } else if aipl_syntax::diverges(else_src) {
+                    body.ty.clone()
+                } else if matches!(self.table.shallow(&otherwise.ty), It::Unit) {
                     It::Unit
                 } else {
                     self.agree(&body.ty, &otherwise.ty).or_else(|m| {
@@ -1127,9 +1160,11 @@ impl Pinner<'_> {
                     let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
                     let (saved, body) = self.scoped(binds, |p| p.expr(&arm.body))?;
                     self.restore(saved);
-                    self.agree(&body.ty, &result).or_else(|m| {
-                        reject(format!("the arms of a `match` disagree ({m})"), &arm.span)
-                    })?;
+                    if !aipl_syntax::diverges(&arm.body) {
+                        self.agree(&body.ty, &result).or_else(|m| {
+                            reject(format!("the arms of a `match` disagree ({m})"), &arm.span)
+                        })?;
+                    }
                     out.push(TMatchArm {
                         pattern,
                         body,
@@ -1156,8 +1191,38 @@ impl Pinner<'_> {
         (vars, map)
     }
 
+    /// The element types of a tuple type, if `t` is one: a tuple template applied to its elements,
+    /// or the struct a tuple of known elements lowers to.
+    fn tuple_elems(&mut self, t: &It, span: &Span) -> Res<Option<Vec<It>>> {
+        match t {
+            It::Gen(base, args) if base.starts_with(crate::check::TUPLE_TEMPLATE) => {
+                Ok(Some(args.clone()))
+            }
+            It::Named(n) if n.starts_with("__tuple$") => {
+                let Some(fields) = self.decls.structs.get(n).cloned() else {
+                    return Ok(None);
+                };
+                let mut out = Vec::new();
+                for (_, ty, _) in &fields {
+                    out.push(self.lower(ty, &HashMap::new(), span)?);
+                }
+                Ok(Some(out))
+            }
+            _ => Ok(None),
+        }
+    }
+
     /// The type of `owner.field`, for a struct or an application of a generic one.
     fn field_type(&mut self, owner: &It, field: &str, span: &Span) -> Res<It> {
+        if let Some(elems) = self.tuple_elems(owner, span)? {
+            let slot = field
+                .strip_prefix('_')
+                .and_then(|n| n.parse::<usize>().ok());
+            return match slot.and_then(|i| elems.get(i)) {
+                Some(t) => Ok(t.clone()),
+                None => reject(format!("a tuple has no field {field:?}"), span),
+            };
+        }
         let (fields, map): (Vec<(String, Type, bool)>, HashMap<String, It>) = match owner {
             It::Named(n) => match self.decls.structs.get(n) {
                 Some(f) => (f.clone(), HashMap::new()),
@@ -1357,6 +1422,65 @@ impl Pinner<'_> {
         }
     }
 
+    /// The payload types of the case `bare` of the scrutinee type `st`.
+    fn ctor_payload(&mut self, st: &It, bare: &str, span: &Span) -> Res<Vec<It>> {
+        Ok(match st {
+            It::Opt(t) if bare == "some" => vec![(**t).clone()],
+            It::Opt(_) if bare == "none" => Vec::new(),
+            It::Res(t, _) if bare == "ok" => vec![(**t).clone()],
+            It::Res(_, e) if bare == "err" => vec![(**e).clone()],
+            It::Gen(v, targs) if self.decls.generic_variants.contains_key(v) => {
+                let tmpl = self.decls.generic_variants[v].clone();
+                let map: HashMap<String, It> = tmpl
+                    .type_vars
+                    .iter()
+                    .map(|t| t.name.clone())
+                    .zip(targs.iter().cloned())
+                    .collect();
+                let Some(case) = tmpl.cases.iter().find(|c| c.name.text == bare) else {
+                    return reject(format!("{v:?} has no case {bare:?}"), span);
+                };
+                let mut out = Vec::new();
+                for slot in &case.payload {
+                    out.push(self.lower(&slot.ty, &map, span)?);
+                }
+                out
+            }
+            It::Named(v) if self.decls.variants.contains_key(v) => {
+                let cases = self.decls.variants[v].clone();
+                let Some((_, tys)) = cases.iter().find(|(c, _)| c == bare) else {
+                    return reject(format!("{v:?} has no case {bare:?}"), span);
+                };
+                let mut out = Vec::new();
+                for t in tys {
+                    out.push(self.lower(t, &HashMap::new(), span)?);
+                }
+                out
+            }
+            _ => return gap("a pattern on this scrutinee", span),
+        })
+    }
+
+    /// Whether `name` spells a case of the scrutinee type `st`.
+    fn is_case_of(&self, st: &It, name: &str) -> bool {
+        let bare = name.split('@').next().unwrap_or(name);
+        match st {
+            It::Opt(_) => matches!(bare, "some" | "none"),
+            It::Res(..) => matches!(bare, "ok" | "err"),
+            It::Named(v) => self
+                .decls
+                .variants
+                .get(v)
+                .is_some_and(|cs| cs.iter().any(|(c, _)| c == bare)),
+            It::Gen(v, _) => self
+                .decls
+                .generic_variants
+                .get(v)
+                .is_some_and(|t| t.cases.iter().any(|c| c.name.text == bare)),
+            _ => false,
+        }
+    }
+
     /// The pattern as a typed one and the names it binds, against a scrutinee of type `st`.
     fn pattern(
         &mut self,
@@ -1364,55 +1488,42 @@ impl Pinner<'_> {
         st: &It,
         span: &Span,
     ) -> Res<(TPattern<It>, Vec<(String, It)>)> {
+        let st = &self.table.shallow(st);
         Ok(match pattern {
             Pattern::Wildcard => (TPattern::Wildcard, Vec::new()),
             Pattern::Str(s) => (TPattern::Str(s.clone()), Vec::new()),
             Pattern::Char(c) => (TPattern::Char(*c), Vec::new()),
+            Pattern::Int(n) => {
+                if !matches!(st, It::Var(_) | It::Prim(_)) {
+                    return reject("an integer pattern needs an integer scrutinee", span);
+                }
+                (TPattern::Int(*n), Vec::new())
+            }
+            Pattern::Bind(name) => {
+                if self.is_case_of(st, name) {
+                    (TPattern::Bind(name.clone()), Vec::new())
+                } else {
+                    (
+                        TPattern::Bind(name.clone()),
+                        vec![(name.clone(), st.clone())],
+                    )
+                }
+            }
             Pattern::Ctor {
                 name,
                 bindings,
                 ignore_payload,
             } => {
                 let bare = name.split('@').next().unwrap_or(name);
-                let payload = match st {
-                    It::Opt(t) if bare == "some" => vec![(**t).clone()],
-                    It::Opt(_) if bare == "none" => Vec::new(),
-                    It::Res(t, _) if bare == "ok" => vec![(**t).clone()],
-                    It::Res(_, e) if bare == "err" => vec![(**e).clone()],
-                    It::Gen(v, targs) if self.decls.generic_variants.contains_key(v) => {
-                        let tmpl = self.decls.generic_variants[v].clone();
-                        let map: HashMap<String, It> = tmpl
-                            .type_vars
-                            .iter()
-                            .map(|t| t.name.clone())
-                            .zip(targs.iter().cloned())
-                            .collect();
-                        let Some(case) = tmpl.cases.iter().find(|c| c.name.text == bare) else {
-                            return reject(format!("{v:?} has no case {bare:?}"), span);
-                        };
-                        let mut out = Vec::new();
-                        for slot in &case.payload {
-                            out.push(self.lower(&slot.ty, &map, span)?);
-                        }
-                        out
-                    }
-                    It::Named(v) if self.decls.variants.contains_key(v) => {
-                        let cases = self.decls.variants[v].clone();
-                        let Some((_, tys)) = cases.iter().find(|(c, _)| c == bare) else {
-                            return reject(format!("{v:?} has no case {bare:?}"), span);
-                        };
-                        let mut out = Vec::new();
-                        for t in tys {
-                            out.push(self.lower(t, &HashMap::new(), span)?);
-                        }
-                        out
-                    }
-                    _ => return gap("a pattern on this scrutinee", span),
-                };
-                if !*ignore_payload && bindings.len() != payload.len() {
+                let payload = self.ctor_payload(st, bare, span)?;
+                // The success of a `!E` result carries nothing to bind.
+                let void_ok = bare == "ok"
+                    && bindings.is_empty()
+                    && matches!(payload.as_slice(), [t] if self.table.shallow(t) == It::Unit);
+                if !*ignore_payload && !void_ok && bindings.len() != payload.len() {
                     return reject(format!("{bare:?} binds the wrong number of values"), span);
                 }
-                let binds = if *ignore_payload {
+                let binds = if *ignore_payload || void_ok {
                     Vec::new()
                 } else {
                     bindings.iter().cloned().zip(payload).collect()
@@ -1426,8 +1537,92 @@ impl Pinner<'_> {
                     binds,
                 )
             }
-            _ => return gap("a nested, array or literal pattern", span),
+            Pattern::Nested { name, args } => {
+                let bare = name.split('@').next().unwrap_or(name);
+                let payload = self.ctor_payload(st, bare, span)?;
+                if args.len() != payload.len() {
+                    return reject(format!("{bare:?} has {} slot(s)", payload.len()), span);
+                }
+                let (mut subs, mut binds) = (Vec::new(), Vec::new());
+                for (sub, ty) in args.iter().zip(&payload) {
+                    let (p, b) = self.pattern(sub, ty, span)?;
+                    subs.push(p);
+                    binds.extend(b);
+                }
+                (
+                    TPattern::Nested {
+                        name: name.clone(),
+                        args: subs,
+                    },
+                    binds,
+                )
+            }
+            Pattern::Tuple(ps) => {
+                let mut subs = Vec::new();
+                let mut binds = Vec::new();
+                for (i, sub) in ps.iter().enumerate() {
+                    let ty = self.field_type(st, &format!("_{i}"), span)?;
+                    let (p, b) = self.pattern(sub, &ty, span)?;
+                    subs.push(p);
+                    binds.extend(b);
+                }
+                (TPattern::Tuple(subs), binds)
+            }
+            Pattern::ArrayNested(ps) => {
+                let elem = self.sequence_elem(st, span)?;
+                let (mut subs, mut binds) = (Vec::new(), Vec::new());
+                for sub in ps {
+                    let (p, b) = self.pattern(sub, &elem, span)?;
+                    subs.push(p);
+                    binds.extend(b);
+                }
+                (TPattern::ArrayNested(subs), binds)
+            }
+            Pattern::Array(items) | Pattern::ArrayRest(items) => {
+                let elem = self.sequence_elem(st, span)?;
+                let (mut typed, mut binds) = (Vec::new(), Vec::new());
+                for item in items {
+                    match &item.kind {
+                        // A name binds the element at its position; `_` ignores it.
+                        ExprKind::Ident(name) => {
+                            if name != "_" {
+                                binds.push((name.clone(), elem.clone()));
+                            }
+                            typed.push(self.node(
+                                TExprKind::Ident(name.clone()),
+                                elem.clone(),
+                                item,
+                            ));
+                        }
+                        _ => {
+                            let lit = self.expr(item)?;
+                            self.agree(&lit.ty, &elem).or_else(|m| {
+                                reject(format!("a pattern literal does not fit ({m})"), &item.span)
+                            })?;
+                            typed.push(lit);
+                        }
+                    }
+                }
+                let rest = matches!(pattern, Pattern::ArrayRest(_));
+                (
+                    if rest {
+                        TPattern::ArrayRest(typed)
+                    } else {
+                        TPattern::Array(typed)
+                    },
+                    binds,
+                )
+            }
         })
+    }
+
+    /// The element an array or `str` pattern matches at each position.
+    fn sequence_elem(&self, st: &It, span: &Span) -> Res<It> {
+        match st {
+            It::Arr(t) => Ok((**t).clone()),
+            It::Prim(Primitive::Str) => Ok(It::Prim(Primitive::Char)),
+            _ => reject("an array pattern needs an array or str scrutinee", span),
+        }
     }
 
     /// `inst` is a synthesized instance of the generic `base`: its arguments are whatever make the
@@ -1456,6 +1651,19 @@ impl Pinner<'_> {
     }
 
     fn link_fields(&mut self, inst: &str, base: &str, targs: &[It]) -> Result<(), String> {
+        if base.starts_with(crate::check::TUPLE_TEMPLATE) {
+            let elems = self
+                .tuple_elems(&It::Named(inst.to_string()), &Span::default())
+                .map_err(|_| "a tuple element".to_string())?
+                .ok_or_else(|| format!("{inst} is not a known tuple"))?;
+            if elems.len() != targs.len() {
+                return Err("tuples of different sizes".into());
+            }
+            for (got, want) in elems.iter().zip(targs) {
+                self.agree(got, want)?;
+            }
+            return Ok(());
+        }
         let span = Span::default();
         let pairs: Vec<(Type, Type)> = if let (Some(t), Some(fields)) = (
             self.decls.generic_structs.get(base),
@@ -1603,9 +1811,22 @@ impl Pinner<'_> {
             }
             Callee::ToSet if args.len() == 1 => {
                 let x = self.expr(&args[0])?;
-                let elem = match self.known(&x.ty, &x.span)? {
-                    It::Prim(Primitive::Str) => It::Prim(Primitive::Char),
-                    It::Arr(t) => *t,
+                let xt = self.known(&x.ty, &x.span)?;
+                let elem = match (&xt, self.tuple_elems(&xt, &x.span)?) {
+                    (_, Some(elems)) => {
+                        let first = elems[0].clone();
+                        for other in &elems[1..] {
+                            self.agree(other, &first).or_else(|m| {
+                                reject(
+                                    format!("a tuple's elements must share a type ({m})"),
+                                    &x.span,
+                                )
+                            })?;
+                        }
+                        first
+                    }
+                    (It::Prim(Primitive::Str), _) => It::Prim(Primitive::Char),
+                    (It::Arr(t), _) => (**t).clone(),
                     _ => return gap("to_set on this receiver", &e.span),
                 };
                 let order = self.table.fresh_order();
@@ -1613,7 +1834,20 @@ impl Pinner<'_> {
             }
             Callee::ToArray if args.len() == 1 => {
                 let x = self.expr(&args[0])?;
-                let It::Set(elem, _) = self.known(&x.ty, &x.span)? else {
+                let xt = self.known(&x.ty, &x.span)?;
+                if let Some(elems) = self.tuple_elems(&xt, &x.span)? {
+                    let first = elems[0].clone();
+                    for other in &elems[1..] {
+                        self.agree(other, &first).or_else(|m| {
+                            reject(
+                                format!("a tuple's elements must share a type ({m})"),
+                                &x.span,
+                            )
+                        })?;
+                    }
+                    return Ok(call(vec![x], It::Arr(Box::new(first)), self));
+                }
+                let It::Set(elem, _) = xt else {
                     return gap("to_array on this receiver", &e.span);
                 };
                 return Ok(call(vec![x], It::Arr(elem), self));
@@ -1828,9 +2062,21 @@ impl Pinner<'_> {
             let mut typed = Vec::new();
             let mut saved = Vec::new();
             for (param, pty) in params.iter().zip(&ptys) {
-                if param.ty.is_some() {
-                    return gap("an annotated closure parameter", &param.span);
-                }
+                // A written type is the parameter's; the position's must accept it.
+                let pty = match &param.ty {
+                    Some(t) => {
+                        let written = self.lower(t, &HashMap::new(), &param.span)?;
+                        self.agree(pty, &written).or_else(|m| {
+                            reject(
+                                format!("the closure parameter does not fit ({m})"),
+                                &param.span,
+                            )
+                        })?;
+                        written
+                    }
+                    None => pty.clone(),
+                };
+                let pty = &pty;
                 saved.push((
                     param.name.clone(),
                     self.env.insert(
@@ -1865,20 +2111,7 @@ impl Pinner<'_> {
     }
 }
 
-fn form_name(k: &ExprKind) -> &'static str {
-    match k {
-        ExprKind::Construct(..) => "Construct",
-        ExprKind::Field(..) => "Field",
-        ExprKind::For(..) => "For",
-        ExprKind::Shim(..) => "Shim",
-        ExprKind::Match(..) => "Match",
-        ExprKind::IfLet(..) => "IfLet",
-        ExprKind::SetLit(..) => "SetLit",
-        ExprKind::DictLit(..) => "DictLit",
-        ExprKind::Index(..) => "Index",
-        ExprKind::Slice(..) => "Slice",
-        ExprKind::Try(..) => "Try",
-        ExprKind::Lambda(..) => "Lambda",
-        _ => "other",
-    }
+fn form_name(k: &ExprKind) -> String {
+    let text = format!("{k:?}");
+    text.split(['(', ' ', '{']).next().unwrap_or("").to_string()
 }

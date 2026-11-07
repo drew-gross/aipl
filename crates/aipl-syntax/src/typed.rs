@@ -355,6 +355,9 @@ pub enum TExprKind<T: TyRepr = Ty> {
     IfLet(Box<TMatchArm<T>>, Box<TExpr<T>>, Box<TExpr<T>>),
     /// `[a, b]`; the node's `ty` is the array, so an empty one still says its element.
     ArrayLit(Vec<TExpr<T>>),
+    /// `(a, b)`; the node's `ty` is the tuple's struct (or its template applied to type variables).
+    /// Monomorphization lowers it to that struct's construction.
+    TupleLit(Vec<TExpr<T>>),
     SetLit(Vec<TExpr<T>>, PinnedOrder),
     DictLit(Vec<(TExpr<T>, TExpr<T>)>),
     Index(Box<TExpr<T>>, Box<TExpr<T>>),
@@ -430,9 +433,10 @@ impl<T: TyRepr> TExpr<T> {
                     f(c);
                 }
             }
-            K::Call { args: items, .. } | K::ArrayLit(items) | K::SetLit(items, _) => {
-                items.iter().for_each(f)
-            }
+            K::Call { args: items, .. }
+            | K::ArrayLit(items)
+            | K::TupleLit(items)
+            | K::SetLit(items, _) => items.iter().for_each(f),
             K::DictLit(pairs) => {
                 for (k, v) in pairs {
                     f(k);
@@ -491,9 +495,10 @@ impl<T: TyRepr> TExpr<T> {
                     f(c);
                 }
             }
-            K::Call { args: items, .. } | K::ArrayLit(items) | K::SetLit(items, _) => {
-                items.iter_mut().for_each(f)
-            }
+            K::Call { args: items, .. }
+            | K::ArrayLit(items)
+            | K::TupleLit(items)
+            | K::SetLit(items, _) => items.iter_mut().for_each(f),
             K::DictLit(pairs) => {
                 for (k, v) in pairs {
                     f(k);
@@ -567,6 +572,7 @@ impl<T: TyRepr> TExpr<T> {
             K::Match(s, arms) => ExprKind::Match(e(s), arms.iter().map(TMatchArm::erase).collect()),
             K::IfLet(arm, s, o) => ExprKind::IfLet(Box::new(arm.erase()), e(s), e(o)),
             K::ArrayLit(items) => ExprKind::ArrayLit(items.iter().map(TExpr::erase).collect()),
+            K::TupleLit(items) => ExprKind::TupleLit(items.iter().map(TExpr::erase).collect()),
             K::SetLit(items, order) => ExprKind::SetLit(
                 items.iter().map(TExpr::erase).collect(),
                 order.to_set_order(),
@@ -679,6 +685,7 @@ impl<T: TyRepr> TExpr<T> {
                 map_one(o, f)?,
             ),
             K::ArrayLit(items) => K::ArrayLit(map_all(items, f)?),
+            K::TupleLit(items) => K::TupleLit(map_all(items, f)?),
             K::SetLit(items, order) => K::SetLit(map_all(items, f)?, *order),
             K::DictLit(pairs) => K::DictLit(
                 pairs

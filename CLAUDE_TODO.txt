@@ -100,3 +100,12 @@ generics:
 lexer / parse_json:
   the per-byte cache and the rules' first-byte sets are rebuilt for every `lex_all`, so a source of a few tokens still pays for them (the lexer's own test case, over five-rule rule sets, costs 49% more instructions, and lex_aipl's 15%); the rules themselves are rebuilt per call too (`aipl_rules()`, `json_rules()`), and a constant cannot hold a computed value
 
+
+optimizer / destination-passing:
+  arrays/extend/extend_reserves_once regressed 218 -> 427 instructions (code 1008 -> 1760) in Round 1; uninvestigated
+  `$into` variants for optional and result producers
+  leading-spread literals (`[..xs.map(f).join(), b]`) still build then copy
+  unchecked push (Round 3 of the $into project)
+
+diagnostics:
+  spreading an optional into an array leaks the internal message "len expects an array, got i64?"

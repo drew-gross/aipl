@@ -36,6 +36,8 @@ fn oracle_report() {
         files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
     }
     let (mut programs, mut skipped) = (0usize, 0usize);
+    let mut both_reject = 0usize;
+    let mut pinner_misses: Vec<String> = Vec::new();
     let (mut pinned, mut gaps, mut rejected) = (0usize, 0usize, 0usize);
     let mut gap_kinds: BTreeMap<String, usize> = BTreeMap::new();
     let mut rejections: BTreeMap<String, usize> = BTreeMap::new();
@@ -46,7 +48,30 @@ fn oracle_report() {
             continue;
         };
         let Ok(frontend) = aipl::codegen::frontend(&program) else {
-            skipped += 1;
+            // The checker rejects this program: the pinner must find something wrong with it too.
+            match aipl::codegen::lowered_for_check(&program) {
+                Ok((_, lowered)) => {
+                    let result = pin(&lowered);
+                    let found = result
+                        .failures
+                        .iter()
+                        .any(|(_, f)| matches!(f, Failure::Rejected(_)));
+                    if found {
+                        both_reject += 1;
+                    } else {
+                        let gap = result
+                            .failures
+                            .iter()
+                            .any(|(_, f)| matches!(f, Failure::Gap(..)));
+                        pinner_misses.push(format!(
+                            "{}{}",
+                            file.display(),
+                            if gap { " (a gap hides it)" } else { "" }
+                        ));
+                    }
+                }
+                Err(_) => skipped += 1,
+            }
             continue;
         };
         programs += 1;
@@ -99,6 +124,14 @@ fn oracle_report() {
             .collect::<Vec<_>>()
             .join("\n")
     };
+    println!(
+        "checker-rejected programs: both reject {both_reject}, pinner accepts {}",
+        pinner_misses.len()
+    );
     println!("--- gaps ---\n{}", top(&gap_kinds));
     println!("--- rejections ---\n{}", top(&rejections));
+    println!(
+        "--- the pinner accepts what the checker rejects ---\n{}",
+        pinner_misses.join("\n")
+    );
 }
