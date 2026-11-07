@@ -1,0 +1,37 @@
+# `to_array` on an ordered set of chars is the chars in the set's order. A char set is a
+# bitfield, not an array block, so the array is built from the bits rather than shared.
+
+import { equal as ==, len, map_to_dict, to_array, to_set, wrapping_increment as ++ } from builtins;
+
+fn ascending(text: str) -> char[] {
+    let found: #<{char} = text.to_set();
+    found.to_array()
+}
+
+fn descending(text: str) -> char[] {
+    let found: #>{char} = text.to_set();
+    found.to_array()
+}
+
+test({
+    // Each char once, smallest first or largest first.
+    assert(ascending("banana") == ['a', 'b', 'n']);
+    assert(descending("banana") == ['n', 'b', 'a']);
+    assert(ascending("zyx abc") == [' ', 'a', 'b', 'c', 'x', 'y', 'z']);
+
+    // Nothing, one, and the whole of what a lexer rule names.
+    assert(ascending("") == []);
+    assert(descending("") == []);
+    assert(ascending("q") == ['q']);
+    assert(ascending("0123456789").len() == 10);
+
+    // It is an array like any other: it has a length, is walked, and builds a dict.
+    let letters = ascending("hello");
+    assert(letters.len() == 4);
+    mut walked = 0;
+    for (let c : letters) {
+        if (c == 'l') { set walked++; };
+    }
+    assert(walked == 1);
+    assert(letters.map_to_dict(|c| { (c, 1) }).len() == 4);
+})

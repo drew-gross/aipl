@@ -113,6 +113,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  optional_of_test looks like it can use string comparison rather than print for assertions
+  need a better way to avoid dispatching code on the wrong representation
   split Type into variants that can and cannot be generic, and have the stage the resolves generics transform. This feel more sound than the current patchwork.
   merge aipl's top level doc and docs commands
   some sort of enforcement/restriction on tests with main+sections
@@ -727,7 +729,8 @@ optimizations:
           set depth = depth - 1;
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
-  operation fusion:
+  operation
+    foo.to_array().map() and other .to_array().* fusions sound useful
     s.to_array().to_set() can be just s.
     <any array generator> -> to_dict is probably good fusion to have to avoid materializing that array
     collect_ok fusions

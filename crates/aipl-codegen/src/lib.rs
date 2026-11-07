@@ -18640,15 +18640,75 @@ fn compile_call_expr_direct<M: Module>(
                 ));
             }
             // A set of `char` is not a block but a 256-bit bitfield held inline, so there is no
-            // block to share as the array, and reading the bitfield as one gives an empty array
-            // rather than the chars. Refused until it builds the array from the bits.
+            // block to share as the array: the members are written out, in the set's order,
+            // into a new `char[]` — which is a `str` at runtime, built the way `to_str` builds
+            // one (measure, allocate exactly, write, record the length). The measure is a
+            // popcount, and the write steps through the members as a `for` over the set does.
             if is_char_set(&t) {
-                return Err(Error::at(
-                    "\"to_array\" on a set of char is not supported yet — a char set is a bitfield \
-                     and has no array to hand back; walk it with `for (let c : set)`"
-                        .to_string(),
-                    receiver.span.clone(),
+                let descending = *order == aipl_syntax::ast::SetOrder::Desc;
+                let b = cx.builtins;
+                let len = emit_charset_len(builder, ptr);
+                let built = b.call(module, builder, "aipl_str_alloc", &[len]);
+                let start = b.call(module, builder, "aipl_str_write_ptr", &[built]);
+                let cursor = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
                 ));
+                builder.ins().stack_store(types::I64, start, cursor, 0);
+                let member = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let first = builder
+                    .ins()
+                    .iconst(types::I64, if descending { 255 } else { 0 });
+                builder.ins().stack_store(types::I64, first, member, 0);
+                let header = builder.create_block();
+                let body = builder.create_block();
+                let exit = builder.create_block();
+                builder.ins().jump(header, &[]);
+
+                builder.switch_to_block(header);
+                let at = builder.ins().stack_load(types::I64, types::I64, member, 0);
+                let step_fn = if descending {
+                    "aipl_charset_prev"
+                } else {
+                    "aipl_charset_next"
+                };
+                let found = b.call(module, builder, step_fn, &[ptr, at]);
+                let more = builder
+                    .ins()
+                    .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, found, 0);
+                builder.ins().brif(more, body, &[], exit, &[]);
+
+                builder.switch_to_block(body);
+                builder.seal_block(body);
+                sink_byte(builder, Sink::Write(cursor), found);
+                let after = builder
+                    .ins()
+                    .iadd_imm_s(found, if descending { -1 } else { 1 });
+                builder.ins().stack_store(types::I64, after, member, 0);
+                builder.ins().jump(header, &[]);
+                builder.seal_block(header);
+
+                builder.switch_to_block(exit);
+                builder.seal_block(exit);
+                b.call_void(module, builder, "aipl_str_grew", &[built, len]);
+                let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    str24::STR_SIZE as u32,
+                    3,
+                ));
+                let out = builder.ins().stack_addr(types::I64, slot, 0);
+                let str_ty = ConcreteType::Primitive(Primitive::Str);
+                copy_composite(builder, out, built, &str_ty, structs);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(out, &str_ty));
+                return Ok((out, ConcreteType::Array(elem.clone())));
             }
             // The set's block, under its value.
             let set_v = ptr;

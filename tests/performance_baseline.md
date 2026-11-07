@@ -675,6 +675,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/results/void_ok | 11 | 770 | 548 | 2342 | 11600 |
 | tests/cases/sets/as_sequence | 41 | 2221 | 1989 | 6345 | 16040 |
 | tests/cases/sets/basic | 2 | 96 | 96 | 305 | 1556 |
+| tests/cases/sets/char_set_to_array | 9 | 188 | 236 | 3950 | 6360 |
 | tests/cases/sets/elem_types | 2 | 34 | 34 | 346 | 1692 |
 | tests/cases/sets/empty_char_set_contexts | 56 | 3938 | 3938 | 7789 | 14788 |
 | tests/cases/sets/iteration | 21 | 1390 | 1486 | 3720 | 8440 |
