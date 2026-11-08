@@ -9,7 +9,8 @@
 
 // Core types: spans, errors, debug tracing, and the AST.
 pub use aipl_syntax::{
-    ast, benchmark_diagnostics, benchmark_source_name, trace_diagnostics, DebugOptions, Error, Span,
+    ast, benchmark_diagnostics, benchmark_source_name, trace_diagnostics, typed, DebugOptions,
+    Error, Span,
 };
 
 // Lexer + parser surface.

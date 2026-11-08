@@ -78,6 +78,10 @@ impl PinnedOrder {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ty {
     Unit,
+    /// What an expression that never produces a value has when nothing around it asks for a type
+    /// (`return x;` as a statement). Where context does ask — a branch of an `if` whose other
+    /// branch yields a number — the expression has that type instead.
+    Never,
     Primitive(Primitive),
     /// A struct or variant — always a monomorphic one: generic applications are lowered to
     /// synthetic named types before type checking.
@@ -105,6 +109,8 @@ pub enum Ty {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTy {
     Unit,
+    /// See [`Ty::Never`].
+    Never,
     Primitive(Primitive),
     Named(String),
     Case(Box<ConcreteTy>),
@@ -159,7 +165,7 @@ impl Ty {
         match self {
             Ty::Var(_) => true,
             Ty::Generic(_, args) => args.iter().any(Ty::mentions_var),
-            Ty::Unit | Ty::Primitive(_) | Ty::Named(_) => false,
+            Ty::Unit | Ty::Never | Ty::Primitive(_) | Ty::Named(_) => false,
             Ty::Case(t) | Ty::Optional(t) | Ty::Array(t) | Ty::Set(t, _) => t.mentions_var(),
             Ty::Dict(a, b) | Ty::Result(a, b) => a.mentions_var() || b.mentions_var(),
             Ty::Fn(params, ret) => params.iter().any(Ty::mentions_var) || ret.mentions_var(),
@@ -182,6 +188,7 @@ impl Ty {
         let boxed = |t: &Ty| t.concretize_with(subst, instance).map(Box::new);
         Some(match self {
             Ty::Unit => ConcreteTy::Unit,
+            Ty::Never => ConcreteTy::Never,
             Ty::Primitive(p) => ConcreteTy::Primitive(*p),
             Ty::Named(n) => ConcreteTy::Named(n.clone()),
             Ty::Case(t) => ConcreteTy::Case(boxed(t)?),
@@ -215,6 +222,7 @@ impl ConcreteTy {
         let boxed = |t: &ConcreteTy| Box::new(t.to_ty());
         match self {
             ConcreteTy::Unit => Ty::Unit,
+            ConcreteTy::Never => Ty::Never,
             ConcreteTy::Primitive(p) => Ty::Primitive(*p),
             ConcreteTy::Named(n) => Ty::Named(n.clone()),
             ConcreteTy::Case(t) => Ty::Case(boxed(t)),
@@ -234,7 +242,9 @@ impl TyRepr for Ty {
     fn to_type(&self) -> Type {
         let boxed = |t: &Ty| Box::new(t.to_type());
         match self {
-            Ty::Unit => Type::Unit,
+            // The written language has no type for it; a value that never arrives is as good as
+            // unit wherever one is looked for.
+            Ty::Unit | Ty::Never => Type::Unit,
             Ty::Primitive(p) => Type::Primitive(*p),
             Ty::Named(n) => Type::Named(n.clone()),
             Ty::Case(t) => Type::Case(boxed(t)),

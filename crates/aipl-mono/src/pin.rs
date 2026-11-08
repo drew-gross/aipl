@@ -32,8 +32,9 @@ use aipl_syntax::ast::{
     Callee, Expr, ExprKind, Function, Item, Pattern, Primitive, Program, Signature, Type,
 };
 use aipl_syntax::typed::{
-    PinnedOrder, TExpr, TExprKind, TFieldDecl, TFunction, TItem, TLambdaParam, TMatchArm, TParam,
-    TPattern, TProgram, TSignature, TStructDecl, TTypeParam, Ty, TyRepr,
+    PinnedOrder, TCaseParam, TExpr, TExprKind, TFieldDecl, TFunction, TItem, TLambdaParam,
+    TMatchArm, TParam, TPattern, TProgram, TSignature, TStructDecl, TTypeParam, TVariantCase,
+    TVariantDecl, Ty, TyRepr,
 };
 use aipl_syntax::{Error, Span};
 
@@ -89,6 +90,9 @@ enum Kind {
 struct Slot {
     bound: Option<It>,
     kind: Kind,
+    /// The type of an expression that never produces a value (`return`): if nothing asks it to be
+    /// a type, it is [`Ty::Never`] rather than the default number.
+    diverges: bool,
 }
 
 /// The variables of one function body.
@@ -140,7 +144,11 @@ impl Table {
     }
 
     fn fresh(&mut self, kind: Kind) -> It {
-        self.slots.push(Slot { bound: None, kind });
+        self.slots.push(Slot {
+            bound: None,
+            kind,
+            diverges: false,
+        });
         It::Var(self.slots.len() - 1)
     }
 
@@ -205,6 +213,9 @@ impl Table {
                 }
                 if kind != Kind::Any {
                     self.slots[*w].kind = kind;
+                }
+                if self.slots[v].diverges {
+                    self.slots[*w].diverges = true;
                 }
             }
             (It::Prim(p), Kind::Int) if !p.is_int() => {
@@ -306,6 +317,7 @@ impl Table {
             It::Fn(ps, r) => Ty::Fn(ps.iter().map(|p| self.resolve(p)).collect(), boxed(&r)),
             It::Var(v) => match self.slots[v].kind {
                 Kind::Float => Ty::Primitive(Primitive::F64),
+                Kind::Any if self.slots[v].diverges => Ty::Never,
                 Kind::Int | Kind::Any => Ty::Primitive(Primitive::I64),
                 Kind::Brace => Ty::Set(
                     Box::new(Ty::Primitive(Primitive::I64)),
@@ -423,6 +435,9 @@ struct Pinner<'a> {
     /// The effects the code being typed may perform: the function's own, plus those of the
     /// `shim`s around it.
     effects: Vec<String>,
+    /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
+    /// returns nothing, so the operand's shape is the only constraint.
+    in_test: bool,
 }
 
 /// A generic call's type arguments, held until the whole body has been typed.
@@ -521,7 +536,15 @@ pub fn pin(program: &Program) -> Pinned {
     for item in &program.items {
         match item {
             Item::Fn(f) => match pin_function(&decls, f) {
-                Ok(t) => items.push(TItem::Fn(t)),
+                Ok(mut t) => {
+                    if let Some(block) = &f.test_body {
+                        match pin_test_body(&decls, f, block) {
+                            Ok(body) => t.test_body = Some(body),
+                            Err(e) => failures.push((format!("{}.test", f.name.text), e)),
+                        }
+                    }
+                    items.push(TItem::Fn(t));
+                }
                 Err(e) => failures.push((f.name.text.clone(), e)),
             },
             Item::Struct(s) if s.type_vars.iter().any(|tp| tp.default.is_some()) => {
@@ -548,14 +571,16 @@ pub fn pin(program: &Program) -> Pinned {
                     declaration_error(&decls, item).unwrap(),
                 ));
             }
-            Item::Struct(s) => {
-                // Field defaults are expressions; a struct without any carries over whole.
-                if s.fields.iter().all(|f| f.default.is_none()) {
-                    if let Some(t) = pin_struct(s) {
-                        items.push(TItem::Struct(t));
-                    }
-                }
-            }
+            Item::Struct(s) => match pin_struct(&decls, s) {
+                Ok(Some(t)) => items.push(TItem::Struct(t)),
+                Ok(None) => {}
+                Err(e) => failures.push((s.name.text.clone(), e)),
+            },
+            Item::Variant(v) => match pin_variant(&decls, v) {
+                Ok(Some(t)) => items.push(TItem::Variant(t)),
+                Ok(None) => {}
+                Err(e) => failures.push((v.name.text.clone(), e)),
+            },
             _ => {}
         }
     }
@@ -598,27 +623,106 @@ fn declaration_error(decls: &Decls, item: &Item) -> Option<Failure> {
     }
 }
 
-fn pin_struct(s: &aipl_syntax::ast::StructDecl) -> Option<TStructDecl> {
-    Some(TStructDecl {
+/// A struct's declaration with its field defaults typed. A generic struct's defaults wait for an
+/// instance to meet their field's type, so they are left out.
+fn pin_struct(decls: &Decls, s: &aipl_syntax::ast::StructDecl) -> Res<Option<TStructDecl>> {
+    let Some(type_vars) = s
+        .type_vars
+        .iter()
+        .map(pin_type_param)
+        .collect::<Option<Vec<_>>>()
+    else {
+        return Ok(None);
+    };
+    let mut fields = Vec::new();
+    for f in &s.fields {
+        let Some(ty) = declared(&f.ty) else {
+            return Ok(None);
+        };
+        let default = match &f.default {
+            Some(d) if !s.is_generic() => {
+                let what = format!(
+                    "default for struct {:?} field {:?}",
+                    s.name.text, f.name.text
+                );
+                Some(pin_slot_default(decls, &s.name.text, &f.ty, d, &[], &what)?)
+            }
+            _ => None,
+        };
+        fields.push(TFieldDecl {
+            name: f.name.clone(),
+            ty,
+            default,
+        });
+    }
+    Ok(Some(TStructDecl {
         name: s.name.clone(),
         doc: s.doc.clone(),
-        type_vars: s
-            .type_vars
-            .iter()
-            .map(pin_type_param)
-            .collect::<Option<_>>()?,
-        fields: s
-            .fields
-            .iter()
-            .map(|f| {
-                Some(TFieldDecl {
-                    name: f.name.clone(),
-                    ty: declared(&f.ty)?,
-                    default: None,
-                })
-            })
-            .collect::<Option<_>>()?,
-    })
+        type_vars,
+        fields,
+    }))
+}
+
+/// A variant's declaration with its payload defaults typed; each sees the named slots before it.
+fn pin_variant(decls: &Decls, v: &aipl_syntax::ast::VariantDecl) -> Res<Option<TVariantDecl>> {
+    let Some(type_vars) = v
+        .type_vars
+        .iter()
+        .map(pin_type_param)
+        .collect::<Option<Vec<_>>>()
+    else {
+        return Ok(None);
+    };
+    let mut cases = Vec::new();
+    for c in &v.cases {
+        let mut earlier: Vec<(String, Type)> = Vec::new();
+        let mut payload = Vec::new();
+        for slot in &c.payload {
+            let Some(ty) = declared(&slot.ty) else {
+                return Ok(None);
+            };
+            let default = match &slot.default {
+                Some(d) if !v.is_generic() => {
+                    let what = format!(
+                        "default for variant {:?} case {:?} payload {:?}",
+                        v.name.text,
+                        c.name.text,
+                        slot.name.as_deref().unwrap_or_default()
+                    );
+                    Some(pin_slot_default(
+                        decls,
+                        &v.name.text,
+                        &slot.ty,
+                        d,
+                        &earlier,
+                        &what,
+                    )?)
+                }
+                _ => None,
+            };
+            if let Some(n) = &slot.name {
+                earlier.push((n.clone(), slot.ty.clone()));
+            }
+            payload.push(TCaseParam {
+                name: slot.name.clone(),
+                ty,
+                default,
+                implicit_some: slot.implicit_some,
+                doc: slot.doc.clone(),
+            });
+        }
+        cases.push(TVariantCase {
+            name: c.name.clone(),
+            doc: c.doc.clone(),
+            payload,
+        });
+    }
+    Ok(Some(TVariantDecl {
+        name: v.name.clone(),
+        doc: v.doc.clone(),
+        type_vars,
+        cases,
+    }))
 }
 
 fn pin_type_param(tp: &aipl_syntax::ast::TypeParam) -> Option<TTypeParam> {
@@ -654,12 +758,18 @@ fn peel(t: &Type) -> Type {
     }
 }
 
-fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
-    let mut p = Pinner {
+/// A pinner for one body: the type variables it may mention, and the effects it may use.
+fn pinner_for<'a>(
+    decls: &'a Decls,
+    fn_name: &str,
+    type_vars: &[aipl_syntax::ast::TypeParam],
+    effects: &[String],
+) -> Pinner<'a> {
+    Pinner {
         decls,
         table: Table::default(),
         ret: It::Unit,
-        rigid: f.sig.type_vars.iter().map(|t| t.name.clone()).collect(),
+        rigid: type_vars.iter().map(|t| t.name.clone()).collect(),
         env: HashMap::new(),
         instantiating: false,
         anonymous: 0,
@@ -667,17 +777,66 @@ fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
         linking: HashSet::new(),
         calls: Vec::new(),
         constructions: Vec::new(),
-        own_bounds: f
-            .sig
-            .type_vars
+        own_bounds: type_vars
             .iter()
             .map(|t| (t.name.clone(), t.bound))
             .collect(),
         explicit_args: None,
         validations: Vec::new(),
-        fn_name: f.name.text.clone(),
-        effects: f.sig.effects.clone(),
+        fn_name: fn_name.to_string(),
+        effects: effects.to_vec(),
+        in_test: false,
+    }
+}
+
+/// An attached `.test` or `.benchmark` block, typed as the function the test driver makes of it:
+/// no parameters, no type variables, no effects of its own (a benchmark has `measure`), and a
+/// unit result.
+fn pin_test_body(decls: &Decls, f: &Function, block: &Expr) -> Res<TExpr<Ty>> {
+    let effects = if aipl_syntax::benchmark_source_name(&f.name.text).is_some() {
+        vec!["measure".to_string()]
+    } else {
+        Vec::new()
     };
+    let mut p = pinner_for(decls, &f.name.text, &[], &effects);
+    p.in_test = true;
+    let body = p.expr(block)?;
+    p.coerce_expr(&body, &It::Unit, &block.span, "the function's result")?;
+    p.settle()?;
+    p.finish(body, &block.span)
+}
+
+/// A struct field's or variant payload slot's default, typed against the slot. `earlier` holds the
+/// named slots declared before it, the only ones it may read.
+fn pin_slot_default(
+    decls: &Decls,
+    owner: &str,
+    ty: &Type,
+    default: &Expr,
+    earlier: &[(String, Type)],
+    what: &str,
+) -> Res<TExpr<Ty>> {
+    let mut p = pinner_for(decls, owner, &[], &[]);
+    let none = HashMap::new();
+    for (name, t) in earlier {
+        let t = p.lower(t, &none, &default.span)?;
+        p.env.insert(
+            name.clone(),
+            Binding {
+                ty: t,
+                mutable: false,
+            },
+        );
+    }
+    let expected = p.lower(ty, &none, &default.span)?;
+    let e = p.expr(default)?;
+    p.coerce_expr(&e, &expected, &default.span, what)?;
+    p.settle()?;
+    p.finish(e, &default.span)
+}
+
+fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
+    let mut p = pinner_for(decls, &f.name.text, &f.sig.type_vars, &f.sig.effects);
     for e in &f.sig.effects {
         if !aipl_syntax::KNOWN_EFFECTS.contains(&e.as_str()) {
             return reject(
@@ -734,11 +893,50 @@ fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
     if let Some(rt) = &f.sig.return_ty {
         decls.validate(rt, &type_var_names, &fn_ctx, &f.name.span)?;
     }
+    // A default reads only the parameters before it. One whose parameter's type mentions a type
+    // variable (`pad: T = 0`) has no type to meet until a call fixes `T`; it is checked on its
+    // own and left out of the pinned signature.
+    let mut defaults: Vec<Option<TExpr<It>>> = Vec::new();
+    let everything = std::mem::take(&mut p.env);
+    for (i, param) in f.sig.params.iter().enumerate() {
+        let mut pinned = None;
+        if let Some(default) = &param.default {
+            p.env = f.sig.params[..i]
+                .iter()
+                .zip(&param_tys)
+                .map(|(q, t)| {
+                    (
+                        q.name.clone(),
+                        Binding {
+                            ty: t.clone(),
+                            mutable: false,
+                        },
+                    )
+                })
+                .collect();
+            let e = p.expr(default)?;
+            if !crate::check::mentions_typevar(&param.ty) {
+                let what = format!(
+                    "default for fn {:?} parameter {:?}",
+                    display(&f.name.text),
+                    param.name
+                );
+                p.coerce_expr(&e, &param_tys[i], &default.span, &what)?;
+                pinned = Some(e);
+            }
+        }
+        defaults.push(pinned);
+    }
+    p.env = everything;
     let body = p.expr(&f.body)?;
     let ret = p.ret.clone();
     p.coerce_expr(&body, &ret, &f.body.span, "the function's result")?;
     p.settle()?;
     let body = p.finish(body, &f.body.span)?;
+    let defaults = defaults
+        .into_iter()
+        .map(|d| d.map(|d| p.finish(d, &f.name.span)).transpose())
+        .collect::<Res<Vec<_>>>()?;
     let mut type_vars = f
         .sig
         .type_vars
@@ -762,13 +960,14 @@ fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
             .params
             .iter()
             .zip(&param_tys)
-            .map(|(param, ty)| TParam {
+            .zip(defaults)
+            .map(|((param, ty), default)| TParam {
                 name: param.name.clone(),
                 name_span: param.name_span.clone(),
                 ty: p.table.resolve(ty),
                 mutable: param.mutable,
                 arity: param.arity,
-                default: None,
+                default,
                 implicit_some: param.implicit_some,
             })
             .collect(),
@@ -1055,6 +1254,15 @@ impl Pinner<'_> {
         }
         // What was shown is not part of the type the value has; compare the bases.
         let base = self.table.shallow(expected);
+        // Each element of a literal is shown to meet the refinement its slot asks for.
+        if let (TExprKind::ArrayLit(items), It::Arr(want)) = (&e.kind, &base) {
+            if !items.is_empty() && !self.table.exclusions(want).is_empty() {
+                for item in items {
+                    self.coerce_expr(item, want, &item.span, what)?;
+                }
+                return Ok(());
+            }
+        }
         self.coerce(&e.ty, &base, span, what)
     }
 
@@ -1209,6 +1417,11 @@ impl Pinner<'_> {
         match &a {
             It::Prim(Primitive::Str) => self.table.unify(elem, &It::Prim(Primitive::Char))?,
             It::Set(e, _) => self.agree(e, elem)?,
+            // An empty `#{}` nothing else has decided is a set when a sequence is wanted.
+            It::Var(v) if self.table.slots[*v].kind == Kind::Brace => {
+                let order = self.table.fresh_order();
+                self.table.unify(&a, &It::Set(elem.clone(), order))?;
+            }
             It::Dict(..) | It::Named(_)
                 if matches!(callee, Callee::Len | Callee::IsEmpty | Callee::IsNonempty) => {}
             _ => return Ok(false),
@@ -1347,6 +1560,9 @@ impl Pinner<'_> {
                 let ret = self.ret.clone();
                 self.coerce_expr(&x, &ret, &x.span, "the returned value")?;
                 let ty = self.fresh();
+                if let It::Var(v) = ty {
+                    self.table.slots[v].diverges = true;
+                }
                 self.node(K::Return(Box::new(x)), ty, e)
             }
             ExprKind::Let(name, ann, v, body_src) | ExprKind::LetMut(name, ann, v, body_src) => {
@@ -1540,6 +1756,13 @@ impl Pinner<'_> {
                 {
                     return Ok(self.node(K::Index(Box::new(a), Box::new(i)), container, e));
                 }
+                if let Some(cell) = self.grid_cell(&container, &i.ty, &e.span)? {
+                    return Ok(self.node(
+                        K::Index(Box::new(a), Box::new(i)),
+                        It::Opt(Box::new(cell)),
+                        e,
+                    ));
+                }
                 let elem = match container {
                     It::Arr(t) => *t,
                     It::Prim(Primitive::Str) => It::Prim(Primitive::Char),
@@ -1587,7 +1810,11 @@ impl Pinner<'_> {
                         .or_else(|m| reject(format!("set elements disagree ({m})"), &item.span))?;
                     out.push(item);
                 }
-                if items.is_empty() {
+                let ordered = matches!(
+                    PinnedOrder::of(*order),
+                    Some(PinnedOrder::Asc | PinnedOrder::Desc)
+                );
+                if items.is_empty() && !ordered {
                     // `#{}` is a set or a dict: its position says which.
                     let ty = self.table.fresh(Kind::Brace);
                     return Ok(self.node(K::SetLit(out, PinnedOrder::Unordered), ty, e));
@@ -1700,7 +1927,7 @@ impl Pinner<'_> {
                 let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
                 if arm.pattern.is_nested() {
                     let view = TypeView { decls: self.decls };
-                    let ty = self.table.resolve(&st).to_type();
+                    let ty = self.refined_type(&st);
                     crate::match_check::bind_nested(&view, &arm.pattern, &ty, arm.span.clone())
                         .map_err(Failure::Rejected)?;
                 }
@@ -1745,6 +1972,7 @@ impl Pinner<'_> {
                 let x = self.expr(x)?;
                 let ret = self.known(&self.ret.clone(), &e.span)?;
                 let ty = match (self.known(&x.ty, &x.span)?, ret) {
+                    (It::Opt(t) | It::Res(t, _), _) if self.in_test => *t,
                     (It::Opt(t), It::Opt(_)) => *t,
                     (It::Res(t, err), It::Res(_, want)) => {
                         self.table.unify(&err, &want).or_else(|m| {
@@ -2490,6 +2718,59 @@ impl Pinner<'_> {
     }
 
     /// An index or length operand: some integer.
+    /// The cells of a grid (`T[,]`, an instance of the builtin grid struct) as the array they are
+    /// stored in, or `None` for any other type.
+    fn grid_cells(&mut self, grid: &It, span: &Span) -> Res<Option<It>> {
+        let n = match self.table.shallow(grid) {
+            // Inside a generic function the grid may still be an application (`T[,]`).
+            It::Gen(base, args) if base == aipl_syntax::GRID_TYPE && args.len() == 1 => {
+                return Ok(Some(It::Arr(Box::new(args[0].clone()))));
+            }
+            It::Named(n) => n,
+            _ => return Ok(None),
+        };
+        if !aipl_syntax::is_grid_instance(&n) {
+            return Ok(None);
+        }
+        let Some(cells) = self
+            .decls
+            .structs
+            .get(&n)
+            .and_then(|fields| fields.iter().find(|(f, _, _)| f == "cells"))
+            .map(|(_, ty, _)| ty.clone())
+        else {
+            return Ok(None);
+        };
+        Ok(Some(self.lower(&cells, &HashMap::new(), span)?))
+    }
+
+    /// The element type of `grid` when `index` is a `(row, column)` pair that addresses one of its
+    /// cells; the pair's numbers are positions, `u64` unless they are already something else.
+    fn grid_cell(&mut self, grid: &It, index: &It, span: &Span) -> Res<Option<It>> {
+        let Some(It::Arr(elem)) = self.grid_cells(grid, span)? else {
+            return Ok(None);
+        };
+        let shallow = self.table.shallow(index);
+        let Some(slots) = self.tuple_elems(&shallow, span)? else {
+            return Ok(None);
+        };
+        if slots.len() != 2 {
+            return Ok(None);
+        }
+        for slot in &slots {
+            match self.table.shallow(slot) {
+                It::Var(v) if self.table.slots[v].kind != Kind::Float => {
+                    self.table
+                        .unify(slot, &It::Prim(Primitive::U64))
+                        .or_else(|m| reject(m, span))?;
+                }
+                It::Prim(p) if p.is_int() => {}
+                _ => return Ok(None),
+            }
+        }
+        Ok(Some(*elem))
+    }
+
     fn index_operand(&mut self, i: &TExpr<It>) -> Res<()> {
         match self.table.shallow(&i.ty) {
             // An integer variable stays what its other uses make it (`i64` when nothing does):
@@ -3126,7 +3407,12 @@ impl Pinner<'_> {
                         );
                     }
                 }
-                if matches!(lt, It::Fn(..)) || matches!(rt, It::Fn(..)) {
+                // A constructor's name beside a `Case<V>` is that case, which compares by its tag.
+                let beside_case = matches!(
+                    (&lt, &rt),
+                    (It::Case(_), It::Fn(..)) | (It::Fn(..), It::Case(_))
+                );
+                if (matches!(lt, It::Fn(..)) || matches!(rt, It::Fn(..))) && !beside_case {
                     return reject(
                         format!(
                             "{:?} is not supported for function values",
@@ -3297,6 +3583,24 @@ impl Pinner<'_> {
             return reject(msg, &e.span);
         };
         let mut sig = sig.sig;
+        // `(row, column).is_in_bounds_of(grid)`, and `grid.try_set((row, column), value)`.
+        if *callee == Callee::IsInBoundsOf && args.len() == 2 {
+            let index = self.expr(&args[0])?;
+            let grid = self.expr(&args[1])?;
+            if self.grid_cell(&grid.ty, &index.ty, &e.span)?.is_some() {
+                return Ok(call(vec![index, grid], bool_ty, self));
+            }
+        }
+        if *callee == Callee::WithOrSelf && args.len() == 3 {
+            let grid = self.expr(&args[0])?;
+            let index = self.expr(&args[1])?;
+            if let Some(cell) = self.grid_cell(&grid.ty, &index.ty, &e.span)? {
+                let value = self.arg(&args[2], &cell)?;
+                self.coerce_expr(&value, &cell, &args[2].span, "grid cell")?;
+                let ty = grid.ty.clone();
+                return Ok(call(vec![grid, index, value], ty, self));
+            }
+        }
         if *callee == Callee::Map && !args.is_empty() {
             let first = self.expr(&args[0])?;
             match self.table.shallow(&first.ty) {
@@ -3336,14 +3640,34 @@ impl Pinner<'_> {
                 // A span given to `cartesian_product` is the array of its positions.
                 let as_positions = *callee == Callee::CartesianProduct
                     && matches!(self.table.shallow(&typed.ty), It::Named(ref n) if n == aipl_syntax::SPAN_TYPE);
-                let seen_ty = if as_positions {
+                // `any` takes a grid as the array of its cells.
+                let cells = if *callee == Callee::Any && i == 0 {
+                    self.grid_cells(&typed.ty, &arg.span)?
+                } else {
+                    None
+                };
+                let as_positions = as_positions || cells.is_some();
+                let seen_ty = if let Some(cells) = cells {
+                    cells
+                } else if as_positions {
                     It::Arr(Box::new(It::Prim(Primitive::U64)))
                 } else {
                     typed.ty.clone()
                 };
                 let adapted = if sig.params[i].arity.is_variadic() {
-                    self.variadic_arg(&ptys[i], &seen_ty)
-                        .or_else(|m| reject(format!("an argument to {name:?}: {m}"), &arg.span))?;
+                    // A sequence that is the parameter's own type, refinement included (a
+                    // literal with an element in it for a `T+`), is taken as it stands.
+                    let whole = matches!(
+                        self.table.shallow(&seen_ty),
+                        It::Arr(_) | It::Set(..) | It::Prim(Primitive::Str)
+                    ) && self
+                        .coerce_expr(&typed, &ptys[i], &arg.span, "an argument")
+                        .is_ok();
+                    if !whole {
+                        self.variadic_arg(&ptys[i], &seen_ty).or_else(|m| {
+                            reject(format!("an argument to {name:?}: {m}"), &arg.span)
+                        })?;
+                    }
                     true
                 } else {
                     self.adapt_receiver(callee, &ptys[i], &seen_ty)

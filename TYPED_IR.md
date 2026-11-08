@@ -99,8 +99,19 @@ Consequences for the types in `typed.rs`:
   `type_args`, after the declared ones). They are not rigid-equal to each other.
 - An unconstrained set order, empty `#{}`, `none`, `[]` and integer/float literals are inference variables (own
   `Ord` and `Kind::{Int, Float, Brace}`), defaulted at function end.
-- A `Return` expression has no value; the pinner gives it a fresh variable (it unifies with anything, then
-  defaults). A `Never` type would be cleaner and is a follow-up.
+- A `Return` expression has no value. It gets a fresh variable marked as diverging: where context asks for a
+  type (a branch of an `if` whose other branch yields a number) it takes that type; where nothing does (`return x;`
+  as a statement) it settles on `Ty::Never` / `ConcreteTy::Never`, not on the default number. The written
+  language has no such type, so `Never` erases to `()`.
+- A `.test`/`.benchmark` block is pinned as the function the test driver makes of it: no parameters, no type
+  variables, no effects (a benchmark has `measure`), a unit result, and `?` fails the test instead of returning.
+  The checker only looks at a block when tests run, so the oracle holds the pinner's verdict on a block to the
+  checker's verdict on `build_test_program`/`build_benchmark_program`. A block that fails to pin is reported as
+  `<fn>.test` and the function itself still pins.
+- A parameter default sees only the parameters before it and is pinned against its parameter's type, except when
+  that type mentions a type variable (`pad: T = 0`): there it is checked on its own and left out of the pinned
+  signature, because a call is what decides `T`. Struct field and variant payload defaults are pinned the same
+  way; those of generic declarations are left out. Variants are now items of the pinned program.
 
 ## Running the oracle
 
@@ -112,15 +123,14 @@ program, and every program carries the builtins and any compiler sources it impo
 counted many times: read the *ranking*, not the totals. A "rejected-but-checker-accepted" line is a missing
 coercion or special case; a "gap" is a form not yet typed.
 
-Not measured yet: the other direction (programs the checker rejects must be rejected by the pinner). `frontend`
-returns `Err` for those, so there is no lowered program to hand the pinner; it needs `frontend` split so the
-lowering half (everything before `check_resolved`) is callable on its own.
+The other direction is measured too: for a program the checker rejects (`frontend` returns `Err`), the harness
+pins the lowered program from `lowered_for_check` and counts a miss when the pinner accepts it.
 
 ## Stages (each ends green: targeted tests, then one `cargo handoff`)
 
 - [x] **0. `typed.rs`**: `Ty`, `ConcreteTy`, `TExpr`, `TProgram`, `erase`, `concretize`; 6 unit tests. Additive.
 - [x] **1. `pin.rs` as an oracle, beside the old checker.** Nothing consumes it. Agreement over the whole corpus
-      reached (see Status); `.test` bodies and defaults still to pin.
+      reached over the whole corpus (see Status), including `.test` bodies, defaults and `Never`.
   - [ ] Declarations: structs, variants, generic templates, signatures -> `TSignature`/`TItem`.
   - [ ] Unifier core: inference variables, occurs/rigid-var handling, zonk, `i64` defaulting.
   - [ ] Expression rules, in rising difficulty: literals/idents/let/mut/set/if/while/for; calls to non-generic
@@ -176,9 +186,12 @@ lowering half (everything before `check_resolved`) is callable on its own.
   The oracle is now a test: `pin::the_pinner_agrees_with_the_checker` runs over `tests/cases` (18s) and fails on any
   gap, false rejection (a program whose file records `--- check --compile ---` is allowed to be rejected) or
   miss; `pin::oracle_report` (ignored) also covers `crates/` (170s) and prints the ranking.
-  Stage 1 remaining before it is "done": pin `.test` bodies, parameter/field defaults (`default: None` today),
-  and give `Return` a `Never`; then decide whether to flip stage 2.
-- Not pinned yet: `.test` bodies (`TFunction::test_body` is `None`), parameter defaults and struct field defaults
-  (`default: None`), and `Return` has a fresh-variable type rather than a `Never`.
+- Session 4: finished stage 1. `.test`/`.benchmark` bodies, parameter/field/payload defaults and `Never` are
+  pinned. Pinning test bodies exposed pinner gaps that only test code reached, now fixed: a `T+` parameter given an
+  array literal, grids (`grid[cell]`, `is_in_bounds_of`, `try_set`, `any` over a grid), `#>{..a, x}` keeping its
+  order, a constructor name beside a `Case<V>` in `==`, an element of an array literal shown to meet its slot's
+  refinement, an empty `#{}` used as a sequence, and `if let` with a nested tuple pattern. Whole corpus: 0 gaps,
+  0 false rejections, 128/128 rejected. `pin::the_pinner_types_tests_defaults_and_diverging_statements` pins
+  each new part directly. Next: stage 2 (mono over the pinned IR), on the user's go-ahead.
 - Stage 1 is done when the oracle prints zero gaps, zero false rejections and an empty "accepts what the checker
-  rejects" list over the whole corpus, then it becomes a real assertion (drop the `#[ignore]`).
+  rejects" list over the whole corpus. It does, and `pin::the_pinner_agrees_with_the_checker` asserts it.

@@ -104,9 +104,23 @@ fn oracle(dirs: &[&str]) -> Disagreement {
         let failed: std::collections::HashSet<&str> =
             result.failures.iter().map(|(n, _)| n.as_str()).collect();
         pinned += user.iter().filter(|n| !failed.contains(n.as_str())).count();
+        // A `.test` block is checked only when the tests run, as the driver's function of its own,
+        // so the pinner's verdict on one is held against that run's, and only computed when needed.
+        let mut tests_accepted = None;
         for (name, failure) in &result.failures {
-            if !user.contains(name) {
+            let owner = name.strip_suffix(".test");
+            if !user.contains(owner.unwrap_or(name)) {
                 continue;
+            }
+            if owner.is_some() {
+                let accepted = *tests_accepted.get_or_insert_with(|| {
+                    aipl::codegen::frontend(&aipl::codegen::build_test_program(&program)).is_ok()
+                        && aipl::codegen::build_benchmark_program(&program)
+                            .is_none_or(|b| aipl::codegen::frontend(&b).is_ok())
+                });
+                if !accepted {
+                    continue;
+                }
             }
             match failure {
                 Failure::Gap(what, _) => {
@@ -202,5 +216,66 @@ fn the_pinner_agrees_with_the_checker() {
         d.gaps == 0 && d.false_rejections == 0 && d.misses == 0,
         "the pinner and the checker disagree:\n{}",
         d.report
+    );
+}
+
+/// What the pinner makes of the parts of a program that are not a function's body: a `.test`
+/// block, a parameter's default, a struct field's default, and a `return` nothing reads.
+#[test]
+fn the_pinner_types_tests_defaults_and_diverging_statements() {
+    use aipl::typed::{TExprKind, TItem, Ty};
+    aipl::install_parser_hooks();
+    let dir = std::env::temp_dir().join(format!("aipl-pin-parts-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("parts.aipl");
+    std::fs::write(
+        &file,
+        r#"import { equal as ==, wrapping_add as + } from builtins;
+
+struct Point { x: i64, y: i64 = 3 }
+
+fn scaled(n: i64, by: i64 = 2) -> i64 {
+    return n;
+    n + by
+}.test({
+    assert(scaled(1) == 3);
+})
+"#,
+    )
+    .unwrap();
+    let program = aipl::loader::load_program(&file, DebugOptions::OFF).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    let (_, lowered) = aipl::codegen::lowered_for_check(&program).unwrap();
+    let pinned = pin(&lowered);
+    let failures: Vec<String> = pinned
+        .failures
+        .iter()
+        .map(|(name, f)| match f {
+            Failure::Rejected(e) => format!("{name}: {}", e.message),
+            Failure::Gap(what, _) => format!("{name}: gap in {what}"),
+        })
+        .collect();
+    assert!(failures.is_empty(), "{failures:?}");
+    let mut seen = (false, false, false, false);
+    for item in &pinned.program.items {
+        match item {
+            TItem::Fn(f) if f.name.text == "scaled" => {
+                seen.0 = f.test_body.is_some();
+                seen.1 = f.sig.params[1]
+                    .default
+                    .as_ref()
+                    .is_some_and(|d| d.ty == Ty::Primitive(aipl::ast::Primitive::I64));
+                seen.2 = matches!(&f.body.kind, TExprKind::Seq(first, _) if first.ty == Ty::Never);
+            }
+            TItem::Struct(s) if s.name.text == "Point" => {
+                seen.3 = s.fields[1].default.is_some();
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(
+        seen,
+        (true, true, true, true),
+        "(test block, parameter default, diverging statement, field default) pinned"
     );
 }
