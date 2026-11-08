@@ -107,6 +107,42 @@ fn oracle(dirs: &[&str]) -> Disagreement {
         // A `.test` block is checked only when the tests run, as the driver's function of its own,
         // so the pinner's verdict on one is held against that run's, and only computed when needed.
         let mut tests_accepted = None;
+        // The program `check` actually runs: each `.test` block is a `__test$<fn>` function there,
+        // and the checker accepts it, so the pinner must too.
+        let has_tests = program
+            .items
+            .iter()
+            .any(|i| matches!(i, aipl::ast::Item::Fn(f) if f.test_body.is_some()));
+        if has_tests {
+            let drivers = [
+                Some(aipl::codegen::build_test_program(&program)),
+                aipl::codegen::build_benchmark_program(&program),
+            ];
+            for driver in drivers.into_iter().flatten() {
+                let Ok(fe) = aipl::codegen::frontend(&driver) else {
+                    continue;
+                };
+                for (name, failure) in pin(&fe.check_program).failures {
+                    if !name.starts_with("__test$") {
+                        continue;
+                    }
+                    let (what, bucket) = match failure {
+                        Failure::Gap(what, _) => {
+                            gaps += 1;
+                            (what.clone(), &mut gap_kinds)
+                        }
+                        Failure::Rejected(e) => {
+                            rejected += 1;
+                            (e.message.clone(), &mut rejections)
+                        }
+                    };
+                    *bucket.entry(what.clone()).or_default() += 1;
+                    examples
+                        .entry(what)
+                        .or_insert_with(|| format!("{} in {name}", file.display()));
+                }
+            }
+        }
         for (name, failure) in &result.failures {
             let owner = name.strip_suffix(".test");
             if !user.contains(owner.unwrap_or(name)) {
