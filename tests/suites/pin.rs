@@ -279,3 +279,68 @@ fn scaled(n: i64, by: i64 = 2) -> i64 {
         "(test block, parameter default, diverging statement, field default) pinned"
     );
 }
+
+/// Author helper: how often monomorphization's inferred types differ from the pinned ones, by the
+/// form of the expression, over `tests/cases` (`AIPL_CASE=a,b` narrows it).
+#[test]
+#[ignore = "author helper: prints where mono's inference and the pinner disagree"]
+fn mono_agreement_report() {
+    use aipl::mono::probe::Report;
+    aipl::install_parser_hooks();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    aipl_files(&root.join("tests/cases"), &mut files);
+    if let Ok(only) = std::env::var("AIPL_CASE") {
+        files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
+    }
+    let mut total = Report::default();
+    let (mut programs, mut failed) = (0usize, 0usize);
+    for file in &files {
+        let Ok(program) = aipl::loader::load_program(file, DebugOptions::OFF) else {
+            continue;
+        };
+        let run = std::panic::catch_unwind(|| aipl::codegen::mono_agreement(&program));
+        let report = match run {
+            Ok(Ok(report)) => report,
+            other => {
+                failed += 1;
+                if failed <= 5 {
+                    let why = match other {
+                        Ok(Err(errors)) => errors
+                            .first()
+                            .map(|e| e.message.lines().next().unwrap_or("").to_string())
+                            .unwrap_or_default(),
+                        _ => "panicked".to_string(),
+                    };
+                    println!("failed: {} -- {why}", file.display());
+                }
+                continue;
+            }
+        };
+        programs += 1;
+        total.compared += report.compared;
+        total.agreed += report.agreed;
+        total.unmatched += report.unmatched;
+        total.unbound += report.unbound;
+        total.placeholder += report.placeholder;
+        total.instances += report.instances;
+        for (form, (n, example)) in report.disagreements {
+            let entry = total
+                .disagreements
+                .entry(form)
+                .or_insert((0, format!("{} -- {example}", file.display())));
+            entry.0 += n;
+        }
+    }
+    println!(
+        "programs {programs} (failed to monomorphize {failed}); instances {}; compared {} agreed {} \
+         placeholder {} unbound {} unmatched {}",
+        total.instances, total.compared, total.agreed, total.placeholder, total.unbound,
+        total.unmatched
+    );
+    let mut rows: Vec<_> = total.disagreements.iter().collect();
+    rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    for (form, (n, example)) in rows.into_iter().take(40) {
+        println!("{n:7}  {form}\n         e.g. {example}");
+    }
+}

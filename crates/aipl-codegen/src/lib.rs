@@ -3011,6 +3011,20 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
 /// type-check, optimize, monomorphize, optimize again and mark last uses. What it hands back is
 /// what [`emit_program`] turns into machine code, so a JIT module and an object file built from the
 /// same program can share one of these (see [`lowered`]).
+/// How far monomorphization's inference is from the pinner's on `program`: the program is checked
+/// and pinned, then monomorphized *without* the optimizer, so the trees are the ones the pinner saw,
+/// and every inferred type is compared with the pinned one. See `aipl_mono::probe`.
+pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec<Error>> {
+    let frontend = frontend(program)?;
+    let pinned = aipl_mono::pin::pin(&frontend.check_program);
+    let probe = aipl_mono::probe::Probe::new(&pinned.program);
+    let lowered = aipl_mono::lower_reductions(&frontend.program);
+    let lowered = aipl_mono::lower_try_set(&lowered);
+    aipl_mono::monomorphize_probed(&lowered, Some(&probe), DebugOptions::OFF)
+        .map_err(|e| vec![e])?;
+    Ok(probe.report.into_inner())
+}
+
 fn lower_program(
     program: &Program,
     dbg: DebugOptions,

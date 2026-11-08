@@ -30,6 +30,7 @@ mod check;
 mod match_check;
 mod patterns;
 pub mod pin;
+pub mod probe;
 pub use check::{check, check_resolved, set_mangle};
 
 mod fold;
@@ -1566,6 +1567,16 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
 /// is replaced by zero or more concrete instances, one per distinct tuple of
 /// type arguments it's called with.
 pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram, Error> {
+    monomorphize_probed(program, None, dbg)
+}
+
+/// [`monomorphize`], comparing the type it infers for each expression with the pinned one (see
+/// [`probe`]).
+pub fn monomorphize_probed(
+    program: &Program,
+    probe: Option<&probe::Probe>,
+    dbg: DebugOptions,
+) -> Result<MonoProgram, Error> {
     // Field types per struct (for typing `Field`/`Construct`).
     // struct name → [(field_name, field_type, default_expr)]
     let mut structs: HashMap<String, Vec<(String, Type, Option<Expr>)>> = HashMap::new();
@@ -1743,6 +1754,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         cur_ret: Type::Unit,
         cur_expected: None,
         try_errs: Vec::new(),
+        probe,
+        cur_template: String::new(),
+        cur_subst: None,
         dbg,
     };
 
@@ -2598,6 +2612,12 @@ struct Mono<'a> {
     /// error variable. Mirrors the checker's own `try_errs` — see
     /// [`check::err_side_from_tries`].
     try_errs: Vec<Type>,
+    /// Compares each inferred type with the pinner's; see [`probe`].
+    probe: Option<&'a probe::Probe>,
+    /// The source function the instance being processed came from.
+    cur_template: String,
+    /// What that instance's type variables are, when the probe could read them off its parameters.
+    cur_subst: Option<probe::Substitution>,
     dbg: DebugOptions,
 }
 
@@ -2712,6 +2732,11 @@ impl Mono<'_> {
         // Lambdas synthesized while processing this body inherit its effects,
         // and are named under it.
         self.cur_fn = name.to_string();
+        if let Some(probe) = self.probe {
+            self.cur_template = template.to_string();
+            let tys: Vec<Type> = params.iter().map(|p| p.ty.clone()).collect();
+            self.cur_subst = probe.substitution(template, &tys);
+        }
         self.cur_receiver = params
             .first()
             .filter(|p| p.mutable)
@@ -6595,6 +6620,14 @@ impl Mono<'_> {
     }
 
     fn infer(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
+        let result = self.infer_node(expr, env)?;
+        if let (Some(probe), Some(subst)) = (self.probe, &self.cur_subst) {
+            probe.compare(&self.cur_template, subst, expr, &result.1);
+        }
+        Ok(result)
+    }
+
+    fn infer_node(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
         let span = expr.span.clone();
         // Carries `Expr::ty` onto the rewritten node: codegen re-derives types
         // from the AST too, so a lock that stops here would leave it deriving the

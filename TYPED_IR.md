@@ -141,9 +141,19 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         must agree with the pinner's; `erase(pin(p)) == p`; the fallback cases (`[].len()`, context-free
         `none`, `#{}`, unused `ok(1)`) with equal `--- report ---` to the `i64`-annotated spelling.
   - Exit: agreement over the whole corpus, with a known-gaps list that is empty. Handoff green (pinner unused).
-- [ ] **2. Monomorphize over pinned IR.** Old mono selectable (`AIPL_PIPELINE=old|typed`, test only) until the
-      new `MonoProgram`, erased, equals the old one for the whole corpus and the dogfood IR fingerprint is
-      unchanged. Then delete old `infer`.
+- [ ] **2. Monomorphize over pinned IR**, in steps that each leave the tree green (a rewrite of `Mono::infer`,
+      ~1,600 lines that interleave inference with lambda lifting, ownership, variadic shapes and desugaring,
+      cannot be swapped in one piece, and the pre-mono passes sit between pinning and mono, so a pinned tree
+      does not reach mono intact yet):
+  - [x] **2a. Agreement probe** (`probe.rs`, `codegen::mono_agreement`, `pin::mono_agreement_report`): monomorphize
+        the unoptimized program and compare `infer`'s type for each expression with the pinned one.
+  - [ ] **2b. Pinned types replace the checker's stamps.** Mono already takes `Expr::ty` as the expected type of a
+        context-dependent expression (`none`, `[]`, `ok`/`err`, narrowed literal arrays). Stamp those from the
+        pinner instead of the checker's `locks`, so mono, which is unchanged, runs on pinned answers. Baseline
+        rows and the dogfood fingerprint must not move.
+  - [ ] **2c. Stamp every literal and call** the pinner typed, make `infer` read the stamp where it exists, and
+        delete the branches that guessed (the `Num` widening, `narrows_literal_array`, `is_unpinned_optional`).
+  - [ ] **2d. Substitution over `TExpr`** for what remains, once the passes (stage 3) hand mono a pinned tree.
 - [ ] **3. Port the passes**: pre-mono first, then post-mono. After each, `--- report ---` and baseline rows must
       not move.
 - [ ] **4. Retire the old.** Delete `check.rs`, `ArrayReceivers`/`holds_array`/`known_array`,
@@ -195,3 +205,12 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   each new part directly. Next: stage 2 (mono over the pinned IR), on the user's go-ahead.
 - Stage 1 is done when the oracle prints zero gaps, zero false rejections and an empty "accepts what the checker
   rejects" list over the whole corpus. It does, and `pin::the_pinner_agrees_with_the_checker` asserts it.
+- Session 5: stage 2 started with the probe. Over `tests/cases` (618 programs that monomorphize, 2,349 instances)
+  mono's inferred type equals the pinned one at 12,690 of 13,306 compared nodes (95.4%); 1,815 nodes have no
+  pinned counterpart (introduced by mono) and 296 hold a placeholder in mono's type. The 616 disagreements are
+  mostly mono being coarser: an integer literal typed `i64` where the pinner knows `u64` (143), `u8` (40), `i16`,
+  `i8`, `u32` (the widening `infer` leaves to later passes, which is what the project removes); a mutating call's
+  desugaring typed `i64`/`()` where the pinner has the statement's type (118 + 16); and nodes a desugaring gives the
+  span of what it replaced, so the probe cannot tell them apart (`ones`, `set_field_nested`). Not yet sorted into
+  "mono wrong", "pinner wrong" and "span collision"; do that before 2b. `pin::mono_agreement_report` prints the
+  ranking (`#[ignore]`, 18s).
