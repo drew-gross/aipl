@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
 use aipl_syntax::ast::{Expr, ExprKind, Type};
-use aipl_syntax::typed::{ConcreteTy, TItem, TProgram, Ty, TyRepr};
+use aipl_syntax::typed::{ConcreteTy, TExpr, TItem, TProgram, Ty, TyRepr};
 
 /// The pinned types of one function: its parameters, and each node's type by span.
 struct PinnedFn {
@@ -353,50 +353,30 @@ fn has_variable(t: &Type) -> bool {
     Ty::from_type(t).is_none_or(|t| t.mentions_var())
 }
 
+/// What [`stamp_everything`] does with a node that already carries a stamp.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Stamping {
+    /// Leave it: the stamp was recorded where the context was in view.
+    KeepExisting,
+    /// Overwrite it with the pinned type: the tree was pinned after the passes that moved it.
+    Replace,
+}
+
 /// Give every expression the pinned type of the node it was pinned as, where it has none
-/// (`Expr::ty`), except a unit or never-returning one. The checker's own stamps are kept.
+/// (`Expr::ty`), except a unit or never-returning one. `stamping` says whether a stamp already there is kept.
 ///
 /// The two trees are walked together, since pinning does not restructure anything. Where they stop
 /// matching (a node of another form, a different number of children) the rest of that subtree is
 /// matched by span and form instead, and left alone if several pinned nodes share them: a default
 /// spliced into several calls keeps one span and takes a different type at each.
-pub fn stamp_everything(program: &mut aipl_syntax::ast::Program, pinned: &TProgram) {
-    use aipl_syntax::typed::TExpr;
-    fn stamp(e: &mut Expr, ty: &Ty) {
-        if e.ty.is_none() && !matches!(ty, Ty::Unit | Ty::Never) {
-            e.ty = Some(Box::new(ty.to_type()));
-        }
-    }
-    fn by_span(e: &mut Expr, nodes: &HashMap<(usize, usize, String), Option<Ty>>) {
-        if let Some(Some(ty)) = nodes.get(&(e.span.start, e.span.end, form(&e.kind))) {
-            stamp(e, ty);
-        }
-        for child in crate::children_mut(e) {
-            by_span(child, nodes);
-        }
-    }
-    fn together(e: &mut Expr, t: &TExpr<Ty>, nodes: &HashMap<(usize, usize, String), Option<Ty>>) {
-        if e.span != t.span || form(&e.kind) != typed_form(&t.kind) {
-            return by_span(e, nodes);
-        }
-        if !t.defaulted {
-            stamp(e, &t.ty);
-        }
-        let mut typed = Vec::new();
-        t.for_each_child(&mut |c| typed.push(c));
-        let children: Vec<&mut Expr> = crate::children_mut(e).collect();
-        if children.len() != typed.len() {
-            for child in children {
-                by_span(child, nodes);
-            }
-            return;
-        }
-        for (child, tc) in children.into_iter().zip(typed) {
-            together(child, tc, nodes);
-        }
-    }
-    let probe = Probe::new(pinned);
+pub fn stamp_everything(
+    program: &mut aipl_syntax::ast::Program,
+    pinned: &crate::pin::Pinned,
+    stamping: Stamping,
+) {
+    let probe = Probe::new(&pinned.program);
     let bodies: HashMap<&str, &TExpr<Ty>> = pinned
+        .program
         .items
         .iter()
         .filter_map(|item| match item {
@@ -414,6 +394,90 @@ pub fn stamp_everything(program: &mut aipl_syntax::ast::Program, pinned: &TProgr
         ) else {
             continue;
         };
-        together(&mut f.body, body, &pf.nodes);
+        let stamper = Stamper {
+            instances: &pinned.instances,
+            nodes: &pf.nodes,
+            stamping,
+        };
+        stamper.together(&mut f.body, body);
+    }
+}
+
+/// [`stamp_everything`]'s walk over one function body.
+struct Stamper<'a> {
+    instances: &'a crate::pin::Instances,
+    nodes: &'a HashMap<(usize, usize, String), Option<Ty>>,
+    stamping: Stamping,
+}
+
+impl Stamper<'_> {
+    fn stamp(&self, e: &mut Expr, ty: &Ty) {
+        if matches!(ty, Ty::Unit | Ty::Never) {
+            return;
+        }
+        let pinned = self.spelled(ty.to_type());
+        match (&e.ty, self.stamping) {
+            // A stamp that already says this keeps its spelling.
+            (Some(old), Stamping::Replace) if canon(old) == canon(&pinned) => {}
+            (Some(_), Stamping::KeepExisting) => {}
+            _ => e.ty = Some(Box::new(pinned)),
+        }
+    }
+
+    /// `t` with each generic instance written as the application it is. Monomorphization
+    /// instantiates a generic type from the application; the instance's name alone does not say
+    /// which template and arguments it came from.
+    fn spelled(&self, t: Type) -> Type {
+        let go = |t: Type| Box::new(self.spelled(t));
+        match t {
+            Type::Named(n) => match self.instances.get(&n) {
+                Some((base, args)) => Type::Generic(
+                    base.clone(),
+                    args.iter().map(|a| self.spelled(a.to_type())).collect(),
+                ),
+                None => Type::Named(n),
+            },
+            Type::Case(t) => Type::Case(go(*t)),
+            Type::Optional(t) => Type::Optional(go(*t)),
+            Type::Array(t) => Type::Array(go(*t)),
+            Type::Set(t, o) => Type::Set(go(*t), o),
+            Type::Dict(k, v) => Type::Dict(go(*k), go(*v)),
+            Type::Result(a, b) => Type::Result(go(*a), go(*b)),
+            Type::Fn(ps, r) => Type::Fn(ps.into_iter().map(|p| self.spelled(p)).collect(), go(*r)),
+            other => other,
+        }
+    }
+
+    /// Stamp `e` and its subtree by span and form, for a subtree that no longer lines up with
+    /// the pinned one.
+    fn by_span(&self, e: &mut Expr) {
+        if let Some(Some(ty)) = self.nodes.get(&(e.span.start, e.span.end, form(&e.kind))) {
+            self.stamp(e, ty);
+        }
+        for child in crate::children_mut(e) {
+            self.by_span(child);
+        }
+    }
+
+    /// Stamp `e` and its subtree from the pinned `t`, the two walked together.
+    fn together(&self, e: &mut Expr, t: &TExpr<Ty>) {
+        if e.span != t.span || form(&e.kind) != typed_form(&t.kind) {
+            return self.by_span(e);
+        }
+        if !t.defaulted {
+            self.stamp(e, &t.ty);
+        }
+        let mut typed = Vec::new();
+        t.for_each_child(&mut |c| typed.push(c));
+        let children: Vec<&mut Expr> = crate::children_mut(e).collect();
+        if children.len() != typed.len() {
+            for child in children {
+                self.by_span(child);
+            }
+            return;
+        }
+        for (child, tc) in children.into_iter().zip(typed) {
+            self.together(child, tc);
+        }
     }
 }

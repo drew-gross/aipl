@@ -113,6 +113,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
   in tabulate cells_line() could be a self method
   in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
   optional_of_test looks like it can use string comparison rather than print for assertions

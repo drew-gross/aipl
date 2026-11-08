@@ -103,7 +103,13 @@ struct Table {
     /// Variables that became `char` because a `str` was taken for a `char[]`. An array of one is
     /// spelled `str` once resolved: a sequence that came from text is text.
     from_text: HashSet<usize>,
+    /// The instance names [`Table::resolve`] has spelled for a generic application, with the
+    /// application each one is.
+    instances: std::cell::RefCell<Instances>,
 }
+
+/// A generic instance's name (`Box$i64`) -> the template and arguments it is the application of.
+pub type Instances = HashMap<String, (String, Vec<Ty>)>;
 
 #[derive(Debug, Clone, Copy)]
 enum OrdSlot {
@@ -372,7 +378,11 @@ impl Table {
                 } else {
                     // Every argument is known: the application is the instance it names.
                     let written: Vec<Type> = args.iter().map(TyRepr::to_type).collect();
-                    Ty::Named(crate::check::generic_instance_name(&base, &written))
+                    let name = crate::check::generic_instance_name(&base, &written);
+                    self.instances
+                        .borrow_mut()
+                        .insert(name.clone(), (base, args));
+                    Ty::Named(name)
                 }
             }
             It::Dict(k, v) => Ty::Dict(boxed(&k), boxed(&v)),
@@ -426,6 +436,8 @@ struct Sig {
 
 /// The declarations the bodies are typed against.
 struct Decls {
+    /// Filled by every function pinned: see [`Table::instances`].
+    instances: std::cell::RefCell<Instances>,
     sigs: HashMap<String, Sig>,
     /// Field name, type and whether it has a default, in declaration order.
     structs: HashMap<String, Vec<(String, Type, bool)>>,
@@ -522,12 +534,15 @@ pub struct Pinned {
     pub program: TProgram,
     /// Functions that did not pin: its name and why.
     pub failures: Vec<(String, Failure)>,
+    /// The generic applications behind the instance names in [`Pinned::program`]'s types.
+    pub instances: Instances,
 }
 
 /// Pin every function of `program`. Functions are independent: one that fails is reported and
 /// left out of [`Pinned::program`], and the rest are still pinned.
 pub fn pin(program: &Program) -> Pinned {
     let mut decls = Decls {
+        instances: Default::default(),
         sigs: HashMap::new(),
         structs: HashMap::new(),
         variants: HashMap::new(),
@@ -654,6 +669,7 @@ pub fn pin(program: &Program) -> Pinned {
             doc: program.doc.clone(),
         },
         failures,
+        instances: decls.instances.take(),
     }
 }
 
@@ -1234,6 +1250,10 @@ impl Pinner<'_> {
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
         self.mark_defaulted(&mut typed, &body);
         check_literals(&typed)?;
+        self.decls
+            .instances
+            .borrow_mut()
+            .extend(self.table.instances.take());
         Ok(typed)
     }
 
@@ -1530,7 +1550,23 @@ impl Pinner<'_> {
     }
 
     /// `e`, told whether its value is used (see [`Pos`]).
+    ///
+    /// A stamp already on `e` (`Expr::ty`) is the context its type was decided in, recorded where
+    /// that context was in view. A pass may since have moved `e` out from under it, so a stamp is
+    /// met with the type found here: it can decide what nothing around `e` now does (the order of a
+    /// set an inlined call was asked to return).
     fn expr_at(&mut self, e: &Expr, pos: Pos) -> Res<TExpr<It>> {
+        let typed = self.expr_unstamped(e, pos)?;
+        if let Some(recorded) = &e.ty {
+            if let Ok(want) = self.lower(recorded, &HashMap::new(), &e.span) {
+                // A stamp that cannot be met is the stamp's mistake, not the program's.
+                let _ = self.agree(&typed.ty, &want);
+            }
+        }
+        Ok(typed)
+    }
+
+    fn expr_unstamped(&mut self, e: &Expr, pos: Pos) -> Res<TExpr<It>> {
         use TExprKind as K;
         let bool_ty = It::Prim(Primitive::Bool);
         Ok(match &e.kind {
@@ -3548,6 +3584,16 @@ impl Pinner<'_> {
             } else {
                 bool_ty
             };
+            // A constructor's name compared with a `Case<V>` is that case, as it is where a
+            // `Case<V>` is a parameter's type.
+            let (mut l, mut r) = (l, r);
+            if matches!(op, Some(BinOp::Eq | BinOp::Ne)) {
+                match (self.table.shallow(&l.ty), self.table.shallow(&r.ty)) {
+                    (It::Fn(..), It::Case(_)) => l.ty = r.ty.clone(),
+                    (It::Case(_), It::Fn(..)) => r.ty = l.ty.clone(),
+                    _ => {}
+                }
+            }
             return Ok(call(vec![l, r], ret, self));
         }
         // `starts_with`/`ends_with`/`contains` and `extend`: the second argument is variadic over

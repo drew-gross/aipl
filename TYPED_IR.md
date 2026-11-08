@@ -149,17 +149,16 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         the unoptimized program and compare `infer`'s type for each expression with the pinned one.
   - [x] **2b. Pinned types replace the checker's stamps.** Decision (Session 6): `frontend` stamps every node the
         pinner typed (except unit, never and defaulted nodes); 166 baseline rows moved as their own measured change.
-  - [~] **2c. `infer` reads the stamps.** Done so far (Session 7): an integer literal, a negated one, or an array
-        of them takes its width from the stamp when the stamp is plain (primitives and arrays), which replaces
-        `narrows_literal_array` (deleted). Not done, and why: trusting a stamp for *every* node is unsafe today.
-        Over cases_arrays/generics/optimizations/lambdas/strings a blanket "stamp wins" failed 5 of 291 cases:
-        two hard errors and three moved rows. Of ~800 nodes where stamp and inference differ, the real causes are
-        (a) stale stamps: the passes rebuild a node and carry the old node's `ty` over (an `If`/`Let`/`Match`
-        stamped `char[]` that is now `()`, an `Ident` stamped `Span` that is now `str`), which only stage 3 fixes;
-        (b) spelling: the pinner says `Generic("Rule",[Tok])` / `Named("Rule$Tok")` where mono says the other, and
-        `TypeVar("any$1")` survives in some stamps; (c) mono coarser (a `print` call typed `()`, stamp `bool`).
-        What remains to delete (`Num` flexing via `flex_int_ty`, `drop_none`/`is_unpinned_optional`, `drop_lit`)
-        needs call-site `type_args`, i.e. 2d.
+  - [x] **2c. `infer` reads the stamps.** (Session 10.) A node's type is its stamp unless there is none, the stamp
+        holds a placeholder, or the node is a call whose arguments decide its type (`result_only`); `narrows_literal_array`
+        and the special arms for literal widths, `to_float` and `collect_arms` are gone, one rule replaces them. What made
+        this possible: (a) the program is **re-pinned after the pre-mono passes** (`codegen::repin`,
+        `Stamping::Replace`), so a stamp can no longer be stale however the passes moved nodes; (b) a stamp spells a
+        generic instance as the application it is (`Pinned::instances`, recorded when the pinner names an instance),
+        and `infer` instantiates it with `resolve_generic_ty`; (c) the pinner types a constructor name beside a
+        `Case<V>` in `==` as that case. Four baseline rows moved (listed in Session 10 notes).
+        Still to delete, because each needs a call's `type_args` (2d): `Num` flexing through `flex_int_ty`,
+        `drop_none`/`is_unpinned_optional`, `drop_lit`.
   - [ ] **2d. Substitution over `TExpr`** for what remains, once the passes (stage 3) hand mono a pinned tree.
 - [~] **3. Passes read types instead of guessing them.** Revised in Session 8: porting every pass to `TExpr` is a
       type-safety nicety, not what stops the optimizations. What stops them is that they cannot ask a node's type,
@@ -274,3 +273,14 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   of peeling the first element is +33% instructions on `loop_tuple_windows_fusion` (24,901 -> 33,243) for 200 fewer
   code bytes; the peel stays and its comment says why. `counting_variants::is_array` reads declared return types, not
   a guess about a value, so it is not a candidate.
+- Session 10: re-pin after the passes + one stamp rule in `infer` (2c done). Stale stamps were never the pinner's
+  fault: re-pinning the optimized program makes every stamp describe the tree mono reads, at the cost of one more
+  pinner run per compile. Preference recorded: Drew prefers regular structure and architecture to performance, so a
+  uniform rule that costs a few instructions beats a special case that saves them (this also reopens the
+  `tuple_windows` optional-carry loop, +33% instructions on its case, as a simplification candidate).
+- Session 10 (continued): the first handoff of the re-pin failed twice, both worth knowing. (1) `ConcatStr` is a
+  representation `infer` gives a `str` argument that the stamp (a plain `str`) cannot say, so an inferred `ConcatStr`
+  is never replaced by a stamp. (2) A pass can remove the context that decided a type: `inline_single_use` puts a
+  callee's body into its caller, and the body's `to_set()` was only an ordered set because the callee's return type
+  said so; re-pinning then typed it unordered. The pinner now meets a node's existing stamp (`Expr::ty`) with the
+  type it finds (`Pinner::expr_at`): a stamp is the recorded context, and it survives the passes that move a node.

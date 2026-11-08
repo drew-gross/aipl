@@ -8183,36 +8183,20 @@ impl Mono<'_> {
         if let Some(p) = prev_expected {
             self.cur_expected = p;
         }
-        // The literal shapes — a bare `none`, an empty collection, an `ok`/`err`
-        // with a placeholder side — infer a *placeholder* once their context is
-        // gone rather than failing. The rewritten expression is right either way;
-        // only the type needs correcting, and only when what was inferred is one
-        // of those placeholders: a constructor's own inferred type is the
-        // concrete instance and is better than the recorded application.
+        // A node says what it is (`Expr::ty`, stamped from the pinner's types), and that is its
+        // type here. What inference found stands only where there is no stamp, or where the stamp
+        // is one monomorphization has to look through: a placeholder, or the answer for a call
+        // whose type its arguments decide (see `result_only`). A stamp names a generic instance
+        // as the application it is, which is what instantiates it.
         let ty = match &expr.ty {
-            Some(t) if has_placeholder(&inferred) && !has_placeholder(t) => (**t).clone(),
-            // A numeral or an array of numerals can only say `i64` for itself, and is stored
-            // at the width its context gave it, which the pinner recorded. Left as `i64`, a
-            // generic callee is instantiated for the wrong element type and reads the narrow
-            // storage as wide.
-            Some(t) if is_numeric_literal(&expr.kind) && is_plain(t) => (**t).clone(),
-            // A float conversion is the width its position gave it, which the checker
-            // recorded; the call itself can only say `IEEE754Float64`.
+            // `ConcatStr` is a representation a `str` takes at a call's argument, which the
+            // stamp (a plain `str`) cannot say.
             Some(t)
-                if matches!(&expr.kind, ExprKind::Call(Callee::ToFloat, ..))
-                    && matches!(&**t, Type::Primitive(p) if p.is_float()) =>
+                if !has_placeholder(t)
+                    && !matches!(inferred, Type::ConcatStr)
+                    && (!result_only || has_placeholder(&inferred)) =>
             {
-                (**t).clone()
-            }
-            // `collect_arms` is monomorphized as `T[] -> T[]`; the checker typed the
-            // call as an array of the one case collected and recorded it.
-            Some(t)
-                if matches!(
-                    &expr.kind,
-                    ExprKind::Call(Callee::CollectArms | Callee::AsCase, ..)
-                ) =>
-            {
-                (**t).clone()
+                self.resolve_generic_ty(t)?
             }
             _ => inferred,
         };
@@ -10442,36 +10426,6 @@ pub fn children(e: &Expr) -> Children<'_> {
         // The target of a `set` is a name by now, not an expression to walk.
         ExprKind::Assign(_, value, body) => Children::of([value, body]),
         _ => e.children(),
-    }
-}
-
-/// Whether `kind` is built of nothing but integer literals: a numeral, a negated one, or an array
-/// of them (nested arrays included). Such an expression has no type of its own beyond `i64`, so
-/// the width the pinner stamped on it is the only record of what its context asked for.
-fn is_numeric_literal(kind: &ExprKind) -> bool {
-    fn all_int_literals(e: &Expr) -> bool {
-        match &e.kind {
-            ExprKind::Num(_) => true,
-            ExprKind::Neg(inner) => all_int_literals(inner),
-            ExprKind::ArrayLit(elems) => elems.iter().all(all_int_literals),
-            _ => false,
-        }
-    }
-    match kind {
-        ExprKind::Num(_) => true,
-        ExprKind::Neg(inner) => all_int_literals(inner),
-        ExprKind::ArrayLit(elems) => elems.iter().all(all_int_literals),
-        _ => false,
-    }
-}
-
-/// Whether `t` is built only of primitives and arrays: no placeholder, no type variable, no
-/// generic instance whose spelling differs between the pinner and monomorphization.
-fn is_plain(t: &Type) -> bool {
-    match t {
-        Type::Primitive(_) => true,
-        Type::Array(inner) => is_plain(inner),
-        _ => false,
     }
 }
 

@@ -3003,7 +3003,11 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     // Every expression the pinner typed says what it is (`Expr::ty`), not only the context-dependent
     // ones the checker stamped.
     let pinned = aipl_mono::pin::pin(&check_program);
-    aipl_mono::probe::stamp_everything(&mut program, &pinned.program);
+    aipl_mono::probe::stamp_everything(
+        &mut program,
+        &pinned,
+        aipl_mono::probe::Stamping::KeepExisting,
+    );
     Ok(Frontend {
         program,
         check_program,
@@ -3035,6 +3039,21 @@ pub fn stamp_agreement(program: &Program) -> Result<aipl_mono::probe::StampRepor
     ))
 }
 
+/// `program` with every expression's stamp (`Expr::ty`) replaced by what the pinner makes of the
+/// program as it now stands. `builtins` are the declarations the checker put ahead of the program. A function that no longer pins keeps the stamps it had.
+fn repin(builtins: &[Item], mut program: Program) -> Program {
+    let mut items = builtins.to_vec();
+    items.extend(program.items.iter().cloned());
+    let whole = Program {
+        items,
+        sources: program.sources.clone(),
+        doc: program.doc.clone(),
+    };
+    let pinned = aipl_mono::pin::pin(&whole);
+    aipl_mono::probe::stamp_everything(&mut program, &pinned, aipl_mono::probe::Stamping::Replace);
+    program
+}
+
 /// The part of compiling a program that does not depend on the backend: resolve, lower,
 /// type-check, optimize, monomorphize, optimize again and mark last uses. What it hands back is
 /// what [`emit_program`] turns into machine code, so a JIT module and an object file built from the
@@ -3056,6 +3075,7 @@ fn lower_program(
     // the builtin signatures (and their `!prints`) live, and shared by every
     // pass that needs it rather than recomputed per pass per round.
     let effectful = aipl_mono::effectful_fns(&check_program.items);
+    let builtin_decls = check_program.items.len() - checked.items.len();
     let max_exprs = inline_max_exprs();
 
     // The pre-monomorphization optimization pipeline. The order is the
@@ -3168,6 +3188,10 @@ fn lower_program(
     ];
     let rounds = optimization_rounds();
     let folded = aipl_mono::passes::optimize(checked, &pre_mono, rounds, dbg);
+    // The passes above moved and rebuilt expressions, so the types stamped before them describe
+    // the tree as it was. Pinning the result again makes every stamp describe the tree monomorphization
+    // actually reads.
+    let folded = repin(&check_program.items[..builtin_decls], folded);
 
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
