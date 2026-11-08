@@ -37,15 +37,16 @@ fn mono_fn_names(p: &aipl::mono::MonoProgram) -> Vec<String> {
     names
 }
 
-/// Monomorphize one source, **through the loader** — mono's input is a loaded
-/// program, not a parsed one. An operator is a call to its spelling until the
-/// loader resolves it against the file's imports, so a source using an operator has
-/// to be loaded for mono to see the call it names.
+/// Monomorphize one source, **through the loader and the frontend** — mono's input is a loaded
+/// program whose expressions say what they are (`Expr::ty`), not a parsed one. An operator is a
+/// call to its spelling until the loader resolves it against the file's imports, so a source
+/// using an operator has to be loaded for mono to see the call it names.
 fn mono_names(src: &str) -> Vec<String> {
     aipl::install_parser_hooks();
     let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
         .expect("load");
-    let mono = monomorphize(&prog, DebugOptions::OFF).expect("monomorphize");
+    let frontend = aipl::codegen::frontend(&prog).expect("frontend");
+    let mono = monomorphize(&frontend.program, DebugOptions::OFF).expect("monomorphize");
     mono_fn_names(&mono)
 }
 
@@ -351,84 +352,51 @@ fn named_type_param_unifies_across_uses() {
 #[test]
 fn named_type_param_distinct_instances_per_type() {
     let names = mono_names(
-        "import { wrapping_add as + } from builtins;
-         fn value_or<T: any>(s: T?, d: T) -> T { d }
-         fn main() -> i64 { value_or(some(1), 2) + value_or(some('a'), 'b') }",
+        "fn value_or<T: any>(s: T?, d: T) -> T { d }
+         fn main() -> i64 { let c = value_or(some('a'), 'b'); value_or(some(1), 2) }",
     );
     assert_eq!(names, vec!["main", "value_or$char", "value_or$i64"]);
 }
 
 #[test]
 fn named_type_param_inferred_from_other_argument() {
-    // A bare `none` for `s: T?` carries no type, and a bare literal for `d: T`
-    // carries a value rather than a width — so nothing names `T`. `s` is
-    // dropped as an unpinned optional and `d` as a literal, leaving a
-    // zero-parameter instance keyed on the value (`$lit1_5`).
+    // A bare `none` for `s: T?` carries no type, and the literal for `d: T` is an `i64`
+    // like any other: `T` is `i64`, and the instance is the ordinary one.
     let names = mono_names(
         "fn value_or<T: any>(s: T?, d: T) -> T { d }
          fn main() -> i64 { value_or(none, 5) }",
     );
-    assert_eq!(names, vec!["main", "value_or$i64$lit1_5"]);
+    assert_eq!(names, vec!["main", "value_or$i64"]);
 }
 
 #[test]
-fn int_literal_arg_makes_one_instance_per_value() {
-    // The literal is inlined into the body, so two values are two bodies and
-    // must not share an instance. `[x]` rather than `x` as the body: a body
-    // that *is* the literal folds away at the call site instead (see
-    // `int_literal_call_folding_emits_no_instance`).
-    let names = mono_names(
-        "import { wrapping_add as + } from builtins;
-         fn wrap<T: any>(x: T) -> T[] { [x] }
-         fn main() -> i64 { wrap(5).len() + wrap(7).len() }",
-    );
-    assert_eq!(names, vec!["main", "wrap$i64$lit0_5", "wrap$i64$lit0_7"]);
-}
-
-#[test]
-fn int_literal_args_are_dropped_per_variable_not_per_argument() {
-    // `T` is literal-pinned, so *every* bare-`T` parameter passed a literal is
-    // inlined — not just the first. Deciding this per argument instead would
-    // bind `T = i64` on the first and then see an already-pinned integer
-    // variable on the second, giving both calls one instance called with
-    // different values.
-    let names = mono_names(
-        "import { wrapping_add as + } from builtins;
-         fn pair<T: any>(a: T, b: T) -> T[] { [a, b] }
-         fn main() -> i64 { pair(0, 5).len() + pair(0, 7).len() }",
-    );
-    assert_eq!(
-        names,
-        vec!["main", "pair$i64$lit0_0$lit1_5", "pair$i64$lit0_0$lit1_7"]
-    );
-}
-
-#[test]
-fn negative_int_literal_arg_mangles_without_a_dash() {
-    // `n` prefixes the magnitude: a `-` in a mangled name would reach a symbol.
+fn int_literal_args_of_one_type_share_an_instance() {
+    // A literal is an argument like any other: `wrap(5)` and `wrap(7)` are one instance, and
+    // so are `pair(0, 5)` and `pair(0, 7)`.
     let names = mono_names(
         "fn wrap<T: any>(x: T) -> T[] { [x] }
-         fn main() -> i64 { wrap(-5).len() }",
+         fn pair<T: any>(a: T, b: T) -> T[] { [a, b] }
+         fn main() {
+             let a = wrap(5);
+             let b = wrap(7);
+             let c = pair(0, 5);
+             let d = pair(0, 7);
+         }",
     );
-    assert_eq!(names, vec!["main", "wrap$i64$lit0_n5"]);
+    assert_eq!(names, vec!["main", "pair$i64", "wrap$i64"]);
 }
 
 #[test]
-fn int_literal_call_folding_emits_no_instance() {
-    // Once its literal is inlined, `identity`'s body *is* the literal — so the
-    // call becomes that literal and no instance is emitted at all.
+fn a_call_with_a_literal_argument_is_an_ordinary_call() {
     let names = mono_names(
         "fn identity<T: any>(x: T) -> T { x }
          fn main() -> i64 { identity(5) }",
     );
-    assert_eq!(names, vec!["main"]);
+    assert_eq!(names, vec!["identity$i64", "main"]);
 }
 
 #[test]
-fn int_literal_call_folding_keeps_a_call_with_argument_effects() {
-    // A body that ignores its parameter would still fold to a literal, but the
-    // argument has to be evaluated — so folding is refused unless *every*
-    // parameter was dropped as a literal. Here `x` is a call, not a literal.
+fn a_call_with_an_effectful_argument_keeps_it() {
     let names = mono_names(
         "fn konst<T: any>(x: T) -> i64 { 42 }
          fn side() -> i64 { 7 }
@@ -438,10 +406,9 @@ fn int_literal_call_folding_keeps_a_call_with_argument_effects() {
 }
 
 #[test]
-fn concrete_arg_pins_so_the_literal_is_not_dropped() {
-    // The receiver pins `T = u8`, so the literal has a width to flex to and
-    // stays an ordinary argument — the "passing a literal to a concrete int
-    // parameter still works" requirement, made executable.
+fn concrete_arg_gives_the_literal_its_width() {
+    // The receiver makes `T` a `u8`, so the literal is a `u8` — the "passing a literal to a
+    // concrete int parameter still works" requirement, made executable.
     let names = mono_names(
         "fn value_or<T: any>(s: T?, d: T) -> T { d }
          fn main() -> i64 { let n: u8? = none; let r: u8 = value_or(n, 0); 0 }",
@@ -465,54 +432,43 @@ fn non_generic_program_is_unchanged() {
 }
 
 #[test]
-fn empty_array_arg_pins_any_array_to_pseudo_type() {
-    // `any[]` with only an empty-array argument monomorphizes to the
-    // `EmptyArray` pseudo-type instance.
+fn empty_array_arg_is_an_array_of_the_default_type() {
+    // An empty array nothing constrains is an `i64[]`, so `any[]` is instantiated at `i64`.
     let names = mono_names(
         "fn g(v: any[]) -> i64 { 0 }
          fn main() -> i64 { g([]) }",
     );
-    assert_eq!(names, vec!["g$EmptyArray", "main"]);
+    assert_eq!(names, vec!["g$i64", "main"]);
 }
 
 #[test]
-fn none_literal_pins_any_optional_to_pseudo_type() {
-    // `any?` with only a bare-`none` argument pins nothing — no argument names
-    // the payload type, and none can. So the instance drops the parameter
-    // (`$dn0`) and declares the `none` in its body instead.
+fn none_literal_is_an_optional_of_the_default_type() {
+    // A bare `none` nothing constrains is an `i64?`, so `any?` is instantiated at `i64`.
     let names = mono_names(
         "fn is_present(x: any?) -> bool { match (x) { some(v) => true, none => false } }
          fn main() -> i64 { if (is_present(none)) { 1 } else { 0 } }",
     );
-    assert_eq!(names, vec!["is_present$NoneLiteral$dn0", "main"]);
+    assert_eq!(names, vec!["is_present$i64", "main"]);
 }
 
 #[test]
-fn concrete_arg_still_wins_over_empty_marker() {
-    // For multi-arg generics, an empty/`none` argument only fills in a type
-    // variable that no concrete argument pinned. Here the second arg pins T
-    // to i64, so the instance is `g$i64...`, not `g$EmptyArray`. Being a bare
-    // literal, `b` is then inlined per value (`$lit1_7`) — and `a` stays
-    // `i64[]`, which is what receives the empty array.
+fn concrete_arg_decides_the_type_of_an_empty_array() {
+    // The second argument makes `T` a `u8`, and the empty array is the `u8[]` its parameter wants.
     let names = mono_names(
         "fn g<T: any>(a: T[], b: T) -> i64 { 0 }
-         fn main() -> i64 { g([], 7) }",
+         fn main() -> i64 { let b: u8 = 7; g([], b) }",
     );
-    assert_eq!(names, vec!["g$i64$lit1_7", "main"]);
+    assert_eq!(names, vec!["g$u8", "main"]);
 }
 
 #[test]
-fn empty_and_none_in_separate_any_params_get_distinct_markers() {
-    // Two anonymous `any` params are independent type variables, each pinned to
-    // its own pseudo-type marker — and the two markers are treated differently.
-    // The bare-`none` parameter is dropped from the instance (`$dn1`, at index
-    // 1); the empty-array one is still passed, since only the optional case has
-    // been converted so far.
+fn empty_and_none_in_separate_any_params_are_independent() {
+    // Two anonymous `any` params are independent type variables, each settling on the default.
     let names = mono_names(
         "fn h(xs: any[], x: any?) -> i64 { 0 }
          fn main() -> i64 { h([], none) }",
     );
-    assert_eq!(names, vec!["h$EmptyArray$NoneLiteral$dn1", "main"]);
+    assert_eq!(names, vec!["h$i64$i64", "main"]);
 }
 
 /// Every name a loaded program defines, in item order.

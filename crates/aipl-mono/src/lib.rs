@@ -2451,23 +2451,6 @@ struct ParamSpec {
     set_kept: Option<aipl_syntax::ast::SetOrder>,
     concat: bool,
     variadic: VShape,
-    /// Nothing pinned this parameter's type but a bare `none` at the call site,
-    /// so the argument carries no information the instance can't supply itself:
-    /// the parameter is dropped and the body binds the `none` in its place. See
-    /// [`is_unpinned_optional`].
-    drop_none: bool,
-    /// Nothing pinned this parameter's type variable but a bare integer literal
-    /// at the call site, so the width the instance would be built at (`i64`) is
-    /// an arbitrary choice rather than one the program asked for. The parameter
-    /// is dropped and the literal *substituted* into the body in its place, one
-    /// instance per value (`$lit{i}_{v}`) — so every use inside the body flexes
-    /// to its own context, exactly as if the literal had been written there.
-    ///
-    /// Substituted rather than `let`-bound, unlike `drop_none`: a binding fixes
-    /// the literal at one width (`let x = 200` is an `i64`, and the inliner's
-    /// `wrap_args` annotates deliberately), which is the whole thing being
-    /// avoided. See [`Mono::lit_drop_value`] for the rule and the guards.
-    drop_lit: Option<i64>,
 }
 
 /// How an instance specializes its template's signature — everything that
@@ -2643,26 +2626,6 @@ fn set_push(out: Expr, val: Expr, span: Span) -> Expr {
 
 type Env = HashMap<String, Type>;
 
-/// Whether `ty` names a type variable that `map` has not pinned yet — what
-/// decides whether a deferred (literal-typed) argument still has something to
-/// contribute.
-fn mentions_unbound(ty: &Type, vars: &HashSet<&str>, map: &HashMap<String, Type>) -> bool {
-    vars.iter()
-        .any(|v| ty_mentions(ty, v) && !map.contains_key(*v))
-}
-
-/// Whether `ty` is an optional whose payload type nothing ever pinned.
-///
-/// After substitution a parameter declared `T?` reads as `Optional(NoneInner)`
-/// exactly when the only argument that could have pinned `T` was a bare `none`:
-/// a pinned `T` substitutes to a concrete payload, and a parameter cannot be
-/// *declared* with the placeholder. So this shape means "an optional that is
-/// necessarily empty, of a type nothing can name" — which is why the parameter
-/// can be dropped and the body left to declare the `none` itself.
-fn is_unpinned_optional(ty: &Type) -> bool {
-    matches!(ty, Type::Optional(inner) if is_none_inner(inner))
-}
-
 impl Mono<'_> {
     /// Process one (already concrete) function: type the body and rewrite every
     /// generic call within it to its mangled instance name.
@@ -2676,59 +2639,10 @@ impl Mono<'_> {
         body: &Expr,
         specs: &[ParamSpec],
     ) -> Result<ConcreteFn, Error> {
-        // A dropped parameter is not in scope: the body supplies its value
-        // itself, and leaving the name bound here would let a missed rewrite
-        // type silently against the template's declared parameter type instead
-        // of failing as an unknown binding.
-        let is_dropped = |i: usize| {
-            specs
-                .get(i)
-                .is_some_and(|s| s.drop_none || s.drop_lit.is_some())
-        };
         let mut env: Env = HashMap::new();
-        for (i, p) in params.iter().enumerate() {
-            if !is_dropped(i) {
-                env.insert(p.name.clone(), p.ty.clone());
-            }
+        for p in params {
+            env.insert(p.name.clone(), p.ty.clone());
         }
-        // A parameter nothing pinned but a bare `none` is not a parameter of the
-        // instance at all: the body declares it. Wrapping rather than
-        // substituting keeps this one rewrite — later passes see an ordinary
-        // binding of an ordinary literal.
-        let dropped: Vec<&Param> = params
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| specs.get(*i).is_some_and(|s| s.drop_none))
-            .map(|(_, p)| p)
-            .collect();
-        let body = &dropped.iter().rev().fold(body.clone(), |b, p| {
-            Expr::new(
-                ExprKind::Let(
-                    p.name.clone(),
-                    None,
-                    Box::new(Expr::new(ExprKind::None, b.span.clone())),
-                    Box::new(b.clone()),
-                ),
-                b.span.clone(),
-            )
-        });
-        // A parameter nothing pinned but an integer literal is inlined instead
-        // of bound: a binding would fix the literal at one width, and the point
-        // of this instance is that each *use* picks its own. The value is
-        // rebuilt from the mangled name's record of it, so `ParamSpec` stays a
-        // plain value struct.
-        let body = &params
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| specs.get(i)?.drop_lit.map(|v| (p, v)))
-            .fold(body.clone(), |b, (p, v)| {
-                // `Num` carries a plain `i64`, so a negative value needs no
-                // `Neg` wrapper — `const_int`/`flex_int_values` read either. The
-                // fresh node is deliberately unstamped: mono re-infers it, which
-                // is what lets each use pick its own width.
-                let lit = Expr::new(ExprKind::Num(v), b.span.clone());
-                subst::substitute(&b, &p.name, &lit)
-            });
         // Lambdas synthesized while processing this body inherit its effects,
         // and are named under it.
         self.cur_fn = name.to_string();
@@ -2774,7 +2688,6 @@ impl Mono<'_> {
             params: params
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| !is_dropped(*i))
                 .map(|(i, p)| ConcreteParam {
                     ty: settled(&p.ty, &format!("fn {name:?} parameter {:?}", p.name)),
                     name: p.name.clone(),
@@ -3081,14 +2994,8 @@ impl Mono<'_> {
     /// A variable appearing *only* as a function-typed parameter's result is
     /// pinned from the lambda's own body — see the second inference pass below.
     ///
-    /// This path is deliberately simpler than the ordinary generic-call arm and
-    /// lags it: it binds every non-function argument eagerly, with none of that
-    /// arm's bow-outs — no integer-literal deferral, and neither of the dropped
-    /// parameters (`ParamSpec::drop_none`, `ParamSpec::drop_lit`). So a bare
-    /// `none` or a bare literal passed *alongside a lambda* pins its variable
-    /// where the same argument passed alone would not. Unifying the two is its
-    /// own project; the parameter lists here are built for `specialize_call_with`,
-    /// which does its own dropping and index-shifting.
+    /// The parameter lists here are built for `specialize_call_with`, which does its own
+    /// dropping and index-shifting.
     fn specialize_generic_call(
         &mut self,
         gname: &str,
@@ -5076,24 +4983,6 @@ impl Mono<'_> {
         for i in specs.indices(|p| p.variadic == VShape::Opt) {
             mangled.push_str(&format!("$vo{i}"));
         }
-        for i in specs.indices(|p| p.drop_none) {
-            mangled.push_str(&format!("$dn{i}"));
-        }
-        for (i, v) in specs
-            .params
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| p.drop_lit.map(|v| (i, v)))
-        {
-            // The *value* is part of the name: each literal gets its own
-            // instance, since the literal is inlined into the body and two
-            // values give two different bodies. `n` prefixes a negative, so no
-            // `-` reaches a symbol name.
-            match v < 0 {
-                true => mangled.push_str(&format!("$lit{i}_n{}", v.unsigned_abs())),
-                false => mangled.push_str(&format!("$lit{i}_{v}")),
-            }
-        }
         if self.emitted.insert(mangled.clone()) {
             self.dbg
                 .trace("mono", format_args!("enqueue instance `{mangled}`"));
@@ -5115,12 +5004,11 @@ impl Mono<'_> {
         &mut self,
         gname: &str,
         arg_tys: &[Type],
-        flexible: &[bool],
         // The type the checker recorded for the call's result, when the position
         // it sits in gave it one (see `Expr::ty`).
         locked: Option<&Type>,
         span: Span,
-    ) -> Result<(Vec<Type>, Type, HashSet<String>), Error> {
+    ) -> Result<(Vec<Type>, Type), Error> {
         // Copy the bits we need so we don't borrow `self.generics` across the
         // `&mut self` enqueue.
         let (type_vars, param_tys, variadic, return_ty, defaults) = {
@@ -5144,19 +5032,8 @@ impl Mono<'_> {
         // since an AIPL string *is* the char sequence) or a single element
         // (`T = str`) — indistinguishable in isolation. Binding the rest first
         // usually settles `T`, and then the variadic only has to agree with it.
-        // A bare integer literal types as `i64` but flexes to whatever width
-        // its context wants, so it must not be the thing that *pins* a type
-        // variable: `some_u64.value_or(0)` would bind `T` twice and conflict,
-        // `u64` against the literal's `i64`. Deferred to the pass below, which
-        // binds only what nothing else settled — the same bow-out an empty `[]`
-        // or a bare `none` takes.
-        let mut deferred: Vec<(usize, &Type, &Type)> = Vec::new();
         for (i, (pty, aty)) in param_tys.iter().zip(arg_tys).enumerate() {
             if variadic[i] {
-                continue;
-            }
-            if flexible.get(i).copied().unwrap_or(false) {
-                deferred.push((i, pty, aty));
                 continue;
             }
             // A bare `none` or an empty `[]` carries only a placeholder element
@@ -5194,47 +5071,6 @@ impl Mono<'_> {
                 continue;
             }
             self.bind_generic_or(&target, &aty, &var_set, &mut map, gname, span.clone())?;
-        }
-        // The deferred literals, now that everything with a width of its own has
-        // had its say. A literal still pins a variable nothing else reached; it
-        // just no longer overrides one. What it pins it to is `i64` — but a
-        // variable *only* a literal reached is recorded in `lit_pinned`, because
-        // that `i64` is an arbitrary choice rather than a width the program
-        // asked for, and the caller turns those parameters into per-value
-        // instances with the literal inlined (see `ParamSpec::drop_lit`).
-        let mut lit_pinned: HashSet<String> = HashSet::new();
-        for (_, pty, aty) in &deferred {
-            // A pair of literals flexes to a pair of integers, as a bare literal
-            // flexes to an integer.
-            let is_int_slots = |t: &Type| {
-                self.tuple_field_tys(t)
-                    .is_some_and(|slots| slots.iter().all(aipl_syntax::is_int_ty))
-            };
-            // Unpinned: the literal is all there is, so it pins. Pinned to an
-            // integer: the literal flexes to that width, which is the whole
-            // point of deferring it. Pinned to anything else: flexing cannot
-            // apply, so the mismatch is real and binding it reports the conflict
-            // here — at the call, naming the variable — rather than leaving it
-            // to surface later against a synthesized binding.
-            let flexes = !mentions_unbound(pty, &var_set, &map)
-                && var_set.iter().all(|v| {
-                    !ty_mentions(pty, v)
-                        || map
-                            .get(*v)
-                            .is_some_and(|t| aipl_syntax::is_int_ty(t) || is_int_slots(t))
-                });
-            if !flexes {
-                // Recorded *before* binding: "nothing else reached it" is a
-                // statement about the map as it stands now. A parameter written
-                // as the bare variable is the only shape that can be inlined —
-                // `T[]` or `T?` would need the literal to be a container.
-                if let Type::TypeVar(v) = pty {
-                    if !map.contains_key(v) {
-                        lit_pinned.insert(v.clone());
-                    }
-                }
-                self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
-            }
         }
         // Fallback pass: any type variable that no concrete arg pinned can
         // still be inferred from an empty-array or bare-`none` argument — the
@@ -5300,98 +5136,7 @@ impl Mono<'_> {
             Some(t) => subst_vars(t, &map),
             None => Type::Primitive(Primitive::I64),
         };
-        Ok((targs, ret, lit_pinned))
-    }
-
-    /// The literal value parameter `p` should have inlined into the instance
-    /// body, or `None` to keep it an ordinary parameter. See
-    /// [`ParamSpec::drop_lit`].
-    ///
-    /// The rule is per *type variable*, not per argument: a variable in
-    /// `lit_pinned` is one nothing but bare integer literals reached, and every
-    /// parameter written as exactly that variable and passed a literal is
-    /// inlined. Deciding it per variable is what makes `min(0, 5)` and
-    /// `min(0, 7)` distinct instances — in the deferred pass the first literal
-    /// binds `T = i64`, after which the second sees an already-pinned integer
-    /// variable and is never considered, so a per-argument rule would inline
-    /// only the first and call one instance with two different values.
-    ///
-    /// Only the bare `T` shape qualifies: a `T[]` or `T?` parameter would need
-    /// the literal to be a container, and never receives one.
-    ///
-    /// Declining is always safe — the parameter simply stays, typed `i64` as it
-    /// is today — so the guards are generous:
-    ///
-    /// - a variadic parameter's argument is a *sequence*, not the literal;
-    /// - a `mut` parameter, or any parameter of a mutating method, is written
-    ///   through, and [`subst::substitute`] cannot rewrite a `set` target;
-    /// - likewise any parameter the body assigns to — the same hazard reached
-    ///   by a different route, and the one that would leave a dangling
-    ///   identifier rather than merely a missed optimization.
-    fn lit_drop_value(
-        &self,
-        gname: &str,
-        p: &Param,
-        arg: Option<&Expr>,
-        lit_pinned: &HashSet<String>,
-    ) -> Option<i64> {
-        let Type::TypeVar(v) = &p.ty else {
-            return None;
-        };
-        if !lit_pinned.contains(v)
-            || p.arity.is_variadic()
-            || p.mutable
-            || self.mutating.contains(gname)
-        {
-            return None;
-        }
-        if subst::assigns_to(&self.generics.get(gname)?.body, &p.name) {
-            return None;
-        }
-        aipl_syntax::const_int(arg?)
-    }
-
-    /// The value this call collapses to, when inlining its dropped literals
-    /// leaves a body that is nothing but an integer literal. `None` keeps the
-    /// call.
-    ///
-    /// The test is deliberately [`aipl_syntax::const_int`] and not
-    /// [`aipl_syntax::flex_int_values`]. That one answers "does this flex",
-    /// not "is this alone": it reaches through a block's tail, so
-    /// `{ let a = f(); 200 }` counts as flexible while folding it to `200`
-    /// would drop `f()`'s effects. Requiring the whole body to *be* the literal
-    /// makes the rewrite safe by construction — a literal has no effects, no
-    /// captures and no recursion.
-    ///
-    /// *Every* parameter must have been dropped as a literal, which is a
-    /// stronger requirement than the body coming out literal. A body is free to
-    /// ignore a parameter (`fn k<T>(x: T) -> i64 { 42 }`), and folding that call
-    /// away would discard its argument — along with any effects evaluating it
-    /// would have had. Requiring the full set means there are no arguments left
-    /// to discard.
-    fn folds_to_literal(&self, gname: &str, params: &[ParamSpec]) -> Option<i64> {
-        let g = self.generics.get(gname)?;
-        if g.sig.params.is_empty()
-            || !g
-                .sig
-                .params
-                .iter()
-                .enumerate()
-                .all(|(i, _)| params.get(i).is_some_and(|s| s.drop_lit.is_some()))
-        {
-            return None;
-        }
-        let body = g
-            .sig
-            .params
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| params.get(i)?.drop_lit.map(|v| (p, v)))
-            .fold(g.body.clone(), |b, (p, v)| {
-                let lit = Expr::new(ExprKind::Num(v), b.span.clone());
-                subst::substitute(&b, &p.name, &lit)
-            });
-        aipl_syntax::const_int(&body)
+        Ok((targs, ret))
     }
 
     /// Which parameters the call to `template` (with the given concrete
@@ -6428,15 +6173,13 @@ impl Mono<'_> {
         }
         // The checker has already matched the function's arity to the
         // position's, so `expected` lines up with the parameters one to one.
-        let flexible = vec![false; expected.len()];
-        let (type_args, ret, _) =
-            self.instantiate_types(name, expected, &flexible, None, span.clone())?;
+        let (type_args, ret) = self.instantiate_types(name, expected, None, span.clone())?;
         // Substitution can leave a generic application (`(A, B)` is
         // `__tuple2<A, B>`); the consumers of a function value's result — a
         // wrapper deciding whether the result fits an array slot — read a
         // resolved instance type, as `specialize_generic_call` hands them.
         let ret = self.resolve_generic_ty(&ret)?;
-        let params = self.param_specs(name, &type_args, expected, &[], &[], &HashSet::new());
+        let params = self.param_specs(name, &type_args, expected, &[]);
         let mangled = self.enqueue_full(name, ParamSpecs { type_args, params });
         Ok((mangled, ret))
     }
@@ -6445,17 +6188,13 @@ impl Mono<'_> {
     /// `type_args`, reached with arguments of types `atys`: which are moved in
     /// (`owned`), which `str` arguments meet a `char[]`/`T[]` parameter and keep
     /// their representation (`str_kept`), each variadic's shape, and the
-    /// parameters a bare `none` or an integer literal at the call site drops
-    /// (`args` and `lit_pinned` — empty for a function value, which has no
-    /// call site).
+    /// parameters a bare `none` at the call site drops.
     fn param_specs(
         &self,
         gname: &str,
         type_args: &[Type],
         atys: &[Type],
         owned: &[usize],
-        args: &[Expr],
-        lit_pinned: &HashSet<String>,
     ) -> Vec<ParamSpec> {
         let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
         let Generic { sig, .. } = &self.generics[gname];
@@ -6487,8 +6226,6 @@ impl Mono<'_> {
                 } else {
                     VShape::Seq
                 },
-                drop_none: is_unpinned_optional(&subst_vars(&p.ty, &tmap)),
-                drop_lit: self.lit_drop_value(gname, p, args.get(i), lit_pinned),
                 ..ParamSpec::default()
             })
             .collect()
@@ -7897,44 +7634,8 @@ impl Mono<'_> {
                 // store-back path owns the receiver); only free calls compute the
                 // owned-parameter set used for the move optimization.
                 if self.generics.contains_key(name) {
-                    // Which arguments are bare integer literals, and so flex to
-                    // a width rather than fixing one (see `instantiate_types`).
-                    let flexible: Vec<bool> = args
-                        .iter()
-                        .map(|a| {
-                            matches!(&a.kind, ExprKind::Num(_))
-                                || matches!(&a.kind, ExprKind::Neg(x) if matches!(x.kind, ExprKind::Num(_)))
-                                || check::is_int_pair(a)
-                        })
-                        .collect();
-                    let (type_args, ret, lit_pinned) = self.instantiate_types(
-                        name,
-                        &atys,
-                        &flexible,
-                        expr.ty.as_deref(),
-                        span.clone(),
-                    )?;
-                    // A pair of literals takes the integer types the instance gave
-                    // its parameter, as a bare literal does at the call.
-                    let slot_types: HashMap<String, Type> = self.generics[name]
-                        .sig
-                        .type_var_names()
-                        .into_iter()
-                        .zip(type_args.iter().cloned())
-                        .collect();
-                    for (i, a) in args.iter().enumerate() {
-                        let param = self.generics[name].sig.params.get(i).map(|p| p.ty.clone());
-                        let Some(param) = param.map(|t| subst_vars(&t, &slot_types)) else {
-                            continue;
-                        };
-                        if check::is_int_pair(a) && self.tuple_field_tys(&param).is_some() {
-                            let mut fitted = a.clone();
-                            fitted.ty = Some(Box::new(param));
-                            let (ra, t) = self.infer(&fitted, env)?;
-                            rargs[i] = ra;
-                            atys[i] = t;
-                        }
-                    }
+                    let (type_args, ret) =
+                        self.instantiate_types(name, &atys, expr.ty.as_deref(), span.clone())?;
                     // A method-style call is the same call with its receiver
                     // first, so the receiver can be moved in like any argument;
                     // `owned_eligible` itself declines the one receiver that
@@ -7945,26 +7646,7 @@ impl Mono<'_> {
                     // `char[]`/`T[]` parameter (`str_kept` — specialize on the str
                     // directly, no `char[]` materialization; `T` is still `char`,
                     // so only the `char[]`-substituted parameter is marked).
-                    let params =
-                        self.param_specs(name, &type_args, &atys, &owned, args, &lit_pinned);
-                    // The dropped parameters take their arguments with them —
-                    // each was a bare `none` the instance now declares itself,
-                    // or an integer literal it now has inlined in the body.
-                    let rargs: Vec<Expr> = rargs
-                        .into_iter()
-                        .enumerate()
-                        .filter(|(i, _)| {
-                            !params
-                                .get(*i)
-                                .is_some_and(|p| p.drop_none || p.drop_lit.is_some())
-                        })
-                        .map(|(_, a)| a)
-                        .collect();
-                    // A call whose body reduces to a literal *is* that literal:
-                    // fold it in place and emit no instance.
-                    if let Some(v) = self.folds_to_literal(name, &params) {
-                        return Ok((node(ExprKind::Num(v)), ret));
-                    }
+                    let params = self.param_specs(name, &type_args, &atys, &owned);
                     let mangled = self.enqueue_full(name, ParamSpecs { type_args, params });
                     (
                         node(ExprKind::Call(Callee::User(mangled), rargs, method_style)),

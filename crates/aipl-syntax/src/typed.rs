@@ -279,10 +279,10 @@ pub struct TExpr<T: TyRepr = Ty> {
     pub value_span: Option<Box<Span>>,
     /// See [`Expr::name_span`].
     pub name_span: Option<Box<Span>>,
-    /// Whether `ty` mentions a type that nothing in the function constrained, so pinning settled
-    /// it by default (`i64`). Such a type is a placeholder for the stages that read it, not a
-    /// finding.
-    pub defaulted: bool,
+    /// Whether `ty` is, or holds, a generic application (`Rule<K>`) one of whose arguments nothing in
+    /// the function decided, so pinning fell back to a default. Such a type is not a finding: the
+    /// argument is for monomorphization to settle from the instances the program has.
+    pub unsettled: bool,
 }
 
 /// One arm of a typed `match`, or the arm of an `if let`.
@@ -391,7 +391,7 @@ impl<T: TyRepr> TExpr<T> {
             span,
             value_span: None,
             name_span: None,
-            defaulted: false,
+            unsettled: false,
         }
     }
 
@@ -404,7 +404,7 @@ impl<T: TyRepr> TExpr<T> {
             span: like.span.clone(),
             value_span: like.value_span.clone(),
             name_span: like.name_span.clone(),
-            defaulted: false,
+            unsettled: false,
         }
     }
 
@@ -742,7 +742,7 @@ impl<T: TyRepr> TExpr<T> {
             span: self.span.clone(),
             value_span: self.value_span.clone(),
             name_span: self.name_span.clone(),
-            defaulted: self.defaulted,
+            unsettled: self.unsettled,
         })
     }
 }

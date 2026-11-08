@@ -108,6 +108,10 @@ struct Table {
     instances: std::cell::RefCell<Instances>,
 }
 
+/// What the pinner calls the type variable of the n-th anonymous `any` of a function: this followed by n.
+/// Monomorphization names those variables its own way, so a type mentioning one cannot be substituted there.
+pub const ANONYMOUS_ANY: &str = "any$";
+
 /// A generic instance's name (`Box$i64`) -> the template and arguments it is the application of.
 pub type Instances = HashMap<String, (String, Vec<Ty>)>;
 
@@ -337,16 +341,32 @@ impl Table {
         }
     }
 
-    /// Whether resolving `t` has to default a variable nothing constrained.
-    fn would_default(&self, t: &It) -> bool {
+    /// Whether `t` is, or holds, a generic application with an argument that resolving has to
+    /// default because nothing constrained it.
+    fn leaves_application_open(&self, t: &It) -> bool {
+        let open = |t: &It| self.leaves_application_open(t);
+        match self.shallow(t) {
+            It::Gen(_, args) => args.iter().any(|a| self.has_open_variable(a) || open(a)),
+            It::Case(t) | It::Opt(t) | It::Arr(t) | It::Set(t, _) | It::Without(t, _) => open(&t),
+            It::Dict(a, b) | It::Res(a, b) => open(&a) || open(&b),
+            It::Fn(ps, r) => ps.iter().any(open) || open(&r),
+            It::Var(_) | It::Unit | It::Prim(_) | It::Named(_) | It::Rigid(_) => false,
+        }
+    }
+
+    fn has_open_variable(&self, t: &It) -> bool {
         match self.shallow(t) {
             It::Var(_) => true,
             It::Case(t) | It::Opt(t) | It::Arr(t) | It::Set(t, _) | It::Without(t, _) => {
-                self.would_default(&t)
+                self.has_open_variable(&t)
             }
-            It::Dict(a, b) | It::Res(a, b) => self.would_default(&a) || self.would_default(&b),
-            It::Gen(_, args) => args.iter().any(|a| self.would_default(a)),
-            It::Fn(ps, r) => ps.iter().any(|p| self.would_default(p)) || self.would_default(&r),
+            It::Dict(a, b) | It::Res(a, b) => {
+                self.has_open_variable(&a) || self.has_open_variable(&b)
+            }
+            It::Gen(_, args) => args.iter().any(|a| self.has_open_variable(a)),
+            It::Fn(ps, r) => {
+                ps.iter().any(|p| self.has_open_variable(p)) || self.has_open_variable(&r)
+            }
             It::Unit | It::Prim(_) | It::Named(_) | It::Rigid(_) => false,
         }
     }
@@ -1029,7 +1049,7 @@ fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
     // Each anonymous `any` is a type variable of its own.
     for n in 1..=p.anonymous {
         type_vars.push(TTypeParam {
-            name: format!("any${n}"),
+            name: format!("{ANONYMOUS_ANY}{n}"),
             bound: aipl_syntax::ast::Bound::Any,
             default: None,
             name_span: Default::default(),
@@ -1228,16 +1248,16 @@ impl Pinner<'_> {
         Ok(())
     }
 
-    /// Set [`TExpr::defaulted`] on each node of `typed` whose type in `source` (the tree it was
-    /// resolved from, of the same shape) still has an open variable.
-    fn mark_defaulted(&self, typed: &mut TExpr<Ty>, source: &TExpr<It>) {
-        typed.defaulted = self.table.would_default(&source.ty);
+    /// Set [`TExpr::unsettled`] on each node of `typed` whose type in `source` (the tree it was
+    /// resolved from, of the same shape) holds a generic application with an open argument.
+    fn mark_unsettled(&self, typed: &mut TExpr<Ty>, source: &TExpr<It>) {
+        typed.unsettled = self.table.leaves_application_open(&source.ty);
         let mut sources = Vec::new();
         source.for_each_child(&mut |c| sources.push(c));
         let mut i = 0;
         typed.for_each_child_mut(&mut |c| {
             if let Some(s) = sources.get(i) {
-                self.mark_defaulted(c, s);
+                self.mark_unsettled(c, s);
             }
             i += 1;
         });
@@ -1248,7 +1268,7 @@ impl Pinner<'_> {
         let mut typed = body
             .map_types(&mut |t| Some(self.table.resolve(t)))
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
-        self.mark_defaulted(&mut typed, &body);
+        self.mark_unsettled(&mut typed, &body);
         check_literals(&typed)?;
         self.decls
             .instances
@@ -1312,7 +1332,7 @@ impl Pinner<'_> {
                     v
                 } else {
                     self.anonymous += 1;
-                    It::Rigid(format!("any${}", self.anonymous))
+                    It::Rigid(format!("{ANONYMOUS_ANY}{}", self.anonymous))
                 }
             }
             Type::Dict(k, v) => It::Dict(Box::new(go(self, k)?), Box::new(go(self, v)?)),
@@ -1541,7 +1561,7 @@ impl Pinner<'_> {
             span: e.span.clone(),
             value_span: e.value_span.clone(),
             name_span: e.name_span.clone(),
-            defaulted: false,
+            unsettled: false,
         }
     }
 

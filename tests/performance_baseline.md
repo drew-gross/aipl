@@ -178,7 +178,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_grid_from | 0 | 0 | 0 | 634 | 1568 |
 | crates/aipl-mono/src/builtin_grid_get | 1 | 80 | 80 | 676 | 2156 |
 | crates/aipl-mono/src/builtin_grid_is_in_bounds_of | 0 | 0 | 0 | 548 | 1008 |
-| crates/aipl-mono/src/builtin_grid_of | 5 | 456 | 560 | 2194 | 6136 |
+| crates/aipl-mono/src/builtin_grid_of | 5 | 456 | 560 | 2196 | 6144 |
 | crates/aipl-mono/src/builtin_grid_try_set | 3 | 192 | 192 | 1296 | 2344 |
 | crates/aipl-mono/src/builtin_height | 0 | 0 | 0 | 485 | 1332 |
 | crates/aipl-mono/src/builtin_inline_str | 4 | 254 | 254 | 792 | 3768 |
@@ -224,7 +224,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_try_map | 42 | 2365 | 2163 | 6550 | 21280 |
 | crates/aipl-mono/src/builtin_tuple_windows | 10 | 568 | 664 | 3319 | 7276 |
 | crates/aipl-mono/src/builtin_union_all | 51 | 2181 | 1860 | 4948 | 10608 |
-| crates/aipl-mono/src/builtin_value_or | 0 | 0 | 0 | 591 | 2368 |
+| crates/aipl-mono/src/builtin_value_or | 0 | 0 | 0 | 485 | 1968 |
 | crates/aipl-mono/src/builtin_value_or_err | 0 | 0 | 0 | 862 | 4924 |
 | crates/aipl-mono/src/builtin_width | 1 | 104 | 104 | 218 | 960 |
 | crates/aipl-mono/src/builtin_words | 10 | 728 | 968 | 7241 | 8416 |
@@ -251,7 +251,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/arrays/bool_packed_ops | 4 | 68 | 69 | 1743 | 2240 |
 | tests/cases/arrays/char_and_bool_elems | 0 | 0 | 0 | 556 | 1132 |
 | tests/cases/arrays/char_str_alias | 24 | 1544 | 1544 | 4201 | 7496 |
-| tests/cases/arrays/contains | 4 | 344 | 344 | 2717 | 7480 |
+| tests/cases/arrays/contains | 4 | 344 | 344 | 2740 | 7704 |
 | tests/cases/arrays/extend/extend | 48 | 3068 | 3102 | 8525 | 15680 |
 | tests/cases/arrays/extend/extend_call_form_copies | 2 | 72 | 72 | 802 | 2064 |
 | tests/cases/arrays/extend/extend_char | 8 | 634 | 634 | 1745 | 5664 |
@@ -271,7 +271,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/arrays/narrow_elements_packed | 56 | 3608 | 4938 | 31441 | 19376 |
 | tests/cases/arrays/nested_array_annotation | 11 | 760 | 760 | 1303 | 4860 |
 | tests/cases/arrays/nested_array_to_str | 23 | 1668 | 1668 | 6703 | 12328 |
-| tests/cases/arrays/nested_optional_deep_none | 15 | 984 | 984 | 2810 | 7072 |
+| tests/cases/arrays/nested_optional_deep_none | 14 | 952 | 952 | 2732 | 6676 |
 | tests/cases/arrays/nested_optional_none_levels | 38 | 2519 | 2519 | 6358 | 9680 |
 | tests/cases/arrays/nested_optional_repr | 11 | 742 | 742 | 2372 | 8040 |
 | tests/cases/arrays/nested_optionals | 20 | 1322 | 1322 | 3579 | 8076 |
@@ -287,7 +287,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/arrays/push/push_growth | 3 | 160 | 160 | 1062 | 2300 |
 | tests/cases/arrays/push/push_in_place | 1 | 32 | 48 | 261 | 832 |
 | tests/cases/arrays/push/push_in_place_amortized | 1 | 64 | 112 | 423 | 1120 |
-| tests/cases/arrays/push/push_none_element | 15 | 889 | 833 | 5084 | 15392 |
+| tests/cases/arrays/push/push_none_element | 15 | 889 | 833 | 5121 | 12936 |
 | tests/cases/arrays/push_aliased_array | 4 | 312 | 384 | 1815 | 2840 |
 | tests/cases/arrays/push_through_inlined_function | 17 | 3399 | 4439 | 12150 | 8160 |
 | tests/cases/arrays/reduce | 38 | 2555 | 2555 | 6729 | 16292 |
@@ -302,10 +302,10 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/arrays/spread/spread_elem_types | 9 | 283 | 276 | 1999 | 6508 |
 | tests/cases/arrays/spread/spread_evaluates_once | 39 | 2824 | 2824 | 6306 | 9436 |
 | tests/cases/arrays/spread/spread_value_semantics | 3 | 152 | 152 | 1857 | 4608 |
-| tests/cases/arrays/starts_ends_with | 14 | 1096 | 1096 | 4819 | 14624 |
+| tests/cases/arrays/starts_ends_with | 14 | 1096 | 1096 | 4835 | 14796 |
 | tests/cases/arrays/str_array | 6 | 576 | 576 | 1205 | 3832 |
 | tests/cases/arrays/sum_and_len | 0 | 0 | 0 | 239 | 608 |
-| tests/cases/arrays/to_str_arrays | 22 | 1432 | 1448 | 5118 | 9420 |
+| tests/cases/arrays/to_str_arrays | 22 | 1432 | 1448 | 5221 | 9244 |
 | tests/cases/arrays/try_set | 24 | 2096 | 1163 | 24579 | 18884 |
 | tests/cases/arrays/tuple_windows | 34 | 2240 | 2288 | 5987 | 12528 |
 | tests/cases/arrays/with | 29 | 1554 | 805 | 8541 | 22648 |
@@ -400,9 +400,9 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/effects/shim_covers_synthesized_functions | 38 | 2545 | 2545 | 5678 | 8744 |
 | tests/cases/effects/shim_effects | 47 | 3395 | 3155 | 7253 | 23356 |
 | tests/cases/effects/transitive_caller_with_declaration_passes | 1 | 88 | 88 | 478 | 4204 |
-| tests/cases/equality/arrays | 8 | 640 | 640 | 2090 | 4568 |
+| tests/cases/equality/arrays | 8 | 640 | 640 | 2106 | 4488 |
 | tests/cases/equality/optionals | 0 | 0 | 0 | 205 | 820 |
-| tests/cases/equality/sets | 8 | 296 | 296 | 601 | 2664 |
+| tests/cases/equality/sets | 8 | 296 | 296 | 618 | 2632 |
 | tests/cases/equality/structs | 0 | 0 | 0 | 323 | 1272 |
 | tests/cases/equality/variants | 0 | 0 | 0 | 376 | 960 |
 | tests/cases/execute_program/not_found | 8 | 356 | 297 | 282 | 2288 |
@@ -443,7 +443,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/generics/bare_type_param | 0 | 0 | 0 | 45 | 256 |
 | tests/cases/generics/bound_propagation | 17 | 1097 | 1097 | 3386 | 8428 |
 | tests/cases/generics/count_elements | 1 | 17 | 17 | 394 | 1028 |
-| tests/cases/generics/declared_param_literal_fit | 0 | 0 | 0 | 231 | 848 |
+| tests/cases/generics/declared_param_literal_fit | 0 | 0 | 0 | 232 | 848 |
 | tests/cases/generics/emit_builder | 7 | 610 | 610 | 1725 | 6532 |
 | tests/cases/generics/emit_builder_multi | 10 | 857 | 857 | 2260 | 8380 |
 | tests/cases/generics/empty_array_arg | 0 | 0 | 0 | 43 | 220 |
@@ -451,12 +451,12 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/generics/higher_order_struct | 0 | 0 | 0 | 153 | 788 |
 | tests/cases/generics/higher_order_variant | 0 | 0 | 0 | 66 | 348 |
 | tests/cases/generics/int_bound | 11 | 699 | 699 | 2214 | 6096 |
-| tests/cases/generics/int_literal_arg | 11 | 690 | 690 | 2199 | 6136 |
+| tests/cases/generics/int_literal_arg | 11 | 690 | 690 | 2201 | 6172 |
 | tests/cases/generics/int_literal_arg_pinned_by_other_param | 11 | 688 | 688 | 1879 | 5240 |
 | tests/cases/generics/is_len_greater_than_5 | 0 | 0 | 0 | 132 | 544 |
 | tests/cases/generics/is_present_any_optional | 0 | 0 | 0 | 81 | 404 |
-| tests/cases/generics/let_annotation_type_param | 19 | 1242 | 930 | 4933 | 12836 |
-| tests/cases/generics/map_over_generic_struct_field | 0 | 0 | 0 | 990 | 6308 |
+| tests/cases/generics/let_annotation_type_param | 19 | 1242 | 930 | 4976 | 12532 |
+| tests/cases/generics/map_over_generic_struct_field | 0 | 0 | 0 | 989 | 6304 |
 | tests/cases/generics/none_literal_arg | 0 | 0 | 0 | 28 | 164 |
 | tests/cases/generics/nullary_ctor_from_context | 15 | 1054 | 1054 | 2415 | 10200 |
 | tests/cases/generics/ord_bound | 0 | 0 | 0 | 45 | 256 |
@@ -496,9 +496,9 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/integers/literal_flex_boundaries | 0 | 0 | 0 | 157 | 760 |
 | tests/cases/integers/literal_flexing | 32 | 2046 | 2046 | 4850 | 7016 |
 | tests/cases/integers/narrow | 37 | 2337 | 1228 | 3764 | 10260 |
-| tests/cases/integers/narrow_int_elements | 43 | 2010 | 1300 | 12028 | 26052 |
+| tests/cases/integers/narrow_int_elements | 42 | 1930 | 1300 | 11960 | 25772 |
 | tests/cases/integers/narrow_literal_inlined_into_generic_call | 32 | 2120 | 2120 | 4423 | 12488 |
-| tests/cases/integers/negative_literals | 0 | 0 | 0 | 153 | 684 |
+| tests/cases/integers/negative_literals | 0 | 0 | 0 | 128 | 608 |
 | tests/cases/integers/saturating_add | 0 | 0 | 0 | 250 | 1156 |
 | tests/cases/integers/saturating_sub | 0 | 0 | 0 | 256 | 1156 |
 | tests/cases/integers/sized_in_aggregates | 29 | 1601 | 1329 | 4023 | 13172 |
@@ -508,7 +508,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/kwargs/basic | 8 | 494 | 494 | 1461 | 5140 |
 | tests/cases/kwargs/cross_file | 7 | 616 | 616 | 1156 | 5344 |
 | tests/cases/kwargs/default_calls_kw_fn | 5 | 298 | 298 | 985 | 4688 |
-| tests/cases/kwargs/default_reads_generic_param | 12 | 834 | 674 | 2800 | 8284 |
+| tests/cases/kwargs/default_reads_generic_param | 12 | 834 | 674 | 2810 | 8280 |
 | tests/cases/kwargs/default_reads_param | 47 | 2866 | 1653 | 3187 | 6668 |
 | tests/cases/kwargs/default_reads_param_once | 11 | 827 | 827 | 2040 | 5264 |
 | tests/cases/kwargs/default_reads_self | 6 | 479 | 479 | 1418 | 5624 |
@@ -528,7 +528,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/lambdas/fn_ref_shadowing | 1 | 40 | 40 | 435 | 1268 |
 | tests/cases/lambdas/generic_fn_as_value | 25 | 1710 | 1766 | 6863 | 16488 |
 | tests/cases/lambdas/map_capture | 2 | 128 | 128 | 670 | 1468 |
-| tests/cases/lambdas/map_empty | 1 | 24 | 24 | 826 | 3440 |
+| tests/cases/lambdas/map_empty | 3 | 72 | 72 | 938 | 3888 |
 | tests/cases/lambdas/map_fresh_variant | 4 | 144 | 160 | 660 | 1824 |
 | tests/cases/lambdas/map_in_place | 16 | 972 | 1004 | 3004 | 7400 |
 | tests/cases/lambdas/map_span | 31 | 1778 | 1810 | 5287 | 9372 |
@@ -584,7 +584,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/optimizations/borrowed_bindings | 46 | 3191 | 3191 | 8252 | 19100 |
 | tests/cases/optimizations/builds_into_struct_stays_in_place | 4 | 256 | 64 | 2894 | 5748 |
 | tests/cases/optimizations/cartesian_product_loop_fusion | 5 | 147 | 387 | 1306 | 3516 |
-| tests/cases/optimizations/const_array_literal | 52 | 3354 | 3354 | 10114 | 17336 |
+| tests/cases/optimizations/const_array_literal | 52 | 3354 | 3354 | 10217 | 17160 |
 | tests/cases/optimizations/const_fold | 0 | 0 | 0 | 150 | 796 |
 | tests/cases/optimizations/const_fold_saturating | 0 | 0 | 0 | 28 | 176 |
 | tests/cases/optimizations/count_fusion | 54 | 9746 | 9746 | 47857 | 10948 |
@@ -683,9 +683,9 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/results/try_inside_composite_releases | 17 | 1464 | 1464 | 4563 | 16304 |
 | tests/cases/results/try_operator | 0 | 0 | 0 | 263 | 1440 |
 | tests/cases/results/variant_payload | 1 | 88 | 88 | 1218 | 8356 |
-| tests/cases/results/void_ok | 11 | 770 | 548 | 2354 | 11672 |
-| tests/cases/sets/as_sequence | 41 | 2221 | 1989 | 6220 | 15956 |
-| tests/cases/sets/basic | 2 | 96 | 96 | 305 | 1556 |
+| tests/cases/results/void_ok | 11 | 770 | 548 | 2354 | 11920 |
+| tests/cases/sets/as_sequence | 41 | 2221 | 1989 | 6124 | 15724 |
+| tests/cases/sets/basic | 2 | 96 | 96 | 309 | 1592 |
 | tests/cases/sets/char_set_to_array | 9 | 188 | 236 | 3900 | 6316 |
 | tests/cases/sets/elem_types | 2 | 34 | 34 | 346 | 1692 |
 | tests/cases/sets/empty_char_set_contexts | 56 | 3938 | 3938 | 7789 | 14788 |
@@ -702,7 +702,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/sets/to_set_tuple | 53 | 3039 | 2951 | 5926 | 14716 |
 | tests/cases/sets/union | 14 | 744 | 328 | 1308 | 5656 |
 | tests/cases/sets/union_from_array_elem | 18 | 924 | 900 | 2563 | 7484 |
-| tests/cases/strings/bool_to_str | 22 | 1421 | 1421 | 4086 | 7288 |
+| tests/cases/strings/bool_to_str | 22 | 1421 | 1421 | 4189 | 7816 |
 | tests/cases/strings/compare | 0 | 0 | 0 | 389 | 1876 |
 | tests/cases/strings/concat/concat_in_function_param | 1 | 88 | 88 | 67 | 420 |
 | tests/cases/strings/concat/concat_no_leak_across_calls | 1 | 88 | 88 | 70 | 380 |
@@ -730,7 +730,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/strings/int_to_str/method_form | 3 | 124 | 124 | 609 | 4580 |
 | tests/cases/strings/int_to_str/negatives | 8 | 529 | 529 | 1414 | 4896 |
 | tests/cases/strings/join | 13 | 825 | 591 | 725 | 3956 |
-| tests/cases/strings/join_empty | 32 | 2048 | 1931 | 5014 | 11444 |
+| tests/cases/strings/join_empty | 35 | 2096 | 1979 | 5265 | 11512 |
 | tests/cases/strings/join_gap_separators | 43 | 2513 | 1268 | 4105 | 15476 |
 | tests/cases/strings/len | 0 | 0 | 0 | 156 | 664 |
 | tests/cases/strings/literals/print_empty_string | 0 | 0 | 0 | 39 | 212 |
@@ -835,7 +835,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/tuples/field_access | 2 | 106 | 106 | 566 | 4456 |
 | tests/cases/tuples/for_loop_destructure | 15 | 1147 | 1147 | 2677 | 5616 |
 | tests/cases/tuples/for_loop_indexed_destructure | 61 | 4193 | 4161 | 5839 | 9484 |
-| tests/cases/tuples/generic_tuple | 21 | 1422 | 1422 | 3362 | 7300 |
+| tests/cases/tuples/generic_tuple | 21 | 1422 | 1422 | 3378 | 7360 |
 | tests/cases/tuples/optional_tuple | 12 | 849 | 849 | 2164 | 8108 |
 | tests/cases/tuples/three_elements | 7 | 474 | 474 | 1392 | 5164 |
 | tests/cases/tuples/to_array | 46 | 3080 | 3080 | 8074 | 12904 |

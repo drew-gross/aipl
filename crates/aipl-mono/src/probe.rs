@@ -184,7 +184,11 @@ fn typed_form(kind: &aipl_syntax::typed::TExprKind<Ty>) -> String {
     if let aipl_syntax::typed::TExprKind::Call { callee, .. } = kind {
         return format!("Call {}", callee.name());
     }
-    first_word(kind)
+    // The numeral is `Num` in the written tree.
+    match first_word(kind).as_str() {
+        "Int" => "Num".to_string(),
+        word => word.to_string(),
+    }
 }
 
 /// The name a derived `Debug` starts with, without formatting the rest.
@@ -403,6 +407,22 @@ pub fn stamp_everything(
     }
 }
 
+/// Whether `t` names the type variable of an anonymous `any` (see [`crate::pin::ANONYMOUS_ANY`]).
+fn mentions_anonymous_any(t: &Type) -> bool {
+    match t {
+        Type::TypeVar(v) => v.starts_with(crate::pin::ANONYMOUS_ANY),
+        Type::Case(t) | Type::Optional(t) | Type::Array(t) | Type::Set(t, _) => {
+            mentions_anonymous_any(t)
+        }
+        Type::Dict(a, b) | Type::Result(a, b) => {
+            mentions_anonymous_any(a) || mentions_anonymous_any(b)
+        }
+        Type::Fn(ps, r) => ps.iter().any(mentions_anonymous_any) || mentions_anonymous_any(r),
+        Type::Generic(_, args) | Type::Tuple(args) => args.iter().any(mentions_anonymous_any),
+        _ => false,
+    }
+}
+
 /// [`stamp_everything`]'s walk over one function body.
 struct Stamper<'a> {
     instances: &'a crate::pin::Instances,
@@ -416,6 +436,9 @@ impl Stamper<'_> {
             return;
         }
         let pinned = self.spelled(ty.to_type());
+        if mentions_anonymous_any(&pinned) {
+            return;
+        }
         match (&e.ty, self.stamping) {
             // A stamp that already says this keeps its spelling.
             (Some(old), Stamping::Replace) if canon(old) == canon(&pinned) => {}
@@ -464,7 +487,8 @@ impl Stamper<'_> {
         if e.span != t.span || form(&e.kind) != typed_form(&t.kind) {
             return self.by_span(e);
         }
-        if !t.defaulted {
+        // A generic application the pinner had to guess an argument of is monomorphization's to settle.
+        if !t.unsettled {
             self.stamp(e, &t.ty);
         }
         let mut typed = Vec::new();

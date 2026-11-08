@@ -159,7 +159,19 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         `Case<V>` in `==` as that case. Four baseline rows moved (listed in Session 10 notes).
         Still to delete, because each needs a call's `type_args` (2d): `Num` flexing through `flex_int_ty`,
         `drop_none`/`is_unpinned_optional`, `drop_lit`.
-  - [ ] **2d. Substitution over `TExpr`** for what remains, once the passes (stage 3) hand mono a pinned tree.
+  - [x] **2d. The last guesses are gone** (Session 11). Reframed like stage 3: no `TExpr` substitution is needed, because
+        every node's stamp is its type, so a generic call's type arguments are read off the argument and result
+        stamps by the one binding routine (`instantiate_types`). Deleted: the deferred-literal pass and
+        `flexible`, `lit_pinned`, `ParamSpec::drop_lit` (+ `lit_drop_value`, `folds_to_literal`, the `$lit` instance
+        names, `subst::assigns_to`), `ParamSpec::drop_none` (+ `is_unpinned_optional`, `$dn`), the pair-of-literals
+        refit, and `TExpr::defaulted` (a defaulted node is stamped like any other: an unconstrained `none`, `[]` or
+        numeral IS an `i64`-based value). Consequences accepted as the uniform rule: `wrap(5)` and `wrap(7)` are one
+        instance (was one per value); `g([])` is `g$i64` (was `g$EmptyArray`); `identity(5)` is a call (was folded).
+        The probe's form names were wrong for numerals (`Num` vs `Int`), so no numeral had ever been stamped from the
+        pinner; fixed. Anonymous `any` type variables (`any$N`) are the pinner's own names and are not stamped.
+        Mono's tests now run through `frontend`, since mono's input is a program whose nodes say what they are.
+        Left (stage 4): `NoneInner`/`EmptyArrayArg`/`NoneLiteralArg`/`pseudo_marker` are now unreachable from stamped
+        input and can be deleted with the checker's stamping.
 - [~] **3. Passes read types instead of guessing them.** Revised in Session 8: porting every pass to `TExpr` is a
       type-safety nicety, not what stops the optimizations. What stops them is that they cannot ask a node's type,
       and since stage 2 every node carries `Expr::ty` (pre-mono, from the pinner; post-mono, from `infer`). So the
@@ -284,3 +296,11 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   callee's body into its caller, and the body's `to_set()` was only an ordered set because the callee's return type
   said so; re-pinning then typed it unordered. The pinner now meets a node's existing stamp (`Expr::ty`) with the
   type it finds (`Pinner::expr_at`): a stamp is the recorded context, and it survives the passes that move a node.
+- Session 11: 2d. See the 2d entry. Baseline rows moved by the uniform rule (instances shared per type, defaulted
+  `none`/`[]` typed `i64`); reviewed in the handoff diff.
+- Session 11 (continued): the first handoff of 2d died in one `aipl check` shard: `variant "Rule$i64" case "Term" is
+  still abstract: Case<i64>`. A generic application whose argument nothing decides (`Rule<K>` in
+  `Then([..]).show()`) must not be defaulted to `i64`: `K: variant` is not satisfied by it, and monomorphization settles
+  it from the instances the program has (`sole_instance`). Nodes whose type holds such an application carry
+  `TExpr::unsettled` and are not stamped. That is the one place a defaulted type still stays out of the stamps; moving
+  the `sole_instance` rule into the pinner (a program-level default for a bounded variable) would remove it.
