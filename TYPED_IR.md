@@ -150,7 +150,8 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   - [ ] **2b. Pinned types replace the checker's stamps.** Mono already takes `Expr::ty` as the expected type of a
         context-dependent expression (`none`, `[]`, `ok`/`err`, narrowed literal arrays). Stamp those from the
         pinner instead of the checker's `locks`, so mono, which is unchanged, runs on pinned answers. Baseline
-        rows and the dogfood fingerprint must not move.
+        rows and the dogfood fingerprint must not move. The pinner's *types* are there (see Session 5); what is
+        left is the rule for *which* nodes carry a stamp, since stamping all of them moves rows.
   - [ ] **2c. Stamp every literal and call** the pinner typed, make `infer` read the stamp where it exists, and
         delete the branches that guessed (the `Num` widening, `narrows_literal_array`, `is_unpinned_optional`).
   - [ ] **2d. Substitution over `TExpr`** for what remains, once the passes (stage 3) hand mono a pinned tree.
@@ -214,3 +215,22 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   span of what it replaced, so the probe cannot tell them apart (`ones`, `set_field_nested`). Not yet sorted into
   "mono wrong", "pinner wrong" and "span collision"; do that before 2b. `pin::mono_agreement_report` prints the
   ranking (`#[ignore]`, 18s).
+- Session 5 (continued): sorted the probe's disagreements and fixed the pinner's side of them: a function that
+  returns the sequence it was given returns a `str` as a `str` (the signature sees `char[]`; the pinned node did
+  too), and a constructor name where a `Case<V>` is wanted (payload-carrying wrapper or nullary) has type
+  `Case<V>`, not the constructor function or the variant. `Probe::finish` now sets aside disagreements at a span
+  where mono itself gave several types (146). What remains is mono being coarser than the pinner: integer
+  literals typed `i64` (about 225), a `print`/`put` statement typed `i64` where it is `()` (about 117), `!x`
+  typed `()` (16), `int_parse` targets (5); plus nodes a desugaring gives another node's span.
+- Stamps (`pin::stamp_agreement_report`, `#[ignore]`, tests/cases plus crates): of 122,260 stamped expressions
+  (nodes keyed by span *and* form, which removed the shared-span noise) the pinner's type equals the checker's
+  stamp at 122,257. The three others: `err("..")` stamped `()!Error` where the pinner has `()!str` (the pinner
+  binds `E` from the argument before the function's `!Error` is in view), and two `map` calls over a `str` that the
+  checker stamps `char[][]` and the pinner types `str[]`. The checker also rewrites `int_parse` targets while
+  stamping (`retargeted_int_parse`); that is not a type and stays with whatever replaces it.
+- Experiment: `AIPL_STAMP_ALL=1` (read by `frontend`; off by default) stamps every node the pinner typed, except
+  unit and never. Over `cases_arrays`, `cases_generics` and `cases_optimizations` 171 of 188 cases still pass and
+  17 fail: 16 on a moved baseline row (between -16% and +3% code bytes, mono now seeing exact types where it
+  guessed) and `arrays/push/err_push_char_from_empty`, which stops being an error. So blanket stamping is the
+  behaviour change that stage 3/4 is for, not a free swap now; the exact set of nodes the checker stamps has to be
+  reproduced first, or the moved rows accepted as their own measured change.

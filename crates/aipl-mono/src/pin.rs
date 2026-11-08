@@ -3716,6 +3716,18 @@ impl Pinner<'_> {
         }
         // `xs.collect_arms(Circle)` / `x.as_case(Circle)`: the elements are all that one case, so
         // the result is typed as the variant less every other case.
+        // A function that hands back the sequence it was given hands back a `str` as a `str`: it
+        // is an array of chars to the signature, and only to it.
+        let ret = match (ptys.first(), typed_args.first()) {
+            (Some(p0), Some(a0))
+                if matches!(self.table.shallow(&a0.ty), It::Prim(Primitive::Str))
+                    && matches!(self.table.shallow(p0), It::Arr(_))
+                    && self.table.shallow(p0) == self.table.shallow(&ret) =>
+            {
+                It::Prim(Primitive::Str)
+            }
+            _ => ret,
+        };
         // A set in the result takes the order of the set the call was made on.
         let ret = match self.table.shallow(&ret) {
             It::Set(inner, o) if self.table.order(o) == Ord::Known(PinnedOrder::Unordered) => {
@@ -3759,6 +3771,21 @@ impl Pinner<'_> {
     /// An argument, typed with the parameter type it lands in as its context. A lambda needs the
     /// context to type its own parameters.
     fn arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
+        let mut typed = self.arg_inner(arg, expected)?;
+        // A constructor's name where a `Case<V>` is wanted is that case, not the constructor function.
+        if matches!(self.table.shallow(expected), It::Case(_))
+            && matches!(
+                self.table.shallow(&typed.ty),
+                It::Fn(..) | It::Named(_) | It::Gen(..)
+            )
+            && aipl_syntax::ctor_ref_case(arg).is_some()
+        {
+            typed.ty = expected.clone();
+        }
+        Ok(typed)
+    }
+
+    fn arg_inner(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
         // A named function given where a function is wanted, generic or not.
         if let ExprKind::Ident(name) = &arg.kind {
             if !self.env.contains_key(name)

@@ -322,6 +322,7 @@ fn mono_agreement_report() {
         total.agreed += report.agreed;
         total.unmatched += report.unmatched;
         total.unbound += report.unbound;
+        total.collisions += report.collisions;
         total.placeholder += report.placeholder;
         total.instances += report.instances;
         for (form, (n, example)) in report.disagreements {
@@ -334,13 +335,61 @@ fn mono_agreement_report() {
     }
     println!(
         "programs {programs} (failed to monomorphize {failed}); instances {}; compared {} agreed {} \
-         placeholder {} unbound {} unmatched {}",
+         placeholder {} unbound {} unmatched {} collisions {}",
         total.instances, total.compared, total.agreed, total.placeholder, total.unbound,
-        total.unmatched
+        total.unmatched, total.collisions
     );
     let mut rows: Vec<_> = total.disagreements.iter().collect();
     rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
     for (form, (n, example)) in rows.into_iter().take(40) {
         println!("{n:7}  {form}\n         e.g. {example}");
+    }
+}
+
+/// Author helper: where the pinner's type differs from what the checker stamps on an expression
+/// (`Expr::ty`), over `tests/cases` (`AIPL_CASE=a,b` narrows it).
+#[test]
+#[ignore = "author helper: prints where the checker's stamps and the pinner disagree"]
+fn stamp_agreement_report() {
+    aipl::install_parser_hooks();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    aipl_files(&root.join("tests/cases"), &mut files);
+    aipl_files(&root.join("crates"), &mut files);
+    if let Ok(only) = std::env::var("AIPL_CASE") {
+        files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
+    }
+    let (mut compared, mut agreed, mut unmatched) = (0usize, 0usize, 0usize);
+    let mut disagreements: BTreeMap<String, (usize, String)> = BTreeMap::new();
+    let mut forms: BTreeMap<String, usize> = BTreeMap::new();
+    for file in &files {
+        let Ok(program) = aipl::loader::load_program(file, DebugOptions::OFF) else {
+            continue;
+        };
+        let Ok(Ok(report)) = std::panic::catch_unwind(|| aipl::codegen::stamp_agreement(&program))
+        else {
+            continue;
+        };
+        compared += report.compared;
+        agreed += report.agreed;
+        unmatched += report.unmatched;
+        for (form, n) in report.forms {
+            *forms.entry(form).or_default() += n;
+        }
+        for (key, (n, example)) in report.disagreements {
+            disagreements
+                .entry(key)
+                .or_insert((0, format!("{} -- {example}", file.display())))
+                .0 += n;
+        }
+    }
+    println!("stamps compared {compared} agreed {agreed} unmatched {unmatched}");
+    let mut by_form: Vec<_> = forms.iter().collect();
+    by_form.sort_by(|a, b| b.1.cmp(a.1));
+    println!("stamped forms: {by_form:?}");
+    let mut rows: Vec<_> = disagreements.iter().collect();
+    rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    for (key, (n, example)) in rows.into_iter().take(40) {
+        println!("{n:7}  {key}\n         e.g. {example}");
     }
 }

@@ -3000,6 +3000,10 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     // it has verified every value entering one, and from here on a
     // `T[] without []` is the `T[]` it is at runtime (see `Type::Without`).
     aipl_syntax::erase_refinements(&mut program);
+    if std::env::var_os("AIPL_STAMP_ALL").is_some() {
+        let pinned = aipl_mono::pin::pin(&check_program);
+        aipl_mono::probe::stamp_everything(&mut program, &pinned.program);
+    }
     Ok(Frontend {
         program,
         check_program,
@@ -3007,10 +3011,6 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     })
 }
 
-/// The part of compiling a program that does not depend on the backend: resolve, lower,
-/// type-check, optimize, monomorphize, optimize again and mark last uses. What it hands back is
-/// what [`emit_program`] turns into machine code, so a JIT module and an object file built from the
-/// same program can share one of these (see [`lowered`]).
 /// How far monomorphization's inference is from the pinner's on `program`: the program is checked
 /// and pinned, then monomorphized *without* the optimizer, so the trees are the ones the pinner saw,
 /// and every inferred type is compared with the pinned one. See `aipl_mono::probe`.
@@ -3022,9 +3022,23 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     let lowered = aipl_mono::lower_try_set(&lowered);
     aipl_mono::monomorphize_probed(&lowered, Some(&probe), DebugOptions::OFF)
         .map_err(|e| vec![e])?;
-    Ok(probe.report.into_inner())
+    Ok(probe.finish())
 }
 
+/// The checker's stamps (`Expr::ty`) against the pinner's types; see `aipl_mono::probe`.
+pub fn stamp_agreement(program: &Program) -> Result<aipl_mono::probe::StampReport, Vec<Error>> {
+    let frontend = frontend(program)?;
+    let pinned = aipl_mono::pin::pin(&frontend.check_program);
+    Ok(aipl_mono::probe::compare_stamps(
+        &frontend.program,
+        &pinned.program,
+    ))
+}
+
+/// The part of compiling a program that does not depend on the backend: resolve, lower,
+/// type-check, optimize, monomorphize, optimize again and mark last uses. What it hands back is
+/// what [`emit_program`] turns into machine code, so a JIT module and an object file built from the
+/// same program can share one of these (see [`lowered`]).
 fn lower_program(
     program: &Program,
     dbg: DebugOptions,
