@@ -45,9 +45,11 @@
 //! ```
 //!
 //! The first element is peeled off by indexing so `$prev` starts as a value of
-//! the element type rather than an optional — the pass runs before types are
-//! known, so it could not annotate a `mut $prev: T? = none;` — and the loop
-//! then skips that element rather than pairing it with itself. Nothing here can
+//! the element type rather than an optional, and the loop then skips that element
+//! rather than pairing it with itself. Carrying `mut $prev: T? = none` instead
+//! (typed from the receiver's recorded type) is smaller but measured 33% more
+//! instructions on `optimizations/loop_tuple_windows_fusion`: the pairing becomes
+//! an `if let` on an optional that is rebuilt every iteration. Nothing here can
 //! change behaviour: no function is called, `xs` is still evaluated once, and
 //! the pairs reach `body` in the same order.
 //!

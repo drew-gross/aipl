@@ -265,3 +265,12 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   (every literal has a stamp now); `fuse/loop_fusions` peels the first element of a `tuple_windows` loop to avoid
   annotating `mut $prev: T? = none` (the element type is now readable); `counting_variants::is_array` inspects
   declared return types. Not type-related: `known_constructor_elimination` (matches on constructor shape).
+- Session 9: the audit's behaviour-changing wins, measured. (1) `fold_lengths::mentions_number` became
+  `mentions_untyped_number`: a numeral that carries a stamp keeps its width when lifted out of its array, so the
+  index fold no longer refuses elements with numbers. (2) `fold_index` now folds an out-of-range *numeric* index of a
+  non-empty literal into a `none` typed from the literal's stamp (`none_for`). Together: `optimizations/fold_emptiness_and_index`
+  -4.6% instructions, -4.5% code bytes, one fewer allocation; nothing else in arrays/lambdas/generics/strings/
+  optimizations moved. (3) NOT a win, reverted: carrying `mut $prev: T? = none` in the `tuple_windows` fusion instead
+  of peeling the first element is +33% instructions on `loop_tuple_windows_fusion` (24,901 -> 33,243) for 200 fewer
+  code bytes; the peel stays and its comment says why. `counting_variants::is_array` reads declared return types, not
+  a guess about a value, so it is not a candidate.

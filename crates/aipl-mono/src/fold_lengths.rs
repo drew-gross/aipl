@@ -434,21 +434,14 @@ fn count_of(
 ///   literal, or a name ([`stable_index`]). A name an enclosing `let` binds, that
 ///   this walk would carry the index under, is a different name there and is
 ///   refused.
-/// - **The element comes out of its array.** A bare number in `[1, 2]` takes its
-///   width from the array it sits in (`u8[]`), and `some(1)` on its own is
-///   `i64`. The checker has already run, so nothing would catch the change; an
-///   element that mentions a number is therefore left where it is
-///   ([`mentions_number`]), and the fold is missed rather than wrong. The
-///   elements this is for — strings, names, calls — carry their own types.
+/// - **The element comes out of its array.** A bare number in `[1, 2]` takes its width from the
+///   array it sits in (`u8[]`), and `some(1)` on its own is `i64`, unless the number carries the
+///   width the pinner gave it ([`Expr::ty`]). One without a type (a node an earlier pass built)
+///   keeps the fold from happening ([`mentions_untyped_number`]): it is missed rather than wrong.
 ///
-/// An index past the end of a *non-empty* literal is `none` too, but is not
-/// folded: nothing records the type of that `none`, and the element type can
-/// only be read off an empty literal's recorded type.
-///
-/// `none` is typed from the empty literal it replaces: an empty `[]` is
-/// context-typed, so the checker recorded its type on it ([`Expr::ty`]), and the
-/// `none` that stands in for an index into it is that type made optional. An
-/// empty literal with no recorded type is not folded.
+/// An index past the end of a literal is `none` too, typed from the literal's own stamp, once every
+/// element can be dropped. An index that is a name is folded only for an empty literal: for any
+/// other it may land inside.
 fn fold_index(
     whole: &Expr,
     operand: &Expr,
@@ -474,9 +467,11 @@ fn stable_index(index: &Expr) -> bool {
     matches!(index.kind, ExprKind::Num(_) | ExprKind::Ident(_))
 }
 
-/// Whether `e` mentions a number literal anywhere — see [`fold_index`].
-fn mentions_number(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Num(_)) || crate::children(e).any(|c| mentions_number(c))
+/// Whether `e` mentions a number literal the pinner left untyped — see [`fold_index`]. A node
+/// a pass built carries no type; a numeral written in the source always does.
+fn mentions_untyped_number(e: &Expr) -> bool {
+    (matches!(e.kind, ExprKind::Num(_)) && e.ty.is_none())
+        || crate::children(e).any(|c| mentions_untyped_number(c))
 }
 
 /// `e[index]`, computed from `e`'s shape. `whole` is the index expression, whose
@@ -502,7 +497,7 @@ fn index_of(whole: &Expr, e: &Expr, index: &Expr, blocked: &HashSet<String>) -> 
                     let k = usize::try_from(*k).ok()?;
                     match elems.get(k) {
                         Some(picked) => {
-                            if mentions_number(picked) || !droppable(Some(k)) {
+                            if mentions_untyped_number(picked) || !droppable(Some(k)) {
                                 return None;
                             }
                             Some(like(ExprKind::Call(
@@ -511,11 +506,14 @@ fn index_of(whole: &Expr, e: &Expr, index: &Expr, blocked: &HashSet<String>) -> 
                                 false,
                             )))
                         }
-                        None => none_for_empty(whole, e, elems),
+                        // Past the end: nothing is picked, so every element is dropped.
+                        None if droppable(None) => none_for(whole, e),
+                        None => None,
                     }
                 }
                 // Nothing is there at any position.
-                _ => none_for_empty(whole, e, elems),
+                _ if elems.is_empty() => none_for(whole, e),
+                _ => None,
             }
         }
         ExprKind::If(c, a, b) => Some(like(ExprKind::If(
@@ -548,12 +546,9 @@ fn index_of(whole: &Expr, e: &Expr, index: &Expr, blocked: &HashSet<String>) -> 
     }
 }
 
-/// `none`, of the element type of the empty literal `e` — or `None` for a
-/// literal that has elements, or has no recorded type to take it from.
-fn none_for_empty(whole: &Expr, e: &Expr, elems: &[Expr]) -> Option<Expr> {
-    if !elems.is_empty() {
-        return None;
-    }
+/// `none`, of the element type of the array literal `e` — or `None` for a literal with no
+/// stamped type to take it from.
+fn none_for(whole: &Expr, e: &Expr) -> Option<Expr> {
     let Some(Type::Array(element)) = e.ty.as_deref() else {
         return None;
     };

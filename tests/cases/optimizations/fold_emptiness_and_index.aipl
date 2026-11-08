@@ -13,15 +13,14 @@
 #
 # An index is touchier than a count, so it has two guards. Its position must be a
 # literal or a name, so that evaluating it inside each arm cannot differ from
-# evaluating it once after. And an element is only taken out of its array if it
-# mentions no bare number: `[200, 3]` is `u8[]` because of where it sits, and a
-# `200` on its own would be an `i64`. That fold is missed rather than wrong, and
-# `small` below is the program that would notice.
+# evaluating it once after. And an element is only taken out of its array if every
+# bare number in it carries the type the array gave it: `[200, 3]` is `u8[]`
+# because of where it sits, and a `200` on its own would be an `i64`. `small` below
+# is the program that would notice.
 #
-# One fold is missed for want of a type: an index past the end of a *non-empty*
-# literal (`["beta"][1]`) is `none`, but nothing records what it is a `none` of —
-# only an empty `[]` carries the type it was checked against. `second_form` asks
-# for exactly that, to check it still answers correctly; it is not claimed free.
+# An index past the end of a *non-empty* literal (`["beta"][1]`) is `none` of the
+# literal's element type, which the literal's own recorded type supplies.
+# `second_form` asks for exactly that.
 
 import { equal as ==, is_empty, is_nonempty, measure, print, value_or } from builtins;
 

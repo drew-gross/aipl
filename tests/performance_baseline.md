@@ -596,7 +596,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/optimizations/ctor_eq_unwrap | 54 | 3477 | 3477 | 7807 | 10064 |
 | tests/cases/optimizations/filter_emptiness_fusion | 198 | 12412 | 6136 | 15199 | 9600 |
 | tests/cases/optimizations/filter_map_fusion | 17 | 2843 | 17067 | 47938 | 6684 |
-| tests/cases/optimizations/fold_emptiness_and_index | 30 | 2202 | 2146 | 3217 | 12456 |
+| tests/cases/optimizations/fold_emptiness_and_index | 29 | 2146 | 2146 | 3069 | 11900 |
 | tests/cases/optimizations/fold_extends | 36 | 2250 | 2154 | 5583 | 12664 |
 | tests/cases/optimizations/fold_extends_value_or | 49 | 3117 | 3093 | 11934 | 17624 |
 | tests/cases/optimizations/fold_lengths | 22 | 1154 | 1154 | 2049 | 6616 |
