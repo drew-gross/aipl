@@ -63,11 +63,9 @@
 //! A `str` is the `char` sequence too, and `extend` takes a `str` receiver where
 //! `push` does not ("push requires an array, got str"). Rewriting
 //! `set s.extend(['c', 'd'])` into pushes would therefore stop compiling. This
-//! pass runs before monomorphization and cannot ask what `v` is — so it asks the
-//! *declaration* instead, and emits a push only for a receiver annotated as an
-//! array ([`ArrayReceivers`]). A `mut` array seeded with `[]` has to be
-//! annotated anyway, nothing else being able to pin its element type, so in
-//! practice the annotation is there. The rows that append a whole sequence need
+//! pass asks what `v` was declared as, and emits a push only for a receiver annotated as an
+//! array, or seeded with an array literal or a reservation ([`ArrayReceivers`]); what a
+//! source is comes from the type the pinner stamped on it. The rows that append a whole sequence need
 //! none of this: `extend` is what they emit, and it takes either receiver.
 //!
 //! # Why there is no reservation
@@ -114,11 +112,11 @@ pub fn fold_extends(program: &Program, scope: &Scope) -> Program {
 
 fn folded_fn(f: &Function) -> Function {
     let mut out = f.clone();
-    out.body = fold_expr(&f.body, &mut ArrayReceivers::of_function(f, &f.body));
+    out.body = fold_expr(&f.body, &mut ArrayReceivers::from_params(&f.sig.params));
     out.test_body = f
         .test_body
         .as_ref()
-        .map(|t| fold_expr(t, &mut ArrayReceivers::of_function(f, t)));
+        .map(|t| fold_expr(t, &mut ArrayReceivers::from_params(&f.sig.params)));
     out
 }
 
@@ -131,10 +129,6 @@ fn folded_fn(f: &Function) -> Function {
 #[derive(Default)]
 struct ArrayReceivers {
     receivers: Vec<(String, bool)>,
-    /// The names declared to hold an array and bound exactly once in the function, so
-    /// that no inner binding can mean something else by the same spelling — see
-    /// [`ArrayReceivers::known_array`].
-    arrays: std::collections::HashSet<String>,
     /// Hoisted keyword arguments bound to an empty sequence.
     ///
     /// The loader fills an omitted keyword argument by binding the default once
@@ -158,35 +152,11 @@ impl ArrayReceivers {
         }
     }
 
-    /// The receivers of `f`, and the names `body` binds exactly once to an array.
-    fn of_function(f: &Function, body: &Expr) -> ArrayReceivers {
-        let mut counts = std::collections::HashMap::new();
-        let mut candidates = std::collections::HashSet::new();
-        for p in &f.sig.params {
-            *counts.entry(p.name.clone()).or_insert(0usize) += 1;
-            if is_array(&p.ty) {
-                candidates.insert(p.name.clone());
-            }
-        }
-        bound_names(body, &mut counts, &mut candidates);
-        let mut out = ArrayReceivers::from_params(&f.sig.params);
-        out.arrays = candidates
-            .into_iter()
-            .filter(|n| counts.get(n) == Some(&1))
-            .collect();
-        out
-    }
-
-    /// Whether `e` is certainly an array: a literal, or a name that is declared one and
-    /// bound nowhere else in the function. Types are not known this early, and
-    /// `xs.map(f)` over an optional is a different thing from the same spelling over
-    /// an array, so a fold that only holds for arrays asks this first.
+    /// Whether `e` is certainly an array: a literal, or anything the pinner typed as one.
+    /// `xs.map(f)` over an optional is a different thing from the same spelling over an
+    /// array, so a fold that only holds for arrays asks this first.
     fn known_array(&self, e: &Expr) -> bool {
-        match &e.kind {
-            ExprKind::ArrayLit(_) => true,
-            ExprKind::Ident(n) => self.arrays.contains(n),
-            _ => false,
-        }
+        matches!(e.kind, ExprKind::ArrayLit(_)) || value_is_array(e)
     }
 
     /// Whether `name` is declared to hold an array. Innermost declaration wins.
@@ -200,12 +170,16 @@ impl ArrayReceivers {
 
     /// A `mut` binding is an array when it says so, or when it starts as an array literal.
     fn declare(&mut self, name: &str, ty: &Option<Type>, value: &Expr) {
-        let holds = ty.as_ref().is_some_and(is_array)
-            || (ty.is_none()
-                && matches!(
-                    value.kind,
-                    ExprKind::ArrayLit(_) | ExprKind::Call(Callee::ArrReserve, ..)
-                ));
+        let holds = match ty {
+            Some(ty) => is_array(ty),
+            // Stamped arrays are not enough: pushing into a receiver that merely holds some
+            // other function's array measured worse than the `extend` it replaces, so only a
+            // receiver that starts as a literal or a reservation is taken for one.
+            None => matches!(
+                value.kind,
+                ExprKind::ArrayLit(_) | ExprKind::Call(Callee::ArrReserve, ..)
+            ),
+        };
         self.receivers.push((name.to_string(), holds));
     }
 
@@ -241,54 +215,9 @@ impl ArrayReceivers {
     }
 }
 
-/// Count every binder in `e` by name, and note the ones bound to something that is an array
-/// (an array annotation, or an array literal / reserved array as the initializer).
-fn bound_names(
-    e: &Expr,
-    counts: &mut std::collections::HashMap<String, usize>,
-    arrays: &mut std::collections::HashSet<String>,
-) {
-    let mut bind = |name: &str| *counts.entry(name.to_string()).or_insert(0) += 1;
-    match &e.kind {
-        ExprKind::Let(n, ty, value, _) | ExprKind::LetMut(n, ty, value, _) => {
-            bind(n);
-            if ty.as_ref().is_some_and(is_array)
-                || matches!(
-                    &value.kind,
-                    ExprKind::ArrayLit(_)
-                        | ExprKind::Call(Callee::ArrReserve | Callee::WithCapacity, ..)
-                )
-            {
-                arrays.insert(n.clone());
-            }
-        }
-        ExprKind::For(n, index, ..) => {
-            for b in aipl_syntax::loop_binders(n, index) {
-                bind(&b);
-            }
-        }
-        ExprKind::Match(_, arms) => {
-            for a in arms {
-                for b in a.pattern.bindings() {
-                    bind(&b);
-                }
-            }
-        }
-        ExprKind::IfLet(arm, ..) => {
-            for b in arm.pattern.bindings() {
-                bind(&b);
-            }
-        }
-        ExprKind::Lambda(params, _) => {
-            for p in params {
-                bind(&p.name);
-            }
-        }
-        _ => {}
-    }
-    for child in crate::children(e) {
-        bound_names(child, counts, arrays);
-    }
+/// Whether the pinner typed `e` as an array. A `str` is its own type, not an array.
+fn value_is_array(e: &Expr) -> bool {
+    e.ty.as_deref().is_some_and(is_array)
 }
 
 fn is_array(t: &Type) -> bool {
@@ -704,10 +633,16 @@ mod tests {
     #[test]
     fn a_map_is_only_extended_from_a_known_array() {
         let map = |xs: Expr| e(ExprKind::Call(Callee::Map, vec![xs, id("f")], true));
-        let mut known = array_receiver();
-        known.arrays.insert("xs".to_string());
+        let known = array_receiver();
+        let array_xs = || {
+            let mut xs = id("xs");
+            xs.ty = Some(Box::new(Type::Array(Box::new(Type::Primitive(
+                aipl_syntax::ast::Primitive::I64,
+            )))));
+            xs
+        };
 
-        let whole = extend_of(map(id("xs")));
+        let whole = extend_of(map(array_xs()));
         let out = appended(extend_statement(&whole).expect("shape"), &known)
             .expect("a known array is walked");
         assert!(format!("{out:?}").contains("ExtendMap"), "{out:?}");
@@ -717,9 +652,8 @@ mod tests {
         assert!(appended(extend_statement(&whole).expect("shape"), &known).is_none());
 
         // A known array into a receiver that is not declared one (a `str` takes no `extend_map`).
-        let whole = extend_of(map(id("xs")));
-        let mut str_receiver = receivers(false);
-        str_receiver.arrays.insert("xs".to_string());
+        let whole = extend_of(map(array_xs()));
+        let str_receiver = receivers(false);
         assert!(appended(extend_statement(&whole).expect("shape"), &str_receiver).is_none());
     }
 

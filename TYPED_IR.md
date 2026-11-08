@@ -161,8 +161,21 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         What remains to delete (`Num` flexing via `flex_int_ty`, `drop_none`/`is_unpinned_optional`, `drop_lit`)
         needs call-site `type_args`, i.e. 2d.
   - [ ] **2d. Substitution over `TExpr`** for what remains, once the passes (stage 3) hand mono a pinned tree.
-- [ ] **3. Port the passes**: pre-mono first, then post-mono. After each, `--- report ---` and baseline rows must
-      not move.
+- [~] **3. Passes read types instead of guessing them.** Revised in Session 8: porting every pass to `TExpr` is a
+      type-safety nicety, not what stops the optimizations. What stops them is that they cannot ask a node's type,
+      and since stage 2 every node carries `Expr::ty` (pre-mono, from the pinner; post-mono, from `infer`). So the
+      work is: make each pass read the stamp where it guessed, keep stamps right where a pass builds nodes, and
+      only then (stage 4) make the type mandatory by switching representation. After each step `--- report ---`
+      and baseline rows must not move.
+  - [x] `fold_extends`: `ArrayReceivers`' per-function declaration census (`bound_names`, the once-bound rule,
+        `of_function`) is gone; a source is an array when the pinner stamped it one. The *receiver* rule stays
+        syntactic on purpose (annotated, or seeded by `[]`/a reservation): a receiver that merely holds another
+        function's array measured worse when pushed into (`optimizations/fold_extends_value_or`).
+  - [x] Post-mono nodes are typed: `Mono::infer` stamps every node it returns with its inferred type (not unit,
+        not a placeholder or `ConcatStr`), so passes over the `MonoProgram` can read `e.ty`. Nothing reads them
+        yet.
+  - [ ] Passes that still guess or are syntactic about types: see the audit list in the notes (Session 8).
+  - [ ] Keep stamps right where a pass builds or moves nodes (the stale stamps found in Session 7).
 - [ ] **4. Retire the old.** Delete `check.rs`, `ArrayReceivers`/`holds_array`/`known_array`,
       `narrows_literal_array`, `is_unpinned_optional`, `Expr::ty` stamping; the pinner becomes the checker and
       the diagnostics sections are refilled. Behaviour-changing wins (fold_extends on exact types, ...) are
@@ -243,3 +256,12 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   reproduced first, or the moved rows accepted as their own measured change.
 - Session 7: stage 2c begun. The oracle also pins the synthesized `__test$` programs (`check`'s own driver
   programs). Literal widths now come from the stamp (see 2c above); the blanket-stamp experiment is recorded there.
+- Session 8: stage 3 reframed (see above). `fold_extends` reads stamps (`known_array`), `Mono::infer` stamps its
+  output. Baseline rows did not move across arrays/lambdas/generics/optimizations/strings/loops.
+- Session 8 audit of passes that still work around missing types (each is a candidate for the next step, and a
+  behaviour-changing win with its own measurement): `fold_lengths::mentions_number` skips a literal array whose
+  elements mention a number because their widths were unknown (the stamps now say); `fold_lengths::fold_index`
+  folds an out-of-range index only into an *empty* literal because only its recorded type could type the `none`
+  (every literal has a stamp now); `fuse/loop_fusions` peels the first element of a `tuple_windows` loop to avoid
+  annotating `mut $prev: T? = none` (the element type is now readable); `counting_variants::is_array` inspects
+  declared return types. Not type-related: `known_constructor_elimination` (matches on constructor shape).

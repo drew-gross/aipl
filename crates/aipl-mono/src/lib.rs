@@ -6620,7 +6620,15 @@ impl Mono<'_> {
     }
 
     fn infer(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
-        let result = self.infer_node(expr, env)?;
+        let mut result = self.infer_node(expr, env)?;
+        // Every node leaves inference saying what it is, so the passes that run on the
+        // monomorphized program read a type instead of re-deriving one.
+        if result.0.ty.is_none()
+            && !matches!(result.1, Type::Unit)
+            && !mentions_pseudo_type(&result.1)
+        {
+            result.0.ty = Some(Box::new(result.1.clone()));
+        }
         if let (Some(probe), Some(subst)) = (self.probe, &self.cur_subst) {
             probe.compare(&self.cur_template, subst, expr, &result.1);
         }
@@ -10464,6 +10472,19 @@ fn is_plain(t: &Type) -> bool {
         Type::Primitive(_) => true,
         Type::Array(inner) => is_plain(inner),
         _ => false,
+    }
+}
+
+/// Whether `t` is, or contains, a type that only exists during monomorphization: a placeholder
+/// or the `ConcatStr` representation.
+fn mentions_pseudo_type(t: &Type) -> bool {
+    match t {
+        Type::ConcatStr => true,
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => mentions_pseudo_type(i),
+        Type::Dict(k, v) | Type::Result(k, v) => mentions_pseudo_type(k) || mentions_pseudo_type(v),
+        Type::Fn(ps, r) => ps.iter().any(mentions_pseudo_type) || mentions_pseudo_type(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_pseudo_type),
+        _ => has_placeholder(t),
     }
 }
 
