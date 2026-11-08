@@ -24,14 +24,23 @@ fn aipl_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-#[test]
-#[ignore = "author helper: prints how much of the corpus the pinner covers"]
-fn oracle_report() {
+/// How far the pinner and the checker disagree over `dirs`: functions the pinner cannot type yet,
+/// functions it rejects that the checker (and the file's own expectations) accept, and programs
+/// the checker rejects that it accepts.
+struct Disagreement {
+    gaps: usize,
+    false_rejections: usize,
+    misses: usize,
+    report: String,
+}
+
+fn oracle(dirs: &[&str]) -> Disagreement {
     aipl::install_parser_hooks();
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut files = Vec::new();
-    aipl_files(&root.join("tests/cases"), &mut files);
-    aipl_files(&root.join("crates"), &mut files);
+    for dir in dirs {
+        aipl_files(&root.join(dir), &mut files);
+    }
     if let Ok(only) = std::env::var("AIPL_CASE") {
         files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
     }
@@ -47,32 +56,39 @@ fn oracle_report() {
             skipped += 1;
             continue;
         };
-        let Ok(frontend) = aipl::codegen::frontend(&program) else {
-            // The checker rejects this program: the pinner must find something wrong with it too.
-            match aipl::codegen::lowered_for_check(&program) {
-                Ok((_, lowered)) => {
-                    let result = pin(&lowered);
-                    let found = result
-                        .failures
-                        .iter()
-                        .any(|(_, f)| matches!(f, Failure::Rejected(_)));
-                    if found {
-                        both_reject += 1;
-                    } else {
-                        let gap = result
+        let frontend = match aipl::codegen::frontend(&program) {
+            Ok(f) => f,
+            Err(errors) => {
+                let first = errors
+                    .first()
+                    .map(|e| e.message.lines().next().unwrap_or("").to_string())
+                    .unwrap_or_default();
+                // The checker rejects this program: the pinner must find something wrong with it too.
+                match aipl::codegen::lowered_for_check(&program) {
+                    Ok((_, lowered)) => {
+                        let result = pin(&lowered);
+                        let found = result
                             .failures
                             .iter()
-                            .any(|(_, f)| matches!(f, Failure::Gap(..)));
-                        pinner_misses.push(format!(
-                            "{}{}",
-                            file.display(),
-                            if gap { " (a gap hides it)" } else { "" }
-                        ));
+                            .any(|(_, f)| matches!(f, Failure::Rejected(_)));
+                        if found {
+                            both_reject += 1;
+                        } else {
+                            let gap = result
+                                .failures
+                                .iter()
+                                .any(|(_, f)| matches!(f, Failure::Gap(..)));
+                            pinner_misses.push(format!(
+                                "{}{} -- {first}",
+                                file.display(),
+                                if gap { " (a gap hides it)" } else { "" }
+                            ));
+                        }
                     }
+                    Err(_) => skipped += 1,
                 }
-                Err(_) => skipped += 1,
+                continue;
             }
-            continue;
         };
         programs += 1;
         let result = pin(&frontend.check_program);
@@ -100,21 +116,44 @@ fn oracle_report() {
                         .entry(what.clone())
                         .or_insert_with(|| format!("{} in {name}", file.display()));
                 }
+                Failure::Rejected(_)
+                    if std::fs::read_to_string(file)
+                        .is_ok_and(|src| src.contains("--- check --compile ---")) =>
+                {
+                    // The file records that it does not compile; the checker stops later.
+                }
                 Failure::Rejected(e) => {
                     rejected += 1;
                     *rejections.entry(e.message.clone()).or_default() += 1;
+                    let at = e
+                        .span
+                        .as_ref()
+                        .and_then(|sp| {
+                            let src = std::fs::read_to_string(file).ok()?;
+                            let text = src.get(sp.start..sp.end.min(sp.start + 60))?;
+                            Some(format!(" at `{}`", text.lines().next().unwrap_or("")))
+                        })
+                        .unwrap_or_default();
                     examples
                         .entry(e.message.clone())
-                        .or_insert_with(|| format!("{} in {name}", file.display()));
+                        .or_insert_with(|| format!("{} in {name}{at}", file.display()));
                 }
             }
         }
     }
-    println!(
+    use std::fmt::Write;
+    let mut report = String::new();
+    writeln!(
+        report,
         "files: {} programs checked: {programs} (skipped {skipped})",
         files.len()
-    );
-    println!("functions: pinned {pinned}, gap {gaps}, rejected-but-checker-accepted {rejected}");
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "functions: pinned {pinned}, gap {gaps}, rejected-but-checker-accepted {rejected}"
+    )
+    .unwrap();
     let top = |m: &BTreeMap<String, usize>| {
         let mut v: Vec<_> = m.iter().collect();
         v.sort_by(|a, b| b.1.cmp(a.1));
@@ -124,14 +163,44 @@ fn oracle_report() {
             .collect::<Vec<_>>()
             .join("\n")
     };
-    println!(
+    writeln!(
+        report,
         "checker-rejected programs: both reject {both_reject}, pinner accepts {}",
         pinner_misses.len()
-    );
-    println!("--- gaps ---\n{}", top(&gap_kinds));
-    println!("--- rejections ---\n{}", top(&rejections));
-    println!(
+    )
+    .unwrap();
+    writeln!(report, "--- gaps ---\n{}", top(&gap_kinds)).unwrap();
+    writeln!(report, "--- rejections ---\n{}", top(&rejections)).unwrap();
+    writeln!(
+        report,
         "--- the pinner accepts what the checker rejects ---\n{}",
         pinner_misses.join("\n")
+    )
+    .unwrap();
+    Disagreement {
+        gaps,
+        false_rejections: rejected,
+        misses: pinner_misses.len(),
+        report,
+    }
+}
+
+/// Author helper: how much of the whole corpus (cases and the compiler's own sources) the pinner
+/// covers, and what it stumbles on. `AIPL_CASE=a,b` narrows it by path.
+#[test]
+#[ignore = "author helper: prints how much of the corpus the pinner covers"]
+fn oracle_report() {
+    println!("{}", oracle(&["tests/cases", "crates"]).report);
+}
+
+/// The pinner types every program the checker accepts, and rejects every program it rejects.
+/// (The compiler's own sources are left to `oracle_report`: they are most of the cost.)
+#[test]
+fn the_pinner_agrees_with_the_checker() {
+    let d = oracle(&["tests/cases"]);
+    assert!(
+        d.gaps == 0 && d.false_rejections == 0 && d.misses == 0,
+        "the pinner and the checker disagree:\n{}",
+        d.report
     );
 }

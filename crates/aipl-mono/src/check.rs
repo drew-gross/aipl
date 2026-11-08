@@ -171,7 +171,11 @@ pub(crate) const TUPLE_TEMPLATE: &str = "__tuple";
 /// it *and no other effect*. So a missing `!measure` means a call to `measure`
 /// from anywhere else, and a caller that has `!measure` is a `.benchmark`
 /// block that reached for an effect — which is not supported there yet.
-fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[String]) -> String {
+pub(crate) fn undeclared_effect_message(
+    callee: &str,
+    effect: &str,
+    caller_effects: &[String],
+) -> String {
     if effect == "measure" {
         format!("fn {callee:?} can only be called from a `.benchmark` block")
     } else if caller_effects.iter().any(|e| e == "measure") {
@@ -203,7 +207,7 @@ fn undeclared_effect_message(callee: &str, effect: &str, caller_effects: &[Strin
 /// written `match (x) { .. };` — with the semicolon that makes it a statement,
 /// and the same semicolon is what makes a mutating `if` or `shim` one.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Pos {
+pub(crate) enum Pos {
     /// The value is consumed: a binding's initializer, a call argument, a
     /// block's trailing expression, an operand.
     Value,
@@ -273,7 +277,7 @@ fn outer_assign(body: &Expr, declared: &HashSet<String>) -> Option<(String, Span
 ///
 /// `if let` is a [`ValueForm::If`]: the keyword a reader sees is `if`, and it is
 /// made a statement the same way.
-enum ValueForm {
+pub(crate) enum ValueForm {
     Match,
     If,
     Shim,
@@ -304,7 +308,11 @@ impl ValueForm {
 /// `declared` is what the block itself binds before its first statement — a
 /// pattern's binders, or nothing — and [`outer_assign`] grows it as it walks, so
 /// a block driving its own `mut` to compute its value is untouched.
-fn no_outer_assign(body: &Expr, declared: &HashSet<String>, form: ValueForm) -> Result<(), Error> {
+pub(crate) fn no_outer_assign(
+    body: &Expr,
+    declared: &HashSet<String>,
+    form: ValueForm,
+) -> Result<(), Error> {
     let (part, kw, make_stmt) = form.words();
     match outer_assign(body, declared) {
         None => Ok(()),
@@ -1833,7 +1841,7 @@ impl<'a> Cx<'a> {
 
 /// The refusal of a default on the type parameter of a declaration other than a
 /// function: only a call has an inference for a default to stand in for.
-fn defaults_only_on_functions(kind: &str, name: &aipl_syntax::SpanStr) -> Error {
+pub(crate) fn defaults_only_on_functions(kind: &str, name: &aipl_syntax::SpanStr) -> Error {
     Error::at(
         format!(
             "{kind} {:?}: a type parameter's default is for a function, where a call can leave \
@@ -3261,220 +3269,13 @@ impl Cx<'_> {
         Ok(match_scrutinee_ty(st))
     }
 
-    /// Type a nested pattern against `ty`: the binders it introduces, each with
-    /// the type of the value it names, and the pattern as the matrix algorithm
-    /// reads it (`patterns::Pat`), built here because a `Ctor(..)`'s arity is
-    /// only known against the type.
-    ///
-    /// The rules per form: a tuple pattern needs a tuple of that arity; a
-    /// constructor needs a case of its type with as many slots as it has
-    /// sub-patterns; a literal needs the scalar it spells; a binder or `_`
-    /// takes anything. A name in a nested slot is a binder unless it spells a
-    /// case (see `Pattern::normalized`), and a capitalised binder that names no
-    /// case of the type is refused rather than silently bound.
     fn bind_nested(
         &self,
         pattern: &Pattern,
         ty: &Type,
         span: Span,
     ) -> Result<(patterns::Pat, Vec<(String, Type)>), Error> {
-        let (pat, binders) = self.bind_nested_inner(pattern, ty, &span)?;
-        let mut seen: Vec<&str> = Vec::new();
-        for (name, _) in &binders {
-            if seen.contains(&name.as_str()) {
-                return Err(Error::at(
-                    format!("binder {name:?} appears more than once in this pattern"),
-                    span,
-                ));
-            }
-            seen.push(name);
-        }
-        Ok((pat, binders))
-    }
-
-    /// The element type a `[..]` pattern's slots match against: an array's
-    /// element, or `char` for a `str`, whose destructuring reads it as one.
-    fn seq_elem_ty(&self, ty: &Type) -> Option<Type> {
-        match ty {
-            Type::Array(e) => Some((**e).clone()),
-            _ if is_str_repr(ty) => Some(Type::Primitive(Primitive::Char)),
-            _ if is_typevar(ty) => Some(ty.clone()),
-            _ => None,
-        }
-    }
-
-    fn bind_nested_inner(
-        &self,
-        pattern: &Pattern,
-        ty: &Type,
-        span: &Span,
-    ) -> Result<(patterns::Pat, Vec<(String, Type)>), Error> {
-        use patterns::{Lit, Pat};
-        Ok(match pattern {
-            Pattern::Wildcard => (Pat::Wild, Vec::new()),
-            Pattern::Bind(name) => (Pat::Wild, vec![(name.clone(), ty.clone())]),
-            Pattern::Int(n) => {
-                if !aipl_syntax::is_int_ty(ty) && !is_typevar(ty) {
-                    return Err(Error::at(
-                        format!("integer pattern {n} matches an integer, not {}", tyname(ty)),
-                        span.clone(),
-                    ));
-                }
-                (Pat::Lit(Lit::Int(*n)), Vec::new())
-            }
-            Pattern::Str(s) => {
-                if !is_str_repr(ty) && !is_typevar(ty) {
-                    return Err(Error::at(
-                        format!("string-literal pattern matches a str, not {}", tyname(ty)),
-                        span.clone(),
-                    ));
-                }
-                (Pat::Lit(Lit::Str(s.clone())), Vec::new())
-            }
-            Pattern::Char(c) => {
-                if !matches!(ty, Type::Primitive(Primitive::Char)) && !is_typevar(ty) {
-                    return Err(Error::at(
-                        format!("char-literal pattern matches a char, not {}", tyname(ty)),
-                        span.clone(),
-                    ));
-                }
-                (Pat::Lit(Lit::Char(*c)), Vec::new())
-            }
-            // A `..` array pattern is compiled directly, by length, and a nested
-            // match is a decision tree over exact lengths; the two do not mix.
-            Pattern::ArrayRest(_) => {
-                return Err(Error::at(
-                    "an array pattern ending in `..` cannot share a `match` with a nested \
-                     pattern — write the nested arms in their own `match`"
-                        .to_string(),
-                    span.clone(),
-                ))
-            }
-            Pattern::Array(_) | Pattern::ArrayNested(_) => {
-                let ps = &pattern
-                    .array_elems()
-                    .expect("both array forms answer `array_elems`");
-                let elem = self.seq_elem_ty(ty).ok_or_else(|| {
-                    Error::at(
-                        format!(
-                            "`[..]` pattern matches an array or a str, not {}",
-                            tyname(ty)
-                        ),
-                        span.clone(),
-                    )
-                })?;
-                let mut subs = Vec::with_capacity(ps.len());
-                let mut binders = Vec::new();
-                for sub in ps {
-                    let (pat, bs) = self.bind_nested_inner(sub, &elem, span)?;
-                    subs.push(pat);
-                    binders.extend(bs);
-                }
-                // One synthetic constructor per length: rows of different
-                // lengths never specialize against each other, which is exactly
-                // how `[a]` and `[a, b]` tell two alternatives apart. An array
-                // type's signature is `Open`, so the match still needs a `_`.
-                (Pat::Ctor(patterns::array_ctor(ps.len()), subs), binders)
-            }
-            Pattern::Tuple(ps) => {
-                let Some(elems) = self.tuple_elems(ty) else {
-                    return Err(Error::at(
-                        format!(
-                            "tuple pattern of {} matches a tuple, not {}",
-                            ps.len(),
-                            tyname(ty)
-                        ),
-                        span.clone(),
-                    ));
-                };
-                if elems.len() != ps.len() {
-                    return Err(Error::at(
-                        format!(
-                            "tuple pattern has {} elements, but {} has {}",
-                            ps.len(),
-                            tyname(ty),
-                            elems.len()
-                        ),
-                        span.clone(),
-                    ));
-                }
-                let mut subs = Vec::with_capacity(ps.len());
-                let mut binders = Vec::new();
-                for (p, t) in ps.iter().zip(&elems) {
-                    let (sp, b) = self.bind_nested_inner(p, t, span)?;
-                    subs.push(sp);
-                    binders.extend(b);
-                }
-                (Pat::Ctor(patterns::TUPLE.to_string(), subs), binders)
-            }
-            Pattern::Ctor {
-                name,
-                bindings,
-                ignore_payload,
-            } => {
-                let payload = self.pattern_case_payload(ty, name, span)?;
-                // The matrix compares against the type's own case names, which
-                // are bare; a pattern's may carry its `@Variant` qualification.
-                let name = name.split('@').next().unwrap_or(name).to_string();
-                if *ignore_payload {
-                    if payload.is_empty() {
-                        return Err(Error::at(
-                            format!(
-                                "constructor {name:?} carries no payload, so \"..\" ignores \
-                                 nothing — write {name:?} instead"
-                            ),
-                            span.clone(),
-                        ));
-                    }
-                    return Ok((
-                        Pat::Ctor(name.clone(), vec![Pat::Wild; payload.len()]),
-                        Vec::new(),
-                    ));
-                }
-                if bindings.len() != payload.len() {
-                    return Err(Error::at(
-                        format!(
-                            "constructor {name:?} binds {} value(s), but {} given",
-                            payload.len(),
-                            bindings.len()
-                        ),
-                        span.clone(),
-                    ));
-                }
-                let binders: Vec<(String, Type)> = bindings
-                    .iter()
-                    .zip(payload.iter())
-                    .filter(|(b, _)| b.as_str() != "_")
-                    .map(|(b, t)| (b.clone(), t.clone()))
-                    .collect();
-                (
-                    Pat::Ctor(name.clone(), vec![Pat::Wild; payload.len()]),
-                    binders,
-                )
-            }
-            Pattern::Nested { name, args } => {
-                let payload = self.pattern_case_payload(ty, name, span)?;
-                let name = name.split('@').next().unwrap_or(name).to_string();
-                if args.len() != payload.len() {
-                    return Err(Error::at(
-                        format!(
-                            "constructor {name:?} carries {} value(s), but the pattern has {}",
-                            payload.len(),
-                            args.len()
-                        ),
-                        span.clone(),
-                    ));
-                }
-                let mut subs = Vec::with_capacity(args.len());
-                let mut binders = Vec::new();
-                for (p, t) in args.iter().zip(&payload) {
-                    let (sp, b) = self.bind_nested_inner(p, t, span)?;
-                    subs.push(sp);
-                    binders.extend(b);
-                }
-                (Pat::Ctor(name.clone(), subs), binders)
-            }
-        })
+        crate::match_check::bind_nested(self, pattern, ty, span)
     }
 
     /// The element types of a tuple type — the synthetic struct a tuple lowers
@@ -3492,54 +3293,6 @@ impl Cx<'_> {
         }
     }
 
-    /// The payload types of case `name` of `ty` — `some`/`none` of an optional,
-    /// `ok`/`err` of a result, or a variant's case — or an error naming what
-    /// `ty` does offer.
-    fn pattern_case_payload(&self, ty: &Type, name: &str, span: &Span) -> Result<Vec<Type>, Error> {
-        let bare: &str = name.split('@').next().unwrap_or(name);
-        self.note_case(ty, bare);
-        match ty {
-            Type::Optional(inner) => match bare {
-                "some" => Ok(vec![(**inner).clone()]),
-                "none" => Ok(vec![]),
-                other => Err(Error::at(
-                    format!("\"match\" on an optional expects \"some\"/\"none\", got {other:?}"),
-                    span.clone(),
-                )),
-            },
-            Type::Result(ok, err) => match bare {
-                "ok" if is_unit(ok) => Ok(vec![]),
-                "ok" => Ok(vec![(**ok).clone()]),
-                "err" => Ok(vec![(**err).clone()]),
-                other => Err(Error::at(
-                    format!("\"match\" on a result expects \"ok\"/\"err\", got {other:?}"),
-                    span.clone(),
-                )),
-            },
-            _ if self.cases_of(ty).is_some() => {
-                let cases = self.cases_of(ty).expect("just checked");
-                match cases.into_iter().find(|(c, _)| c.as_str() == bare) {
-                    Some((_, p)) => Ok(p),
-                    None => Err(Error::at(
-                        format!("{} has no constructor {bare:?}", tyname(ty)),
-                        span.clone(),
-                    )),
-                }
-            }
-            other => Err(Error::at(
-                format!(
-                    "constructor pattern {bare:?} needs an optional, result or variant, got {}",
-                    tyname(other)
-                ),
-                span.clone(),
-            )),
-        }
-    }
-
-    /// A match with nested patterns is exhaustive when no value escapes every
-    /// arm, and every arm must be reachable — both asked of the matrix
-    /// algorithm (`patterns::useful`), with the witness it hands back naming
-    /// what is missing.
     fn check_nested_exhaustive(
         &self,
         rows: &[patterns::Row],
@@ -3547,147 +3300,16 @@ impl Cx<'_> {
         arms: &[MatchArm],
         span: Span,
     ) -> Result<(), Error> {
-        use patterns::Pat;
-        let tys = [st.clone()];
-        for (i, arm) in arms.iter().enumerate() {
-            if patterns::useful(&rows[..i], &rows[i], &tys, self).is_none() {
-                return Err(Error::at(
-                    "unreachable arm: every value it matches is matched by an arm above it"
-                        .to_string(),
-                    arm.span.clone(),
-                ));
-            }
-        }
-        if let Some(witness) = patterns::useful(rows, &[Pat::Wild], &tys, self) {
-            let what = patterns::render(&witness[0]);
-            let message = if what == "_" {
-                // An open domain (a literal column) with no catch-all: there is
-                // no one value to name.
-                "non-exhaustive match: not every value is matched — add a `_` or binder arm"
-                    .to_string()
-            } else {
-                format!("non-exhaustive match: {what} is not matched")
-            };
-            return Err(Error::at(message, span));
-        }
-        Ok(())
+        crate::match_check::check_nested_exhaustive(self, rows, st, arms, span)
     }
 
-    /// Every constructor of the scrutinee's type must be matched exactly once.
     fn check_match_exhaustive(
         &self,
         st: &Type,
         arms: &[MatchArm],
         span: Span,
     ) -> Result<(), Error> {
-        // A `str` / array match compares by exact equality and is open-domain, so
-        // it must end with a wildcard `_` arm (the default). Arms are tried
-        // top-to-bottom, so the `_` must be last (anything after it is
-        // unreachable), and the literal patterns must be distinct (a duplicate is
-        // the only way an earlier arm makes a later one unreachable under exact
-        // matching).
-        if is_str_repr(st) || matches!(st, Type::Array(_) | Type::Primitive(Primitive::Char)) {
-            let noun = if is_str_repr(st) {
-                "a str"
-            } else if matches!(st, Type::Primitive(Primitive::Char)) {
-                "a char"
-            } else {
-                "an array"
-            };
-            for (idx, arm) in arms.iter().enumerate() {
-                // The `_` arm must be last.
-                if matches!(arm.pattern, Pattern::Wildcard) && idx != arms.len() - 1 {
-                    return Err(Error::at(
-                        "the `_` arm must be last (arms after it are unreachable)".to_string(),
-                        arm.span.clone(),
-                    ));
-                }
-                // A duplicate literal pattern is dead code. (`Pattern: Eq`, so this
-                // compares string literals and array-literal element lists alike.)
-                if !matches!(arm.pattern, Pattern::Wildcard)
-                    && arms[..idx].iter().any(|p| p.pattern == arm.pattern)
-                {
-                    let what = match &arm.pattern {
-                        Pattern::Str(lit) => format!("duplicate {lit:?} arm"),
-                        Pattern::Char(c) => {
-                            format!("duplicate {:?} arm", char::from(*c))
-                        }
-                        _ => "duplicate match arm".to_string(),
-                    };
-                    return Err(Error::at(what, arm.span.clone()));
-                }
-            }
-            if !matches!(arms.last(), Some(a) if matches!(a.pattern, Pattern::Wildcard)) {
-                return Err(Error::at(
-                    format!("non-exhaustive match on {noun}: add a `_` arm"),
-                    span.clone(),
-                ));
-            }
-            return Ok(());
-        }
-        let required: Vec<String> = match st {
-            Type::Optional(_) => vec!["some".into(), "none".into()],
-            Type::Result(_, _) => vec!["ok".into(), "err".into()],
-            // A concrete or (abstract) generic variant — every case must appear.
-            _ if self.cases_of(st).is_some() => self
-                .cases_of(st)
-                .expect("just checked")
-                .into_iter()
-                .map(|(c, _)| c)
-                .collect(),
-            // A non-matchable scrutinee already errored in `match_arm_bindings`.
-            _ => return Ok(()),
-        };
-        let mut seen: HashSet<&str> = HashSet::new();
-        for arm in arms {
-            // Non-constructor patterns already errored in `match_arm_bindings`.
-            let Pattern::Ctor { name, .. } = &arm.pattern else {
-                continue;
-            };
-            // Patterns may be variant-qualified (`Case@Variant`); compare against
-            // the bare case names the variant declares.
-            let bare = name.split('@').next().unwrap_or(name);
-            if !seen.insert(bare) {
-                return Err(Error::at(
-                    format!("duplicate \"{bare}\" arm"),
-                    arm.span.clone(),
-                ));
-            }
-        }
-        let missing: Vec<&str> = required
-            .iter()
-            .map(String::as_str)
-            .filter(|c| !seen.contains(c))
-            .collect();
-        // A `_` arm covers whatever is left. It has to be last, since arms
-        // after it can never run, and it has to have something left to cover,
-        // or it is dead itself — which is the shape that would otherwise go
-        // quiet the moment someone removes the last case it stood for.
-        if let Some(i) = arms
-            .iter()
-            .position(|a| matches!(a.pattern, Pattern::Wildcard))
-        {
-            if i != arms.len() - 1 {
-                return Err(Error::at(
-                    "the `_` arm must be last (arms after it are unreachable)".to_string(),
-                    arms[i].span.clone(),
-                ));
-            }
-            if missing.is_empty() {
-                return Err(Error::at(
-                    "unreachable `_` arm: every case is already matched above it".to_string(),
-                    arms[i].span.clone(),
-                ));
-            }
-            return Ok(());
-        }
-        if !missing.is_empty() {
-            return Err(Error::at(
-                format!("non-exhaustive match: missing {}", missing.join(", ")),
-                span.clone(),
-            ));
-        }
-        Ok(())
+        crate::match_check::check_match_exhaustive(self, st, arms, span)
     }
 
     /// Effects produced by calling `name`. Read straight from its signature —
@@ -6933,7 +6555,7 @@ impl Cx<'_> {
 }
 
 /// Whether `ty` is one of the IEEE 754 float types.
-fn is_float_ty(ty: &Type) -> bool {
+pub(crate) fn is_float_ty(ty: &Type) -> bool {
     matches!(ty, Type::Primitive(p) if p.is_float())
 }
 
@@ -6947,7 +6569,7 @@ fn float_builtin_for(op: BinOp) -> Option<&'static str> {
 
 /// An error unless `ty` is something the integer operators take: a float operand to one of
 /// them is a mistake whose fix is the float operation, so the message names the import.
-fn reject_float_operand(op: BinOp, ty: &Type, span: &Span) -> Result<(), Error> {
+pub(crate) fn reject_float_operand(op: BinOp, ty: &Type, span: &Span) -> Result<(), Error> {
     if !is_float_ty(ty) {
         return Ok(());
     }
@@ -6967,7 +6589,7 @@ fn reject_float_operand(op: BinOp, ty: &Type, span: &Span) -> Result<(), Error> 
 
 /// The type of a float operation's operands: both the same float type. `name` is the
 /// builtin, for the message.
-fn check_float_operands(
+pub(crate) fn check_float_operands(
     name: &str,
     lt: &Type,
     rt: &Type,
@@ -7067,7 +6689,7 @@ fn is_tuple_ty(ty: &Type) -> bool {
 /// Which tuple pattern the loader read a temporary's slots for — what a value
 /// that is not a tuple was being taken apart by.
 #[derive(Clone, Copy)]
-enum TuplePattern {
+pub(crate) enum TuplePattern {
     /// `let (a, b) = v;`
     Let,
     /// `for (let (a, b) : xs)`, where the value is each element.
@@ -7075,7 +6697,7 @@ enum TuplePattern {
 }
 
 impl TuplePattern {
-    fn not_a_tuple(self, ty: &str) -> String {
+    pub(crate) fn not_a_tuple(self, ty: &str) -> String {
         match self {
             TuplePattern::Let => format!(
                 "cannot destructure {ty} as a tuple — a pattern like \"(a, b)\" takes apart a tuple value"
@@ -7093,7 +6715,7 @@ impl TuplePattern {
 /// `__builtin_`, or the loader's per-file module prefix `__m<index>__` (added to
 /// every non-root file's top-level names). Neither can appear in a user-written
 /// identifier, so this only ever strips compiler-internal decoration.
-fn display(name: &str) -> &str {
+pub(crate) fn display(name: &str) -> &str {
     aipl_syntax::strip_mangle_prefix(name)
 }
 
@@ -7273,7 +6895,7 @@ fn typevar_ty(name: &str) -> Type {
 
 const TYPEVAR: &str = "__typevar__$";
 
-fn is_typevar(t: &Type) -> bool {
+pub(crate) fn is_typevar(t: &Type) -> bool {
     matches!(t, Type::TypeVar(_))
 }
 
@@ -7375,7 +6997,7 @@ fn mentions_unknown(t: &Type) -> bool {
 }
 
 /// Whether `t` names a type called one of `names`, anywhere inside it.
-fn names_a_type_named(t: &Type, names: &[&str]) -> bool {
+pub(crate) fn names_a_type_named(t: &Type, names: &[&str]) -> bool {
     match t {
         Type::Named(n) => names.contains(&n.as_str()),
         Type::Case(inner)
@@ -7396,7 +7018,27 @@ fn names_a_type_named(t: &Type, names: &[&str]) -> bool {
     }
 }
 
-fn mentions_typevar(t: &Type) -> bool {
+/// Whether `t` names the type variable `v`.
+pub(crate) fn mentions_type_named(t: &Type, v: &str) -> bool {
+    match t {
+        Type::TypeVar(n) => n == v,
+        Type::Case(i)
+        | Type::Optional(i)
+        | Type::Array(i)
+        | Type::Set(i, _)
+        | Type::Without(i, _) => mentions_type_named(i, v),
+        Type::Dict(a, b) | Type::Result(a, b) => {
+            mentions_type_named(a, v) || mentions_type_named(b, v)
+        }
+        Type::Fn(ps, r) => {
+            ps.iter().any(|p| mentions_type_named(p, v)) || mentions_type_named(r, v)
+        }
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(|e| mentions_type_named(e, v)),
+        _ => false,
+    }
+}
+
+pub(crate) fn mentions_typevar(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
         Type::Case(v) => mentions_typevar(v),
@@ -7498,7 +7140,7 @@ fn is_collection_of(ty: &Type, elem: &Type) -> bool {
     matches!(ty, Type::Array(e) | Type::Optional(e) if **e == *elem)
 }
 
-fn tyname(t: &Type) -> String {
+pub(crate) fn tyname(t: &Type) -> String {
     match t {
         // The sentinel carries its variable's name (see `typevar_ty`); name it in
         // the message rather than leaking the mangling, and stay generic for an
@@ -7532,7 +7174,7 @@ fn tyname(t: &Type) -> String {
     }
 }
 
-fn is_unit(t: &Type) -> bool {
+pub(crate) fn is_unit(t: &Type) -> bool {
     *t == Type::Unit
 }
 
@@ -7771,7 +7413,12 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
 /// like a bare discard. (Reassigning the binding doesn't count as a read: only
 /// `Ident` references do, which is what `count_ident` tallies.) `span.clone()` points at
 /// the bound value.
-fn check_result_inspected(name: &str, vt: &Type, body: &Expr, span: Span) -> Result<(), Error> {
+pub(crate) fn check_result_inspected(
+    name: &str,
+    vt: &Type,
+    body: &Expr,
+    span: Span,
+) -> Result<(), Error> {
     if matches!(vt, Type::Result(_, _)) && crate::count_ident(name, body) == 0 {
         return Err(Error::at(
             format!(
@@ -8115,4 +7762,65 @@ pub(crate) fn matches_elementwise(arms: &[MatchArm], arity: usize) -> bool {
         matches!(&a.pattern, Pattern::Tuple(ps) if ps.len() == arity)
             || matches!(a.pattern, Pattern::Wildcard)
     })
+}
+
+impl crate::match_check::MatchInfo for Cx<'_> {
+    fn cases_of(&self, ty: &Type) -> Option<Vec<(String, Vec<Type>)>> {
+        Cx::cases_of(self, ty)
+    }
+    fn tuple_elems(&self, ty: &Type) -> Option<Vec<Type>> {
+        Cx::tuple_elems(self, ty)
+    }
+    fn note_case(&self, ty: &Type, bare: &str) {
+        Cx::note_case(self, ty, bare)
+    }
+}
+
+/// The declaration tables a written type is validated against.
+pub(crate) struct DeclTables<'a> {
+    pub structs: &'a HashMap<String, Vec<(String, Type, bool)>>,
+    pub variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
+    pub ctors: &'a HashMap<String, String>,
+    pub generic_structs: &'a HashMap<String, StructDecl>,
+    pub generic_variants: &'a HashMap<String, VariantDecl>,
+    pub generic_ctors: &'a HashMap<String, String>,
+    pub sigs: &'a HashMap<String, Signature>,
+}
+
+/// Whether `t`, as a user wrote it, is a type that may appear there: it names a type that
+/// exists, an element is something an array/optional/set/dict may hold, a refinement excludes
+/// something its base has. `type_params` are the type variables in scope; `ctx` begins the
+/// message.
+pub(crate) fn validate_type(
+    d: &DeclTables,
+    t: &Type,
+    type_params: &[String],
+    ctx: &str,
+) -> Result<(), Error> {
+    let cx = Cx {
+        structs: d.structs,
+        syn_structs: std::cell::RefCell::new(HashMap::new()),
+        variants: d.variants,
+        syn_variants: std::cell::RefCell::new(HashMap::new()),
+        ctors: d.ctors,
+        generic_structs: d.generic_structs,
+        generic_variants: d.generic_variants,
+        generic_ctors: d.generic_ctors,
+        sigs: d.sigs,
+        current_ret: std::cell::RefCell::new(Type::Unit),
+        current_fn: std::cell::RefCell::new(String::new()),
+        resolutions: std::cell::RefCell::new(Vec::new()),
+        pattern_names: std::cell::RefCell::new(Default::default()),
+        current_type_params: std::cell::RefCell::new(Vec::new()),
+        current_expected: std::cell::RefCell::new(None),
+        locks: std::cell::RefCell::new(HashMap::new()),
+        return_pinned: std::cell::RefCell::new(HashMap::new()),
+        explicit_type_args: std::cell::RefCell::new(HashMap::new()),
+        lambda_params: std::cell::RefCell::new(HashMap::new()),
+        current_type_bounds: std::cell::RefCell::new(HashMap::new()),
+        resolving: std::cell::RefCell::new(HashSet::new()),
+        try_errs: std::cell::RefCell::new(Vec::new()),
+        recovered: std::cell::RefCell::new(Vec::new()),
+    };
+    cx.check_ty(t, type_params, ctx)
 }

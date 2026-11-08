@@ -27,6 +27,7 @@ use std::{
 };
 
 mod check;
+mod match_check;
 mod patterns;
 pub mod pin;
 pub use check::{check, check_resolved, set_mangle};

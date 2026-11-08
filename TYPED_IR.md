@@ -119,7 +119,8 @@ lowering half (everything before `check_resolved`) is callable on its own.
 ## Stages (each ends green: targeted tests, then one `cargo handoff`)
 
 - [x] **0. `typed.rs`**: `Ty`, `ConcreteTy`, `TExpr`, `TProgram`, `erase`, `concretize`; 6 unit tests. Additive.
-- [ ] **1. `pin.rs` as an oracle, beside the old checker.** Nothing consumes it. (In progress; see Status.)
+- [x] **1. `pin.rs` as an oracle, beside the old checker.** Nothing consumes it. Agreement over the whole corpus
+      reached (see Status); `.test` bodies and defaults still to pin.
   - [ ] Declarations: structs, variants, generic templates, signatures -> `TSignature`/`TItem`.
   - [ ] Unifier core: inference variables, occurs/rigid-var handling, zonk, `i64` defaulting.
   - [ ] Expression rules, in rising difficulty: literals/idents/let/mut/set/if/while/for; calls to non-generic
@@ -159,15 +160,24 @@ lowering half (everything before `check_resolved`) is callable on its own.
   are int-width cases such as `takes_u64(x)` where a narrowed value is passed, and `i64[][]` vs `i64[,]`).
   Forms now typed: patterns of every kind, tuple literals (`TExprKind::TupleLit`, lowered by mono), `shim`,
   diverging branches (`aipl_syntax::diverges`), annotated closure parameters, tuple fields/`to_set`/`to_array`.
-- **Reject direction (the remaining stage-1 work).** Of the 128 programs the checker rejects, the pinner rejects
-  54 and *accepts 74*. They are the diagnostics not ported yet; the oracle prints the list under "the pinner
-  accepts what the checker rejects". By family: effects (undeclared, shim coverage/signature, `random`), `ord`
-  and int bounds, float operand rules, integer literal range and mixed widths, exhaustiveness/unreachable/
-  wildcard rules for `match`, `no_outer_assign` (an expression `if`/`match`/`if let`/`shim` that mutates),
-  statement/expression `match` use, unused results, set/dict element validity, refinements (`err_nonempty`),
-  unknown types in signatures, unimported builtins (several are hidden behind a gap), explicit type args and type
-  parameter defaults, generic inference failures (`err_generic_cannot_infer`, `err_return_only_type_param`).
-  Port each from `check.rs` (search the message text of the matching `err_*` case's `--- check --compile ---`).
+- Session 3: ported the diagnostics and closed the reject direction. Whole corpus (cases and the compiler's own
+  sources): 62,156 function bodies pin, 0 gaps, 1 false rejection (fixed after the run: an index literal was forced
+  to `u64`), and of the 128 programs the checker rejects the pinner rejects all 128. Ported: effects and shims
+  (coverage, signature, undeclared), `main`/`!random`, integer literal range, unknown names/types/structs, type
+  parameter bounds/defaults/ambiguity/explicit type arguments, generic struct inference, `ord`/`int`/`variant`
+  bounds, statement-vs-expression `match`/`if`/`if let`/`shim` (`no_outer_assign`), discarded results and
+  mutating methods, refinements (`without []`, `without C`, `collect_arms`/`as_case`), float operator rules,
+  mixed-width arithmetic, ordered/dict/set element validity (via `check::validate_type`), tuple-pattern misuse,
+  wildcard rules, exhaustiveness and reachability (shared with the checker through `match_check.rs`).
+  Shared with the checker rather than re-derived (move them into the pinner at stage 4 when `check.rs` goes):
+  `check::{validate_type, DeclTables, undeclared_effect_message, no_outer_assign, check_result_inspected,
+  reject_float_operand, optional_map_signature, span_map_signature, defaults_only_on_functions}` and
+  `match_check.rs` (the match rules, written against a `MatchInfo` trait both implement).
+  The oracle is now a test: `pin::the_pinner_agrees_with_the_checker` runs over `tests/cases` (18s) and fails on any
+  gap, false rejection (a program whose file records `--- check --compile ---` is allowed to be rejected) or
+  miss; `pin::oracle_report` (ignored) also covers `crates/` (170s) and prints the ranking.
+  Stage 1 remaining before it is "done": pin `.test` bodies, parameter/field defaults (`default: None` today),
+  and give `Return` a `Never`; then decide whether to flip stage 2.
 - Not pinned yet: `.test` bodies (`TFunction::test_body` is `None`), parameter defaults and struct field defaults
   (`default: None`), and `Return` has a fresh-variable type rather than a `Never`.
 - Stage 1 is done when the oracle prints zero gaps, zero false rejections and an empty "accepts what the checker
