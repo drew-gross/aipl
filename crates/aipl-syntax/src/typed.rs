@@ -279,6 +279,10 @@ pub struct TExpr<T: TyRepr = Ty> {
     pub value_span: Option<Box<Span>>,
     /// See [`Expr::name_span`].
     pub name_span: Option<Box<Span>>,
+    /// Whether `ty` mentions a type that nothing in the function constrained, so pinning settled
+    /// it by default (`i64`). Such a type is a placeholder for the stages that read it, not a
+    /// finding.
+    pub defaulted: bool,
 }
 
 /// One arm of a typed `match`, or the arm of an `if let`.
@@ -387,6 +391,7 @@ impl<T: TyRepr> TExpr<T> {
             span,
             value_span: None,
             name_span: None,
+            defaulted: false,
         }
     }
 
@@ -399,6 +404,7 @@ impl<T: TyRepr> TExpr<T> {
             span: like.span.clone(),
             value_span: like.value_span.clone(),
             name_span: like.name_span.clone(),
+            defaulted: false,
         }
     }
 
@@ -736,6 +742,7 @@ impl<T: TyRepr> TExpr<T> {
             span: self.span.clone(),
             value_span: self.value_span.clone(),
             name_span: self.name_span.clone(),
+            defaulted: self.defaulted,
         })
     }
 }

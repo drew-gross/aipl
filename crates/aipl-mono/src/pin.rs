@@ -100,6 +100,9 @@ struct Slot {
 struct Table {
     slots: Vec<Slot>,
     orders: Vec<OrdSlot>,
+    /// Variables that became `char` because a `str` was taken for a `char[]`. An array of one is
+    /// spelled `str` once resolved: a sequence that came from text is text.
+    from_text: HashSet<usize>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -150,6 +153,36 @@ impl Table {
             diverges: false,
         });
         It::Var(self.slots.len() - 1)
+    }
+
+    /// Whether a variable on the way from `t` to what it is was made `char` by taking a `str` for
+    /// a `char[]`.
+    fn chain_from_text(&self, t: &It) -> bool {
+        let mut cur = t.clone();
+        while let It::Var(v) = cur {
+            if self.from_text.contains(&v) {
+                return true;
+            }
+            match &self.slots[v].bound {
+                Some(next) => cur = next.clone(),
+                None => return false,
+            }
+        }
+        false
+    }
+
+    /// Whether `t` is a variable that became `char` because a `str` was taken for a `char[]`.
+    fn element_from_text(&self, t: &It) -> bool {
+        let mut cur = t.clone();
+        let mut text = false;
+        while let It::Var(v) = cur {
+            text |= self.from_text.contains(&v);
+            match &self.slots[v].bound {
+                Some(next) => cur = next.clone(),
+                None => return false,
+            }
+        }
+        text && cur == It::Prim(Primitive::Char)
     }
 
     /// `t` with its outermost variable chain followed.
@@ -214,6 +247,10 @@ impl Table {
                 if kind != Kind::Any {
                     self.slots[*w].kind = kind;
                 }
+                if self.from_text.contains(&v) || self.from_text.contains(w) {
+                    self.from_text.insert(v);
+                    self.from_text.insert(*w);
+                }
                 if self.slots[v].diverges {
                     self.slots[*w].diverges = true;
                 }
@@ -242,6 +279,17 @@ impl Table {
         // A variable takes the type as written, refinements and all; structure is compared
         // through them.
         let (ca, cb) = (self.chase(a), self.chase(b));
+        // A variable equated with one that is `char` for being text is text too.
+        if let It::Var(x) = &ca {
+            if self.chain_from_text(b) {
+                self.from_text.insert(*x);
+            }
+        }
+        if let It::Var(y) = &cb {
+            if self.chain_from_text(a) {
+                self.from_text.insert(*y);
+            }
+        }
         match (&ca, &cb) {
             (It::Var(x), It::Var(y)) if x == y => return Ok(()),
             (It::Var(x), _) => return self.bind(*x, cb),
@@ -283,6 +331,20 @@ impl Table {
         }
     }
 
+    /// Whether resolving `t` has to default a variable nothing constrained.
+    fn would_default(&self, t: &It) -> bool {
+        match self.shallow(t) {
+            It::Var(_) => true,
+            It::Case(t) | It::Opt(t) | It::Arr(t) | It::Set(t, _) | It::Without(t, _) => {
+                self.would_default(&t)
+            }
+            It::Dict(a, b) | It::Res(a, b) => self.would_default(&a) || self.would_default(&b),
+            It::Gen(_, args) => args.iter().any(|a| self.would_default(a)),
+            It::Fn(ps, r) => ps.iter().any(|p| self.would_default(p)) || self.would_default(&r),
+            It::Unit | It::Prim(_) | It::Named(_) | It::Rigid(_) => false,
+        }
+    }
+
     /// `t` as a pinned type. A variable nothing constrained takes its kind's default.
     fn resolve(&self, t: &It) -> Ty {
         let boxed = |t: &It| Box::new(self.resolve(t));
@@ -294,6 +356,7 @@ impl Table {
             It::Case(t) => Ty::Case(boxed(&t)),
             It::Rigid(v) => Ty::Var(v),
             It::Opt(t) => Ty::Optional(boxed(&t)),
+            It::Arr(t) if self.element_from_text(&t) => Ty::Primitive(Primitive::Str),
             It::Arr(t) => Ty::Array(boxed(&t)),
             It::Set(t, o) => Ty::Set(
                 boxed(&t),
@@ -837,6 +900,9 @@ fn pin_slot_default(
 
 fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
     let mut p = pinner_for(decls, &f.name.text, &f.sig.type_vars, &f.sig.effects);
+    // The function a test driver makes of a `.test` block is a test body wherever it is found.
+    p.in_test = aipl_syntax::is_test_body(&f.name.text)
+        || aipl_syntax::benchmark_source_name(&f.name.text).is_some();
     for e in &f.sig.effects {
         if !aipl_syntax::KNOWN_EFFECTS.contains(&e.as_str()) {
             return reject(
@@ -1146,11 +1212,27 @@ impl Pinner<'_> {
         Ok(())
     }
 
+    /// Set [`TExpr::defaulted`] on each node of `typed` whose type in `source` (the tree it was
+    /// resolved from, of the same shape) still has an open variable.
+    fn mark_defaulted(&self, typed: &mut TExpr<Ty>, source: &TExpr<It>) {
+        typed.defaulted = self.table.would_default(&source.ty);
+        let mut sources = Vec::new();
+        source.for_each_child(&mut |c| sources.push(c));
+        let mut i = 0;
+        typed.for_each_child_mut(&mut |c| {
+            if let Some(s) = sources.get(i) {
+                self.mark_defaulted(c, s);
+            }
+            i += 1;
+        });
+    }
+
     /// Resolve every inference type in `body`.
     fn finish(&self, body: TExpr<It>, span: &Span) -> Res<TExpr<Ty>> {
-        let typed = body
+        let mut typed = body
             .map_types(&mut |t| Some(self.table.resolve(t)))
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
+        self.mark_defaulted(&mut typed, &body);
         check_literals(&typed)?;
         Ok(typed)
     }
@@ -1342,6 +1424,9 @@ impl Pinner<'_> {
             (x, y) if (*x == str_ty && *y == error) || (*x == error && *y == str_ty) => Ok(()),
             // A `str` is the `char[]` (and pins an open element to `char`).
             (It::Prim(Primitive::Str), It::Arr(t)) | (It::Arr(t), It::Prim(Primitive::Str)) => {
+                if let It::Var(v) = self.table.shallow(t) {
+                    self.table.from_text.insert(v);
+                }
                 self.table.unify(t, &char_ty)
             }
             // A constructor named as a value stands for its case: a function building `V`, or (for a
@@ -1436,6 +1521,7 @@ impl Pinner<'_> {
             span: e.span.clone(),
             value_span: e.value_span.clone(),
             name_span: e.name_span.clone(),
+            defaulted: false,
         }
     }
 
@@ -2047,7 +2133,10 @@ impl Pinner<'_> {
                         span: param.span.clone(),
                     });
                 }
-                let (saved, body) = self.scoped(scope, |p| p.expr(body))?;
+                let saved_test = std::mem::replace(&mut self.in_test, false);
+                let scoped = self.scoped(scope, |p| p.expr(body));
+                self.in_test = saved_test;
+                let (saved, body) = scoped?;
                 self.restore(saved);
                 let ty = It::Fn(ptys, Box::new(body.ty.clone()));
                 self.node(K::Lambda(typed, Box::new(body)), ty, e)
@@ -3843,9 +3932,12 @@ impl Pinner<'_> {
                     span: param.span.clone(),
                 });
             }
+            // A `?` in a closure leaves the closure, so a test's `?` rule is not in force there.
+            let saved_test = std::mem::replace(&mut self.in_test, false);
             let saved_ret = std::mem::replace(&mut self.ret, (*ret).clone());
             let body = self.expr(body);
             self.ret = saved_ret;
+            self.in_test = saved_test;
             for (name, old) in saved.into_iter().rev() {
                 match old {
                     Some(b) => self.env.insert(name, b),

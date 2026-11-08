@@ -228,8 +228,9 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   binds `E` from the argument before the function's `!Error` is in view), and two `map` calls over a `str` that the
   checker stamps `char[][]` and the pinner types `str[]`. The checker also rewrites `int_parse` targets while
   stamping (`retargeted_int_parse`); that is not a type and stays with whatever replaces it.
-- Experiment: `AIPL_STAMP_ALL=1` (read by `frontend`; off by default) stamps every node the pinner typed, except
-  unit and never. Over `cases_arrays`, `cases_generics` and `cases_optimizations` 171 of 188 cases still pass and
+- Decision (Session 6): stamp everything. `frontend` now stamps every node the pinner typed (`probe::stamp_everything`,
+  the two trees walked together; span and form only as a fallback), except unit and never. The experiment that led
+  to it, run behind a switch: Over `cases_arrays`, `cases_generics` and `cases_optimizations` 171 of 188 cases still pass and
   17 fail: 16 on a moved baseline row (between -16% and +3% code bytes, mono now seeing exact types where it
   guessed) and `arrays/push/err_push_char_from_empty`, which stops being an error. So blanket stamping is the
   behaviour change that stage 3/4 is for, not a free swap now; the exact set of nodes the checker stamps has to be

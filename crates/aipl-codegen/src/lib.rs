@@ -3000,10 +3000,10 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     // it has verified every value entering one, and from here on a
     // `T[] without []` is the `T[]` it is at runtime (see `Type::Without`).
     aipl_syntax::erase_refinements(&mut program);
-    if std::env::var_os("AIPL_STAMP_ALL").is_some() {
-        let pinned = aipl_mono::pin::pin(&check_program);
-        aipl_mono::probe::stamp_everything(&mut program, &pinned.program);
-    }
+    // Every expression the pinner typed says what it is (`Expr::ty`), not only the context-dependent
+    // ones the checker stamped.
+    let pinned = aipl_mono::pin::pin(&check_program);
+    aipl_mono::probe::stamp_everything(&mut program, &pinned.program);
     Ok(Frontend {
         program,
         check_program,

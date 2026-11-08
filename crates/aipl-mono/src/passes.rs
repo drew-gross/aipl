@@ -360,19 +360,25 @@ pub fn optimize<P: Optimizable>(
 /// had its type recorded, and now an expression at that span does not" is
 /// exactly the loss, and duplication cannot fake it.
 fn recorded_spans(program: &impl Optimizable) -> HashSet<Site> {
-    let mut out = HashSet::new();
+    let (mut out, mut unrecorded) = (HashSet::new(), HashSet::new());
     for f in program.functions() {
         let file = origin(f.name);
-        collect_recorded(f.body, &file, &mut out);
+        collect_recorded(f.body, &file, &mut out, &mut unrecorded);
         if let Some(test_body) = f.test_body {
-            collect_recorded(test_body, &file, &mut out);
+            collect_recorded(test_body, &file, &mut out, &mut unrecorded);
         }
     }
+    // A site that arrives with both has an expression whose type pinning left to default beside
+    // one it did not (two files share offsets, and an inlined body keeps its own), so what a pass
+    // does to it says nothing.
+    out.retain(|site| !unrecorded.contains(site));
     out
 }
 
 /// A context-typed expression's identity for [`recorded_spans`]: the file its
-/// function came from (see [`origin`]) and its span. A span alone is an offset
+/// function came from (see [`origin`]), its span and its kind. The kind matters because a
+/// pass that builds an expression for what it replaces gives it the replaced one's span, so a
+/// recorded `some(..)` and an unrecorded `[]` it made can share one. A span alone is an offset
 /// into *some* file, and a program merges many — its own, and every builtin
 /// it reaches — so two files' expressions share offsets constantly.
 ///
@@ -381,7 +387,7 @@ fn recorded_spans(program: &impl Optimizable) -> HashSet<Site> {
 /// copy goes unreported, since the copy is filed under its new function; that
 /// is the price of a key that does not mistake one file's expression for
 /// another's.
-type Site = (String, usize, usize);
+type Site = (String, usize, usize, &'static str);
 
 /// Which file the function `name` came from, as far as its name says: the
 /// `__m<N>__` prefix of one of an imported file's items, the `__builtin_*` name
@@ -397,12 +403,17 @@ fn origin(name: &str) -> String {
     }
 }
 
-fn collect_recorded(e: &Expr, file: &str, out: &mut HashSet<Site>) {
-    if is_context_typed(e) && e.ty.is_some() {
-        out.insert((file.to_string(), e.span.start, e.span.end));
+fn collect_recorded(e: &Expr, file: &str, out: &mut HashSet<Site>, unrecorded: &mut HashSet<Site>) {
+    if is_context_typed(e) {
+        let site = (file.to_string(), e.span.start, e.span.end, context_kind(e));
+        if e.ty.is_some() {
+            out.insert(site);
+        } else {
+            unrecorded.insert(site);
+        }
     }
     for child in crate::children(e) {
-        collect_recorded(child, file, out);
+        collect_recorded(child, file, out, unrecorded);
     }
 }
 
@@ -436,7 +447,7 @@ fn collect_lost(
 ) {
     if is_context_typed(e)
         && e.ty.is_none()
-        && recorded.contains(&(file.to_string(), e.span.start, e.span.end))
+        && recorded.contains(&(file.to_string(), e.span.start, e.span.end, context_kind(e)))
     {
         out.push((context_kind(e), (e.span.start, e.span.end)));
     }

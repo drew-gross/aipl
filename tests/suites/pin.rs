@@ -346,8 +346,10 @@ fn mono_agreement_report() {
     }
 }
 
-/// Author helper: where the pinner's type differs from what the checker stamps on an expression
-/// (`Expr::ty`), over `tests/cases` (`AIPL_CASE=a,b` narrows it).
+/// Author helper: where an expression's stamp (`Expr::ty`) in the program `frontend` hands on differs
+/// from its pinned type. Every node is stamped from the pinner except where the checker had already
+/// stamped one, so a difference is a stamp the checker left that the pinner would not have written
+/// (`AIPL_CASE=a,b` narrows it).
 #[test]
 #[ignore = "author helper: prints where the checker's stamps and the pinner disagree"]
 fn stamp_agreement_report() {

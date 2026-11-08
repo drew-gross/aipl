@@ -353,30 +353,67 @@ fn has_variable(t: &Type) -> bool {
     Ty::from_type(t).is_none_or(|t| t.mentions_var())
 }
 
-/// Experiment: give every expression the pinned type of the node at its span, where it has none
-/// (`Expr::ty`), except a unit or never-returning one. With the checker's own stamps kept, mono runs on
-/// a program in which every node says what it is.
+/// Give every expression the pinned type of the node it was pinned as, where it has none
+/// (`Expr::ty`), except a unit or never-returning one. The checker's own stamps are kept.
+///
+/// The two trees are walked together, since pinning does not restructure anything. Where they stop
+/// matching (a node of another form, a different number of children) the rest of that subtree is
+/// matched by span and form instead, and left alone if several pinned nodes share them: a default
+/// spliced into several calls keeps one span and takes a different type at each.
 pub fn stamp_everything(program: &mut aipl_syntax::ast::Program, pinned: &TProgram) {
+    use aipl_syntax::typed::TExpr;
+    fn stamp(e: &mut Expr, ty: &Ty) {
+        if e.ty.is_none() && !matches!(ty, Ty::Unit | Ty::Never) {
+            e.ty = Some(Box::new(ty.to_type()));
+        }
+    }
+    fn by_span(e: &mut Expr, nodes: &HashMap<(usize, usize, String), Option<Ty>>) {
+        if let Some(Some(ty)) = nodes.get(&(e.span.start, e.span.end, form(&e.kind))) {
+            stamp(e, ty);
+        }
+        for child in crate::children_mut(e) {
+            by_span(child, nodes);
+        }
+    }
+    fn together(e: &mut Expr, t: &TExpr<Ty>, nodes: &HashMap<(usize, usize, String), Option<Ty>>) {
+        if e.span != t.span || form(&e.kind) != typed_form(&t.kind) {
+            return by_span(e, nodes);
+        }
+        if !t.defaulted {
+            stamp(e, &t.ty);
+        }
+        let mut typed = Vec::new();
+        t.for_each_child(&mut |c| typed.push(c));
+        let children: Vec<&mut Expr> = crate::children_mut(e).collect();
+        if children.len() != typed.len() {
+            for child in children {
+                by_span(child, nodes);
+            }
+            return;
+        }
+        for (child, tc) in children.into_iter().zip(typed) {
+            together(child, tc, nodes);
+        }
+    }
     let probe = Probe::new(pinned);
+    let bodies: HashMap<&str, &TExpr<Ty>> = pinned
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            TItem::Fn(f) => Some((f.name.text.as_str(), &f.body)),
+            _ => None,
+        })
+        .collect();
     for item in &mut program.items {
         let aipl_syntax::ast::Item::Fn(f) = item else {
             continue;
         };
-        let Some(pf) = probe.fns.get(&f.name.text) else {
+        let (Some(pf), Some(body)) = (
+            probe.fns.get(&f.name.text),
+            bodies.get(f.name.text.as_str()),
+        ) else {
             continue;
         };
-        fn go(e: &mut Expr, nodes: &HashMap<(usize, usize, String), Option<Ty>>) {
-            if e.ty.is_none() {
-                if let Some(Some(ty)) = nodes.get(&(e.span.start, e.span.end, form(&e.kind))) {
-                    if !matches!(ty, Ty::Unit | Ty::Never) {
-                        e.ty = Some(Box::new(ty.to_type()));
-                    }
-                }
-            }
-            for child in crate::children_mut(e) {
-                go(child, nodes);
-            }
-        }
-        go(&mut f.body, &pf.nodes);
+        together(&mut f.body, body, &pf.nodes);
     }
 }
