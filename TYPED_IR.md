@@ -147,13 +147,19 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
       does not reach mono intact yet):
   - [x] **2a. Agreement probe** (`probe.rs`, `codegen::mono_agreement`, `pin::mono_agreement_report`): monomorphize
         the unoptimized program and compare `infer`'s type for each expression with the pinned one.
-  - [ ] **2b. Pinned types replace the checker's stamps.** Mono already takes `Expr::ty` as the expected type of a
-        context-dependent expression (`none`, `[]`, `ok`/`err`, narrowed literal arrays). Stamp those from the
-        pinner instead of the checker's `locks`, so mono, which is unchanged, runs on pinned answers. Baseline
-        rows and the dogfood fingerprint must not move. The pinner's *types* are there (see Session 5); what is
-        left is the rule for *which* nodes carry a stamp, since stamping all of them moves rows.
-  - [ ] **2c. Stamp every literal and call** the pinner typed, make `infer` read the stamp where it exists, and
-        delete the branches that guessed (the `Num` widening, `narrows_literal_array`, `is_unpinned_optional`).
+  - [x] **2b. Pinned types replace the checker's stamps.** Decision (Session 6): `frontend` stamps every node the
+        pinner typed (except unit, never and defaulted nodes); 166 baseline rows moved as their own measured change.
+  - [~] **2c. `infer` reads the stamps.** Done so far (Session 7): an integer literal, a negated one, or an array
+        of them takes its width from the stamp when the stamp is plain (primitives and arrays), which replaces
+        `narrows_literal_array` (deleted). Not done, and why: trusting a stamp for *every* node is unsafe today.
+        Over cases_arrays/generics/optimizations/lambdas/strings a blanket "stamp wins" failed 5 of 291 cases:
+        two hard errors and three moved rows. Of ~800 nodes where stamp and inference differ, the real causes are
+        (a) stale stamps: the passes rebuild a node and carry the old node's `ty` over (an `If`/`Let`/`Match`
+        stamped `char[]` that is now `()`, an `Ident` stamped `Span` that is now `str`), which only stage 3 fixes;
+        (b) spelling: the pinner says `Generic("Rule",[Tok])` / `Named("Rule$Tok")` where mono says the other, and
+        `TypeVar("any$1")` survives in some stamps; (c) mono coarser (a `print` call typed `()`, stamp `bool`).
+        What remains to delete (`Num` flexing via `flex_int_ty`, `drop_none`/`is_unpinned_optional`, `drop_lit`)
+        needs call-site `type_args`, i.e. 2d.
   - [ ] **2d. Substitution over `TExpr`** for what remains, once the passes (stage 3) hand mono a pinned tree.
 - [ ] **3. Port the passes**: pre-mono first, then post-mono. After each, `--- report ---` and baseline rows must
       not move.
@@ -235,3 +241,5 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   guessed) and `arrays/push/err_push_char_from_empty`, which stops being an error. So blanket stamping is the
   behaviour change that stage 3/4 is for, not a free swap now; the exact set of nodes the checker stamps has to be
   reproduced first, or the moved rows accepted as their own measured change.
+- Session 7: stage 2c begun. The oracle also pins the synthesized `__test$` programs (`check`'s own driver
+  programs). Literal widths now come from the stamp (see 2c above); the blanket-stamp experiment is recorded there.

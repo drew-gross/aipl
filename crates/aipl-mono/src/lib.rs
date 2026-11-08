@@ -8183,11 +8183,11 @@ impl Mono<'_> {
         // concrete instance and is better than the recorded application.
         let ty = match &expr.ty {
             Some(t) if has_placeholder(&inferred) && !has_placeholder(t) => (**t).clone(),
-            // An array of bare integer literals can only say `i64` for itself, and
-            // its elements are stored at the width its context gave it — which the
-            // checker recorded. Left as `i64[]`, a generic callee is instantiated
-            // for the wrong element type and reads the narrow storage as wide.
-            Some(t) if narrows_literal_array(&expr.kind, &inferred, t) => (**t).clone(),
+            // A numeral or an array of numerals can only say `i64` for itself, and is stored
+            // at the width its context gave it, which the pinner recorded. Left as `i64`, a
+            // generic callee is instantiated for the wrong element type and reads the narrow
+            // storage as wide.
+            Some(t) if is_numeric_literal(&expr.kind) && is_plain(t) => (**t).clone(),
             // A float conversion is the width its position gave it, which the checker
             // recorded; the call itself can only say `IEEE754Float64`.
             Some(t)
@@ -10437,18 +10437,10 @@ pub fn children(e: &Expr) -> Children<'_> {
     }
 }
 
-/// Whether `recorded` is the narrower type of an array of integer literals that
-/// monomorphization inferred as `inferred`.
-///
-/// A bare numeral has one type of its own, `i64`, so `[3, -128, 127]` infers as
-/// `i64[]` wherever it sits; what makes it an `i8[]` is the context the checker
-/// saw and recorded on the literal ([`Expr::ty`]). Inlining can move the literal
-/// out from under that context, into the argument of a generic call, and then the
-/// recorded type is the only record of it. This says when to trust it: the literal
-/// is built of nothing but integer literals (nested arrays of them included), and
-/// `recorded` is the same shape as `inferred` with an integer type where
-/// `inferred` has `i64`. Anything else keeps what inference found.
-fn narrows_literal_array(kind: &ExprKind, inferred: &Type, recorded: &Type) -> bool {
+/// Whether `kind` is built of nothing but integer literals: a numeral, a negated one, or an array
+/// of them (nested arrays included). Such an expression has no type of its own beyond `i64`, so
+/// the width the pinner stamped on it is the only record of what its context asked for.
+fn is_numeric_literal(kind: &ExprKind) -> bool {
     fn all_int_literals(e: &Expr) -> bool {
         match &e.kind {
             ExprKind::Num(_) => true,
@@ -10457,15 +10449,22 @@ fn narrows_literal_array(kind: &ExprKind, inferred: &Type, recorded: &Type) -> b
             _ => false,
         }
     }
-    fn narrower(inferred: &Type, recorded: &Type) -> bool {
-        match (inferred, recorded) {
-            (Type::Array(i), Type::Array(r)) => narrower(i, r),
-            (Type::Primitive(Primitive::I64), Type::Primitive(r)) => r.is_int(),
-            _ => false,
-        }
+    match kind {
+        ExprKind::Num(_) => true,
+        ExprKind::Neg(inner) => all_int_literals(inner),
+        ExprKind::ArrayLit(elems) => elems.iter().all(all_int_literals),
+        _ => false,
     }
-    matches!(kind, ExprKind::ArrayLit(elems) if elems.iter().all(all_int_literals))
-        && narrower(inferred, recorded)
+}
+
+/// Whether `t` is built only of primitives and arrays: no placeholder, no type variable, no
+/// generic instance whose spelling differs between the pinner and monomorphization.
+fn is_plain(t: &Type) -> bool {
+    match t {
+        Type::Primitive(_) => true,
+        Type::Array(inner) => is_plain(inner),
+        _ => false,
+    }
 }
 
 /// Whether `t` still contains a "decided by context" placeholder — the types a
