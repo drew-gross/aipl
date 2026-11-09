@@ -12,9 +12,17 @@
 # exactly the input's tokens and comments, or it is refused rather than
 # emitted — a formatter bug must never corrupt code.
 #
-# This used to be two AIPL entries with the parse and the token check between
-# them in Rust, from before the parser was itself dogfooded. Now the whole
-# pipeline runs in-engine and Rust's `format_source` is one FFI call.
+# The whole pipeline runs in-engine; Rust's `format_source` is one FFI call, with
+# no native fallback.
+#
+# Style: 4-space indent; width-limited groups that either fit on one line or
+# block-indent one element per line with a trailing comma; imports hoisted to the
+# top (builtins first, then paths sorted; names within a list sorted by imported
+# name, operators first); exactly one blank line between top-level items;
+# call-site keyword arguments spelled tight (`f(1, k=1)`) but declaration
+# defaults spaced (`k: i64 = 1`). String, char, number, and template literals —
+# and everything inside a template's interpolations — are emitted verbatim from
+# the source.
 
 import {
     equal as ==,
@@ -108,6 +116,29 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
     ) == ok(
         "fn f() {\n    if (c) {\n        set x = 1;\n    } else if (d) {\n        set x = 2;\n    };\n}\n",
     ));
+
+    // The output ends in exactly one newline, whatever the input did: a missing one
+    // is added, extras collapse, and an empty or blank program is just that newline.
+    assert(format_source("fn main() {}", 100) == ok("fn main() {}\n"));
+    assert(format_source("fn main() {}\n\n\n", 100) == ok("fn main() {}\n"));
+    assert(format_source("\n\n", 100) == ok("\n"));
+    assert(format_source("// just a comment", 100) == ok("// just a comment\n"));
+    assert(format_source("fn main() {}\n--- stdout ---\nhi\n", 100) == ok(
+        "fn main() {}\n--- stdout ---\nhi\n",
+    ));
+
+    // The width decides where a group breaks. The parameter list exceeds 30 columns
+    // and breaks (with a trailing comma); the one-expression body still fits flat.
+    let wide_fn = "fn f(aaaa: i64, bbbb: i64, cccc: i64) -> i64 { aaaa }\n";
+    assert(format_source(wide_fn, 100) == ok(wide_fn));
+    assert(format_source(wide_fn, 30) == ok(
+        "fn f(\n    aaaa: i64,\n    bbbb: i64,\n    cccc: i64,\n) -> i64 { aaaa }\n",
+    ));
+
+    // A `check` section with flags is a section like any other: it rides along
+    // byte for byte, however oddly its body is spaced.
+    let tail = "--- check --compile --tests ---\n  odd   spacing { here\n";
+    assert(format_source(`fn   f( )  \{ }\n{tail}`, 100) == ok(`fn f() \{}\n{tail}`));
 
     // A malformed program fails with the *parser's* message, not the walker's.
     assert(

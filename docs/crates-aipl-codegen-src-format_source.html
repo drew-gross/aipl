@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/format_source.aipl</code></h1>
 
-      <div class="module-doc"><p><code>format_source</code>, the formatter's top-level pipeline.</p><p>The sequence is: split off the trailing <code>--- section ---</code> blocks, strip trailing whitespace from what's left, parse it with the real parser, lay it out, normalize to exactly one trailing newline, verify the output holds the same tokens as the input, then re-attach the sections verbatim.</p><p>Parsing comes before layout on purpose: the parser's errors are the good ones, and anything it accepts the walker must handle, so a malformed program fails with the parser's message rather than whatever the walker makes of it. The token check comes <em>after</em> and is the safety net: the output must carry exactly the input's tokens and comments, or it is refused rather than emitted — a formatter bug must never corrupt code.</p><p>This used to be two AIPL entries with the parse and the token check between them in Rust, from before the parser was itself dogfooded. Now the whole pipeline runs in-engine and Rust's <code>format_source</code> is one FFI call.</p></div>
+      <div class="module-doc"><p><code>format_source</code>, the formatter's top-level pipeline.</p><p>The sequence is: split off the trailing <code>--- section ---</code> blocks, strip trailing whitespace from what's left, parse it with the real parser, lay it out, normalize to exactly one trailing newline, verify the output holds the same tokens as the input, then re-attach the sections verbatim.</p><p>Parsing comes before layout on purpose: the parser's errors are the good ones, and anything it accepts the walker must handle, so a malformed program fails with the parser's message rather than whatever the walker makes of it. The token check comes <em>after</em> and is the safety net: the output must carry exactly the input's tokens and comments, or it is refused rather than emitted — a formatter bug must never corrupt code.</p><p>The whole pipeline runs in-engine; Rust's <code>format_source</code> is one FFI call, with no native fallback.</p><p>Style: 4-space indent; width-limited groups that either fit on one line or block-indent one element per line with a trailing comma; imports hoisted to the top (builtins first, then paths sorted; names within a list sorted by imported name, operators first); exactly one blank line between top-level items; call-site keyword arguments spelled tight (<code>f(1, k=1)</code>) but declaration defaults spaced (<code>k: i64 = 1</code>). String, char, number, and template literals — and everything inside a template's interpolations — are emitted verbatim from the source.</p></div>
 
 
 
@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-first_error">first_error</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn first_error(__spat$4881: ParseFailure) -&#62; FmtError</code></pre>
+          <pre class="signature"><code>fn first_error(__spat$6657: ParseFailure) -&#62; FmtError</code></pre>
 
           <div class="doc"><p>The first error of a failed parse as the formatter's own. A formatter reports one: it has nothing to say about a file it could not read, and the rest of a parse's errors are <code>aipl check</code>'s to show.</p></div>
 

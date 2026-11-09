@@ -2533,6 +2533,10 @@ fn parse_file(src: &str) -> Result<aipl_parser::Parsed, Vec<aipl_syntax::Error>>
     })
 }
 
+/// The line width the formatter aims for when the caller has no opinion. Long verbatim
+/// atoms (string literals, templates) may still exceed it.
+pub const FORMAT_WIDTH: usize = 100;
+
 /// Format AIPL source to the canonical style at `width` — the dogfooded
 /// `format_source` (`format_source.aipl`) via the FFI, which is the whole
 /// pipeline: split off trailing `--- section ---` blocks, strip trailing

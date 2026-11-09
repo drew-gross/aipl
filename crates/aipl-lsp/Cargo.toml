@@ -9,7 +9,6 @@ license = "MIT"
 aipl-syntax = { workspace = true }
 aipl-parser = { workspace = true }
 aipl-index = { workspace = true }
-aipl-fmt = { workspace = true }
 aipl-loader = { workspace = true }
 aipl-codegen = { workspace = true }
 serde_json = { workspace = true }

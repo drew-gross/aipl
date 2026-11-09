@@ -1,5 +1,4 @@
-# The formatter's token-stream walker, dogfooded in AIPL: the port of the Rust
-# `aipl-fmt` `Walker` (`crates/aipl-fmt/src/lib.rs`). It walks the token stream
+# The formatter's token-stream walker. It walks the token stream
 # `lex_aipl` produces — not the AST, since the parser desugars as it builds
 # (template literals, `set n++`, destructuring), so an AST can't be printed back
 # faithfully — and builds a `Doc` layout tree for `print` to lay out.

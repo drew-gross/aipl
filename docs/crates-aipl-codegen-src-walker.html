@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/walker.aipl</code></h1>
 
-      <div class="module-doc"><p>The formatter's token-stream walker, dogfooded in AIPL: the port of the Rust <code>aipl-fmt</code> <code>Walker</code> (<code>crates/aipl-fmt/src/lib.rs</code>). It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p><p>The Rust walker is a <code>&amp;mut self</code> cursor over <code>(toks, pos, comments, last_end)</code>. AIPL values have no references, so the cursor travels as a <code>W</code> <em>value</em> that every step returns alongside its result — the <code>W…</code> carrier structs below, the same shape <code>lexer.aipl</code>'s <code>StepResult</code> uses for its <code>end</code>. Reading the cursor (<code>peek</code>, <code>at_end</code>, …) takes <code>W</code> by value and returns just the answer; advancing it (<code>bump</code>, <code>expect</code>, <code>lead</code>, …) returns a carrier holding the moved-on <code>W</code>.</p></div>
+      <div class="module-doc"><p>The formatter's token-stream walker. It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p><p>The Rust walker is a <code>&amp;mut self</code> cursor over <code>(toks, pos, comments, last_end)</code>. AIPL values have no references, so the cursor travels as a <code>W</code> <em>value</em> that every step returns alongside its result — the <code>W…</code> carrier structs below, the same shape <code>lexer.aipl</code>'s <code>StepResult</code> uses for its <code>end</code>. Reading the cursor (<code>peek</code>, <code>at_end</code>, …) takes <code>W</code> by value and returns just the answer; advancing it (<code>bump</code>, <code>expect</code>, <code>lead</code>, …) returns a carrier holding the moved-on <code>W</code>.</p></div>
 
 
 
@@ -643,7 +643,7 @@
             <a class="anchor" href="#item-take_comment">take_comment</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn take_comment(self: W, __spat$14619: Span) -&#62; W</code></pre>
+          <pre class="signature"><code>fn take_comment(self: W, __spat$14525: Span) -&#62; W</code></pre>
 
           <div class="doc"><p>Consume comment <code>c</code>: step past it and mark it as the last thing emitted. The Rust <code>pop_front</code> + <code>last_end</code> update, as one move.</p></div>
 
@@ -1623,7 +1623,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$61258: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$61164: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

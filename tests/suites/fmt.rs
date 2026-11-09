@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use aipl::fmt::{format_source, FmtOptions};
+use aipl::codegen::{format_source, FORMAT_WIDTH};
 
 fn setup() {
     aipl::install_parser_hooks();
@@ -81,7 +81,6 @@ fn no_pinned_file_names_a_path_on_one_machine() {
 #[test]
 fn all_aipl_files_stay_formatted() {
     setup();
-    let opts = FmtOptions::default();
     let mut unformatted: Vec<String> = Vec::new();
     let mut checked = 0usize;
     for outcome in par_map(&enforced_files(), |path| {
@@ -89,7 +88,7 @@ fn all_aipl_files_stay_formatted() {
         if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
             return None; // parse-error fixture; nothing to format
         }
-        Some(match format_source(&src, &opts) {
+        Some(match format_source(&src, FORMAT_WIDTH) {
             Ok(formatted) if formatted == src => None,
             Ok(_) => Some(path.display().to_string()),
             Err(e) => Some(format!("{} (format error: {e})", path.display())),
@@ -152,13 +151,12 @@ fn no_retired_section_name_remains_in_the_tree() {
 #[ignore]
 fn format_corpus() {
     setup();
-    let opts = FmtOptions::default();
     let changed = par_map(&enforced_files(), |path| {
         let src = std::fs::read_to_string(path).unwrap();
         if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
             return false;
         }
-        let formatted = format_source(&src, &opts)
+        let formatted = format_source(&src, FORMAT_WIDTH)
             .unwrap_or_else(|e| panic!("[{}] format failed: {e}", path.display()));
         if formatted == src {
             return false;
@@ -190,7 +188,6 @@ fn corpus_formats_idempotently_and_losslessly() {
     }
     assert!(files.len() > 100, "corpus walk found too few files");
 
-    let opts = FmtOptions::default();
     let mut failures: Vec<String> = Vec::new();
     let mut formatted_count = 0usize;
     // Per file: whether it was formatted at all, and every invariant it broke.
@@ -202,14 +199,14 @@ fn corpus_formats_idempotently_and_losslessly() {
             return (false, failures); // an error-case fixture; nothing to format
         }
         let ctx = path.display();
-        let once = match format_source(&src, &opts) {
+        let once = match format_source(&src, FORMAT_WIDTH) {
             Ok(f) => f,
             Err(e) => {
                 failures.push(format!("[{ctx}] format failed: {e}"));
                 return (false, failures);
             }
         };
-        match format_source(&once, &opts) {
+        match format_source(&once, FORMAT_WIDTH) {
             Ok(twice) => {
                 if twice != once {
                     failures.push(format!(
@@ -331,48 +328,6 @@ fn cli_check_formats_with_fix() {
     let _ = std::fs::remove_file(&path);
 }
 
-/// The output always ends in exactly one newline, whatever the input did —
-/// a missing one is added, extras collapse to one, and an empty program
-/// formats to just that newline. Trailing `--- section ---` blocks are the
-/// exception: they ride along verbatim after it.
-#[test]
-fn always_ends_with_one_newline() {
-    setup();
-    let opts = FmtOptions::default();
-    let fmt = |src: &str| format_source(src, &opts).unwrap();
-
-    assert_eq!(fmt("fn main() {}"), "fn main() {}\n"); // none in the input
-    assert_eq!(fmt("fn main() {}\n\n\n"), "fn main() {}\n"); // extras collapse
-    assert_eq!(fmt(""), "\n"); // an empty program is still a newline
-    assert_eq!(fmt("\n\n"), "\n"); // ... as is a blank one
-    assert_eq!(fmt("// just a comment"), "// just a comment\n");
-
-    // The code half still ends with its newline when sections follow, and the
-    // sections keep their own bytes.
-    assert_eq!(
-        fmt("fn main() {}\n--- stdout ---\nhi\n"),
-        "fn main() {}\n--- stdout ---\nhi\n"
-    );
-}
-
-#[test]
-fn width_is_configurable() {
-    setup();
-    let src = "fn f(aaaa: i64, bbbb: i64, cccc: i64) -> i64 { aaaa }\n";
-    let wide = format_source(src, &FmtOptions { max_width: 100 }).unwrap();
-    assert_eq!(
-        wide,
-        "fn f(aaaa: i64, bbbb: i64, cccc: i64) -> i64 { aaaa }\n"
-    );
-    // The parameter list exceeds 30 columns and breaks (with a trailing
-    // comma); the one-expression body still fits flat after it.
-    let narrow = format_source(src, &FmtOptions { max_width: 30 }).unwrap();
-    assert_eq!(
-        narrow,
-        "fn f(\n    aaaa: i64,\n    bbbb: i64,\n    cccc: i64,\n) -> i64 { aaaa }\n"
-    );
-}
-
 /// Author helper: lay out the file named by `AIPL_FMT_PROBE` with the AIPL
 /// formatter and report which way it went. Handy for measuring how much native
 /// stack the walker needs on a given file — pair it with `RUST_MIN_STACK`.
@@ -386,15 +341,4 @@ fn aipl_fmt_probe() {
         Ok(_) => eprintln!("PROBE-OK"),
         Err(e) => eprintln!("PROBE-ERR {e}"),
     }
-}
-
-/// A trailing `check` section with flags is a section like any other to the formatter: it rides
-/// along byte for byte, however oddly its body is spaced.
-#[test]
-fn a_check_section_with_flags_is_preserved_by_the_formatter() {
-    aipl::install_parser_hooks();
-    let tail = "--- check --compile --tests ---\n  odd   spacing { here\n";
-    let src = format!("fn   f( )  {{ }}\n{tail}");
-    let out = aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()).expect("formats");
-    assert_eq!(out, format!("fn f() {{}}\n{tail}"));
 }

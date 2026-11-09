@@ -796,7 +796,7 @@ fn formatting_replaces_the_whole_document() {
     let formatted = edits[0]["newText"].as_str().expect("new text");
     assert_eq!(
         formatted,
-        &aipl::fmt::format_source(source, &aipl::fmt::FmtOptions::default()).expect("format"),
+        &aipl::codegen::format_source(source, aipl::codegen::FORMAT_WIDTH).expect("format"),
         "the server formats with the formatter, not with the client's tabSize",
     );
 

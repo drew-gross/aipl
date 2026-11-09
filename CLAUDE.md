@@ -235,7 +235,7 @@ The old `errors`, `check exit code` and `formatted` names are refused by the par
 what replaced them. Each pinned part is run for the section (a child `aipl check`) rather
 than by the file's own run, so a section may record a failing run.
 
-The formatter (`aipl-fmt` crate, `aipl::fmt::format_source`) is canonical
+The formatter (`format_source.aipl`, reached from Rust as `aipl::codegen::format_source`) is canonical
 (gofmt-style — it decides line breaks; width defaults to 100) and works off the
 lexer token stream, so it preserves comments/literals verbatim and leaves
 trailing `--- section ---` blocks byte-for-byte. Reformatting moves line numbers,

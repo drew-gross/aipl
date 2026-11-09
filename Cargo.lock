@@ -23,7 +23,6 @@ version = "0.1.0"
 dependencies = [
  "aipl-codegen",
  "aipl-docs",
- "aipl-fmt",
  "aipl-index",
  "aipl-linker",
  "aipl-loader",
@@ -80,14 +79,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aipl-fmt"
-version = "0.1.0"
-dependencies = [
- "aipl-codegen",
- "aipl-syntax",
-]
-
-[[package]]
 name = "aipl-index"
 version = "0.1.0"
 dependencies = [
@@ -116,7 +107,6 @@ name = "aipl-lsp"
 version = "0.1.0"
 dependencies = [
  "aipl-codegen",
- "aipl-fmt",
  "aipl-index",
  "aipl-loader",
  "aipl-parser",

@@ -27,7 +27,6 @@ pub use aipl_codegen::{ffi_ast, parse_spec, FfiValue, SpecFields};
 /// stylesheet, written from an [`index`]. Exposed so a project can generate its
 /// own docs from a build script rather than the CLI.
 pub use aipl_docs as docs;
-pub use aipl_fmt as fmt;
 /// Source indexing for tools: the symbols, imports and references a docs
 /// generator, an editor extension or a language server needs. Nothing in the
 /// compiler uses it — it answers questions *about* source rather than compiling

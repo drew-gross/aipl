@@ -37,7 +37,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 4906 | 2472 |
 | crates/aipl-codegen/src/fn_names | 51 | 3234 | 1871 | 22466 | 26152 |
 | crates/aipl-codegen/src/format | 2211 | 168657 | 19208 | 388167 | 228924 |
-| crates/aipl-codegen/src/format_source | 26216 | 4463266 | 716468 | 17672045 | 6999744 |
+| crates/aipl-codegen/src/format_source | 31466 | 5503746 | 716468 | 25032861 | 7004548 |
 | crates/aipl-codegen/src/grammar | 654 | 72543 | 37768 | 98171 | 117536 |
 | crates/aipl-codegen/src/grammar_aipl | 1938337 | 436110638 | 1567069 | 804367460 | 5869392 |
 | crates/aipl-codegen/src/grammar_calc | 9697 | 969905 | 41588 | 4986828 | 468376 |

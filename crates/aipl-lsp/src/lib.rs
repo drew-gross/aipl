@@ -4,7 +4,7 @@
 //! It exists so that an editor asks the *compiler* where a name is defined
 //! rather than guessing from a regular expression. Everything it answers is
 //! something the compiler already computes — [`aipl_index`] for the symbols
-//! and imports, [`aipl_fmt`] for the canonical layout, the loader and
+//! and imports, [`aipl_codegen::format_source`] for the canonical layout, the loader and
 //! [`aipl_codegen::frontend`] for the diagnostics — so there is one answer to
 //! each question and the editor's agrees with `aipl check` by construction.
 //!

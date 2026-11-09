@@ -11,7 +11,7 @@
 //! | `textDocument/references` | the same resolutions, from every open document's analysis |
 //! | `textDocument/hover` | [`aipl_index::Symbol`]'s `detail` and `doc`, for a builtin from [`aipl_index::builtin`] |
 //! | `textDocument/documentSymbol` | [`aipl_index::FileIndex::outline`] |
-//! | `textDocument/formatting` | [`aipl_fmt::format_source`] |
+//! | `textDocument/formatting` | [`aipl_codegen::format_source`] |
 //! | `textDocument/publishDiagnostics` | the loader and [`aipl_codegen::frontend`] |
 //!
 //! There is deliberately no second implementation of anything: a server that
@@ -470,7 +470,7 @@ impl Server {
         let Some((_, text, _)) = locate_document(&self.documents, params) else {
             return Value::Null;
         };
-        let Ok(formatted) = aipl_fmt::format_source(text, &aipl_fmt::FmtOptions::default()) else {
+        let Ok(formatted) = aipl_codegen::format_source(text, aipl_codegen::FORMAT_WIDTH) else {
             // Unparsable source has no canonical form. Declining leaves the
             // buffer alone, which is what a format-on-save user needs: the
             // alternative is losing the text that was mid-edit.

@@ -1,4 +1,4 @@
-# The formatter's raw-block re-layout: `aipl-fmt`'s `print` calls this through the
+# The formatter's raw-block re-layout: the formatter's `print` calls this through the
 # FFI (see `install_parser_hooks`) when emitting a verbatim `"""..."""` raw string
 # or triple-backtick template atom, to align its closing delimiter (and, for a
 # bare-delimiter block, its content) around the column the atom opened at. `base`

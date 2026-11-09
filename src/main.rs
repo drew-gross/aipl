@@ -844,7 +844,7 @@ fn check_format(file: &Path, fix: bool) -> Formatting {
     let Ok(src) = std::fs::read_to_string(file) else {
         return Formatting::Clean;
     };
-    let Ok(formatted) = aipl::fmt::format_source(&src, &aipl::fmt::FmtOptions::default()) else {
+    let Ok(formatted) = aipl::codegen::format_source(&src, aipl::codegen::FORMAT_WIDTH) else {
         return Formatting::Clean;
     };
     if formatted == src {
