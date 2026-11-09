@@ -1,6 +1,5 @@
 # What a lint reports: the message, and the span the caret goes under. The Rust
-# side rebuilds each as an `aipl_syntax::Error` and runs it through the `#[allow]`
-# squelching.
+# side rebuilds each as an `aipl_syntax::Error`.
 
 import {
     Span,

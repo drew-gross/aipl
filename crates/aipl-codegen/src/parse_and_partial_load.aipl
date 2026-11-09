@@ -11,11 +11,12 @@
 #   top-level functions.
 # - `promote_type_vars`: a declaration's own type parameters become type
 #   variables.
-# - `lint`: the lints that have been ported to AIPL. Their hits ride beside the
-#   program, for the Rust driver to squelch and report with its own.
+# - `lint` and `squelch`: the lints, and the `#[allow]` markers that keep what they
+#   flag. The hits that survive ride beside the program, for the Rust driver to
+#   report.
 # - `desugar`: the destructuring forms are lowered. It comes after `lint` so the
 #   lints read what the author wrote, with no temporaries the parser would have
-#   bound; the lints still in Rust run on what this returns.
+#   bound.
 #
 # The formatter parses with `aipl_parse_file` and not this, because it lays out
 # the program the author wrote, attributes and all.
@@ -32,23 +33,36 @@ import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import { Fn, Item, Program, show_program } from "./item.aipl";
 import { lint } from "./lint/lint.aipl";
 import { LintHit } from "./lint/lint_hit.aipl";
+import { squelch } from "./lint/squelch.aipl";
 import { promote_type_vars } from "./promote_type_vars.aipl";
 
-# A file as far as the loader has been ported: the program, the spans of its
-# `#[allow]` markers, and what the ported lints found in the program.
-struct PartialLoad { program: Program, allows: Span[], lints: LintHit[], type_uses: Span[] = [] }
+# A file as far as the loader has been ported: the program, and the lint errors it
+# has: the hits no `#[allow]` squelches, and the markers that squelch nothing.
+struct PartialLoad { program: Program, lints: LintHit[], type_uses: Span[] = [] }
 
 # `aipl_parse_file`, then the steps of loading that happen per file and need
 # nothing from any other.
 pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let ParsedFile { program, allows, type_uses } = aipl_parse_surface_file(src)?;
     let loaded = program.hoist_test_fns().promote_type_vars();
-    ok(PartialLoad { program: loaded.desugar(), allows, lints: lint(loaded), type_uses })
+    ok(PartialLoad {
+        program: loaded.desugar(),
+        lints: squelch(src, allows, lint(loaded)),
+        type_uses,
+    })
 }.test({
     let shaped = parse_and_partial_load(
         "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } }",
     )?;
     assert(shaped.lints$span.len() == 1);
+
+    // An `#[allow]` on the hit's line keeps it; one on any other line squelches nothing.
+    let kept = parse_and_partial_load(
+        "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } } #[allow]",
+    )?;
+    assert(kept.lints == []);
+    let stale = parse_and_partial_load("fn f() { } #[allow]")?;
+    assert(stale.lints$message == ["this `#[allow]` squelches nothing — remove it"]);
 
     // A file with neither attribute and no type parameters is as it was parsed.
     let plain = parse_and_partial_load("fn f() { }")?;

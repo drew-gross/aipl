@@ -1937,6 +1937,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./written_names.aipl",
     // The lints that have moved to AIPL, run by `parse_and_partial_load`.
     "./lint/lint_hit.aipl",
+    "./lint/squelch.aipl",
     "./lint/unused_imports.aipl",
     "./lint/constant_default.aipl",
     "./lint/duplicate_import_source.aipl",

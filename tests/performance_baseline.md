@@ -107,6 +107,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/slice_from_zero | 23783 | 3123840 | 714288 | 12520038 | 5797812 |
 | crates/aipl-codegen/src/lint/slice_to_len | 25361 | 3290292 | 715104 | 14286351 | 5798560 |
 | crates/aipl-codegen/src/lint/slice_whole | 26249 | 3418368 | 715472 | 15266385 | 5807960 |
+| crates/aipl-codegen/src/lint/squelch | 51 | 4080 | 1704 | 7002 | 11096 |
 | crates/aipl-codegen/src/lint/step_by_one | 40816 | 5011603 | 738308 | 31463187 | 5809844 |
 | crates/aipl-codegen/src/lint/union_loop_union_all | 127529 | 12930673 | 756124 | 134454127 | 5903624 |
 | crates/aipl-codegen/src/lint/unused_imports | 26760 | 3457783 | 738660 | 15832270 | 5786476 |
@@ -116,7 +117,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2538 | 2520 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1232 | 1232 | 3829 | 11792 |
 | crates/aipl-codegen/src/parse | 8747 | 928066 | 144080 | 5200115 | 782788 |
-| crates/aipl-codegen/src/parse_and_partial_load | 30525 | 3732700 | 760275 | 15023577 | 7289692 |
+| crates/aipl-codegen/src/parse_and_partial_load | 32974 | 3979275 | 765205 | 16972235 | 7298528 |
 | crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 169097 | 150528 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1784 | 5244 |
 | crates/aipl-codegen/src/parsed | 40 | 3477 | 3017 | 3192 | 70024 |

@@ -319,13 +319,15 @@ impl Loader {
         Ok(())
     }
 
-    /// Parse `src`, and run the per-file lints while the source (for line-scoped
-    /// `#[allow]` squelching) is in hand. Before the `trace` rewrite in
+    /// Parse `src`, refusing it if the per-file lints (squelched by its `#[allow]`
+    /// markers) have anything to say. Before the `trace` rewrite in
     /// [`Loader::prepare`], so a lint sees what the author wrote rather than the
     /// block it desugars to.
     fn parse_and_lint(&self, src: &str) -> Result<(Program, Vec<Span>), Vec<Error>> {
         let parsed = parse_with_allows(src)?;
-        aipl_syntax::lint::check(src, &parsed.allows, parsed.lints)?;
+        if !parsed.lints.is_empty() {
+            return Err(parsed.lints);
+        }
         Ok((parsed.program, parsed.type_uses))
     }
 

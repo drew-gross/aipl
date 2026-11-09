@@ -1,0 +1,70 @@
+# `#[allow]` squelching: which lint hits an author has kept, and what is said about
+# the rest.
+#
+# AIPL has no warnings, so a lint hit is an error, but the lints (and only the
+# lints) can be squelched by appending `#[allow]` to the offending line. The marker
+# is line-scoped: it silences every hit whose span starts on its line, and nothing
+# else. A marker on a line where no lint fires is itself an error, so a marker never
+# outlives the code it excused.
+
+import { Span, any, equal as ==, filter, len, logical_not as !, map } from builtins;
+import { lines } from "../lines.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
+
+# The hits of `hits` that no marker in `allows` squelches, each saying how to keep it,
+# followed by an error for every marker that squelched nothing. `src` is the text the
+# spans index into. A marker is not itself squelchable: what it would squelch is itself.
+pub fn squelch(src: str, allows: Span[], hits: LintHit[]) -> LintHit[] {
+    let marker_lines = allows.map(|marker| src.line_of(marker.start));
+    let hit_lines = hits.map(|h| src.line_of(h.span.start));
+
+    // Every hit that survives says how to keep it, so no lint spells that out in its own
+    // message.
+    let kept = hits
+        .filter(|h| !marker_lines.any(|line| line == src.line_of(h.span.start)))
+        $advised();
+    let stale = allows.filter(|marker| !hit_lines.any(|line| line == src.line_of(marker.start)));
+    [..kept, ..stale$unmatched_marker()]
+}.test({
+    let src = "a\nb #[allow]\nc\nd";
+
+    // A marker silences the hits on its own line, and nothing on the others.
+    assert(squelch(src, [4..12], [hit("here", 2..3), hit("there", 14..15)]) == [
+        hit("there (or append #[allow] to this line to keep it)", 14..15),
+    ]);
+
+    // A marker with no hit on its line is stale; hits survive in the order they came.
+    assert(squelch(src, [4..12], [hit("first", 0..1), hit("second", 14..15)]) == [
+        hit("first (or append #[allow] to this line to keep it)", 0..1),
+        hit("second (or append #[allow] to this line to keep it)", 14..15),
+        hit("this `#[allow]` squelches nothing — remove it", 4..12),
+    ]);
+
+    // No markers: every hit is advised and nothing is stale.
+    assert(squelch(src, [], [hit("m", 0..1)]) == [
+        hit("m (or append #[allow] to this line to keep it)", 0..1),
+    ]);
+    assert(squelch(src, [], []) == []);
+
+    // One marker squelches every hit that starts on its line.
+    assert(squelch(src, [4..12], [hit("a", 2..3), hit("b", 4..5)]) == []);
+})
+
+# `self` with how to keep what it flagged.
+fn advised(self: LintHit) -> LintHit {
+    ..self,
+    message: `{self.message} (or append #[allow] to this line to keep it)`,
+}
+
+# The error for a marker that squelched nothing.
+fn unmatched_marker(self: Span) -> LintHit {
+    hit("this `#[allow]` squelches nothing — remove it", self)
+}
+
+# The line, counting from 1, of byte offset `position` in `self`; an offset past the end
+# is on the last line.
+fn line_of(self: str, position: u64) -> u64 { self[..position].lines().len() }.test({
+    assert("ab\ncd".line_of(0) == 1);
+    assert("ab\ncd".line_of(3) == 2);
+    assert("ab\ncd".line_of(99) == 2);
+})

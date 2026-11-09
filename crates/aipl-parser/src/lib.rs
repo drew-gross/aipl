@@ -216,16 +216,15 @@ pub fn set_split_test_sections_hook(f: fn(&str) -> (String, String)) {
 }
 
 /// The dogfooded AIPL parser, installed by the compiler (via [`set_parse_hook`]):
-/// a whole file to its `Program` and the spans of its `#[allow]` markers.
+/// a whole file to its `Program` and the errors of its lints.
 static PARSE_HOOK: std::sync::OnceLock<fn(&str) -> Result<Parsed, Vec<Error>>> =
     std::sync::OnceLock::new();
 
-/// What a parse returns: the program, the spans of its `#[allow]` markers, and the
-/// hits of the lints, which ran on the program on the AIPL side. The loader gives
-/// the hits to [`aipl_syntax::lint::check`], which squelches and reports them.
+/// What a parse returns: the program, and the errors of the lints, which ran on the
+/// program on the AIPL side and have already been squelched by the file's `#[allow]`
+/// markers. A file with any is refused.
 pub struct Parsed {
     pub program: Program,
-    pub allows: Vec<Span>,
     pub lints: Vec<Error>,
     /// Every token written inside a type annotation, in source order. A language
     /// server resolves the ones that name a declaration.
@@ -261,12 +260,9 @@ pub fn parse(input: &str) -> Result<Program, Error> {
         })
 }
 
-/// [`parse`], additionally returning the spans of every `#[allow]`
-/// lint-squelch marker in the file, and the hits of the ported lints — the loader
-/// hands both to
-/// [`aipl_syntax::lint`]'s pass, which drops lint errors squelched by a
-/// same-line marker. The markers are trivia, so no production ever sees one;
-/// they ride the parser's return value as its one side-channel.
+/// [`parse`], additionally returning the lint errors the file has: the hits of the
+/// lints that no same-line `#[allow]` marker squelches, and the markers that
+/// squelch nothing.
 ///
 /// A file that does not parse fails with *every* syntax error the parser found,
 /// in source order and never empty: where the grammar has committed to what

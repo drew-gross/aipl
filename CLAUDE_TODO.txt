@@ -109,3 +109,6 @@ optimizer / destination-passing:
 
 diagnostics:
   spreading an optional into an array leaks the internal message "len expects an array, got i64?"
+
+naming:
+  `parse_with_allows` / `Parsed` no longer return allows; rename (parse_and_lint?)

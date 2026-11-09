@@ -5192,5 +5192,3 @@ pub fn ctor_ref_case(e: &ast::Expr) -> Option<(&str, &str)> {
     };
     qualified.split_once('@')
 }
-
-pub mod lint;

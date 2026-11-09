@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/lint.aipl</code></h1>
 
-      <div class="module-doc"><p>The lints, run over a parsed file.</p><p><code>aipl_syntax::lint::check</code> is the driver: it squelches the hits an <code>#[allow]</code> marker covers and says how to keep the rest. A lint is added by giving it its own file and a line in <code>lint</code>; the hits come back in the order the lints are listed.</p></div>
+      <div class="module-doc"><p>The lints, run over a parsed file.</p><p><code>squelch</code> is applied to what these return: it drops the hits an <code>#[allow]</code> marker covers and says how to keep the rest. A lint is added by giving it its own file and a line in <code>lint</code>; the hits come back in the order the lints are listed.</p></div>
 
 
 

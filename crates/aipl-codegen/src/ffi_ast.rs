@@ -39,13 +39,9 @@ pub fn program_from_ffi(v: &FfiValue) -> R<ast::Program> {
     }
 }
 
-/// The `Program` and the `#[allow]` spans behind a `Res(Ok(..))` returned by
-/// `aipl_parse_file` — the whole of what `aipl_parser::parse_with_allows`
+/// The `Program` and the lint errors behind a `Res(Ok(..))` returned by
+/// `parse_and_partial_load` — the whole of what `aipl_parser::parse_with_allows`
 /// returns, which is what the parser hook hands back.
-///
-/// The markers are the parser's one side-channel: they are trivia, so no
-/// production sees one, and the loader's lint pass still needs them. They ride
-/// the return value rather than a thread-local sink.
 ///
 /// A parse failure comes back as every `ParseError` it found, each its message at
 /// its span, as [`aipl_syntax::Error`]s the caller renders like any others — in
@@ -75,7 +71,6 @@ fn parse_failure(v: &FfiValue) -> Vec<aipl_syntax::Error> {
 fn parsed_file(v: &FfiValue) -> R<aipl_parser::Parsed> {
     Ok(aipl_parser::Parsed {
         program: program(field(v, "program")?)?,
-        allows: each(field(v, "allows")?, span)?,
         lints: each(field(v, "lints")?, |hit| Ok(parse_error(hit)))?,
         // Not marshaled by an artifact built before it existed.
         type_uses: match v_field(v, "type_uses") {

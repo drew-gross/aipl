@@ -1,8 +1,8 @@
 # The lints, run over a parsed file.
 #
-# `aipl_syntax::lint::check` is the driver: it squelches the hits an `#[allow]`
-# marker covers and says how to keep the rest. A lint is added by giving it its
-# own file and a line in `lint`; the hits come back in the order the lints are listed.
+# `squelch` is applied to what these return: it drops the hits an `#[allow]` marker
+# covers and says how to keep the rest. A lint is added by giving it its own file and
+# a line in `lint`; the hits come back in the order the lints are listed.
 
 import { equal as == } from builtins;
 import { Program } from "../item.aipl";

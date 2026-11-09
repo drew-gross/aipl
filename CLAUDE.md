@@ -748,7 +748,7 @@ Rules worth knowing before reaching for it:
 **One lint, one file.** Each lint is AIPL: `crates/aipl-codegen/src/lint/<name>.aipl`,
 named after the lint function it holds (plus that lint's own private helpers), so
 a fuzzy file search on the name in a diagnostic lands on its implementation.
-`lint.aipl` runs them all with the parse; `aipl-syntax`'s `lint.rs` only applies the
+`lint.aipl` runs them all with the parse, and `lint/squelch.aipl` applies the
 `#[allow]` squelching to what they return. Adding a lint is a new file, a line in
 `lint.aipl`, and an entry in `DOGFOOD_SOURCE_FILES` — the add-lint skill is the recipe.
 
