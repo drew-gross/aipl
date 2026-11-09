@@ -143,7 +143,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1145 | 2584 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 947 | 2484 |
 | crates/aipl-mono/src/builtin_as_case | 0 | 0 | 0 | 272 | 1200 |
-| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3548 | 7628 |
+| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3588 | 7516 |
 | crates/aipl-mono/src/builtin_collect_arms | 9 | 480 | 480 | 1862 | 3328 |
 | crates/aipl-mono/src/builtin_collect_ok | 7 | 512 | 584 | 2741 | 6800 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1463 | 2528 |

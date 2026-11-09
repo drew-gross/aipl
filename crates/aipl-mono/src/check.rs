@@ -441,7 +441,6 @@ struct Cx<'a> {
     /// parameter types may still mention the enclosing function's type
     /// variables, which `lock_node` refuses on purpose. Those are exactly what
     /// a written annotation may mention too, and mono substitutes both alike.
-    lambda_params: std::cell::RefCell<HashMap<usize, Vec<Type>>>,
     /// The bound declared for each of `current_type_params`, so a call inside a
     /// generic body can check a callee's bound against the *enclosing*
     /// variable's (see `bound_satisfied`).
@@ -1852,24 +1851,11 @@ pub(crate) fn defaults_only_on_functions(kind: &str, name: &aipl_syntax::SpanStr
     )
 }
 
-/// Type-check `program`. The checker recovers at each item, so this returns
-/// *every* error found — in source order — or `Ok` if every function is
-/// well-formed.
-/// Type-check `program`, returning it with the types of context-dependent
-/// expressions stamped in (see [`Expr::ty`]).
-///
-/// The rewrite is why this returns a program rather than only errors: a bare
-/// `none`, an empty `[]`, or a generic constructor takes its type from where it
-/// sits, so a later pass that *moves* it — inlining, folding — would otherwise
-/// change what it means. Recording the answer here, while the context is still
-/// visible, is what makes those moves safe.
-pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
-    check_resolved(program).map(|(checked, _)| checked)
-}
-
-/// [`check`], also returning what every written name resolved to — see
-/// [`aipl_syntax::resolution`].
-pub fn check_resolved(program: &Program) -> Result<(Program, Vec<Resolution>), Vec<Error>> {
+/// Type-check `program`. The checker recovers at each item, so this returns *every* error found, in
+/// source order, or what every written name resolved to (see [`aipl_syntax::resolution`]) if every
+/// function is well-formed. The program is not rewritten: what the passes read is typed by the
+/// pinner.
+pub fn check_resolved(program: &Program) -> Result<Vec<Resolution>, Vec<Error>> {
     // struct name → [(field_name, field_type, has_default)]
     let mut structs: HashMap<String, Vec<(String, Type, bool)>> = HashMap::new();
     let mut variants: HashMap<String, Vec<(String, Vec<Type>)>> = HashMap::new();
@@ -1973,7 +1959,6 @@ pub fn check_resolved(program: &Program) -> Result<(Program, Vec<Resolution>), V
         locks: std::cell::RefCell::new(HashMap::new()),
         return_pinned: std::cell::RefCell::new(HashMap::new()),
         explicit_type_args: std::cell::RefCell::new(HashMap::new()),
-        lambda_params: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
         try_errs: std::cell::RefCell::new(Vec::new()),
@@ -2130,20 +2115,7 @@ pub fn check_resolved(program: &Program) -> Result<(Program, Vec<Resolution>), V
     if !errors.is_empty() {
         return Err(errors);
     }
-    let lambda_params = cx.lambda_params.borrow();
-    let mut out = program.clone();
-    // Walked in lockstep with the input: the clone is structurally identical, so
-    // the two trees line up node for node, and each output node is stamped from
-    // the *input* node's identity.
-    for (src, item) in program.items.iter().zip(&mut out.items) {
-        if let (Item::Fn(sf), Item::Fn(f)) = (src, item) {
-            stamp_locks(&sf.body, &mut f.body, &locks, &lambda_params);
-            if let (Some(st), Some(t)) = (sf.test_body.as_ref(), f.test_body.as_mut()) {
-                stamp_locks(st, t, &locks, &lambda_params);
-            }
-        }
-    }
-    Ok((out, aipl_syntax::resolution::settled(cx.resolutions.take())))
+    Ok(aipl_syntax::resolution::settled(cx.resolutions.take()))
 }
 
 /// Tag `e` with the file the function named `name` came from, so the renderer
@@ -2242,81 +2214,6 @@ pub(crate) fn has_return_only_var(sig: &Signature) -> bool {
 /// checked. See [`Cx::locks`] for why this rather than its span.
 fn node_id(e: &Expr) -> usize {
     e as *const Expr as usize
-}
-
-/// Apply [`Cx::locks`] and [`Cx::lambda_params`] to a body, in place.
-fn stamp_locks(
-    src: &Expr,
-    out: &mut Expr,
-    locks: &HashMap<usize, Option<Type>>,
-    lambda_params: &HashMap<usize, Vec<Type>>,
-) {
-    // Type arguments are spent once checking is done: they went into the call's
-    // recorded result type, so the call stands alone from here on.
-    if let (ExprKind::TypeArgs(inner_src, _), ExprKind::TypeArgs(inner_out, _)) =
-        (&src.kind, &mut out.kind)
-    {
-        let mut inner = (**inner_out).clone();
-        stamp_locks(inner_src, &mut inner, locks, lambda_params);
-        *out = inner;
-        return;
-    }
-    if let Some(Some(ty)) = locks.get(&node_id(src)) {
-        out.ty = Some(Box::new(ty.clone()));
-    }
-    // A value lambda's inferred parameter types become annotations, so the
-    // lambda reads downstream exactly as if they had been written.
-    if let (Some(tys), ExprKind::Lambda(params, _)) =
-        (lambda_params.get(&node_id(src)), &mut out.kind)
-    {
-        for (p, ty) in params.iter_mut().zip(tys) {
-            if p.ty.is_none() {
-                p.ty = Some(ty.clone());
-            }
-        }
-    }
-    for (s, o) in crate::children(src)
-        .into_iter()
-        .zip(crate::children_mut(out))
-    {
-        stamp_locks(s, o, locks, lambda_params);
-    }
-    if let Some(rewritten) = retargeted_int_parse(out) {
-        *out = rewritten;
-    }
-}
-
-/// An `int_parse` recorded as producing an integer other than `i64` (see
-/// `Cx::retarget_int_parse`), as the calls that produce it: the signed parse
-/// for a signed target, the unsigned one for an unsigned target — so a `u64`
-/// reaches past `i64::MAX` — each narrowed to the target unless it already is
-/// one. `None` for any other expression.
-fn retargeted_int_parse(e: &Expr) -> Option<Expr> {
-    let ExprKind::Call(Callee::IntParse, args, style) = &e.kind else {
-        return None;
-    };
-    let Some(Type::Optional(core)) = e.ty.as_deref() else {
-        return None;
-    };
-    let Type::Primitive(target) = **core else {
-        return None;
-    };
-    let parse = if target.int_signed() {
-        Callee::IntParse
-    } else {
-        Callee::IntParseUnsigned
-    };
-    let mut call = Expr::new(ExprKind::Call(parse, args.clone(), *style), e.span.clone());
-    if matches!(target, Primitive::I64 | Primitive::U64) {
-        call.ty = e.ty.clone();
-        return Some(call);
-    }
-    let mut narrowed = Expr::new(
-        ExprKind::Call(Callee::Narrow, vec![call], true),
-        e.span.clone(),
-    );
-    narrowed.ty = e.ty.clone();
-    Some(narrowed)
 }
 
 /// During checking, these types stand in for an as-yet-unknown scalar: the
@@ -4679,8 +4576,7 @@ impl Cx<'_> {
     /// type — a constructor's payload, a struct field, a binding's annotation.
     /// It supplies the type of every parameter written without one, so
     /// `Text(|t| Bool(t == "true"))` needs no `|t: str|` when `Text` carries
-    /// `(str) -> A`; the inferred types are recorded in `lambda_params` for
-    /// mono, which lifts the lambda from its annotations. A parameter that is
+    /// `(str) -> A`. A parameter that is
     /// annotated must agree with the position, exactly as in `check_lambda`.
     /// With no expected function type, every parameter must be written.
     ///
@@ -4714,7 +4610,6 @@ impl Cx<'_> {
         };
         let mut ptys = Vec::with_capacity(params.len());
         let mut env2 = env.clone();
-        let mut inferred_any = false;
         for (i, p) in params.iter().enumerate() {
             let from_position = expected_params.map(|ps| &ps[i]);
             let ty = match (&p.ty, from_position) {
@@ -4736,10 +4631,7 @@ impl Cx<'_> {
                     ));
                 }
                 (Some(ann), _) => ann.clone(),
-                (None, Some(pty)) => {
-                    inferred_any = true;
-                    pty.clone()
-                }
+                (None, Some(pty)) => pty.clone(),
                 (None, None) => {
                     return Err(Error::at(
                         format!(
@@ -4760,11 +4652,6 @@ impl Cx<'_> {
                 },
             );
             ptys.push(ty);
-        }
-        if inferred_any {
-            self.lambda_params
-                .borrow_mut()
-                .insert(node_id(lambda), ptys.clone());
         }
         // Reject captures: any free identifier of the body that resolves to an
         // enclosing local (not a global function/type). Function values carry
@@ -7816,7 +7703,6 @@ pub(crate) fn validate_type(
         locks: std::cell::RefCell::new(HashMap::new()),
         return_pinned: std::cell::RefCell::new(HashMap::new()),
         explicit_type_args: std::cell::RefCell::new(HashMap::new()),
-        lambda_params: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
         try_errs: std::cell::RefCell::new(Vec::new()),

@@ -2984,18 +2984,15 @@ pub fn lowered_for_check(program: &Program) -> Result<(Program, Program), Vec<Er
 pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     let (program, check_program) = lowered_for_check(program)?;
     let program = &program;
-    // `check` hands back the program with the types of context-dependent
-    // expressions stamped in (`Expr::ty`) — a bare `none`, an empty `[]`, a
-    // generic constructor. Everything downstream runs on *that*, because the
-    // passes below move expressions away from the context those types came from.
-    let (checked, resolutions) = aipl_mono::check_resolved(&check_program)?;
-    // `check_program` is the synthesized builtin decls followed by the real
-    // program; take back the second half, now stamped. `check` neither reorders
-    // nor adds items, so the tail lines up by construction.
+    // The checker is run for its findings and for what every written name resolved to; the
+    // program everything downstream reads is the lowered one, typed by the pinner below.
+    let resolutions = aipl_mono::check_resolved(&check_program)?;
+    // `check_program` is the synthesized builtin decls followed by the real program; take back
+    // the second half.
     let mut program = Program {
-        items: checked.items[checked.items.len() - program.items.len()..].to_vec(),
-        sources: checked.sources.clone(),
-        doc: checked.doc.clone(),
+        items: check_program.items[check_program.items.len() - program.items.len()..].to_vec(),
+        sources: check_program.sources.clone(),
+        doc: check_program.doc.clone(),
     };
     // The checker is the last pass that cares about a `without` refinement:
     // it has verified every value entering one, and from here on a

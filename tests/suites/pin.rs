@@ -244,10 +244,11 @@ fn oracle_report() {
 }
 
 /// The pinner types every program the checker accepts, and rejects every program it rejects.
-/// (The compiler's own sources are left to `oracle_report`: they are most of the cost.)
+/// The cases, the examples, the projects and the FFI fixtures are held to it. (The compiler's own
+/// sources are left to `oracle_report`: they are most of the cost.)
 #[test]
 fn the_pinner_agrees_with_the_checker() {
-    let d = oracle(&["tests/cases"]);
+    let d = oracle(&["tests/cases", "examples", "projects", "tests/ffi_fixtures"]);
     assert!(
         d.gaps == 0 && d.false_rejections == 0 && d.misses == 0,
         "the pinner and the checker disagree:\n{}",

@@ -475,6 +475,33 @@ struct Decls {
 }
 
 impl Decls {
+    /// The type arguments of the one instance of generic variant `base` the program declares, or
+    /// `None` when there is not exactly one. A construction nothing else decides takes them.
+    fn sole_variant_instance_args(&self, base: &str) -> Option<Vec<Type>> {
+        let template = self.generic_variants.get(base)?;
+        let prefix = format!("{base}$");
+        let mut names: Vec<&String> = self
+            .variants
+            .keys()
+            .filter(|n| n.starts_with(&prefix))
+            .collect();
+        names.sort();
+        let [name] = names.as_slice() else {
+            return None;
+        };
+        let cases = &self.variants[*name];
+        let vars: HashSet<&str> = template.type_vars.iter().map(|t| t.name.as_str()).collect();
+        let mut bound = HashMap::new();
+        for case in &template.cases {
+            if let Some((_, payload)) = cases.iter().find(|(n, _)| *n == case.name.text) {
+                for (slot, instance) in case.payload.iter().zip(payload) {
+                    crate::check::collect_var_bindings(&slot.ty, instance, &vars, &mut bound);
+                }
+            }
+        }
+        crate::check::collect_args(&template.type_vars, &bound)
+    }
+
     /// Whether `t`, as written, may appear in a declaration or annotation.
     fn validate(&self, t: &Type, type_params: &[String], ctx: &str, at: &Span) -> Res<()> {
         crate::check::validate_type(
@@ -1264,7 +1291,62 @@ impl Pinner<'_> {
     }
 
     /// Resolve every inference type in `body`.
-    fn finish(&self, body: TExpr<It>, span: &Span) -> Res<TExpr<Ty>> {
+    /// A generic variant's type argument nothing in the function decided is the argument of the
+    /// program's one instance of it, when there is exactly one (a `Rule<K>` built where no `K` is in
+    /// view, in a program that only ever uses `Rule<Tok>`). The instances counted are the ones
+    /// the program declares, the ones in the functions pinned so far, and the ones in this function.
+    fn settle_open_applications(&mut self, body: &TExpr<It>) {
+        let mut open: Vec<(String, Vec<It>)> = Vec::new();
+        let mut closed: Vec<(String, Vec<It>)> = Vec::new();
+        fn collect(
+            p: &Pinner<'_>,
+            e: &TExpr<It>,
+            open: &mut Vec<(String, Vec<It>)>,
+            closed: &mut Vec<(String, Vec<It>)>,
+        ) {
+            if let It::Gen(base, args) = p.table.shallow(&e.ty) {
+                if args.iter().any(|a| p.table.has_open_variable(a)) {
+                    open.push((base, args));
+                } else {
+                    closed.push((base, args));
+                }
+            }
+            e.for_each_child(&mut |c| collect(p, c, open, closed));
+        }
+        collect(self, body, &mut open, &mut closed);
+        for (base, args) in open {
+            let mut known: Vec<Vec<Type>> = Vec::new();
+            let mut note = |instance: Vec<Type>| {
+                if !known.contains(&instance) {
+                    known.push(instance);
+                }
+            };
+            if let Some(declared) = self.decls.sole_variant_instance_args(&base) {
+                note(declared);
+            }
+            for (b, a) in closed.iter() {
+                if *b == base {
+                    note(a.iter().map(|t| self.table.resolve(t).to_type()).collect());
+                }
+            }
+            for (b, a) in self.decls.instances.borrow().values() {
+                if *b == base {
+                    note(a.iter().map(TyRepr::to_type).collect());
+                }
+            }
+            let [sole] = known.as_slice() else {
+                continue;
+            };
+            for (arg, want) in args.iter().zip(sole) {
+                if let Ok(want) = self.lower(want, &HashMap::new(), &(0..0)) {
+                    let _ = self.table.unify(arg, &want);
+                }
+            }
+        }
+    }
+
+    fn finish(&mut self, body: TExpr<It>, span: &Span) -> Res<TExpr<Ty>> {
+        self.settle_open_applications(&body);
         let mut typed = body
             .map_types(&mut |t| Some(self.table.resolve(t)))
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
@@ -2117,7 +2199,7 @@ impl Pinner<'_> {
                     (It::Opt(t) | It::Res(t, _), _) if self.in_test => *t,
                     (It::Opt(t), It::Opt(_)) => *t,
                     (It::Res(t, err), It::Res(_, want)) => {
-                        self.table.unify(&err, &want).or_else(|m| {
+                        self.agree(&err, &want).or_else(|m| {
                             reject(format!("`?` propagates a different error ({m})"), &e.span)
                         })?;
                         *t

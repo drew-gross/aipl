@@ -187,10 +187,26 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         yet.
   - [ ] Passes that still guess or are syntactic about types: see the audit list in the notes (Session 8).
   - [ ] Keep stamps right where a pass builds or moves nodes (the stale stamps found in Session 7).
-- [ ] **4. Retire the old.** Delete `check.rs`, `ArrayReceivers`/`holds_array`/`known_array`,
-      `narrows_literal_array`, `is_unpinned_optional`, `Expr::ty` stamping; the pinner becomes the checker and
-      the diagnostics sections are refilled. Behaviour-changing wins (fold_extends on exact types, ...) are
-      follow-ups with their own measurements.
+- [~] **4. Retire the old.** The pinner becomes the checker; `check.rs` goes.
+  - [x] **4a. The checker no longer rewrites the program** (Session 12). `frontend` runs `check_resolved` for its
+        findings and the name resolutions only (it now returns just those), and everything downstream reads the
+        *lowered* program typed by the pinner: stamps, plus what `stamp_locks` used to do, now in
+        `probe::stamp_everything` (written `f<T>(x)` type arguments stripped; a value lambda's inferred parameter
+        types written onto it; `int_parse` retargeted to its stamped integer type). Deleted from the checker: the
+        `check` entry point, `stamp_locks`, `retargeted_int_parse`, `lambda_params`. No baseline row moved.
+  - [ ] **4b. Findings from the pinner.** Measured (Session 12): with the pinner's rejections reported instead of the
+        checker's, 189 of 270 `err_*` cases still match byte for byte and 81 differ, as expected: different spans
+        (`true + false` underlined whole vs the operand), different wording (`both sides must be the same type` vs
+        `the operands are bool and i64`), and fewer findings per function, because the checker *recovers* and reports
+        every error in a body while the pinner stops at a function's first. Needed before the switch: error recovery
+        in the pinner (or an agreed one-error-per-function report), the match checks (`match_check.rs`) and lints
+        that read checker state (`locks`: `narrow_target_errors`, `return_pinned_errors`), then refill the sections.
+  - [ ] **4c. Name resolutions from the pinner** (`aipl_syntax::resolution`, read by the LSP and index), after which
+        `Cx` and its ~6,000 lines go and the helpers the pinner shares (`coerce`, `validate_type`, `MatchInfo`,
+        `generic_instance_name`, ...) move to a module of their own.
+  - [ ] **4d. Delete the pseudo-types** (`NoneInner`, `EmptyArrayArg`, `NoneLiteralArg`, `pseudo_marker`) and make
+        `Expr::ty` mandatory by switching the passes to `TExpr`. Behaviour-changing wins on exact types
+        (`fold_extends`' receiver rule, the `tuple_windows` optional carry) are follow-ups with their own measurements.
 
 ## Risks
 
@@ -304,3 +320,14 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   it from the instances the program has (`sole_instance`). Nodes whose type holds such an application carry
   `TExpr::unsettled` and are not stamped. That is the one place a defaulted type still stays out of the stamps; moving
   the `sole_instance` rule into the pinner (a program-level default for a bounded variable) would remove it.
+- Session 12: stage 4a. The checker is validate-only now. 4b/4c are the remaining way to delete it; 4b has a
+  measured shopping list (above).
+- Session 12 (continued): the first handoff of 4a found two things the corpus oracle could not. (1) The pinner
+  rejected `projects/minesweeper/main.aipl` (`?` propagating a `str` into `!Error`: the error sides are now met with
+  `agree`, which knows `Error` is a `str`), and the pinner-agreement test only covered `tests/cases`; it now covers
+  `examples/`, `projects/` and `tests/ffi_fixtures/` too. With the checker no longer stamping, a function the pinner
+  rejects has no stamps at all, so a pinner gap is now a compile error downstream, not a quiet loss of precision.
+  (2) `Refuse(Msg("no")).show()` needs `K` from the program's one `Rule<K>` instance: the checker's rule (an
+  argument, then the return type, then the sole existing instance) now also lives in the pinner
+  (`Pinner::settle_open_applications`), counting the declared instances, those in functions pinned before, and those
+  in the function itself, so the mono-side `sole_instance` fallback no longer decides what a stamped node is.

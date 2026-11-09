@@ -13,7 +13,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
-use aipl_syntax::ast::{Expr, ExprKind, Type};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, Type};
 use aipl_syntax::typed::{ConcreteTy, TExpr, TItem, TProgram, Ty, TyRepr};
 
 /// The pinned types of one function: its parameters, and each node's type by span.
@@ -403,8 +403,60 @@ pub fn stamp_everything(
             nodes: &pf.nodes,
             stamping,
         };
+        strip_type_args(&mut f.body);
         stamper.together(&mut f.body, body);
+        retarget_int_parses(&mut f.body);
     }
+}
+
+/// Written type arguments are spent once the call's type is known (the pinner records it), so the
+/// call stands alone: `f<T>(x)` is `f(x)`.
+fn strip_type_args(e: &mut Expr) {
+    while let ExprKind::TypeArgs(inner, _) = &mut e.kind {
+        let inner = std::mem::replace(&mut **inner, Expr::new(ExprKind::Unit, 0..0));
+        *e = inner;
+    }
+    for child in crate::children_mut(e) {
+        strip_type_args(child);
+    }
+}
+
+/// An `int_parse` stamped as producing an integer other than `i64`, as the calls that produce it:
+/// the signed parse for a signed target, the unsigned one for an unsigned target (so a `u64`
+/// reaches past `i64::MAX`), each narrowed to the target unless it already is one.
+fn retarget_int_parses(e: &mut Expr) {
+    for child in crate::children_mut(e) {
+        retarget_int_parses(child);
+    }
+    let ExprKind::Call(Callee::IntParse, args, style) = &e.kind else {
+        return;
+    };
+    let Some(Type::Optional(core)) = e.ty.as_deref() else {
+        return;
+    };
+    let Type::Primitive(target) = **core else {
+        return;
+    };
+    let parse = if target.int_signed() {
+        Callee::IntParse
+    } else {
+        Callee::IntParseUnsigned
+    };
+    let mut call = Expr::new(ExprKind::Call(parse, args.clone(), *style), e.span.clone());
+    if matches!(
+        target,
+        aipl_syntax::ast::Primitive::I64 | aipl_syntax::ast::Primitive::U64
+    ) {
+        call.ty = e.ty.clone();
+        *e = call;
+        return;
+    }
+    let mut narrowed = Expr::new(
+        ExprKind::Call(Callee::Narrow, vec![call], true),
+        e.span.clone(),
+    );
+    narrowed.ty = e.ty.clone();
+    *e = narrowed;
 }
 
 /// Whether `t` names the type variable of an anonymous `any` (see [`crate::pin::ANONYMOUS_ANY`]).
@@ -490,6 +542,19 @@ impl Stamper<'_> {
         // A generic application the pinner had to guess an argument of is monomorphization's to settle.
         if !t.unsettled {
             self.stamp(e, &t.ty);
+        }
+        // A value lambda's inferred parameter types become annotations, so the lambda reads
+        // downstream exactly as if they had been written.
+        if let (
+            ExprKind::Lambda(params, _),
+            aipl_syntax::typed::TExprKind::Lambda(typed_params, _),
+        ) = (&mut e.kind, &t.kind)
+        {
+            for (p, tp) in params.iter_mut().zip(typed_params) {
+                if p.ty.is_none() && !tp.ty.mentions_var() {
+                    p.ty = Some(self.spelled(tp.ty.to_type()));
+                }
+            }
         }
         let mut typed = Vec::new();
         t.for_each_child(&mut |c| typed.push(c));
