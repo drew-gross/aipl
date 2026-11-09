@@ -205,11 +205,19 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
           type; once any error is held the body is not settled or finished, so nothing downstream reports its echoes.
           `Pinned::failures` holds one entry per error. `oracle_report` now compares the two lists on the checker's
           rejected programs (`tests/cases`: 128): the same errors in 58, at the same places in 94, others in 34.
-        - [ ] The 34 whose places differ are the findings the pinner lacks: `without []` argument checks, a missing
-          check per form (`cannot index/slice a value of type`, `for-loop iterable`, variadic `without []`,
-          type-parameter bound errors `requires "int"`, `narrow` without a target, method-signature rules on
-          declarations, `cannot return a function value`, closure captures/untyped parameters, shim closure rules),
-          and spans the checker puts on the operand/annotation where the pinner uses the literal (`300` as `u8`).
+        - [x] **Findings ported** (Session 13). Oracle over `tests/cases`: the same places as the checker in 126 of the
+          128 rejected programs (the same text in 62), no false rejection over cases, examples, projects, FFI fixtures
+          and the compiler's own sources. Added to the pinner: `cannot index/slice a value of type`, a number as a
+          rule's subject (`known`), declaration rules (`mut` receiver, one `mut`, mutating returns nothing, no function
+          return), `cannot be called as a method`, set `contains`, bound errors collected in `settle` rather than the
+          first, `narrow` with no target, value-lambda rules (typed parameters, captures, no effects; `value_arg`),
+          effects of a function passed by name, `let _ = ()`, `without []` variadics, type-parameter default types, str
+          `match` ctor patterns, float operand spans, shim-closure rules, literal-fit errors reported at the
+          expression the value is handed over as, return mismatch at `value_span`.
+        - [ ] Two programs still differ on purpose, to be settled when the sections are refilled: the checker calls
+          `let r: u8 = identity(300)` a narrowing (the pinner lets the annotation reach the literal and reports the
+          literal), and the checker refuses a generic variant's argument pinned only by a lambda's parameters (`Build`;
+          the pinner infers it from the body).
         - [ ] Match checks (`match_check.rs`), lints that read checker state (`locks`: `narrow_target_errors`,
           `return_pinned_errors`), then refill the sections.
   - [ ] **4c. Name resolutions from the pinner** (`aipl_syntax::resolution`, read by the LSP and index), after which
@@ -346,3 +354,5 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   (discarded statements, assignments, array/set literal elements); `Failure`s are one per error. No behaviour change:
   nothing reports the pinner's errors yet, so the gate is unaffected. The oracle's new comparison is the shopping list
   for the remaining findings.
+- Session 13 (continued): 4b findings. See the list above; `oracle_report` is the measure. `check_literals` now
+  takes the enclosing site span, `settle` collects instead of stopping at the first bound error.

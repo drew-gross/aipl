@@ -24,7 +24,13 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
-    dump winrate matrix to interactive svg
+    matches seems odd for a member of Deck, we should just parse the file into a raw list of matches and analyze that
+    winrate:
+      ignore mirror matches
+      dump winrate matrix to interactive svg
+      include total winrate
+      even column sizes
+      include total match count (W - L - D)
     split out the logic for rendering stuff into a table
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
@@ -114,6 +120,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  cell_text looks like it should be a fold. Also have a lint for this
+  so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
   in tabulate cells_line() could be a self method
   in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
@@ -895,6 +903,7 @@ expression matcher:
   use it for operation fusion
 
 vscode:
+  have a way to show the type of the variable under the cursor (or something like that)
   cells_line in tabulate doesn't support go-to-def
   autocomplete
   go to definition should work for destructurings (types and fields)

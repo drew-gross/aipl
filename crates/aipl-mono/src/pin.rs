@@ -560,6 +560,8 @@ struct Pinner<'a> {
     /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
     /// returns nothing, so the operand's shape is the only constraint.
     in_test: bool,
+    /// Each `narrow` call's target integer type and span: where its value goes has to say which.
+    narrows: Vec<(It, Span)>,
     /// Errors in statements the walk went on past: see [`Pinner::recover`].
     errors: Vec<Error>,
 }
@@ -917,6 +919,7 @@ fn pinner_for<'a>(
         effects: effects.to_vec(),
         in_test: false,
         errors: Vec::new(),
+        narrows: Vec::new(),
     }
 }
 
@@ -933,10 +936,14 @@ fn pin_test_body(decls: &Decls, f: &Function, block: &Expr) -> Result<TExpr<Ty>,
     p.in_test = true;
     let result = (|| {
         let body = p.expr(block)?;
-        p.stop_if_recovered(&block.span)?;
-        p.coerce_expr(&body, &It::Unit, &block.span, "the function's result")?;
-        p.stop_if_recovered(&block.span)?;
+        p.coerce_expr(
+            &body,
+            &It::Unit,
+            block.value_span(),
+            "the function's result",
+        )?;
         p.settle()?;
+        p.stop_if_recovered(&block.span)?;
         p.finish(body, &block.span)
     })();
     with_recovered(p.errors, result)
@@ -1052,6 +1059,7 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
         None => It::Unit,
     };
     check_type_param_defaults(&p, f)?;
+    check_method_declaration(f)?;
     let type_var_names: Vec<String> = f.sig.type_vars.iter().map(|t| t.name.clone()).collect();
     let fn_ctx = format!("fn {:?}", display(&f.name.text));
     for param in &f.sig.params {
@@ -1097,11 +1105,10 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     p.env = everything;
     let body = p.expr(&f.body)?;
     let ret = p.ret.clone();
-    // Recovery left placeholders in the tree, so what follows would only report their echoes.
-    p.stop_if_recovered(&f.body.span)?;
-    p.coerce_expr(&body, &ret, &f.body.span, "the function's result")?;
-    p.stop_if_recovered(&f.body.span)?;
+    p.coerce_expr(&body, &ret, f.body.value_span(), "the function's result")?;
     p.settle()?;
+    // Recovery left placeholders in the tree, which is not worth finishing.
+    p.stop_if_recovered(&f.body.span)?;
     let body = p.finish(body, &f.body.span)?;
     let defaults = defaults
         .into_iter()
@@ -1154,6 +1161,30 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     })
 }
 
+/// The rules on how a function may be declared as a method, and on what it may return.
+fn check_method_declaration(f: &Function) -> Res<()> {
+    let name = display(&f.name.text);
+    let fail = |what: &str| reject(format!("fn {name:?}: {what}"), &f.name.span);
+    if f.sig.params.iter().skip(1).any(|p| p.mutable) {
+        return fail("only the first parameter may be \"mut\"");
+    }
+    if f.sig.is_mutating() {
+        if f.sig.params[0].name != "self" {
+            return fail("a \"mut\" receiver must be named \"self\"");
+        }
+        if f.sig.return_ty.is_some() {
+            return fail("a mutating method cannot return a value");
+        }
+    }
+    if let Some(rt @ Type::Fn(..)) = &f.sig.return_ty {
+        return fail(&format!(
+            "cannot return a function value ({})",
+            aipl_syntax::type_name(rt)
+        ));
+    }
+    Ok(())
+}
+
 /// A type parameter's default is what it takes when nothing pins it, so it must be a type that
 /// parameter could have been pinned to, and a parameter after a defaulted one needs a default too.
 fn check_type_param_defaults(p: &Pinner, f: &Function) -> Res<()> {
@@ -1178,6 +1209,16 @@ fn check_type_param_defaults(p: &Pinner, f: &Function) -> Res<()> {
                         &f.name.span,
                     );
                 }
+                p.decls.validate(
+                    default,
+                    &[],
+                    &format!(
+                        "fn {:?} type parameter {:?} default",
+                        display(&f.name.text),
+                        tp.name
+                    ),
+                    &f.name.span,
+                )?;
                 if !tp.bound.accepts(default, &is_variant) {
                     return reject(
                         format!(
@@ -1242,16 +1283,18 @@ impl Pinner<'_> {
                     _ => false,
                 };
                 if free {
-                    if rec.result_only[i] && rec.defaults[i].is_none() {
-                        return reject(
+                    // After an error a variable may be free only because what pinned it was
+                    // the statement that failed.
+                    if rec.result_only[i] && rec.defaults[i].is_none() && self.errors.is_empty() {
+                        self.errors.push(Error::at(
                             format!(
                                 "fn {:?} takes a type from where its result goes, and nothing \
                                  here says which — bind the result to a declared type, as in \
                                  `let n: u8? = ..;`",
                                 rec.callee
                             ),
-                            &rec.span,
-                        );
+                            rec.span.clone(),
+                        ));
                     }
                     continue;
                 }
@@ -1283,16 +1326,26 @@ impl Pinner<'_> {
                         ),
                         other => format!("but was inferred as {}", aipl_syntax::type_name(other)),
                     };
-                    return reject(
+                    self.errors.push(Error::at(
                         format!(
                             "fn {:?}: type parameter {:?} requires \"{}\", {why}",
                             rec.callee,
                             rec.names[i],
                             need.name()
                         ),
-                        &rec.span,
-                    );
+                        rec.span.clone(),
+                    ));
                 }
+            }
+        }
+        for (target, span) in std::mem::take(&mut self.narrows) {
+            if matches!(self.table.shallow(&target), It::Var(_)) && self.errors.is_empty() {
+                self.errors.push(Error::at(
+                    "\"narrow\" takes the integer type it converts to from where its value \
+                     goes, and nothing here says which — bind it with one, as in \
+                     `let b: u8? = n.narrow();`",
+                    span,
+                ));
             }
         }
         for (name, vars, span) in std::mem::take(&mut self.constructions) {
@@ -1302,15 +1355,17 @@ impl Pinner<'_> {
                 It::Var(x) => self.table.slots[x].kind == Kind::Any,
                 _ => false,
             }) {
-                return reject(
-                    format!(
-                        "cannot infer type parameter {:?} of generic struct {:?} — provide a \
-                         field whose value determines it",
-                        tvs[i].name,
-                        display(&name)
-                    ),
-                    &span,
-                );
+                if self.errors.is_empty() {
+                    self.errors.push(Error::at(
+                        format!(
+                            "cannot infer type parameter {:?} of generic struct {:?} — provide \
+                             a field whose value determines it",
+                            tvs[i].name,
+                            display(&name)
+                        ),
+                        span,
+                    ));
+                }
             }
         }
         Ok(())
@@ -1392,7 +1447,7 @@ impl Pinner<'_> {
             .map_types(&mut |t| Some(self.table.resolve(t)))
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
         self.mark_unsettled(&mut typed, &body);
-        check_literals(&typed)?;
+        check_literals(&typed, &typed.span.clone())?;
         self.decls
             .instances
             .borrow_mut()
@@ -1846,12 +1901,12 @@ impl Pinner<'_> {
                             &v.span,
                         )?;
                         let t = self.lower(t, &HashMap::new(), &e.span)?;
-                        let v = self.arg(v, &t)?;
+                        let v = self.value_arg(v, &t)?;
                         self.coerce_expr(&v, &t, &v.span, "the bound value")?;
                         Ok((v, t))
                     }
                     None => {
-                        let v = match self.shim_closure_type(e, name, v)? {
+                        let v = match self.shim_closure_type(e, name, v, pos)? {
                             Some(expected) => self.arg(v, &expected)?,
                             None => self.expr(v)?,
                         };
@@ -1862,6 +1917,12 @@ impl Pinner<'_> {
                 // A binding's initializer is not a place to recover: the body is typed against
                 // what it produced, so going on would report the echoes of its failure.
                 let (v, ty) = bound?;
+                if self.table.shallow(&ty) == It::Unit {
+                    return reject(
+                        format!("cannot bind {name:?} to a value of type ()"),
+                        &v.span,
+                    );
+                }
                 let old = self.env.insert(name.clone(), Binding { ty, mutable });
                 let body = self.expr_at(body_src, pos)?;
                 if let It::Res(..) = self.table.shallow(&v.ty) {
@@ -1978,11 +2039,11 @@ impl Pinner<'_> {
                     else {
                         return reject(
                             format!("struct {name:?} has no field {:?}", init.name.text),
-                            &e.span,
+                            &init.value.span,
                         );
                     };
                     let fty = self.lower(fty, &targs, &init.value.span)?;
-                    let value = self.arg(&init.value, &fty)?;
+                    let value = self.value_arg(&init.value, &fty)?;
                     if name == aipl_syntax::SPAN_TYPE {
                         // `start..end` builds a span, whose bounds are slice bounds.
                         self.index_operand(&value)?;
@@ -2027,6 +2088,15 @@ impl Pinner<'_> {
                     }
                 }
                 let owner = self.known(&x.ty, &x.span)?;
+                if !self.is_struct_like(&owner, &e.span)? {
+                    return reject(
+                        format!(
+                            "field access on non-struct value of type {}",
+                            self.table.show(&owner)
+                        ),
+                        &x.span,
+                    );
+                }
                 let ty = self.field_type(&owner, field, &e.span)?;
                 self.node(K::Field(Box::new(x), field.clone()), ty, e)
             }
@@ -2055,7 +2125,12 @@ impl Pinner<'_> {
                         })?;
                         *v
                     }
-                    _ => return gap("indexing this type", &e.span),
+                    other => {
+                        return reject(
+                            format!("cannot index a value of type {}", self.table.show(&other)),
+                            &a.span,
+                        )
+                    }
                 };
                 if !matches!(self.table.shallow(&a.ty), It::Dict(..)) {
                     self.index_operand(&i)?;
@@ -2070,7 +2145,13 @@ impl Pinner<'_> {
                 let a = self.expr(a)?;
                 let container = self.known(&a.ty, &a.span)?;
                 if !matches!(container, It::Arr(_) | It::Prim(Primitive::Str)) {
-                    return reject("only an array or str can be sliced", &a.span);
+                    return reject(
+                        format!(
+                            "cannot slice a value of type {}",
+                            self.table.show(&container)
+                        ),
+                        &a.span,
+                    );
                 }
                 let start = self.expr(start)?;
                 self.index_operand(&start)?;
@@ -2334,20 +2415,28 @@ impl Pinner<'_> {
                         span: param.span.clone(),
                     });
                 }
+                self.reject_captures(params, body, &e.span)?;
                 let saved_test = std::mem::replace(&mut self.in_test, false);
+                // A function value has no effects of its own to perform.
+                let saved_effects = std::mem::take(&mut self.effects);
                 let scoped = self.scoped(scope, |p| p.expr(body));
+                self.effects = saved_effects;
                 self.in_test = saved_test;
                 let (saved, body) = scoped?;
                 self.restore(saved);
                 let ty = It::Fn(ptys, Box::new(body.ty.clone()));
                 self.node(K::Lambda(typed, Box::new(body)), ty, e)
             }
-            ExprKind::Lambda(..) => {
+            ExprKind::Lambda(params, _) => {
+                let untyped = params.iter().find(|p| p.ty.is_none());
+                let (name, span) = untyped.map_or(("x", &e.span), |p| (p.name.as_str(), &p.span));
                 return reject(
-                    "a closure used as a value needs the type of every parameter written \
-                     (`|x: i64| ..`), or a position that declares the function type",
-                    &e.span,
-                )
+                    format!(
+                        "lambda parameter {name:?} used as a value must be typed, \
+                         e.g. `|{name}: i64| ...`"
+                    ),
+                    span,
+                );
             }
             other => return gap(format!("expression form {}", form_name(other)), &e.span),
         })
@@ -2386,6 +2475,55 @@ impl Pinner<'_> {
             }
             _ => Ok(None),
         }
+    }
+
+    /// A function value carries no environment, so its body may name nothing local to the function
+    /// it was written in.
+    fn reject_captures(
+        &self,
+        params: &[aipl_syntax::ast::LambdaParam],
+        body: &Expr,
+        span: &Span,
+    ) -> Res<()> {
+        let locals: HashMap<String, Type> = self
+            .env
+            .keys()
+            .map(|name| (name.clone(), Type::Unit))
+            .collect();
+        match crate::free_vars(body, params, &locals).into_iter().next() {
+            Some((captured, _)) => reject(
+                format!(
+                    "a lambda used as a value cannot capture local {captured:?} \
+                     (function values are non-capturing)"
+                ),
+                span,
+            ),
+            None => Ok(()),
+        }
+    }
+
+    /// An argument that is stored as a value (a field, a binding, an assigned place), where a
+    /// closure is a function value: it captures nothing and performs no effect.
+    fn value_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
+        let ExprKind::Lambda(params, body) = &arg.kind else {
+            return self.arg(arg, expected);
+        };
+        self.reject_captures(params, body, &arg.span)?;
+        let saved_effects = std::mem::take(&mut self.effects);
+        let typed = self.arg(arg, expected);
+        self.effects = saved_effects;
+        typed
+    }
+
+    /// Whether a value of this type has fields: a struct, an application of a generic one, or a
+    /// tuple.
+    fn is_struct_like(&mut self, owner: &It, span: &Span) -> Res<bool> {
+        let declared = match owner {
+            It::Named(n) => self.decls.structs.contains_key(n),
+            It::Gen(n, _) => self.decls.generic_structs.contains_key(n),
+            _ => false,
+        };
+        Ok(declared || self.tuple_elems(owner, span)?.is_some())
     }
 
     /// The type of `owner.field`, for a struct or an application of a generic one.
@@ -2802,7 +2940,13 @@ impl Pinner<'_> {
 
     /// The function type a shim's closure must have: the operation's own. `None` unless `name` is
     /// the parser's name for a closure bound in a shim (`e` is the `let` that binds it).
-    fn shim_closure_type(&mut self, e: &Expr, name: &str, value: &Expr) -> Res<Option<It>> {
+    fn shim_closure_type(
+        &mut self,
+        e: &Expr,
+        name: &str,
+        value: &Expr,
+        pos: Pos,
+    ) -> Res<Option<It>> {
         if !aipl_syntax::is_shim_closure_name(name) {
             return Ok(None);
         }
@@ -2815,7 +2959,7 @@ impl Pinner<'_> {
                 &e.span,
             );
         };
-        let ExprKind::Shim(_, bindings, _) = &shim.kind else {
+        let ExprKind::Shim(_, bindings, shim_body) = &shim.kind else {
             return Ok(None);
         };
         let Some(op) = bindings
@@ -2857,6 +3001,53 @@ impl Pinner<'_> {
             );
         }
         let (ptys, ret, _) = self.instantiate(&format!("__builtin_{op}"), &op_sig, &value.span)?;
+        for (param, pty) in params.iter().zip(&ptys) {
+            if let Some(written) = &param.ty {
+                let written = self.lower(written, &HashMap::new(), &value.span)?;
+                if self.agree(pty, &written).is_err() {
+                    return reject(
+                        format!(
+                            "closure parameter {:?} is {}, but \"{op}\" passes a {}",
+                            param.name,
+                            self.table.show(&written),
+                            self.table.show(pty)
+                        ),
+                        &value.span,
+                    );
+                }
+            }
+        }
+        // What the closure sets of its captures, which the shim's body must leave alone and which
+        // the shim writes back when it ends.
+        for name in aipl_syntax::assigned_names(body) {
+            if params.iter().any(|p| p.name == name) || !self.env.contains_key(&name) {
+                continue;
+            }
+            if pos == Pos::Value {
+                return reject(
+                    format!(
+                        "the closure bound to \"{op}\" sets \"{name}\", so this shim changes \
+                         the scope around it: end it with `;`"
+                    ),
+                    &value.span,
+                );
+            }
+            let mut touched: Option<Span> = None;
+            aipl_syntax::each_subexpr(shim_body, &mut |x| {
+                if touched.is_none() && matches!(&x.kind, ExprKind::Ident(n) if *n == name) {
+                    touched = Some(x.span.clone());
+                }
+            });
+            if let Some(at) = touched {
+                return reject(
+                    format!(
+                        "\"{name}\" is set by the closure bound to \"{op}\", which holds it \
+                         until the shim ends; the shim's body cannot use it"
+                    ),
+                    &at,
+                );
+            }
+        }
         Ok(Some(It::Fn(ptys, Box::new(ret))))
     }
 
@@ -2964,9 +3155,6 @@ impl Pinner<'_> {
         Ok(())
     }
 
-    /// `t`, with its variables followed, if its outermost shape is known. A rule that has to look
-    /// at a type's shape before it can say anything cannot run on a type nothing has constrained
-    /// yet; that is a gap in the pinner, not an error in the program.
     /// Go on past a statement the program got wrong. The error is kept, and a node of a type
     /// nothing is known about stands where the statement was, so the statements after it are
     /// still checked. A form the pinner cannot type once an error is held is taken as a
@@ -2990,8 +3178,14 @@ impl Pinner<'_> {
         }
     }
 
+    /// `t`, with its variables followed, if its outermost shape is known. A rule that has to look
+    /// at a type's shape before it can say anything cannot run on a type nothing has constrained
+    /// yet; that is a gap in the pinner, not an error in the program.
     fn known(&self, t: &It, span: &Span) -> Res<It> {
         match self.table.shallow(t) {
+            // A number nothing has fixed the width of is an `i64` as far as a rule about what a
+            // value can be used for goes; the variable itself is left for the context to decide.
+            It::Var(v) if self.table.slots[v].kind == Kind::Int => Ok(It::Prim(Primitive::I64)),
             It::Var(_) => gap("a rule needs a type that is not known yet", span),
             t => Ok(t),
         }
@@ -3219,6 +3413,12 @@ impl Pinner<'_> {
                 bindings,
                 ignore_payload,
             } => {
+                if matches!(st, It::Prim(Primitive::Str)) {
+                    return reject(
+                        "\"match\" on a str expects string literals, `[..]` patterns, or `_`",
+                        span,
+                    );
+                }
                 let bare = name.split('@').next().unwrap_or(name);
                 let payload = self.ctor_payload(st, bare, span)?;
                 if *ignore_payload && payload.is_empty() {
@@ -3471,6 +3671,19 @@ impl Pinner<'_> {
             }
             return Ok(call(typed, *ret, self));
         }
+        if method_style && !args.is_empty() {
+            if let Some(s) = self.decls.sigs.get(name).filter(|s| !s.sig.is_method()) {
+                let _ = s;
+                return reject(
+                    format!(
+                        "fn {:?} cannot be called as a method (its first parameter must be \
+                         named \"self\")",
+                        callee.display_name()
+                    ),
+                    &args[0].span,
+                );
+            }
+        }
         match callee {
             Callee::Some if args.len() == 1 => {
                 let x = self.expr(&args[0])?;
@@ -3509,6 +3722,7 @@ impl Pinner<'_> {
                 }
                 // The integer it converts to is whichever its position asks for.
                 let target = self.table.fresh(Kind::Int);
+                self.narrows.push((target.clone(), e.span.clone()));
                 return Ok(call(vec![x], It::Opt(Box::new(target)), self));
             }
             Callee::IntParse if args.len() == 1 => {
@@ -3644,13 +3858,42 @@ impl Pinner<'_> {
         if args.len() == 2 && (op.is_some() || arith || float.is_some()) {
             let l = self.expr(&args[0])?;
             let r = self.expr(&args[1])?;
-            let operand = self.join_operands(&l.ty, &r.ty, &e.span)?;
-            let (lt, rt) = (self.table.shallow(&l.ty), self.table.shallow(&r.ty));
             let is_float = |p: &Self, t: &It| match t {
                 It::Prim(prim) => prim.is_float(),
                 It::Var(v) => p.table.slots[*v].kind == Kind::Float,
                 _ => false,
             };
+            // The float operations name the operand that is not a float, or that is the other
+            // float type.
+            if float.is_some() {
+                let (lt, rt) = (self.table.shallow(&l.ty), self.table.shallow(&r.ty));
+                for (t, arg) in [(&lt, &args[0]), (&rt, &args[1])] {
+                    if !is_float(self, t) {
+                        return reject(
+                            format!(
+                                "\"{}\" takes IEEE 754 floats, but this operand is {}: floats \
+                                 and integers never mix, and nothing converts between them",
+                                callee.name(),
+                                self.table.show(t)
+                            ),
+                            &arg.span,
+                        );
+                    }
+                }
+                if self.agree(&lt, &rt).is_err() {
+                    return reject(
+                        format!(
+                            "\"{}\" takes two floats of one type, got {} and {}",
+                            callee.name(),
+                            self.table.show(&lt),
+                            self.table.show(&rt)
+                        ),
+                        &args[1].span,
+                    );
+                }
+            }
+            let operand = self.join_operands(&l.ty, &r.ty, &e.span)?;
+            let (lt, rt) = (self.table.shallow(&l.ty), self.table.shallow(&r.ty));
             let as_type = |p: &Self, t: &It| p.table.resolve(t).to_type();
             use aipl_syntax::ast::BinOp;
             let spelling = match (callee, op) {
@@ -3977,6 +4220,16 @@ impl Pinner<'_> {
                 } else {
                     typed.ty.clone()
                 };
+                if i == 0
+                    && matches!(callee, Callee::Contains(_))
+                    && matches!(self.table.shallow(&seen_ty), It::Set(..))
+                {
+                    return reject(
+                        "\"contains\" takes an array or str receiver; for set membership use \
+                         \"has\"",
+                        &arg.span,
+                    );
+                }
                 let adapted = if sig.params[i].arity.is_variadic() {
                     // A sequence that is the parameter's own type, refinement included (a
                     // literal with an element in it for a `T+`), is taken as it stands.
@@ -3986,6 +4239,29 @@ impl Pinner<'_> {
                     ) && self
                         .coerce_expr(&typed, &ptys[i], &arg.span, "an argument")
                         .is_ok();
+                    if !whole && sig.params[i].arity == aipl_syntax::ast::Arity::OneOrMore {
+                        // At least one element: an optional, or an array that may be empty and
+                        // is not itself the element, is neither.
+                        let elem = match self.table.shallow(&ptys[i]) {
+                            It::Arr(t) => self.table.shallow(&t),
+                            other => other,
+                        };
+                        let given = self.table.shallow(&seen_ty);
+                        if matches!(given, It::Opt(_))
+                            || (matches!(given, It::Arr(_)) && !matches!(elem, It::Arr(_)))
+                        {
+                            return reject(
+                                format!(
+                                    "fn {:?} arg {i}: variadic parameter expects {} or its \
+                                     element — at least one element, so no optional and no \
+                                     array that may be empty",
+                                    display(name),
+                                    self.table.show(&ptys[i]),
+                                ),
+                                &arg.span,
+                            );
+                        }
+                    }
                     if !whole {
                         self.variadic_arg(&ptys[i], &seen_ty).or_else(|m| {
                             reject(format!("an argument to {name:?}: {m}"), &arg.span)
@@ -4116,6 +4392,14 @@ impl Pinner<'_> {
                 && !self.decls.generic_ctors.contains_key(name)
             {
                 if let Some(sig) = self.decls.sigs.get(name).map(|s| s.sig.clone()) {
+                    for effect in &sig.effects {
+                        if !self.effects.contains(effect) {
+                            return reject(
+                                undeclared_effect_message(display(name), effect, &self.effects),
+                                &arg.span,
+                            );
+                        }
+                    }
                     let (ptys, ret, _) = self.instantiate(name, &sig, &arg.span)?;
                     let ty = It::Fn(ptys, Box::new(ret));
                     return Ok(self.node(TExprKind::Ident(name.clone()), ty, arg));
@@ -4192,8 +4476,11 @@ fn form_name(k: &ExprKind) -> String {
     text.split(['(', ' ', '{']).next().unwrap_or("").to_string()
 }
 
-/// Every integer literal must fit the type it was pinned to.
-fn check_literals(e: &TExpr<Ty>) -> Res<()> {
+/// Every integer literal must fit the type it was pinned to. A literal that does not is reported
+/// at `site`: the expression it was fitted as part of, which is the one a value is handed to a
+/// type as (an argument, a bound value, a field, a returned value, the body), so
+/// `if (b) { 1 } else { 300 }` is wrong as a whole.
+fn check_literals(e: &TExpr<Ty>, site: &Span) -> Res<()> {
     let name = |t: &Ty| match t {
         Ty::Primitive(p) => Some(p.name().to_string()),
         _ => None,
@@ -4205,7 +4492,7 @@ fn check_literals(e: &TExpr<Ty>) -> Res<()> {
                     if !aipl_syntax::int_fits(n.wrapping_neg(), &name) || n == i64::MIN {
                         return reject(
                             format!("integer literal -{n} does not fit in {name}"),
-                            &e.span,
+                            site,
                         );
                     }
                 }
@@ -4215,19 +4502,25 @@ fn check_literals(e: &TExpr<Ty>) -> Res<()> {
         TExprKind::Int(n) => {
             if let Some(name) = name(&e.ty) {
                 if !aipl_syntax::int_fits(*n, &name) {
-                    return reject(
-                        format!("integer literal {n} does not fit in {name}"),
-                        &e.span,
-                    );
+                    return reject(format!("integer literal {n} does not fit in {name}"), site);
                 }
             }
         }
         _ => {}
     }
     let mut result = Ok(());
+    // The children a value is handed to a type as.
+    let (value, every): (Option<&TExpr<Ty>>, bool) = match &e.kind {
+        TExprKind::Let(_, v, _) | TExprKind::LetMut(_, v, _) | TExprKind::Assign(_, v, _) => {
+            (Some(&**v), false)
+        }
+        TExprKind::Call { .. } | TExprKind::Construct(..) | TExprKind::Return(_) => (None, true),
+        _ => (None, false),
+    };
     e.for_each_child(&mut |c| {
         if result.is_ok() {
-            result = check_literals(c);
+            let is_site = every || value.is_some_and(|v| std::ptr::eq(v, c));
+            result = check_literals(c, if is_site { &c.span } else { site });
         }
     });
     result

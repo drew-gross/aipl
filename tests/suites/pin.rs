@@ -96,7 +96,9 @@ fn oracle(dirs: &[&str]) -> Disagreement {
                             theirs.sort();
                             ours.sort();
                             let places = |v: &[(String, Option<usize>)]| {
-                                v.iter().map(|(_, at)| *at).collect::<Vec<_>>()
+                                let mut at: Vec<_> = v.iter().map(|(_, at)| *at).collect();
+                                at.sort();
+                                at
                             };
                             if places(&theirs) == places(&ours) {
                                 same_places += 1;
