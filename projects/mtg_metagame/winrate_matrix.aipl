@@ -1,0 +1,193 @@
+# The winrate matrix: how each archetype fares against each other one. A deck counts in every
+# archetype it matches, so a match is held against every pairing of its deck's archetypes and
+# its opponent's.
+
+import {
+    IEEE754Float64 as Float,
+    distinct,
+    equal as ==,
+    filter,
+    float_div as /,
+    float_mul as *,
+    get,
+    len,
+    map,
+    push,
+    render,
+    repeat,
+    to_dict,
+    value_or,
+} from builtins;
+import { Identifier, archetypes_of, deck_of, label } from "./archetypes.aipl";
+import { shares } from "./meta_share.aipl";
+import {
+    Deck,
+    Draw,
+    Loss,
+    Match,
+    Record,
+    Result,
+    Win,
+    add_records,
+    win_rate,
+} from "./metagame.aipl";
+import { tabulate } from tabulate;
+
+# One match, from the point of view of an archetype the player's deck is, against an archetype
+# the opponent's deck is.
+struct Observation { player: str, opponent: str, result: Result }
+
+# `self` as the record of a single match.
+fn as_record(self: Result) -> Record {
+    match (self) {
+        Win => Record { win: 1, loss: 0, draw: 0 },
+        Loss => Record { win: 0, loss: 1, draw: 0 },
+        Draw => Record { win: 0, loss: 0, draw: 1 },
+    }
+}.test({
+    assert(Win.as_record() == Record { win: 1, loss: 0, draw: 0 });
+    assert(Loss.as_record() == Record { win: 0, loss: 1, draw: 0 });
+    assert(Draw.as_record() == Record { win: 0, loss: 0, draw: 1 });
+})
+
+# The names of the archetypes `self` is, each once, as a report reads them.
+fn labels_of(self: Deck, identifiers: Identifier[]) -> str[] {
+    self.archetypes_of(identifiers)$label().distinct()
+}.test({
+    let landfall = Identifier {
+        name: "Landfall",
+        cards: ["Forest"],
+        not_cards: [],
+        any_cards: [],
+        maindeck_cards: [],
+    };
+    assert(deck_of(["Forest"], []).labels_of([landfall]) == ["Landfall"]);
+    assert(deck_of(["Swamp"], []).labels_of([landfall]) == ["Other"]);
+})
+
+# A deck with the id `id` and the matches `results` against the decks with the given ids, for
+# tests.
+fn played(id: str, cards: str[], results: (str, Result)[]) -> Deck {
+    ..deck_of(cards, []),
+    deck_id: id,
+    matches: results.map(|(opponent, result)| {
+        Match {
+            opponent_deck_id: some(opponent),
+            result,
+            record: Record { win: 0, loss: 0, draw: 0 },
+            round: "",
+        }
+    }),
+}
+
+# Every match of `decks` against another of `decks`, once for each pairing of an archetype of
+# the one deck and an archetype of the other. A match with no opponent in `decks` is left out.
+fn observations(decks: Deck[], identifiers: Identifier[]) -> Observation[] {
+    let labelled: #{str: str[]} = decks
+        .map(|deck| (deck.deck_id, deck.labels_of(identifiers)))
+        .to_dict();
+    let nothing: str[] = [];
+    mut out: Observation[] = [];
+    for (let deck : decks) {
+        let mine = labelled.get(deck.deck_id).value_or(nothing);
+        for (let match_played : deck.matches) {
+            if (let some(id) = match_played.opponent_deck_id) {
+                if (let some(theirs) = labelled.get(id)) {
+                    for (let player : mine) {
+                        for (let opponent : theirs) {
+                            set out.push(Observation {
+                                player,
+                                opponent,
+                                result: match_played.result,
+                            });
+                        }
+                    }
+                };
+            };
+        }
+    }
+    out
+}.test({
+    let forest = Identifier {
+        name: "Forest",
+        cards: ["Forest"],
+        not_cards: [],
+        any_cards: [],
+        maindeck_cards: [],
+    };
+    let decks = [
+        played("a", ["Forest"], [("b", Win), ("zz", Loss)]),
+        played("b", ["Swamp"], [("a", Loss)]),
+    ];
+    assert(observations(decks, [forest]) == [
+        Observation { player: "Forest", opponent: "Other", result: Win },
+        Observation { player: "Other", opponent: "Forest", result: Loss },
+    ]);
+})
+
+# The win rate as a percentage with one decimal: `55.6%`.
+fn percent_text(self: Float) -> str { `{(self * 100.0).render(digits=1)}%` }.test({
+    assert(percent_text(0.5) == "50.0%");
+    assert(percent_text(2.0 / 3.0) == "66.7%");
+})
+
+# What a cell of the matrix says about `self`: the win rate, or `-` when none of the matches
+# was decided.
+fn cell_text(self: Observation[]) -> str {
+    mut total = Record { win: 0, loss: 0, draw: 0 };
+    for (let each : self) {
+        set total = add_records(total, each.result.as_record());
+    }
+    if (let some(rate) = total.win_rate()) { rate.percent_text() } else { "-" }
+}.test({
+    let nothing: Observation[] = [];
+    assert(nothing.cell_text() == "-");
+    let draw = Observation { player: "a", opponent: "b", result: Draw };
+    assert([draw].cell_text() == "-");
+    let win = Observation { ..draw, result: Win };
+    let loss = Observation { ..draw, result: Loss };
+    assert([win, loss, draw].cell_text() == "50.0%");
+    assert([win, win, loss].cell_text() == "66.7%");
+})
+
+# The matrix on `decks`, loaded from the metagame `name`, as lines: a row for each archetype
+# (most decks first) giving its win rate against each archetype in the columns.
+pub fn winrate_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[] {
+    let names = shares(decks, identifiers)$name;
+    let seen = observations(decks, identifiers);
+    let rows = names.map(|player| {
+        let mine = seen.filter(|each| each.player == player);
+        [player, ..names.map(|opponent| mine.filter(|each| each.opponent == opponent).cell_text())]
+    });
+    [
+        `Winrate Matrix from {name}`,
+        "Win rate of the row's archetype against the column's, draws left out",
+        ..rows.tabulate(
+            ["Archetype", ..names],
+            right_aligned=[false, ..[true].repeat(names.len())],
+        ),
+    ]
+}.test({
+    let forest = Identifier {
+        name: "Forest",
+        cards: ["Forest"],
+        not_cards: [],
+        any_cards: [],
+        maindeck_cards: [],
+    };
+    let decks = [
+        played("a", ["Forest"], [("b", Win), ("c", Win)]),
+        played("b", ["Swamp"], [("a", Loss)]),
+        played("c", ["Forest"], [("a", Loss)]),
+    ];
+    assert(winrate_report("m", decks, [forest]) == [
+        "Winrate Matrix from m",
+        "Win rate of the row's archetype against the column's, draws left out",
+        "+-----------+--------+--------+",
+        "| Archetype | Forest |  Other |",
+        "+===========+========+========+",
+        "| Forest    |  50.0% | 100.0% |",
+        "| Other     |   0.0% |      - |",
+        "+-----------+--------+--------+",
+    ]);
+})

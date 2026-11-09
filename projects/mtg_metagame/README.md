@@ -22,6 +22,11 @@ Order by Metagame %
 …
 ```
 
+`winrate <metagame> [--archetypes <config>]` prints the winrate matrix: a row per archetype (most decks
+first, `Other` last) giving the share of its decided matches it won against each archetype in the
+columns. A match counts toward every pairing of its deck's archetypes and its opponent's, draws are
+left out, and `-` is a pairing with no decided match.
+
 `cards` lists every card played in a metagame, most copies first (main decks and
 sideboards together; equal counts in name order). `share` classifies each deck into
 archetypes and prints how much of the field each is. A deck counts in every archetype it
@@ -34,12 +39,13 @@ a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this 
 
 | file | what it is |
 |---|---|
-| `main.aipl` | the command line: `cards` and `share` |
+| `main.aipl` | the command line: `cards`, `share` and `winrate` |
 | `metagame.aipl` | `Metagame`, `Deck`, `Card`, `Match`, `Record`; decoding them from JSON; `load_metagame` |
 | `counted.aipl` | `Counted` (a name and a count) and `ranked`, the order the listings share |
 | `card_stats.aipl` | `card_counts`: copies played per card |
 | `archetypes.aipl` | the classifier: `Identifier`, `archetypes_of`, `load_identifiers` |
 | `meta_share.aipl` | `shares`, the percentage, `share_report` (the table itself is the `tabulate` library) |
+| `winrate_matrix.aipl` | `observations` (each match per archetype pairing), `winrate_report` |
 | `json.aipl` | accessors over the tree `parse` from the `json` library builds: `field`, `text_field`, `integer_field`, `list_field` |
 
 The files are unpacked by running `gzip -dc` (`execute_program`): nothing here
@@ -48,7 +54,7 @@ reads binary files or decompresses yet.
 ## Status
 
 Loading, the card listing and the metagame share report work. A record's win rate is a float,
-the fraction of its decided matches won. Not yet: the win rate and confidence interval columns,
+the fraction of its decided matches won. The winrate matrix works. Not yet: the win rate and confidence interval columns in `share`,
 ordering by anything but share, and the plot.
 
 ## Plan, following the Python original

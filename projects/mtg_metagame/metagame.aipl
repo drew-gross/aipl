@@ -74,7 +74,7 @@ pub fn all_cards(self: Deck) -> Card[] { [..self.maindeck, ..self.sideboard] }.t
 struct Metagame { name: str, tournament_ids: str[], decks: Deck[] }
 
 # `a` and `b` counted together.
-fn add_records(a: Record, b: Record) -> Record {
+pub fn add_records(a: Record, b: Record) -> Record {
     win: a.win + b.win,
     loss: a.loss + b.loss,
     draw: a.draw + b.draw,
@@ -87,7 +87,7 @@ fn add_records(a: Record, b: Record) -> Record {
 
 # The share of the decided matches `self` won, as a fraction of 1 (an even record is
 # 0.5), or `none` when there is no decided match. Draws are left out of the denominator.
-fn win_rate(self: Record) -> Float? {
+pub fn win_rate(self: Record) -> Float? {
     let decided = self.win + self.loss;
     if (decided > 0) { some(self.win.to_float() / decided.to_float()) } else { none }
 }.test({

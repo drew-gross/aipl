@@ -24,6 +24,7 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
+    dump winrate matrix to interactive svg
     split out the logic for rendering stuff into a table
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)

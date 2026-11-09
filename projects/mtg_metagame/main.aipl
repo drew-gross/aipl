@@ -22,11 +22,13 @@ import { Counted } from "./counted.aipl";
 import { optional_text_field } from "./json.aipl";
 import { share_report } from "./meta_share.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
+import { winrate_report } from "./winrate_matrix.aipl";
 import { Json, parse } from json;
 
 let USAGE = """
     usage: mtg_metagame cards <metagame>
            mtg_metagame share <metagame> [--archetypes <config>]
+           mtg_metagame winrate <metagame> [--archetypes <config>]
 """;
 
 # The archetype list `share` uses when `--archetypes` is not given.
@@ -61,11 +63,12 @@ fn cards_listing(args: str[]) !read_files !execute_program -> str[]!str {
     ok(card_counts(decks)$card_line())
 }
 
-# What `share` was asked: the metagame, and the archetype list to classify its decks with.
-struct ShareOptions { metagame: str, archetypes: str }
+# What `share` or `winrate` was asked: the metagame, and the archetype list to classify its decks with.
+struct DeckOptions { metagame: str, archetypes: str }
 
-# The options in `args`: one metagame, and `--archetypes <config>`, in any order.
-fn parse_share_options(args: str[]) -> ShareOptions!str {
+# The options of the command `command` in `args`: one metagame, and `--archetypes <config>`, in
+# any order.
+fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
     mut metagame = "";
     mut archetypes = DEFAULT_ARCHETYPES;
     mut i: u64 = 0;
@@ -81,31 +84,40 @@ fn parse_share_options(args: str[]) -> ShareOptions!str {
         };
         set i++;
     }
-    if (metagame == "") { return err("share needs a metagame"); };
-    ok(ShareOptions { metagame, archetypes })
+    if (metagame == "") { return err(`{command} needs a metagame`); };
+    ok(DeckOptions { metagame, archetypes })
 }.test({
-    assert(parse_share_options(["m"]) == ok(ShareOptions {
+    assert(parse_deck_options("share", ["m"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Standard2026Q4RC",
     }));
-    assert(parse_share_options(["--archetypes", "Modern2026Q3RC", "m"]) == ok(ShareOptions {
+    assert(parse_deck_options("share", ["--archetypes", "Modern2026Q3RC", "m"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Modern2026Q3RC",
     }));
-    assert(parse_share_options([]) == err("share needs a metagame"));
-    assert(parse_share_options(["m", "n"]) == err(`unexpected argument "n"`));
-    assert(parse_share_options(["m", "--jank"]) == err(`unknown option "--jank"`));
-    assert(parse_share_options(["m", "--archetypes"]) == err(
+    assert(parse_deck_options("share", []) == err("share needs a metagame"));
+    assert(parse_deck_options("winrate", []) == err("winrate needs a metagame"));
+    assert(parse_deck_options("share", ["m", "n"]) == err(`unexpected argument "n"`));
+    assert(parse_deck_options("share", ["m", "--jank"]) == err(`unknown option "--jank"`));
+    assert(parse_deck_options("share", ["m", "--archetypes"]) == err(
         "--archetypes needs the name of a list",
     ));
 })
 
 # The share report for the metagame named by `args`, one line each.
 fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
-    let ShareOptions { metagame, archetypes } = parse_share_options(args)?;
+    let DeckOptions { metagame, archetypes } = parse_deck_options("share", args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks } = load_named(metagame)?;
     ok(share_report(metagame, decks, identifiers))
+}
+
+# The winrate matrix for the metagame named by `args`, one line each.
+fn winrate_listing(args: str[]) !read_files !execute_program -> str[]!str {
+    let DeckOptions { metagame, archetypes } = parse_deck_options("winrate", args)?;
+    let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
+    let Metagame { decks } = load_named(metagame)?;
+    ok(winrate_report(metagame, decks, identifiers))
 }
 
 # The lines a command line asks for, or why it asks for none.
@@ -115,12 +127,13 @@ fn run(args: str[]) !read_files !execute_program -> str[]!str {
     match (command) {
         "cards" => cards_listing(rest),
         "share" => share_listing(rest),
+        "winrate" => winrate_listing(rest),
         _ => err(USAGE),
     }
 }
 
 # Run a command: `cards <metagame>` lists every card played, `share <metagame>` the share of
-# the field each archetype is. The metagame is a file in `data/` (without its `.json.gz`), or
+# the field each archetype is, `winrate <metagame>` how each archetype does against each other. The metagame is a file in `data/` (without its `.json.gz`), or
 # one of the names in `data/index.json`.
 fn main(args: str[]) !prints !read_files !execute_program -> i64 {
     match (run(args)) {

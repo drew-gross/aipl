@@ -195,12 +195,23 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         types written onto it; `int_parse` retargeted to its stamped integer type). Deleted from the checker: the
         `check` entry point, `stamp_locks`, `retargeted_int_parse`, `lambda_params`. No baseline row moved.
   - [ ] **4b. Findings from the pinner.** Measured (Session 12): with the pinner's rejections reported instead of the
-        checker's, 189 of 270 `err_*` cases still match byte for byte and 81 differ, as expected: different spans
-        (`true + false` underlined whole vs the operand), different wording (`both sides must be the same type` vs
-        `the operands are bool and i64`), and fewer findings per function, because the checker *recovers* and reports
-        every error in a body while the pinner stops at a function's first. Needed before the switch: error recovery
-        in the pinner (or an agreed one-error-per-function report), the match checks (`match_check.rs`) and lints
-        that read checker state (`locks`: `narrow_target_errors`, `return_pinned_errors`), then refill the sections.
+        checker's, 189 of 270 `err_*` cases still match byte for byte and 81 differ: different spans (`true + false`
+        underlined whole vs the operand), different wording (`both sides must be the same type` vs `the operands are
+        bool and i64`), and fewer findings per function.
+        - [x] **Recovery** (Session 13). The pinner goes on past a rejected statement the way the checker does, at the
+          same positions and no others (`Pinner::recover`): a discarded statement (`Seq`'s first), an assignment, and
+          the elements of an array or set literal. A `let` initializer is deliberately not one (the body is typed
+          against what it produced), see `err_one_per_binding`. A failed statement leaves a unit node of an unknown
+          type; once any error is held the body is not settled or finished, so nothing downstream reports its echoes.
+          `Pinned::failures` holds one entry per error. `oracle_report` now compares the two lists on the checker's
+          rejected programs (`tests/cases`: 128): the same errors in 58, at the same places in 94, others in 34.
+        - [ ] The 34 whose places differ are the findings the pinner lacks: `without []` argument checks, a missing
+          check per form (`cannot index/slice a value of type`, `for-loop iterable`, variadic `without []`,
+          type-parameter bound errors `requires "int"`, `narrow` without a target, method-signature rules on
+          declarations, `cannot return a function value`, closure captures/untyped parameters, shim closure rules),
+          and spans the checker puts on the operand/annotation where the pinner uses the literal (`300` as `u8`).
+        - [ ] Match checks (`match_check.rs`), lints that read checker state (`locks`: `narrow_target_errors`,
+          `return_pinned_errors`), then refill the sections.
   - [ ] **4c. Name resolutions from the pinner** (`aipl_syntax::resolution`, read by the LSP and index), after which
         `Cx` and its ~6,000 lines go and the helpers the pinner shares (`coerce`, `validate_type`, `MatchInfo`,
         `generic_instance_name`, ...) move to a module of their own.
@@ -331,3 +342,7 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   argument, then the return type, then the sole existing instance) now also lives in the pinner
   (`Pinner::settle_open_applications`), counting the declared instances, those in functions pinned before, and those
   in the function itself, so the mono-side `sole_instance` fallback no longer decides what a stamped node is.
+- Session 13: 4b recovery. The pinner reports every error in a body at the checker's own recovery positions
+  (discarded statements, assignments, array/set literal elements); `Failure`s are one per error. No behaviour change:
+  nothing reports the pinner's errors yet, so the gate is unaffected. The oracle's new comparison is the shopping list
+  for the remaining findings.

@@ -560,6 +560,8 @@ struct Pinner<'a> {
     /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
     /// returns nothing, so the operand's shape is the only constraint.
     in_test: bool,
+    /// Errors in statements the walk went on past: see [`Pinner::recover`].
+    errors: Vec<Error>,
 }
 
 /// A generic call's type arguments, held until the whole body has been typed.
@@ -665,12 +667,14 @@ pub fn pin(program: &Program) -> Pinned {
                     if let Some(block) = &f.test_body {
                         match pin_test_body(&decls, f, block) {
                             Ok(body) => t.test_body = Some(body),
-                            Err(e) => failures.push((format!("{}.test", f.name.text), e)),
+                            Err(es) => failures.extend(
+                                es.into_iter().map(|e| (format!("{}.test", f.name.text), e)),
+                            ),
                         }
                     }
                     items.push(TItem::Fn(t));
                 }
-                Err(e) => failures.push((f.name.text.clone(), e)),
+                Err(es) => failures.extend(es.into_iter().map(|e| (f.name.text.clone(), e))),
             },
             Item::Struct(s) if s.type_vars.iter().any(|tp| tp.default.is_some()) => {
                 failures.push((
@@ -912,13 +916,14 @@ fn pinner_for<'a>(
         fn_name: fn_name.to_string(),
         effects: effects.to_vec(),
         in_test: false,
+        errors: Vec::new(),
     }
 }
 
 /// An attached `.test` or `.benchmark` block, typed as the function the test driver makes of it:
 /// no parameters, no type variables, no effects of its own (a benchmark has `measure`), and a
 /// unit result.
-fn pin_test_body(decls: &Decls, f: &Function, block: &Expr) -> Res<TExpr<Ty>> {
+fn pin_test_body(decls: &Decls, f: &Function, block: &Expr) -> Result<TExpr<Ty>, Vec<Failure>> {
     let effects = if aipl_syntax::benchmark_source_name(&f.name.text).is_some() {
         vec!["measure".to_string()]
     } else {
@@ -926,10 +931,15 @@ fn pin_test_body(decls: &Decls, f: &Function, block: &Expr) -> Res<TExpr<Ty>> {
     };
     let mut p = pinner_for(decls, &f.name.text, &[], &effects);
     p.in_test = true;
-    let body = p.expr(block)?;
-    p.coerce_expr(&body, &It::Unit, &block.span, "the function's result")?;
-    p.settle()?;
-    p.finish(body, &block.span)
+    let result = (|| {
+        let body = p.expr(block)?;
+        p.stop_if_recovered(&block.span)?;
+        p.coerce_expr(&body, &It::Unit, &block.span, "the function's result")?;
+        p.stop_if_recovered(&block.span)?;
+        p.settle()?;
+        p.finish(body, &block.span)
+    })();
+    with_recovered(p.errors, result)
 }
 
 /// A struct field's or variant payload slot's default, typed against the slot. `earlier` holds the
@@ -961,8 +971,36 @@ fn pin_slot_default(
     p.finish(e, &default.span)
 }
 
-fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
+fn pin_function(decls: &Decls, f: &Function) -> Result<TFunction, Vec<Failure>> {
     let mut p = pinner_for(decls, &f.name.text, &f.sig.type_vars, &f.sig.effects);
+    let result = pin_function_in(&mut p, decls, f);
+    with_recovered(p.errors, result)
+}
+
+/// What typing one body came to, given the errors recovered from on the way: all of them when
+/// there were any (a failure that stopped the walk too is one more, unless it is only the pinner
+/// not knowing a form, which a recovered error explains away), else the walk's own outcome.
+fn with_recovered<T>(recovered: Vec<Error>, result: Res<T>) -> Result<T, Vec<Failure>> {
+    // One construct can be reached twice (a desugaring that names the same value twice).
+    let mut seen = HashSet::new();
+    let mut failures: Vec<Failure> = recovered
+        .into_iter()
+        .filter(|e| seen.insert((e.message.clone(), e.span.as_ref().map(|s| s.start))))
+        .map(Failure::Rejected)
+        .collect();
+    match result {
+        Ok(t) if failures.is_empty() => Ok(t),
+        Ok(_) => Err(failures),
+        Err(last) => {
+            if failures.is_empty() || matches!(last, Failure::Rejected(_)) {
+                failures.push(last);
+            }
+            Err(failures)
+        }
+    }
+}
+
+fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunction> {
     // The function a test driver makes of a `.test` block is a test body wherever it is found.
     p.in_test = aipl_syntax::is_test_body(&f.name.text)
         || aipl_syntax::benchmark_source_name(&f.name.text).is_some();
@@ -1059,7 +1097,10 @@ fn pin_function(decls: &Decls, f: &Function) -> Res<TFunction> {
     p.env = everything;
     let body = p.expr(&f.body)?;
     let ret = p.ret.clone();
+    // Recovery left placeholders in the tree, so what follows would only report their echoes.
+    p.stop_if_recovered(&f.body.span)?;
     p.coerce_expr(&body, &ret, &f.body.span, "the function's result")?;
+    p.stop_if_recovered(&f.body.span)?;
     p.settle()?;
     let body = p.finish(body, &f.body.span)?;
     let defaults = defaults
@@ -1704,11 +1745,14 @@ impl Pinner<'_> {
                 let elem = self.fresh();
                 let mut out = Vec::new();
                 for item in items {
-                    let item = self.expr(item)?;
-                    self.agree(&item.ty, &elem).or_else(|m| {
-                        reject(format!("array elements disagree ({m})"), &item.span)
-                    })?;
-                    out.push(item);
+                    let typed = (|| {
+                        let typed = self.expr(item)?;
+                        self.agree(&typed.ty, &elem).or_else(|m| {
+                            reject(format!("array elements disagree ({m})"), &typed.span)
+                        })?;
+                        Ok(typed)
+                    })();
+                    out.push(self.recover(typed, item)?);
                 }
                 self.node(K::ArrayLit(out), It::Arr(Box::new(elem)), e)
             }
@@ -1757,23 +1801,24 @@ impl Pinner<'_> {
                             Some(ExprKind::Ident(v)) => v.clone(),
                             _ => "recv".to_string(),
                         };
-                        return reject(
+                        self.errors.push(Error::at(
                             format!(
                                 "the result of mutating method \"{method}\" is discarded, \
                                  losing the mutation; write \"set {recv}.{method}(..)\" to \
                                  mutate {recv} in place, or use the returned value"
                             ),
-                            &first.span,
-                        );
+                            first.span.clone(),
+                        ));
                     }
                 }
-                let a = self.expr_at(first, Pos::Discard)?;
+                let typed = self.expr_at(first, Pos::Discard);
+                let a = self.recover(typed, first)?;
                 if matches!(self.table.shallow(&a.ty), It::Res(..)) {
-                    return reject(
+                    self.errors.push(Error::at(
                         "this result is discarded, ignoring its possible error; handle it \
                          with `match` or propagate it with `?`",
-                        &first.span,
-                    );
+                        first.span.clone(),
+                    ));
                 }
                 let b = self.expr_at(rest, pos)?;
                 let ty = b.ty.clone();
@@ -1791,7 +1836,7 @@ impl Pinner<'_> {
             }
             ExprKind::Let(name, ann, v, body_src) | ExprKind::LetMut(name, ann, v, body_src) => {
                 let mutable = matches!(e.kind, ExprKind::LetMut(..));
-                let (v, ty) = match ann {
+                let bound = (|| match ann {
                     Some(t) => {
                         let names: Vec<String> = self.rigid.iter().cloned().collect();
                         self.decls.validate(
@@ -1803,7 +1848,7 @@ impl Pinner<'_> {
                         let t = self.lower(t, &HashMap::new(), &e.span)?;
                         let v = self.arg(v, &t)?;
                         self.coerce_expr(&v, &t, &v.span, "the bound value")?;
-                        (v, t)
+                        Ok((v, t))
                     }
                     None => {
                         let v = match self.shim_closure_type(e, name, v)? {
@@ -1811,9 +1856,12 @@ impl Pinner<'_> {
                             None => self.expr(v)?,
                         };
                         let ty = v.ty.clone();
-                        (v, ty)
+                        Ok((v, ty))
                     }
-                };
+                })();
+                // A binding's initializer is not a place to recover: the body is typed against
+                // what it produced, so going on would report the echoes of its failure.
+                let (v, ty) = bound?;
                 let old = self.env.insert(name.clone(), Binding { ty, mutable });
                 let body = self.expr_at(body_src, pos)?;
                 if let It::Res(..) = self.table.shallow(&v.ty) {
@@ -1834,22 +1882,33 @@ impl Pinner<'_> {
                 self.node(kind, ty, e)
             }
             ExprKind::Assign(lhs, v, rest) => {
-                let Some((root, _)) = aipl_syntax::ast::assign_target(lhs) else {
-                    return reject(
-                        "an assignment target must be a variable or a field of one",
-                        &lhs.span,
-                    );
+                let assigned = (|| {
+                    let Some((root, _)) = aipl_syntax::ast::assign_target(lhs) else {
+                        return reject(
+                            "an assignment target must be a variable or a field of one",
+                            &lhs.span,
+                        );
+                    };
+                    let Some(b) = self.env.get(root).cloned() else {
+                        return reject(format!("{root:?} is not defined"), &lhs.span);
+                    };
+                    if !b.mutable {
+                        return reject(format!("{root:?} is not `mut`"), &lhs.span);
+                    }
+                    // The place is typed as the expression it is; a field path reads through
+                    // structs.
+                    let lhs = self.expr(lhs)?;
+                    let v = self.arg(v, &lhs.ty)?;
+                    self.coerce_expr(&v, &lhs.ty, &v.span, "the assigned value")?;
+                    Ok((lhs, v))
+                })();
+                let (lhs, v) = match assigned {
+                    Ok(done) => done,
+                    Err(failure) => {
+                        let place = self.recover(Err(failure), e)?;
+                        (place.clone(), place)
+                    }
                 };
-                let Some(b) = self.env.get(root).cloned() else {
-                    return reject(format!("{root:?} is not defined"), &lhs.span);
-                };
-                if !b.mutable {
-                    return reject(format!("{root:?} is not `mut`"), &lhs.span);
-                }
-                // The place is typed as the expression it is; a field path reads through structs.
-                let lhs = self.expr(lhs)?;
-                let v = self.arg(v, &lhs.ty)?;
-                self.coerce_expr(&v, &lhs.ty, &v.span, "the assigned value")?;
                 let rest = self.expr_at(rest, pos)?;
                 let ty = rest.ty.clone();
                 self.node(K::Assign(Box::new(lhs), Box::new(v), Box::new(rest)), ty, e)
@@ -2029,10 +2088,14 @@ impl Pinner<'_> {
                 let elem = self.fresh();
                 let mut out = Vec::new();
                 for item in items {
-                    let item = self.expr(item)?;
-                    self.agree(&item.ty, &elem)
-                        .or_else(|m| reject(format!("set elements disagree ({m})"), &item.span))?;
-                    out.push(item);
+                    let typed = (|| {
+                        let typed = self.expr(item)?;
+                        self.agree(&typed.ty, &elem).or_else(|m| {
+                            reject(format!("set elements disagree ({m})"), &typed.span)
+                        })?;
+                        Ok(typed)
+                    })();
+                    out.push(self.recover(typed, item)?);
                 }
                 let ordered = matches!(
                     PinnedOrder::of(*order),
@@ -2904,6 +2967,29 @@ impl Pinner<'_> {
     /// `t`, with its variables followed, if its outermost shape is known. A rule that has to look
     /// at a type's shape before it can say anything cannot run on a type nothing has constrained
     /// yet; that is a gap in the pinner, not an error in the program.
+    /// Go on past a statement the program got wrong. The error is kept, and a node of a type
+    /// nothing is known about stands where the statement was, so the statements after it are
+    /// still checked. A form the pinner cannot type once an error is held is taken as a
+    /// consequence of it: the function is rejected either way.
+    fn recover(&mut self, typed: Res<TExpr<It>>, e: &Expr) -> Res<TExpr<It>> {
+        match typed {
+            Err(Failure::Rejected(err)) => self.errors.push(err),
+            Err(Failure::Gap(..)) if !self.errors.is_empty() => {}
+            other => return other,
+        }
+        let ty = self.fresh();
+        Ok(self.node(TExprKind::Unit, ty, e))
+    }
+
+    /// Stop walking a body that has had errors, where checking more would only echo them.
+    fn stop_if_recovered(&self, span: &Span) -> Res<()> {
+        if self.errors.is_empty() {
+            Ok(())
+        } else {
+            gap("a body with errors", span)
+        }
+    }
+
     fn known(&self, t: &It, span: &Span) -> Res<It> {
         match self.table.shallow(t) {
             It::Var(_) => gap("a rule needs a type that is not known yet", span),

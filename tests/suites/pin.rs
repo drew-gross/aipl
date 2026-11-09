@@ -47,6 +47,11 @@ fn oracle(dirs: &[&str]) -> Disagreement {
     let (mut programs, mut skipped) = (0usize, 0usize);
     let mut both_reject = 0usize;
     let mut pinner_misses: Vec<String> = Vec::new();
+    // The programs the checker rejects, where the pinner reports the very same errors, and where
+    // it does not (what each said).
+    let mut same_errors = 0usize;
+    let mut other_errors: Vec<String> = Vec::new();
+    let mut same_places = 0usize;
     let (mut pinned, mut gaps, mut rejected) = (0usize, 0usize, 0usize);
     let mut gap_kinds: BTreeMap<String, usize> = BTreeMap::new();
     let mut rejections: BTreeMap<String, usize> = BTreeMap::new();
@@ -73,6 +78,45 @@ fn oracle(dirs: &[&str]) -> Disagreement {
                             .any(|(_, f)| matches!(f, Failure::Rejected(_)));
                         if found {
                             both_reject += 1;
+                            let key = |e: &aipl::Error| {
+                                (
+                                    e.message.lines().next().unwrap_or("").to_string(),
+                                    e.span.as_ref().map(|s| s.start),
+                                )
+                            };
+                            let mut theirs: Vec<_> = errors.iter().map(key).collect();
+                            let mut ours: Vec<_> = result
+                                .failures
+                                .iter()
+                                .filter_map(|(_, f)| match f {
+                                    Failure::Rejected(e) => Some(key(e)),
+                                    Failure::Gap(..) => None,
+                                })
+                                .collect();
+                            theirs.sort();
+                            ours.sort();
+                            let places = |v: &[(String, Option<usize>)]| {
+                                v.iter().map(|(_, at)| *at).collect::<Vec<_>>()
+                            };
+                            if places(&theirs) == places(&ours) {
+                                same_places += 1;
+                            }
+                            if theirs == ours {
+                                same_errors += 1;
+                            } else if places(&theirs) != places(&ours) {
+                                let show = |v: &[(String, Option<usize>)]| {
+                                    v.iter()
+                                        .map(|(m, at)| format!("      {at:?} {m}"))
+                                        .collect::<Vec<_>>()
+                                        .join("\n")
+                                };
+                                other_errors.push(format!(
+                                    "{}\n    checker:\n{}\n    pinner:\n{}",
+                                    file.display(),
+                                    show(&theirs),
+                                    show(&ours)
+                                ));
+                            }
                         } else {
                             let gap = result
                                 .failures
@@ -219,8 +263,21 @@ fn oracle(dirs: &[&str]) -> Disagreement {
         pinner_misses.len()
     )
     .unwrap();
+    writeln!(
+        report,
+        "of those, the pinner reports exactly the checker's errors in {same_errors}, at the same \
+         places in {same_places}, others in {}",
+        other_errors.len()
+    )
+    .unwrap();
     writeln!(report, "--- gaps ---\n{}", top(&gap_kinds)).unwrap();
     writeln!(report, "--- rejections ---\n{}", top(&rejections)).unwrap();
+    writeln!(
+        report,
+        "--- the pinner's errors differ from the checker's ---\n{}",
+        other_errors.join("\n")
+    )
+    .unwrap();
     writeln!(
         report,
         "--- the pinner accepts what the checker rejects ---\n{}",
