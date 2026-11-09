@@ -31,7 +31,7 @@ mod match_check;
 mod patterns;
 pub mod pin;
 pub mod probe;
-pub use check::{check_resolved, set_mangle};
+pub use check::{attribute, check_resolved, set_mangle};
 
 mod fold;
 pub use fold::{fold_constants, fold_matches_post_mono};

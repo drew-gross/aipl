@@ -10,8 +10,8 @@ fn value_or<T: any>(self: T?, default: T) -> T {
 
 fn main() -> i64 { value_or(some(7), 'z') }
 --- check --compile ---
-error: conflicting types for "T" in "value_or": i64 vs char
-  --> ./tests/cases/generics/errors/err_type_param_conflict.aipl:11:20
+error: fn "value_or" arg 1: expected i64, got char
+  --> ./tests/cases/generics/errors/err_type_param_conflict.aipl:11:38
    |
 11 | fn main() -> i64 { value_or(some(7), 'z') }
-   |                    ^^^^^^^^^^^^^^^^^^^^^^
+   |                                      ^^^

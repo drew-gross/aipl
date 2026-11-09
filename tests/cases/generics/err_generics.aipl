@@ -16,11 +16,11 @@ fn arith_on_type_param<T: any>(a: T, b: T) -> T { a + b }
 // A generic body whose type doesn't match the declared return.
 fn generic_body_unreachable(v: any[]) -> bool { len(v) }
 --- check --compile ---
-error: arithmetic operand: expected i64, got type parameter "T"
+error: arithmetic operand: expected i64, got T
   --> ./tests/cases/generics/err_generics.aipl:14:51
    |
 14 | fn arith_on_type_param<T: any>(a: T, b: T) -> T { a + b }
-   |                                                   ^
+   |                                                   ^^^^^
 
 error: fn "generic_body_unreachable": body returns u64, but the declared return type is bool
   --> ./tests/cases/generics/err_generics.aipl:17:49

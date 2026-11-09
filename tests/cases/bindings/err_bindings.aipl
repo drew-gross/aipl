@@ -50,13 +50,13 @@ error: set: undeclared variable "ghost"
   --> ./tests/cases/bindings/err_bindings.aipl:12:9
    |
 12 |     set ghost = 1;
-   |         ^^^^^^^^^
+   |         ^^^^^
 
 error: set: cannot assign to immutable binding "x" (use "let mut")
   --> ./tests/cases/bindings/err_bindings.aipl:19:9
    |
 19 |     set x = 2;
-   |         ^^^^^
+   |         ^
 
 error: set: expected str, got i64
   --> ./tests/cases/bindings/err_bindings.aipl:25:13

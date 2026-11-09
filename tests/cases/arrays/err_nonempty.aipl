@@ -21,19 +21,19 @@ fn not_an_array() -> i64 {
     n
 }
 --- check --compile ---
-error: binding "xs" is declared i64[] without [], but its value is []
+error: binding "xs" is declared i64[] without [], but its value is i64[]: nothing shows it is not []
  --> ./tests/cases/arrays/err_nonempty.aipl:8:32
   |
 8 |     let xs: i64[] without [] = [];
   |                                ^^
 
-error: nonempty_first expects a non-empty array (a `T[] without []`), got i64[]
+error: fn "nonempty_first" arg 0: expected i64[] without [], got i64[]: nothing shows it is not []
   --> ./tests/cases/arrays/err_nonempty.aipl:12:36
    |
 12 | fn plain_array(xs: i64[]) -> i64 { xs.nonempty_first() }
    |                                    ^^
 
-error: binding "xs" is declared i64[] without [], but its value is i64[]
+error: binding "xs" is declared i64[] without [], but its value is i64[]: nothing shows it is not []
   --> ./tests/cases/arrays/err_nonempty.aipl:15:32
    |
 15 |     let xs: i64[] without [] = [1, 2].filter(|x| x > 5);

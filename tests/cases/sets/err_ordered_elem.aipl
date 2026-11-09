@@ -8,7 +8,7 @@ fn subject() !prints {
     print(`{b}`);
 }
 --- check --compile ---
-error: set literal: an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got bool
+error: fn "subject": an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got bool
  --> ./tests/cases/sets/err_ordered_elem.aipl:7:13
   |
 7 |     let b = #>{true, false};

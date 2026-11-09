@@ -55,7 +55,7 @@ error: fn "payload_invalid_type": a set element must be an integer (i8..i64, u8.
 29 | fn payload_invalid_type() -> #{i64[]}!Error { err("x") }
    |    ^^^^^^^^^^^^^^^^^^^^
 
-error: "err" expects 1 argument, got 0
+error: "err" expects 1 argument
   --> ./tests/cases/results/err_results.aipl:32:25
    |
 32 | fn void_err() -> !str { err() }

@@ -6,13 +6,13 @@ fn not_an_optional(n: i64) -> u8 { n.narrow() }
 
 fn not_from_an_integer(s: str) -> u8? { s.narrow() }
 --- check --compile ---
-error: "narrow" gives an optional, `none` when the value does not fit, but u8 is expected here — handle the `none` to get a u8 (with `?`, `value_or` or a `match`)
+error: fn "not_an_optional": body returns i64?, but the declared return type is u8
  --> ./tests/cases/integers/err_narrow_target.aipl:5:36
   |
 5 | fn not_an_optional(n: i64) -> u8 { n.narrow() }
   |                                    ^^^^^^^^^^
 
-error: "narrow" converts an integer, but its receiver is str
+error: "narrow" converts an integer
  --> ./tests/cases/integers/err_narrow_target.aipl:7:41
   |
 7 | fn not_from_an_integer(s: str) -> u8? { s.narrow() }

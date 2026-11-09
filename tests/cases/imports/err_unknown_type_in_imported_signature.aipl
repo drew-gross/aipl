@@ -9,7 +9,13 @@ fn main() {
 --- file: shapes.aipl ---
 pub fn area(side: i64) -> Measure { 0 }
 --- check --compile ---
-error: fn "area": unknown type "Measure"
+error: unknown type "Measure"
+ --> ./tests/cases/imports/err_unknown_type_in_imported_signature.aipl:7:13
+  |
+7 |     let a = area(1);
+  |             ^^^^^^^
+
+error: unknown type "Measure"
  --> ./tests/cases/imports/shapes.aipl:1:8
   |
 1 | pub fn area(side: i64) -> Measure { 0 }

@@ -84,7 +84,11 @@ fn oracle(dirs: &[&str]) -> Disagreement {
                                     e.span.as_ref().map(|s| s.start),
                                 )
                             };
-                            let mut theirs: Vec<_> = errors.iter().map(key).collect();
+                            // The old checker's findings, which `frontend` no longer reports.
+                            let checker_errors = aipl::mono::check_resolved(&lowered)
+                                .err()
+                                .unwrap_or_default();
+                            let mut theirs: Vec<_> = checker_errors.iter().map(key).collect();
                             let mut ours: Vec<_> = result
                                 .failures
                                 .iter()
@@ -105,7 +109,7 @@ fn oracle(dirs: &[&str]) -> Disagreement {
                             }
                             if theirs == ours {
                                 same_errors += 1;
-                            } else if places(&theirs) != places(&ours) {
+                            } else {
                                 let show = |v: &[(String, Option<usize>)]| {
                                     v.iter()
                                         .map(|(m, at)| format!("      {at:?} {m}"))

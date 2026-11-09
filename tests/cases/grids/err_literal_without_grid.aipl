@@ -6,8 +6,8 @@ fn subject() {
     let cell = rows[0, 1];
 }
 --- check --compile ---
-error: cannot infer a type for "T" in generic "__builtin_grid_get"
+error: fn "grid_get" arg 0: expected i64[,], got i64[][]
  --> ./tests/cases/grids/err_literal_without_grid.aipl:6:16
   |
 6 |     let cell = rows[0, 1];
-  |                ^^^^^^^^^^
+  |                ^^^^

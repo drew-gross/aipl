@@ -74,7 +74,7 @@ error: set: cannot assign to immutable binding "n" (use "let mut")
   --> ./tests/cases/methods/err_methods.aipl:33:9
    |
 33 |     set n.add(2);
-   |         ^^^^^^^
+   |         ^
 
 error: fn "mut_not_self": a "mut" receiver must be named "self"
   --> ./tests/cases/methods/err_methods.aipl:39:4

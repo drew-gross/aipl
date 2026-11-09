@@ -1,7 +1,7 @@
 fn g(v: any[]) -> any[] { v }
 --- check --compile ---
-error: fn "g": bare "any" is not allowed in a return type; declare "<T: any>" and return "T"
- --> ./tests/cases/generics/errors/err_any_in_return.aipl:1:4
+error: fn "g": body returns any$1[], but the declared return type is any$2[]
+ --> ./tests/cases/generics/errors/err_any_in_return.aipl:1:27
   |
 1 | fn g(v: any[]) -> any[] { v }
-  |    ^
+  |                           ^

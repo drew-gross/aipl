@@ -2134,7 +2134,7 @@ pub fn check_resolved(program: &Program) -> Result<Vec<Resolution>, Vec<Error>> 
 /// which the caller already renders correctly, or a builtin declaration) or the
 /// program has no source map (a single parsed file). `Error::in_file` keeps the
 /// innermost attribution, so an error already tagged by the loader is untouched.
-pub(crate) fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource]) -> Error {
+pub fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource]) -> Error {
     let Some(idx) = aipl_syntax::mangled_file_index(name) else {
         return e;
     };

@@ -14,7 +14,7 @@ fn f() -> i64 {
     x
 }
 --- check --compile ---
-error: cannot destructure P as Q — the pattern names the struct it takes apart, and two structs that merely share field names are not interchangeable
+error: binding "__spat$376" is declared Q, but its value is P
   --> ./tests/cases/structs/err_destructure_wrong_struct.aipl:13:19
    |
 13 |     let Q { x } = make();

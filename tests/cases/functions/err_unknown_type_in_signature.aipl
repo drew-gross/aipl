@@ -3,7 +3,7 @@
 
 fn area(shape: Shape) -> i64 { 0 }
 --- check --compile ---
-error: fn "area": unknown type "Shape"
+error: unknown type "Shape"
  --> ./tests/cases/functions/err_unknown_type_in_signature.aipl:4:4
   |
 4 | fn area(shape: Shape) -> i64 { 0 }

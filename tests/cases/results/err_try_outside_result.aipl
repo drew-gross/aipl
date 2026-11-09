@@ -4,7 +4,7 @@
 
 fn bad(x: i64!str) -> i64 { x? }
 --- check --compile ---
-error: "?" can only be used in a function that returns a result, or in a test
+error: `?` needs an optional or result in a function returning one
  --> ./tests/cases/results/err_try_outside_result.aipl:5:29
   |
 5 | fn bad(x: i64!str) -> i64 { x? }

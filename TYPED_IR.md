@@ -194,7 +194,7 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
         `probe::stamp_everything` (written `f<T>(x)` type arguments stripped; a value lambda's inferred parameter
         types written onto it; `int_parse` retargeted to its stamped integer type). Deleted from the checker: the
         `check` entry point, `stamp_locks`, `retargeted_int_parse`, `lambda_params`. No baseline row moved.
-  - [ ] **4b. Findings from the pinner.** Measured (Session 12): with the pinner's rejections reported instead of the
+  - [x] **4b. Findings from the pinner.** Measured (Session 12): with the pinner's rejections reported instead of the
         checker's, 189 of 270 `err_*` cases still match byte for byte and 81 differ: different spans (`true + false`
         underlined whole vs the operand), different wording (`both sides must be the same type` vs `the operands are
         bool and i64`), and fewer findings per function.
@@ -218,8 +218,17 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
           `let r: u8 = identity(300)` a narrowing (the pinner lets the annotation reach the literal and reports the
           literal), and the checker refuses a generic variant's argument pinned only by a lambda's parameters (`Build`;
           the pinner infers it from the body).
-        - [ ] Match checks (`match_check.rs`), lints that read checker state (`locks`: `narrow_target_errors`,
-          `return_pinned_errors`), then refill the sections.
+        - [x] **Match checks and checker-state lints** (Session 13). The pinner already ran `match_check` (match
+          rules, `bind_nested`); the two lints that read checker state are findings of its own now: `narrow` with no
+          target (`Pinner::narrows`, checked in `settle`) and a result-only type variable (`CallRecord::result_only`).
+          Nothing is left that reads `Cx::locks` for a diagnostic.
+        - [x] **The switch** (Session 13). `frontend` reports the pinner's findings (`pinned_findings`, a function's
+          `.test` block left out: it is typed only when the tests run); `check_resolved` still runs after it for the
+          name resolutions, and its errors are reported for a program the pinner accepts (none in the corpus).
+          Wording follows the checker's where the same finding exists (`Site`: `fn "f": body returns A, but the
+          declared return type is B`, `fn "f" arg 0: expected A, got B`, `binding "x" is declared A, ..`), so 84 of the
+          135 rejected `tests/cases` programs read exactly as before and the rest are refilled. `oracle_report` now
+          compares the pinner with `check_resolved` directly.
   - [ ] **4c. Name resolutions from the pinner** (`aipl_syntax::resolution`, read by the LSP and index), after which
         `Cx` and its ~6,000 lines go and the helpers the pinner shares (`coerce`, `validate_type`, `MatchInfo`,
         `generic_instance_name`, ...) move to a module of their own.
@@ -356,3 +365,5 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   for the remaining findings.
 - Session 13 (continued): 4b findings. See the list above; `oracle_report` is the measure. `check_literals` now
   takes the enclosing site span, `settle` collects instead of stopping at the first bound error.
+- Session 13 (continued): 4b is done: the pinner is the type checker `frontend` reports. `Cx` is left for the name
+  resolutions and as a fallback; 4c moves the resolutions to the pinner and deletes it.

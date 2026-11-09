@@ -2988,8 +2988,15 @@ pub fn lowered_for_check(program: &Program) -> Result<(Program, Program), Vec<Er
 pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     let (program, check_program) = lowered_for_check(program)?;
     let program = &program;
-    // The checker is run for its findings and for what every written name resolved to; the
-    // program everything downstream reads is the lowered one, typed by the pinner below.
+    // The pinner is the type checker: what it rejects is the program's findings. A `.test` block
+    // is typed as a function of its own when the tests run, and not otherwise.
+    let pinned = aipl_mono::pin::pin(&check_program);
+    let findings = pinned_findings(&pinned, &check_program.sources);
+    if !findings.is_empty() {
+        return Err(findings);
+    }
+    // The checker is run for what every written name resolved to, and still has the last word on
+    // a program it finds something wrong with that the pinner does not.
     let resolutions = aipl_mono::check_resolved(&check_program)?;
     // `check_program` is the synthesized builtin decls followed by the real program; take back
     // the second half.
@@ -3004,7 +3011,6 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     aipl_syntax::erase_refinements(&mut program);
     // Every expression the pinner typed says what it is (`Expr::ty`), not only the context-dependent
     // ones the checker stamped.
-    let pinned = aipl_mono::pin::pin(&check_program);
     aipl_mono::probe::stamp_everything(
         &mut program,
         &pinned,
@@ -3015,6 +3021,31 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
         check_program,
         resolutions,
     })
+}
+
+/// What the pinner rejected, as errors pointing into the file each came from. A form the pinner
+/// does not type is not the program's fault, but nothing downstream can use a function it left out,
+/// so it is reported too.
+fn pinned_findings(
+    pinned: &aipl_mono::pin::Pinned,
+    sources: &[aipl_syntax::ast::FileSource],
+) -> Vec<Error> {
+    use aipl_mono::pin::Failure;
+    pinned
+        .failures
+        .iter()
+        .filter(|(name, _)| !name.ends_with(".test"))
+        .map(|(name, failure)| {
+            let error = match failure {
+                Failure::Rejected(e) => e.clone(),
+                Failure::Gap(what, span) => Error::at(
+                    format!("the compiler does not type this yet: {what}"),
+                    span.clone(),
+                ),
+            };
+            aipl_mono::attribute(error, name, sources)
+        })
+        .collect()
 }
 
 /// How far monomorphization's inference is from the pinner's on `program`: the program is checked

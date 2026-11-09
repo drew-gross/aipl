@@ -6,7 +6,7 @@ fn subject() {
     let s = (1, "one").to_set();
 }
 --- check --compile ---
-error: "to_set": a tuple's elements must all have one type to make a set, got (i64, str)
+error: a tuple's elements must share a type (str is not an integer type)
  --> ./tests/cases/sets/err_to_set_tuple_mixed.aipl:6:13
   |
 6 |     let s = (1, "one").to_set();

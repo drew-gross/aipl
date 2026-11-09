@@ -7,8 +7,8 @@ fn subject() {
     let s = (xs, xs).to_set();
 }
 --- check --compile ---
-error: "to_set": a set element must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got i64[]
+error: fn "subject": a set element must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got i64[]
  --> ./tests/cases/sets/err_to_set_tuple_elem.aipl:7:13
   |
 7 |     let s = (xs, xs).to_set();
-  |             ^^^^^^^^
+  |             ^^^^^^^^^^^^^^^^^

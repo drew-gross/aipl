@@ -17,7 +17,7 @@ error: "narrow" takes the integer type it converts to from where its value goes,
 8 |     let b = n.narrow();
   |             ^^^^^^^^^^
 
-error: "narrow" converts to an integer type, giving an optional of it, but str? is expected here
+error: fn "not_an_integer": body returns i64?, but the declared return type is str?
   --> ./tests/cases/integers/err_narrow_no_target.aipl:12:37
    |
 12 | fn not_an_integer(n: i64) -> str? { n.narrow() }

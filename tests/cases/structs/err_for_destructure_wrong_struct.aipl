@@ -13,7 +13,7 @@ fn f(ps: P[]) -> i64 {
     0
 }
 --- check --compile ---
-error: cannot destructure P as Q — the pattern names the struct it takes apart, and two structs that merely share field names are not interchangeable
+error: binding "__spat$316" is declared Q, but its value is P
   --> ./tests/cases/structs/err_for_destructure_wrong_struct.aipl:10:24
    |
 10 |     for (let Q { x } : ps) {

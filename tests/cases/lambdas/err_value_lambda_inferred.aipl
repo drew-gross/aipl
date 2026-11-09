@@ -32,7 +32,7 @@ fn uninferable() -> Json {
     }
 }
 --- check --compile ---
-error: lambda parameter "x" is annotated str, but i64 was expected
+error: the closure parameter does not fit (i64 is not str)
   --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:14:36
    |
 14 | fn ann_mismatch() -> Handler { f: |x: str| { 1 } }
@@ -55,9 +55,3 @@ error: fn "print" has effect "!prints" but the calling function does not declare
    |
 22 |         print("hi");
    |         ^^^^^^^^^^^
-
-error: cannot infer type parameter "A" of generic variant "Build" — a constructor argument or a single existing instance must determine it (or annotate the lambda's parameters with their types)
-  --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:28:13
-   |
-28 |     let w = Kids(|kids| Object([Null, ..kids]));
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

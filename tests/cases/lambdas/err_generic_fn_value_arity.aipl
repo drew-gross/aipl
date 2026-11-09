@@ -6,7 +6,7 @@ fn subject() {
     let ps = [1].map(pair);
 }
 --- check --compile ---
-error: fn "pair" takes 2 parameter(s), but a function taking 1 is expected here
+error: fn "map" arg 1: expected (i64) -> i64, got (i64, i64) -> (i64, i64)
  --> ./tests/cases/lambdas/err_generic_fn_value_arity.aipl:6:22
   |
 6 |     let ps = [1].map(pair);

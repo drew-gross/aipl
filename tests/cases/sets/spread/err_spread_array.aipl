@@ -5,7 +5,7 @@ fn subject() {
     let s = #{..xs, 3};
 }
 --- check --compile ---
-error: fn "union" arg 1: expected a set, got i64[]
+error: fn "union" arg 1: expected #{i64}, got i64[]
  --> ./tests/cases/sets/spread/err_spread_array.aipl:5:17
   |
 5 |     let s = #{..xs, 3};

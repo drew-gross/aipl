@@ -11,7 +11,7 @@ fn f(v: V) -> i64 {
     }
 }
 --- check --compile ---
-error: constructor "A@V" binds 1 value(s), but 0 given (write "A(..)" to match it without naming the payload)
+error: constructor "A@V" binds 1 value(s), but 0 given
  --> ./tests/cases/match_arms/err_nullary_for_payload.aipl:9:9
   |
 9 |         A => 1,

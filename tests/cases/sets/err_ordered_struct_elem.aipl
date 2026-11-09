@@ -10,7 +10,7 @@ fn subject() !prints {
     print(`{s}`);
 }
 --- check --compile ---
-error: set literal: an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got Point
+error: fn "subject": an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got Point
  --> ./tests/cases/sets/err_ordered_struct_elem.aipl:9:13
   |
 9 |     let s = #>{Point { x: 1, y: 2 }};

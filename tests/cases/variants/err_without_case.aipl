@@ -41,19 +41,19 @@ fn no_such_case(v: V without Nope) -> i64 { 1 }
 
 fn not_a_variant(n: i64 without C) -> i64 { 1 }
 --- check --compile ---
-error: V without C has no constructor "C"
+error: V has no constructor "C"
   --> ./tests/cases/variants/err_without_case.aipl:13:9
    |
 13 |         C => "c",
    |         ^
 
-error: fn "takes" arg 0: expected V without C, got V
+error: fn "takes" arg 0: expected V without C, got V: nothing shows it is not C
   --> ./tests/cases/variants/err_without_case.aipl:19:31
    |
 19 | fn plain(v: V) -> i64 { takes(v) }
    |                               ^
 
-error: binding "w" is declared V without C, but its value is V
+error: binding "w" is declared V without C, but its value is V: nothing shows it is not C
   --> ./tests/cases/variants/err_without_case.aipl:22:21
    |
 22 |     let w: VMinus = C;

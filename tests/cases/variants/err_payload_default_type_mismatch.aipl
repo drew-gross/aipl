@@ -12,7 +12,7 @@ error: default for variant "Shape" case "Circle" payload "color": expected str, 
 1 | variant Shape = Circle(r: i64, color: str = 5)
   |                                             ^
 
-error: constructor "Circle" argument: expected str, got i64
+error: a constructor argument: expected str, got i64
  --> ./tests/cases/variants/err_payload_default_type_mismatch.aipl:1:45
   |
 1 | variant Shape = Circle(r: i64, color: str = 5)

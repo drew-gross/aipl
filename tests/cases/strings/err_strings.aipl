@@ -80,11 +80,11 @@ error: "==" between str and i64: both sides must be the same type
 16 | fn str_eq_with_i64() -> i64 { if ("hi" == 5) { 1 } else { 2 } }
    |                                   ^^^^^^^^^
 
-error: "+" is integer addition, but this operand is str; build a string with a template, `{a}{b}`
+error: arithmetic operand: expected str, got i64
   --> ./tests/cases/strings/err_strings.aipl:19:28
    |
 19 | fn str_plus_i64() -> i64 { "hi" + 5 }
-   |                            ^^^^
+   |                            ^^^^^^^^
 
 error: "match" on a str expects string literals, `[..]` patterns, or `_`
   --> ./tests/cases/strings/err_strings.aipl:25:9
@@ -122,14 +122,14 @@ error: cannot slice a value of type i64
 61 |     let s = n[..2];
    |             ^
 
-error: slice end: expected i64, got char
+error: an index must be an integer, got char
   --> ./tests/cases/strings/err_strings.aipl:67:17
    |
 67 |     let x = s[..'z'];
    |                 ^^^
 
-error: cannot slice a value of type i64
+error: fn "len" arg 0: expected i64[], got i64
   --> ./tests/cases/strings/err_strings.aipl:74:5
    |
 74 |     n[sp].len()
-   |     ^
+   |     ^^^^^

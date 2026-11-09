@@ -38,13 +38,13 @@ error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — 
 15 | fn plain_result() -> u64 { count([1, 2].filter(|x| x > 5)) }
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got []
+error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got i64[]
   --> ./tests/cases/functions/err_nonempty_variadic.aipl:17:35
    |
 17 | fn empty_literal() -> u64 { count([]) }
    |                                   ^^
 
-error: fn "total" arg 1: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got none
+error: fn "total" arg 1: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got i64?
   --> ./tests/cases/functions/err_nonempty_variadic.aipl:19:43
    |
 19 | fn generic_optional() -> u64 { total([1], none) }

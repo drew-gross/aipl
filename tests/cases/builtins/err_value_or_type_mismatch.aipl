@@ -4,8 +4,8 @@ import { value_or } from builtins;
 
 fn subject() -> i64 { some(1).value_or('z') }
 --- check --compile ---
-error: conflicting types for "T" in "value_or": i64 vs char
- --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:5:23
+error: fn "value_or" arg 1: expected i64, got char
+ --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:5:40
   |
 5 | fn subject() -> i64 { some(1).value_or('z') }
-  |                       ^^^^^^^^^^^^^^^^^^^^^
+  |                                        ^^^

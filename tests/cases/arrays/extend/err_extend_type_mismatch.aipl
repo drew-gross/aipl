@@ -15,7 +15,7 @@ fn subject() {
     set xs.extend(["a"]);
 }
 --- check --compile ---
-error: "extend" source expects i64[], i64, or i64?, got str[]
+error: the argument of "extend": a number cannot be this type
   --> ./tests/cases/arrays/extend/err_extend_type_mismatch.aipl:15:19
    |
 15 |     set xs.extend(["a"]);

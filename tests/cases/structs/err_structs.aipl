@@ -75,7 +75,7 @@ fn range_chained() {
     let r = 1..2..3;
 }
 --- check --compile ---
-error: fn "unknown_type": unknown type "Widget"
+error: unknown type "Widget"
   --> ./tests/cases/structs/err_structs.aipl:25:4
    |
 25 | fn unknown_type(x: Widget) -> i64 { 0 }
@@ -93,13 +93,13 @@ error: struct "Point" has no field "z"
 31 | fn unknown_field() -> i64 { Point { x: 1, z: 2 }.x }
    |                                              ^
 
-error: struct "Point" has no field "z"
+error: struct Point has no field "z"
   --> ./tests/cases/structs/err_structs.aipl:35:9
    |
 35 |     set p.z = 3;
-   |         ^^^^^^^
+   |         ^^^
 
-error: struct "Pair" field "b" has no default and was not provided
+error: missing field "b" of "Pair"
   --> ./tests/cases/structs/err_structs.aipl:39:29
    |
 39 | fn missing_field() -> i64 { Pair { a: 1 }.a }
@@ -115,19 +115,19 @@ error: set: cannot assign to immutable binding "p" (use "let mut")
   --> ./tests/cases/structs/err_structs.aipl:47:9
    |
 47 |     set p.x = 3;
-   |         ^^^^^^^
+   |         ^^^
 
-error: set: field assignment target must be a struct, "n" has type i64
+error: field access on non-struct value of type i64
   --> ./tests/cases/structs/err_structs.aipl:54:9
    |
 54 |     set n.x = 2;
-   |         ^^^^^^^
+   |         ^
 
-error: set: field assignment target must be a struct, "p.x" has type i64
+error: field access on non-struct value of type i64
   --> ./tests/cases/structs/err_structs.aipl:59:9
    |
 59 |     set p.x.y = 3;
-   |         ^^^^^^^^^
+   |         ^^^
 
 error: set: expected i64, got bool
   --> ./tests/cases/structs/err_structs.aipl:65:15
@@ -135,13 +135,13 @@ error: set: expected i64, got bool
 65 |     set p.x = true;
    |               ^^^^
 
-error: struct "Span" field "start": expected i64, got str
+error: an index must be an integer, got str
   --> ./tests/cases/structs/err_structs.aipl:71:13
    |
 71 |     let r = "a"..2;
    |             ^^^
 
-error: struct "Span" field "start": expected i64, got Span
+error: an index must be an integer, got Span
   --> ./tests/cases/structs/err_structs.aipl:75:13
    |
 75 |     let r = 1..2..3;

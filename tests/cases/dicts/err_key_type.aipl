@@ -5,7 +5,7 @@ fn subject() -> i64 {
     0
 }
 --- check --compile ---
-error: dict keys must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
+error: fn "subject": a dict key must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
  --> ./tests/cases/dicts/err_key_type.aipl:4:13
   |
 4 |     let d = #{[1]: "a"};

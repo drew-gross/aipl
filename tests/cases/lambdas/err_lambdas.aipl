@@ -73,13 +73,13 @@ fn map_not_array() !prints {
 // A function value cannot be returned.
 fn return_function() -> (i64) -> i64 { inc }
 --- check --compile ---
-error: "x" is not a function and cannot be called
+error: "x" is not a function
   --> ./tests/cases/lambdas/err_lambdas.aipl:31:5
    |
 31 |     x(3)
    |     ^^^^
 
-error: fn "twice" returns i64, but bool is expected here
+error: fn "filter" arg 1: expected (i64) -> bool, got (i64) -> i64
   --> ./tests/cases/lambdas/err_lambdas.aipl:36:35
    |
 36 |     print(to_str([1, 2, 3].filter(twice)));
@@ -97,13 +97,13 @@ error: fn "shout" has effect "!prints" but the calling function does not declare
 45 |     let ys = [1, 2, 3].map(shout);
    |                            ^^^^^
 
-error: fn "takes_str" expects a str argument, but will be called with i64 here
+error: fn "map" arg 1: expected (i64) -> i64, got (str) -> str
   --> ./tests/cases/lambdas/err_lambdas.aipl:52:32
    |
 52 |     print(to_str([1, 2, 3].map(takes_str)));
    |                                ^^^^^^^^^
 
-error: fn "inc" expects a i64 argument, but will be called with str here
+error: fn "apply_str" arg 0: expected (str) -> str, got (i64) -> i64
   --> ./tests/cases/lambdas/err_lambdas.aipl:55:36
    |
 55 | fn fn_ref_sig() -> str { apply_str(inc, "hi") }
@@ -115,7 +115,7 @@ error: lambda has 2 parameter(s), but (i64) -> i64 was expected
 59 | fn lambda_arity() -> i64 { apply_i64(|x, y| x + y, 3) }
    |                                      ^^^^^^^^^^^^
 
-error: lambda has 2 parameter(s), but (i64) -> _ was expected
+error: lambda has 2 parameter(s), but (i64) -> i64 was expected
   --> ./tests/cases/lambdas/err_lambdas.aipl:62:32
    |
 62 |     print(to_str([1, 2, 3].map(|x, y| x + y)));
@@ -127,7 +127,7 @@ error: lambda body returns bool, but i64 was expected
 66 | fn lambda_body_type() -> i64 { apply_i64(|x| true, 3) }
    |                                              ^^^^
 
-error: map expects an array, an optional or a Span, got i64
+error: fn "map" arg 0: expected i64[], got i64
   --> ./tests/cases/lambdas/err_lambdas.aipl:70:22
    |
 70 |     print(to_str(map(5, |x| x + 1)));

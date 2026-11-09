@@ -42,19 +42,19 @@ fn subject() !prints {
     print(to_str(scalar().len()));
 }
 --- check --compile ---
-error: map expects an array, an optional or a Span, got i64
+error: fn "map" arg 0: expected i64[], got i64
   --> ./tests/cases/generics/err_container_shape.aipl:23:5
    |
 23 |     n.map(|x| x + 1)
    |     ^
 
-error: map expects an array, an optional or a Span, got P
+error: fn "map" arg 0: expected i64[], got P
   --> ./tests/cases/generics/err_container_shape.aipl:28:30
    |
 28 | fn a_struct(p: P) -> i64[] { p.map(|x| x + 1) }
    |                              ^
 
-error: map expects an array, an optional or a Span, got V
+error: fn "map" arg 0: expected i64[], got V
   --> ./tests/cases/generics/err_container_shape.aipl:30:31
    |
 30 | fn a_variant(v: V) -> i64[] { v.map(|x| x + 1) }
@@ -66,7 +66,7 @@ error: fn "an_optional": body returns i64?, but the declared return type is i64[
 34 | fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
    |                                    ^^^^^^^^^^^^^^^^
 
-error: fn "zip_with" arg 1: expected an array, got i64
+error: fn "zip_with" arg 1: expected i64[], got i64
   --> ./tests/cases/generics/err_container_shape.aipl:39:46
    |
 39 | fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }

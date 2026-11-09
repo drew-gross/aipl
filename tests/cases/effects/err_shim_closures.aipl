@@ -95,13 +95,13 @@ error: closure parameter "text" is i64, but "print" passes a str
 19 |     shim prints { print = |text: i64| {}, put = |text| {} } {
    |                           ^^^^^^^^^^^^^^
 
-error: the closure bound to "print" returns str, but "print" returns ()
+error: lambda body returns str, but () was expected
   --> ./tests/cases/effects/err_shim_closures.aipl:26:34
    |
 26 |     shim prints { print = |text| text, put = |text| {} } {
    |                                  ^^^^
 
-error: the closure bound to "read_line" returns i64, but "read_line" returns str?
+error: lambda body returns i64, but str? was expected
   --> ./tests/cases/effects/err_shim_closures.aipl:33:38
    |
 33 |     shim read_stdin { read_line = || 5 } {

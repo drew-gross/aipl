@@ -149,11 +149,11 @@ error: cannot bind "_" to a value of type ()
 65 |     let _ = print("hi");
    |             ^^^^^^^^^^^
 
-error: arithmetic operand: expected i64, got ()
+error: arithmetic operand: expected (), got i64
   --> ./tests/cases/functions/err_functions.aipl:69:42
    |
 69 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
-   |                                          ^^^^^^^^^^^
+   |                                          ^^^^^^^^^^^^^^^
 
 error: fn "subject": body returns i64, but the declared return type is ()
   --> ./tests/cases/functions/err_functions.aipl:72:16

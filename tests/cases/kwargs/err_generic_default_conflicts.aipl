@@ -11,8 +11,8 @@ fn subject() !prints {
     print(to_str(padded(["a"])));
 }
 --- check --compile ---
-error: conflicting types for "T" in "padded": str vs i64
-  --> ./tests/cases/kwargs/err_generic_default_conflicts.aipl:11:18
-   |
-11 |     print(to_str(padded(["a"])));
-   |                  ^^^^^^^^^^^^^
+error: fn "padded" arg 1: expected str, got i64
+ --> ./tests/cases/kwargs/err_generic_default_conflicts.aipl:8:37
+  |
+8 | fn padded<T: any>(xs: T[], pad: T = 0) -> T[] { xs }
+  |                                     ^

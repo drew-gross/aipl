@@ -6,4 +6,4 @@ error: logical operand: expected bool, got i64
  --> ./tests/cases/booleans/logical/err_logical_on_i64.aipl:3:27
   |
 3 | fn subject() -> i64 { if (1 && 2) { 1 } else { 2 } }
-  |                           ^
+  |                           ^^^^^^

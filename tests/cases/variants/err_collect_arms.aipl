@@ -22,7 +22,7 @@ fn held_case(shapes: Shape[]) {
     print(`{shapes.collect_arms(held)}`);
 }
 --- check --compile ---
-error: Shape without Square without Dot has no constructor "Square"
+error: Shape has no constructor "Square"
   --> ./tests/cases/variants/err_collect_arms.aipl:14:13
    |
 14 |             Square(w) => w,

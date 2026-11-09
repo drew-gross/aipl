@@ -429,6 +429,62 @@ fn prim_name(p: Primitive) -> String {
     aipl_syntax::type_name(&Type::Primitive(p))
 }
 
+/// Where a value is handed to a type, for the message when it does not fit.
+#[derive(Clone, Copy)]
+enum Site<'a> {
+    /// A function's result: its name.
+    Result(&'a str),
+    /// A `let` binding's initializer: the binding's name.
+    Binding(&'a str),
+    /// A call's argument: the function and the argument's position.
+    Argument(&'a str, usize),
+    /// A struct's field: the struct and the field.
+    Field(&'a str, &'a str),
+    /// A closure's body against what its position returns.
+    Lambda,
+    /// A `return`'s value against the function's declared result.
+    Return,
+    /// Anything else, in a few words.
+    Other(&'a str),
+}
+
+impl<'a> From<&'a str> for Site<'a> {
+    fn from(what: &'a str) -> Self {
+        Site::Other(what)
+    }
+}
+
+impl<'a> From<&'a String> for Site<'a> {
+    fn from(what: &'a String) -> Self {
+        Site::Other(what)
+    }
+}
+
+impl Site<'_> {
+    /// What is wrong when `given` meets `wanted` here; `hint` is appended.
+    fn mismatch(&self, given: &str, wanted: &str, hint: &str) -> String {
+        match self {
+            Site::Result(f) => format!(
+                "fn {f:?}: body returns {given}, but the declared return type is {wanted}{hint}"
+            ),
+            Site::Binding(n) => {
+                format!("binding {n:?} is declared {wanted}, but its value is {given}{hint}")
+            }
+            Site::Argument(f, i) => {
+                format!("fn {f:?} arg {i}: expected {wanted}, got {given}{hint}")
+            }
+            Site::Field(s, f) => {
+                format!("struct {s:?} field {f:?}: expected {wanted}, got {given}{hint}")
+            }
+            Site::Lambda => format!("lambda body returns {given}, but {wanted} was expected{hint}"),
+            Site::Return => {
+                format!("return value is {given}, but the function returns {wanted}{hint}")
+            }
+            Site::Other(what) => format!("{what}: expected {wanted}, got {given}{hint}"),
+        }
+    }
+}
+
 /// Why a function was not pinned.
 #[derive(Debug)]
 pub enum Failure {
@@ -1105,7 +1161,12 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     p.env = everything;
     let body = p.expr(&f.body)?;
     let ret = p.ret.clone();
-    p.coerce_expr(&body, &ret, f.body.value_span(), "the function's result")?;
+    p.coerce_expr(
+        &body,
+        &ret,
+        f.body.value_span(),
+        Site::Result(display(&f.name.text)),
+    )?;
     p.settle()?;
     // Recovery left placeholders in the tree, which is not worth finishing.
     p.stop_if_recovered(&f.body.span)?;
@@ -1532,7 +1593,14 @@ impl Pinner<'_> {
 
     /// [`Pinner::coerce`] for the value `e`, which can also be shown not to be an excluded value by
     /// what it is: a non-empty array literal is not `[]`, a constructor of case `C` is not case `D`.
-    fn coerce_expr(&mut self, e: &TExpr<It>, expected: &It, span: &Span, what: &str) -> Res<()> {
+    fn coerce_expr<'s>(
+        &mut self,
+        e: &TExpr<It>,
+        expected: &It,
+        span: &Span,
+        site: impl Into<Site<'s>>,
+    ) -> Res<()> {
+        let site = site.into();
         let given = self.table.exclusions(&e.ty);
         let shown = |x: &aipl_syntax::ast::Exclusion, p: &Self| p.shows(e, x);
         let unshown: Vec<_> = self
@@ -1542,15 +1610,9 @@ impl Pinner<'_> {
             .filter(|x| !given.contains(x) && !shown(x, self))
             .collect();
         if let Some(x) = unshown.first() {
-            return reject(
-                format!(
-                    "{what} is {}, but {} is expected: nothing shows it is not {}",
-                    self.table.show(&e.ty),
-                    self.table.show(expected),
-                    x.spelling()
-                ),
-                span,
-            );
+            let wanted = aipl_syntax::type_name(&self.refined_type(expected));
+            let hint = format!(": nothing shows it is not {}", x.spelling());
+            return reject(site.mismatch(&self.table.show(&e.ty), &wanted, &hint), span);
         }
         // What was shown is not part of the type the value has; compare the bases.
         let base = self.table.shallow(expected);
@@ -1558,12 +1620,12 @@ impl Pinner<'_> {
         if let (TExprKind::ArrayLit(items), It::Arr(want)) = (&e.kind, &base) {
             if !items.is_empty() && !self.table.exclusions(want).is_empty() {
                 for item in items {
-                    self.coerce_expr(item, want, &item.span, what)?;
+                    self.coerce_expr(item, want, &item.span, site)?;
                 }
                 return Ok(());
             }
         }
-        self.coerce(&e.ty, &base, span, what)
+        self.coerce(&e.ty, &base, span, site)
     }
 
     /// Whether what `e` is shows it is not the excluded value `x`: a non-empty array literal is not
@@ -1601,7 +1663,14 @@ impl Pinner<'_> {
 
     /// A value of type `actual` where `expected` is declared: unification plus the widenings the
     /// language allows at such a position (`check.rs`'s `coerce` is the specification).
-    fn coerce(&mut self, actual: &It, expected: &It, span: &Span, what: &str) -> Res<()> {
+    fn coerce<'s>(
+        &mut self,
+        actual: &It,
+        expected: &It,
+        span: &Span,
+        site: impl Into<Site<'s>>,
+    ) -> Res<()> {
+        let site = site.into();
         let (a, e) = (self.table.shallow(actual), self.table.shallow(expected));
         // A scalar integer widens to a wider declared one; inside a container it must agree.
         if let (It::Prim(x), It::Prim(y)) = (&a, &e) {
@@ -1609,15 +1678,16 @@ impl Pinner<'_> {
                 return Ok(());
             }
         }
-        self.agree(&a, &e).or_else(|message| {
-            reject(
-                format!(
-                    "{what} is {}, but {} is expected ({message})",
-                    self.table.show(&a),
-                    self.table.show(&e)
+        self.agree(&a, &e).or_else(|_| {
+            let (given, wanted) = (self.table.show(&a), self.table.show(&e));
+            let hint = match (&a, &e) {
+                (It::Prim(x), It::Prim(y)) if x.is_int() && y.is_int() => format!(
+                    " — {wanted} cannot hold every {given}, so convert with `.narrow()`, which \
+                     gives `none` when the value does not fit"
                 ),
-                span,
-            )
+                _ => String::new(),
+            };
+            reject(site.mismatch(&given, &wanted, &hint), span)
         })
     }
 
@@ -1802,9 +1872,7 @@ impl Pinner<'_> {
                 for item in items {
                     let typed = (|| {
                         let typed = self.expr(item)?;
-                        self.agree(&typed.ty, &elem).or_else(|m| {
-                            reject(format!("array elements disagree ({m})"), &typed.span)
-                        })?;
+                        self.coerce(&typed.ty, &elem, &typed.span, "array element")?;
                         Ok(typed)
                     })();
                     out.push(self.recover(typed, item)?);
@@ -1813,7 +1881,7 @@ impl Pinner<'_> {
             }
             ExprKind::If(c, ta, tb) => {
                 let c = self.expr(c)?;
-                self.coerce_expr(&c, &bool_ty, &c.span, "an `if` condition")?;
+                self.coerce_expr(&c, &bool_ty, &c.span, "if condition")?;
                 let a = self.expr_at(ta, pos)?;
                 let b = self.expr_at(tb, pos)?;
                 // An expression `if` produces a value, so neither branch may mutate outside it.
@@ -1825,8 +1893,15 @@ impl Pinner<'_> {
                 let (da, db) = (aipl_syntax::diverges(ta), aipl_syntax::diverges(tb));
                 // A branch that leaves the function has no value to agree with.
                 if !da && !db {
-                    self.agree(&a.ty, &b.ty).or_else(|m| {
-                        reject(format!("the branches of an `if` disagree ({m})"), &e.span)
+                    self.agree(&a.ty, &b.ty).or_else(|_| {
+                        reject(
+                            format!(
+                                "if branches have mismatched types: {} vs {}",
+                                self.table.show(&a.ty),
+                                self.table.show(&b.ty)
+                            ),
+                            &e.span,
+                        )
                     })?;
                 }
                 let ty = if da { b.ty.clone() } else { a.ty.clone() };
@@ -1834,7 +1909,7 @@ impl Pinner<'_> {
             }
             ExprKind::While(c, body) => {
                 let c = self.expr(c)?;
-                self.coerce_expr(&c, &bool_ty, &c.span, "a `while` condition")?;
+                self.coerce_expr(&c, &bool_ty, &c.span, "while condition")?;
                 let body = self.expr_at(body, Pos::Discard)?;
                 self.node(
                     K::While(Box::new(c), Box::new(body)),
@@ -1882,7 +1957,7 @@ impl Pinner<'_> {
             ExprKind::Return(x) => {
                 let x = self.expr(x)?;
                 let ret = self.ret.clone();
-                self.coerce_expr(&x, &ret, &x.span, "the returned value")?;
+                self.coerce_expr(&x, &ret, &x.span, Site::Return)?;
                 let ty = self.fresh();
                 if let It::Var(v) = ty {
                     self.table.slots[v].diverges = true;
@@ -1902,7 +1977,7 @@ impl Pinner<'_> {
                         )?;
                         let t = self.lower(t, &HashMap::new(), &e.span)?;
                         let v = self.value_arg(v, &t)?;
-                        self.coerce_expr(&v, &t, &v.span, "the bound value")?;
+                        self.coerce_expr(&v, &t, &v.span, Site::Binding(name))?;
                         Ok((v, t))
                     }
                     None => {
@@ -1951,16 +2026,21 @@ impl Pinner<'_> {
                         );
                     };
                     let Some(b) = self.env.get(root).cloned() else {
-                        return reject(format!("{root:?} is not defined"), &lhs.span);
+                        return reject(format!("set: undeclared variable {root:?}"), &lhs.span);
                     };
                     if !b.mutable {
-                        return reject(format!("{root:?} is not `mut`"), &lhs.span);
+                        return reject(
+                            format!(
+                                "set: cannot assign to immutable binding {root:?} (use \"let mut\")"
+                            ),
+                            &lhs.span,
+                        );
                     }
                     // The place is typed as the expression it is; a field path reads through
                     // structs.
                     let lhs = self.expr(lhs)?;
                     let v = self.arg(v, &lhs.ty)?;
-                    self.coerce_expr(&v, &lhs.ty, &v.span, "the assigned value")?;
+                    self.coerce_expr(&v, &lhs.ty, &v.span, "set")?;
                     Ok((lhs, v))
                 })();
                 let (lhs, v) = match assigned {
@@ -2048,7 +2128,12 @@ impl Pinner<'_> {
                         // `start..end` builds a span, whose bounds are slice bounds.
                         self.index_operand(&value)?;
                     } else {
-                        self.coerce_expr(&value, &fty, &value.span, "a field value")?;
+                        self.coerce_expr(
+                            &value,
+                            &fty,
+                            &value.span,
+                            Site::Field(display(name), &init.name.text),
+                        )?;
                     }
                     out.push(aipl_syntax::typed::TFieldInit {
                         name: init.name.clone(),
@@ -2171,9 +2256,7 @@ impl Pinner<'_> {
                 for item in items {
                     let typed = (|| {
                         let typed = self.expr(item)?;
-                        self.agree(&typed.ty, &elem).or_else(|m| {
-                            reject(format!("set elements disagree ({m})"), &typed.span)
-                        })?;
+                        self.coerce(&typed.ty, &elem, &typed.span, "set element")?;
                         Ok(typed)
                     })();
                     out.push(self.recover(typed, item)?);
@@ -2564,7 +2647,10 @@ impl Pinner<'_> {
             }
         };
         let Some((_, fty, _)) = fields.iter().find(|(n, _, _)| n == field) else {
-            return reject(format!("no field {field:?}"), span);
+            return reject(
+                format!("struct {} has no field {field:?}", self.table.show(owner)),
+                span,
+            );
         };
         self.lower(fty, &map, span)
     }
@@ -2638,7 +2724,7 @@ impl Pinner<'_> {
                 e,
             ));
         }
-        reject(format!("{name:?} is not defined"), &e.span)
+        reject(format!("unknown identifier {name:?}"), &e.span)
     }
 
     /// A callee's signature with its type variables (and anonymous `any`s) made fresh: its
@@ -2716,18 +2802,41 @@ impl Pinner<'_> {
 
     /// The type two operands of one operator share: the wider of two integers, else what they
     /// agree on.
-    fn join_operands(&mut self, l: &It, r: &It, span: &Span) -> Res<It> {
+    fn join_operands(
+        &mut self,
+        l: &It,
+        r: &It,
+        span: &Span,
+        callee: &Callee,
+        op: Option<aipl_syntax::ast::BinOp>,
+    ) -> Res<It> {
         // Nothing widens at an operator: both operands are one type.
         let (a, b) = (self.table.shallow(l), self.table.shallow(r));
-        self.agree(&a, &b).or_else(|m| {
-            reject(
-                format!(
-                    "the operands are {} and {} ({m})",
-                    self.table.show(&a),
-                    self.table.show(&b)
+        self.agree(&a, &b).or_else(|_| {
+            let (left, right) = (self.table.show(&a), self.table.show(&b));
+            let arithmetic = matches!(
+                callee,
+                Callee::WrappingAdd
+                    | Callee::SaturatingAdd
+                    | Callee::WrappingSub
+                    | Callee::SaturatingSub
+                    | Callee::WrappingMul
+            ) || matches!(
+                op,
+                Some(aipl_syntax::ast::BinOp::Div | aipl_syntax::ast::BinOp::Rem)
+            );
+            let message = match op {
+                _ if arithmetic => format!("arithmetic operand: expected {left}, got {right}"),
+                Some(o) => format!(
+                    "\"{}\" between {left} and {right}: both sides must be the same type",
+                    aipl_syntax::binop_spelling(o)
                 ),
-                span,
-            )
+                None => format!(
+                    "\"{}\" between {left} and {right}: both sides must be the same type",
+                    display(callee.name())
+                ),
+            };
+            reject(message, span)
         })?;
         Ok(a)
     }
@@ -3434,7 +3543,14 @@ impl Pinner<'_> {
                     && bindings.is_empty()
                     && matches!(payload.as_slice(), [t] if self.table.shallow(t) == It::Unit);
                 if !*ignore_payload && !void_ok && bindings.len() != payload.len() {
-                    return reject(format!("{bare:?} binds the wrong number of values"), span);
+                    return reject(
+                        format!(
+                            "constructor {name:?} binds {} value(s), but {} given",
+                            payload.len(),
+                            bindings.len()
+                        ),
+                        span,
+                    );
                 }
                 let binds = if *ignore_payload || void_ok {
                     Vec::new()
@@ -3664,9 +3780,9 @@ impl Pinner<'_> {
                 );
             }
             let mut typed = Vec::new();
-            for (arg, pty) in args.iter().zip(&ptys) {
+            for (i, (arg, pty)) in args.iter().zip(&ptys).enumerate() {
                 let t = self.arg(arg, pty)?;
-                self.coerce_expr(&t, pty, &t.span, &format!("an argument to {name:?}"))?;
+                self.coerce_expr(&t, pty, &t.span, Site::Argument(display(name), i))?;
                 typed.push(t);
             }
             return Ok(call(typed, *ret, self));
@@ -3873,7 +3989,7 @@ impl Pinner<'_> {
                             format!(
                                 "\"{}\" takes IEEE 754 floats, but this operand is {}: floats \
                                  and integers never mix, and nothing converts between them",
-                                callee.name(),
+                                display(callee.name()),
                                 self.table.show(t)
                             ),
                             &arg.span,
@@ -3884,7 +4000,7 @@ impl Pinner<'_> {
                     return reject(
                         format!(
                             "\"{}\" takes two floats of one type, got {} and {}",
-                            callee.name(),
+                            display(callee.name()),
                             self.table.show(&lt),
                             self.table.show(&rt)
                         ),
@@ -3892,7 +4008,7 @@ impl Pinner<'_> {
                     );
                 }
             }
-            let operand = self.join_operands(&l.ty, &r.ty, &e.span)?;
+            let operand = self.join_operands(&l.ty, &r.ty, &e.span, callee, op)?;
             let (lt, rt) = (self.table.shallow(&l.ty), self.table.shallow(&r.ty));
             let as_type = |p: &Self, t: &It| p.table.resolve(t).to_type();
             use aipl_syntax::ast::BinOp;
@@ -3944,9 +4060,7 @@ impl Pinner<'_> {
             }
             let logical = matches!(op, Some(BinOp::And | BinOp::Or));
             if logical {
-                self.agree(&operand, &bool_ty).or_else(|m| {
-                    reject(format!("a logical operand must be bool ({m})"), &e.span)
-                })?;
+                self.coerce(&operand, &bool_ty, &e.span, "logical operand")?;
             }
             if matches!(op, Some(BinOp::Eq | BinOp::Ne)) {
                 for (t, a) in [(&l.ty, &args[0]), (&r.ty, &args[1])] {
@@ -4040,8 +4154,12 @@ impl Pinner<'_> {
             };
             if let Some(seq) = seq {
                 let pat = self.expr(&args[1])?;
-                self.variadic_arg(&seq, &pat.ty)
-                    .or_else(|m| reject(format!("the argument of {name:?}: {m}"), &args[1].span))?;
+                self.variadic_arg(&seq, &pat.ty).or_else(|m| {
+                    reject(
+                        format!("the argument of {:?}: {m}", display(name)),
+                        &args[1].span,
+                    )
+                })?;
                 let mut typed = vec![recv, pat];
                 if at_arity == 1 {
                     let at = self.expr(&args[2])?;
@@ -4131,7 +4249,7 @@ impl Pinner<'_> {
                                     &t,
                                     pty,
                                     &t.span,
-                                    &format!("an argument to {name:?}"),
+                                    &format!("an argument to {:?}", display(name)),
                                 )?;
                                 typed.push(t);
                             }
@@ -4178,7 +4296,8 @@ impl Pinner<'_> {
         if sig.params.len() != args.len() {
             return reject(
                 format!(
-                    "{name:?} expects {} argument(s), got {}",
+                    "fn {:?} expects {} arg(s), got {}",
+                    display(name),
                     sig.params.len(),
                     args.len()
                 ),
@@ -4252,25 +4371,45 @@ impl Pinner<'_> {
                         {
                             return reject(
                                 format!(
-                                    "fn {:?} arg {i}: variadic parameter expects {} or its \
-                                     element — at least one element, so no optional and no \
-                                     array that may be empty",
+                                    "fn {:?} arg {i}: variadic parameter expects {} or {} — at \
+                                     least one element, so no optional and no array that may be \
+                                     empty, got {}",
                                     display(name),
-                                    self.table.show(&ptys[i]),
+                                    aipl_syntax::type_name(&self.refined_type(&ptys[i])),
+                                    self.table.show(&elem),
+                                    self.table.show(&seen_ty),
                                 ),
                                 &arg.span,
                             );
                         }
                     }
                     if !whole {
-                        self.variadic_arg(&ptys[i], &seen_ty).or_else(|m| {
-                            reject(format!("an argument to {name:?}: {m}"), &arg.span)
+                        self.variadic_arg(&ptys[i], &seen_ty).or_else(|_| {
+                            let elem = match self.table.shallow(&ptys[i]) {
+                                It::Arr(t) => self.table.show(&t),
+                                other => self.table.show(&other),
+                            };
+                            reject(
+                                format!(
+                                    "fn {:?} arg {i}: variadic parameter expects {}, {elem}, or \
+                                     {elem}?, got {}",
+                                    display(name),
+                                    self.table.show(&ptys[i]),
+                                    self.table.show(&seen_ty)
+                                ),
+                                &arg.span,
+                            )
                         })?;
                     }
                     true
                 } else {
                     self.adapt_receiver(callee, &ptys[i], &seen_ty)
-                        .or_else(|m| reject(format!("an argument to {name:?}: {m}"), &arg.span))?
+                        .or_else(|m| {
+                            reject(
+                                format!("an argument to {:?}: {m}", display(name)),
+                                &arg.span,
+                            )
+                        })?
                 };
                 if !adapted {
                     if as_positions {
@@ -4278,14 +4417,14 @@ impl Pinner<'_> {
                             &seen_ty,
                             &ptys[i],
                             &arg.span,
-                            &format!("an argument to {name:?}"),
+                            Site::Argument(display(name), i),
                         )?;
                     } else {
                         self.coerce_expr(
                             &typed,
                             &ptys[i],
                             &arg.span,
-                            &format!("an argument to {name:?}"),
+                            Site::Argument(display(name), i),
                         )?;
                     }
                 }
@@ -4412,7 +4551,11 @@ impl Pinner<'_> {
             };
             if ptys.len() != params.len() {
                 return reject(
-                    "the closure takes the wrong number of parameters",
+                    format!(
+                        "lambda has {} parameter(s), but {} was expected",
+                        params.len(),
+                        self.table.show(expected)
+                    ),
                     &arg.span,
                 );
             }
@@ -4463,7 +4606,7 @@ impl Pinner<'_> {
                 };
             }
             let body = body?;
-            self.coerce_expr(&body, &ret, &body.span, "the closure's result")?;
+            self.coerce_expr(&body, &ret, &body.span, Site::Lambda)?;
             let ty = It::Fn(ptys, ret);
             return Ok(self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg));
         }

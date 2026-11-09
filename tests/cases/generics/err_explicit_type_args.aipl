@@ -24,13 +24,7 @@ error: fn "nothing" takes 1 type argument(s) (T), got 2; name all of them or non
 14 |     nothing::<u8, u8>("x");
    |     ^^^^^^^^^^^^^^^^^^^^^^
 
-error: fn "nothing": type parameter "T" requires "int", but str was given
-  --> ./tests/cases/generics/err_explicit_type_args.aipl:15:5
-   |
-15 |     nothing::<str>("x");
-   |     ^^^^^^^^^^^^^^^^^^^
-
-error: fn "plain" takes no type arguments
+error: fn "plain" takes 0 type argument(s) (), got 1; name all of them or none
   --> ./tests/cases/generics/err_explicit_type_args.aipl:16:5
    |
 16 |     plain::<u8>(1);
@@ -47,3 +41,9 @@ error: fn "identity" arg 0: expected str, got i64
    |
 18 |     identity::<str>(5);
    |                     ^
+
+error: fn "nothing": type parameter "T" requires "int", but was inferred as str
+  --> ./tests/cases/generics/err_explicit_type_args.aipl:15:5
+   |
+15 |     nothing::<str>("x");
+   |     ^^^^^^^^^^^^^^^^^^^

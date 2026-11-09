@@ -44,13 +44,13 @@ error: fn "out_of_order": type parameter "U" has no default but follows one that
 11 | fn out_of_order<T: any = i64, U: any>(x: T[], y: U[]) -> u64 { 0 }
    |    ^^^^^^^^^^^^
 
-error: fn "three" takes 3 type argument(s) (T, U, V = u8), got 1; name all of them, all but the defaulted ones, or none
+error: fn "three" takes 3 type argument(s) (T, U, V), got 1; name all of them, all but the defaulted ones, or none
   --> ./tests/cases/generics/err_type_parameter_defaults.aipl:17:23
    |
 17 | fn too_few() -> u64 { three::<str>([], []) }
    |                       ^^^^^^^^^^^^^^^^^^^^
 
-error: fn "two" takes 2 type argument(s) (T, U = u8), got 3; name all of them, all but the defaulted ones, or none
+error: fn "two" takes 2 type argument(s) (T, U), got 3; name all of them, all but the defaulted ones, or none
   --> ./tests/cases/generics/err_type_parameter_defaults.aipl:19:24
    |
 19 | fn too_many() -> u64 { two::<str, u8, bool>([], []) }

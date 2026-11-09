@@ -57,13 +57,13 @@ error: set element: expected str, got i64
 22 | fn tags() -> #{str} { #{"a", 1, 2} }
    |                                 ^
 
-error: len expects an array, got i64
+error: fn "len" arg 0: expected i64[], got i64
   --> ./tests/cases/errors/err_several_per_function.aipl:27:9
    |
 27 |     len(1);
    |         ^
 
-error: len expects an array, got bool
+error: fn "len" arg 0: expected i64[], got bool
   --> ./tests/cases/errors/err_several_per_function.aipl:28:9
    |
 28 |     len(true);
