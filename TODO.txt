@@ -29,8 +29,8 @@ projects:
     make a better templating language (in aipl maybe?) for making the svgs
     matches seems odd for a member of Deck, we should just parse the file into a raw list of matches and analyze that
     winrate:
-      count draws properly for winrate calculations: 1/2 of a win each (for now). 3-0-1 should show up as 87.5% winrate, not 100%
       show meta share
+      clicking on a cell should lock it so you can go to the links
       dump winrate matrix to interactive svg
       include total match count (W - L - D)
       include links to games

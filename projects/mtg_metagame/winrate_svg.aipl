@@ -69,17 +69,19 @@ fn channel(low: i64, middle: i64, high: i64, rate: i64) -> i64 {
 })
 
 # The colour of a cell holding `self`: red for losing, white for even, green for winning, and grey
-# when no match was decided.
+# when it has no match. Its rate is the one `win_rate` gives, in thousandths.
 fn colour(self: Record) -> str {
-    let decided = self.win + self.loss;
-    if (decided == 0) { return "rgb(232,232,232)"; };
-    let rate = self.win * 1000 / decided;
+    let played = self.win + self.loss + self.draw;
+    if (played == 0) { return "rgb(232,232,232)"; };
+    let rate = (self.win * 2 + self.draw) * 500 / played;
     let red = channel(215, 247, 26, rate);
     let green = channel(48, 247, 152, rate);
     let blue = channel(39, 247, 80, rate);
     `rgb({red},{green},{blue})`
 }.test({
-    assert(Record { win: 0, loss: 0, draw: 3 }.colour() == "rgb(232,232,232)");
+    assert(Record { win: 0, loss: 0, draw: 0 }.colour() == "rgb(232,232,232)");
+    // A draw is half a win, so draws alone are an even record.
+    assert(Record { win: 0, loss: 0, draw: 3 }.colour() == "rgb(247,247,247)");
     assert(Record { win: 0, loss: 2, draw: 0 }.colour() == "rgb(215,48,39)");
     assert(Record { win: 1, loss: 1, draw: 0 }.colour() == "rgb(247,247,247)");
     assert(Record { win: 2, loss: 0, draw: 0 }.colour() == "rgb(26,152,80)");
@@ -98,7 +100,9 @@ fn describe(row: str, column: str, cell: Record?) -> str {
     assert(
         describe("A", "B", some(Record { win: 2, loss: 1, draw: 0 })) == "A vs B: 66.7% (2-1-0)",
     );
-    assert(describe("A", "B", some(Record { win: 0, loss: 0, draw: 1 })) == "A vs B: - (0-0-1)");
+    assert(
+        describe("A", "B", some(Record { win: 0, loss: 0, draw: 1 })) == "A vs B: 50.0% (0-0-1)",
+    );
     assert(describe("A", "A", none) == "A against itself is not counted");
 })
 
@@ -117,7 +121,7 @@ fn describe_overall(row: str, total: Record) -> str {
     `{row} overall: {total.rate_text()} ({win}-{loss}-{draw})`
 }.test({
     assert(
-        describe_overall("A", Record { win: 3, loss: 1, draw: 2 }) == "A overall: 75.0% (3-1-2)",
+        describe_overall("A", Record { win: 3, loss: 1, draw: 2 }) == "A overall: 66.7% (3-1-2)",
     );
 })
 
@@ -236,7 +240,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <script type="text/ecmascript"><![CDATA[{SCRIPT}]]></script>
 <rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
-<text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; draws left out</text>
+<text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
 {parts.join(sep="\n")}
 <text id="details" x="{MARGIN}" y="{height - 14}"> </text>
 </svg>

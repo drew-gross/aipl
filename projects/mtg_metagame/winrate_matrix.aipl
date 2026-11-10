@@ -137,12 +137,14 @@ fn percent_text(self: Float) -> str { `{(self * 100.0).render(digits=1)}%` }.tes
     assert(percent_text(2.0 / 3.0) == "66.7%");
 })
 
-# What a cell says about `self`: the win rate, or `-` when none of the matches was decided.
+# What a cell says about `self`: the win rate, or `-` when it has no match.
 pub fn rate_text(self: Record) -> str {
     if (let some(rate) = self.win_rate()) { rate.percent_text() } else { "-" }
 }.test({
     assert(Record { win: 0, loss: 0, draw: 0 }.rate_text() == "-");
-    assert(Record { win: 0, loss: 0, draw: 4 }.rate_text() == "-");
+    assert(Record { win: 0, loss: 0, draw: 0 }.rate_text() == "-");
+    assert(Record { win: 0, loss: 0, draw: 4 }.rate_text() == "50.0%");
+    assert(Record { win: 3, loss: 0, draw: 1 }.rate_text() == "87.5%");
     assert(Record { win: 1, loss: 1, draw: 1 }.rate_text() == "50.0%");
     assert(Record { win: 2, loss: 1, draw: 0 }.rate_text() == "66.7%");
 })

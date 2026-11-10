@@ -26,6 +26,7 @@ import {
     value_or,
     value_or_err,
     wrapping_add as +,
+    wrapping_mul as *,
 } from builtins;
 import {
     field,
@@ -95,17 +96,20 @@ pub fn add_records(a: Record, b: Record) -> Record {
     ) == Record { win: 11, loss: 22, draw: 33 });
 })
 
-# The share of the decided matches `self` won, as a fraction of 1 (an even record is
-# 0.5), or `none` when there is no decided match. Draws are left out of the denominator.
+# The share of its matches `self` won, as a fraction of 1 (an even record is 0.5), or `none` when
+# it has no match. A draw counts as half a win.
 pub fn win_rate(self: Record) -> Float? {
-    let decided = self.win + self.loss;
-    if (decided > 0) { some(self.win.to_float() / decided.to_float()) } else { none }
+    let played = self.win + self.loss + self.draw;
+    let points = self.win * 2 + self.draw;
+    if (played > 0) { some(points.to_float() / (played * 2).to_float()) } else { none }
 }.test({
     // Floats have no `==` of their own beside this file's, so the rate is rendered.
     fn rendered(record: Record) -> str? { record.win_rate()$to_str() }
-    assert(rendered(Record { win: 0, loss: 0, draw: 4 }) == none);
+    assert(rendered(Record { win: 0, loss: 0, draw: 0 }) == none);
+    assert(rendered(Record { win: 0, loss: 0, draw: 4 }) == some("0.5"));
+    assert(rendered(Record { win: 3, loss: 0, draw: 1 }) == some("0.875"));
     assert(rendered(Record { win: 1, loss: 1, draw: 0 }) == some("0.5"));
-    assert(rendered(Record { win: 2, loss: 1, draw: 9 }) == some("0.6666666666666666"));
+    assert(rendered(Record { win: 2, loss: 1, draw: 9 }) == some("0.5416666666666666"));
     assert(rendered(Record { win: 0, loss: 3, draw: 0 }) == some("0.0"));
 })
 
