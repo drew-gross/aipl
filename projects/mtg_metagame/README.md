@@ -35,6 +35,13 @@ of the bracket instead of at round 1: finals, semifinals and quarterfinals first
 2nd last, and so on. Each row says how many times the pairing met in that slot, what share of the metagame's matches in the
 slot that is, and its record and win rate there. Metagames merging several tournaments are counted per tournament.
 
+Click an archetype's name, on its row or its column heading, to remove it from the metagame, as a rotation would:
+its row and column fade, and the Projected column beside Overall shows what every other archetype's win rate would be
+without its matches against the removed ones, with the change in points underneath. That is the simple model: the
+removed decks' matches are dropped, and nobody is assumed to switch to anything else. Hovering a Projected cell lists the
+matches each removal took out of that row. Click a name again to bring it back, or use Restore all in the panel; the
+removed archetypes are kept in the page's address (`#removed=1,4`), so a reload or a shared link keeps them.
+
 Under it the panel breaks the pairing down by the row archetype's record going into the match (`7-1`, `0-3`, ...), highest
 first, with how often the pairing met at that record and how it went, so a matchup that swings between the top and the bottom
 of the standings shows. The table lists every record any archetype had in the metagame, and one the pairing never met at is

@@ -175,7 +175,7 @@ fn panel_attributes(
             `{each.played()},{each.record_text()},{each.rate_text()}`
         }
     });
-    `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}" data-brackets="{at_record.join(sep=";")}"`
+    `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}" data-brackets="{at_record.join(sep=";")}" data-record="{record.win},{record.loss},{record.draw}"`
 }.test({
     let nothing = Record {};
     let cell = Cell {
@@ -190,7 +190,7 @@ fn panel_attributes(
             [0, 2],
             [2, 5, 4],
             10,
-        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="1,50.0%,1-0-0,100.0%;3,75.0%,2-0-1,83.3%" data-brackets="3,3-0-0,100.0%;0,-,-;1,0-0-1,50.0%"`,
+        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="1,50.0%,1-0-0,100.0%;3,75.0%,2-0-1,83.3%" data-brackets="3,3-0-0,100.0%;0,-,-;1,0-0-1,50.0%" data-record="3,0,1"`,
     );
     // A slot the pairing never met in is a row of dashes.
     assert(
@@ -200,7 +200,7 @@ fn panel_attributes(
             [1],
             [2, 5, 4],
             10,
-        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="0,-,-,-" data-brackets="3,3-0-0,100.0%;0,-,-;1,0-0-1,50.0%"`,
+        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="0,-,-,-" data-brackets="3,3-0-0,100.0%;0,-,-;1,0-0-1,50.0%" data-record="3,0,1"`,
     );
 })
 
@@ -226,6 +226,9 @@ let STYLE = """
     .row-label .detail { font-size: 11px; font-weight: normal; fill: #888; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
     .cell { cursor: pointer; }
+    .label[data-row], .label[data-column] { cursor: pointer; }
+    .label.removed { text-decoration: line-through; opacity: 0.4; }
+    .cell.removed { opacity: 0.25; }
     svg:not(.locked-view) .cell:hover rect, .cell.locked rect { filter: saturate(1.6) brightness(0.84); }
     .label.hot { font-weight: bold; }
     #panel { pointer-events: none; }
@@ -242,18 +245,32 @@ let STYLE = """
 # What hovering does: light up the cell's row and column, and fill the panel, which stays at the
 # top of the page, from the cell's attributes. A line wider than the panel is wrapped at a space.
 # Clicking a cell locks the panel on it, whatever the mouse then passes over, until the Unlock
-# button, the same cell or the Escape key is clicked or pressed.
+# button, the same cell or the Escape key is clicked or pressed. Clicking an archetype's name
+# removes it from the metagame: its row and column fade, and the Projected column is what every
+# other archetype's overall record would be without its matches against the removed ones. The
+# removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
-    var root, panel, locked = null;
+    var root, panel, locked = null, removed = [], names = [];
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
         panel = document.getElementById("panel");
-        clear();
+        for (var each of root.querySelectorAll(".row-label")) names[+each.getAttribute("data-row")] = each.getAttribute("data-name");
+        var saved = /removed=([\d,]+)/.exec(location.hash);
+        if (saved) removed = saved[1].split(",").map(Number).filter(function(i) { return i < names.length; });
+        refresh();
+    }
+    function ancestor(node, test) {
+        while (node && !(node.classList && test(node))) node = node.parentNode;
+        return node;
     }
     function cell_of(node) {
-        while (node && !(node.classList && node.classList.contains("cell"))) node = node.parentNode;
-        return node;
+        return ancestor(node, function(n) { return n.classList.contains("cell"); });
+    }
+    function label_of(node) {
+        return ancestor(node, function(n) {
+            return n.classList.contains("label") && (n.hasAttribute("data-row") || n.hasAttribute("data-column"));
+        });
     }
     function light(row, column) {
         for (var each of root.querySelectorAll(".cell, .label")) {
@@ -295,16 +312,155 @@ let SCRIPT = """
         node.setAttribute("y2", y);
         panel.appendChild(node);
     }
+    function button(text, action, y) {
+        put(text, NUMBERS[3], y, "button").setAttribute("data-action", action);
+    }
+    function grab(row, column) {
+        return root.querySelector('.cell[data-row="' + row + '"][data-column="' + column + '"]');
+    }
+    function record_of(cell) {
+        var text = cell && cell.getAttribute("data-record");
+        if (!text) return null;
+        var parts = text.split(",").map(Number);
+        return { win: parts[0], loss: parts[1], draw: parts[2] };
+    }
+    function played(r) { return r.win + r.loss + r.draw; }
+    function record_text(r) { return r.win + "-" + r.loss + "-" + r.draw; }
+    // The win rate in percent, a draw counting as half a win (see `win_rate` in metagame.aipl).
+    function rate_of(r) { return (((2 * r.win + r.draw) / (2 * played(r))) * 100); }
+    // One decimal, half to even on the float's exact value, as the page's other numbers are.
+    function percent(x) {
+        var tie = /^(\d+)\.(\d)50*$/.exec(x.toFixed(25));
+        if (!tie) return x.toFixed(1);
+        var digit = +tie[2];
+        return digit % 2 === 0 ? tie[1] + "." + digit : (+(tie[1] + "." + digit) + 0.1).toFixed(1);
+    }
+    function rate_text(r) { return played(r) === 0 ? "-" : percent(rate_of(r)) + "%"; }
+    // The colour of a record, the same scale as the matrix's (see `colour` in winrate_svg.aipl).
+    function channel(low, middle, high, rate) {
+        return rate < 500
+            ? low + Math.trunc((middle - low) * rate / 500)
+            : middle + Math.trunc((high - middle) * (rate - 500) / 500);
+    }
+    function colour(r) {
+        if (played(r) === 0) return "rgb(232,232,232)";
+        var rate = Math.trunc((2 * r.win + r.draw) * 500 / played(r));
+        return "rgb(" + channel(215, 247, 26, rate) + "," + channel(48, 247, 152, rate) + "," + channel(39, 247, 80, rate) + ")";
+    }
+    // What the row's archetype would have done without the removed archetypes' matches: its
+    // overall record less its record against each of them.
+    function project(row) {
+        var was = record_of(root.querySelector('.cell.overall[data-row="' + row + '"]'));
+        var now = { win: was.win, loss: was.loss, draw: was.draw }, gone = [];
+        for (var column of removed) {
+            var record = column === row ? null : record_of(grab(row, column));
+            if (!record) continue;
+            now.win -= record.win;
+            now.loss -= record.loss;
+            now.draw -= record.draw;
+            gone.push({ column: column, record: record });
+        }
+        return { was: was, now: now, gone: gone };
+    }
+    function delta_text(p) {
+        if (played(p.now) === 0 || played(p.was) === 0) return "-";
+        var d = rate_of(p.now) - rate_of(p.was);
+        return (d < 0 ? "-" : "+") + Math.abs(d).toFixed(1);
+    }
+    function set_labels(cell, rate, detail) {
+        for (var old of Array.from(cell.querySelectorAll("text"))) cell.removeChild(old);
+        var rect = cell.querySelector("rect");
+        var x = +rect.getAttribute("x") + rect.getAttribute("width") / 2, y = +rect.getAttribute("y") + rect.getAttribute("height") / 2;
+        var make = function(text, dy, classes) {
+            var node = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            node.setAttribute("x", x);
+            node.setAttribute("y", y + dy);
+            if (classes) node.setAttribute("class", classes);
+            node.textContent = text;
+            cell.appendChild(node);
+        };
+        if (detail === null) { make(rate, 0); return; }
+        make(rate, -7);
+        make(detail, 9, "detail");
+    }
+    function refresh() {
+        removed.sort(function(a, b) { return a - b; });
+        for (var each of root.querySelectorAll(".cell, .label")) {
+            var row = each.getAttribute("data-row"), column = each.getAttribute("data-column");
+            each.classList.toggle("removed", (row !== null && removed.indexOf(+row) >= 0) || (column !== null && removed.indexOf(+column) >= 0));
+        }
+        for (var cell of root.querySelectorAll(".cell.projected")) {
+            var index = +cell.getAttribute("data-row"), rect = cell.querySelector("rect");
+            if (removed.indexOf(index) >= 0) {
+                rect.setAttribute("fill", "rgb(255,255,255)");
+                set_labels(cell, "out", null);
+                continue;
+            }
+            var p = project(index);
+            rect.setAttribute("fill", colour(p.now));
+            set_labels(cell, rate_text(p.now), played(p.now) === 0 ? null : removed.length === 0 ? record_text(p.now) : delta_text(p));
+        }
+        try {
+            history.replaceState(null, "", removed.length ? "#removed=" + removed.join(",") : location.pathname + location.search);
+        } catch (error) {}
+        if (locked) show(locked); else clear();
+    }
+    function toggle(index) {
+        var at = removed.indexOf(index);
+        if (at >= 0) removed.splice(at, 1); else removed.push(index);
+        refresh();
+    }
     function clear() {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + panel.getAttribute("data-top") + ")");
-        put("Hover a cell for how the pairing did in each round, or click one to lock it.", 0, 14, "head");
+        var y = put_wrapped("Hover a cell for how the pairing did in each round, or click one to lock it. Click an archetype's name to remove it from the metagame and see everyone else's projected win rate.", 14, "head");
+        if (removed.length) {
+            y += 30;
+            put("Removed from the metagame", 0, y, "heading");
+            button("Restore all", "restore", y);
+            for (var index of removed) {
+                y += ROW + 2;
+                put(names[index], 0, y);
+            }
+        }
+    }
+    function show_projection(cell) {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        var index = +cell.getAttribute("data-row"), y = 14;
+        put(names[index] + " projected", 0, y, "heading");
+        if (cell === locked) button("Unlock", "unlock", y);
+        if (removed.indexOf(index) >= 0) {
+            put_wrapped("Removed from the metagame.", y + 20, "summary");
+            return;
+        }
+        var p = project(index);
+        y += 20;
+        put(rate_text(p.now) + " win rate · " + record_text(p.now), 0, y, "summary");
+        y += 20;
+        put("Now " + rate_text(p.was) + " · " + record_text(p.was) + (removed.length ? " · " + delta_text(p) + " points" : ""), 0, y, "summary");
+        if (!removed.length) {
+            put_wrapped("Click an archetype's name to remove it from the metagame.", y + 20, "head");
+            return;
+        }
+        y += 30;
+        put("Matches lost to the removed", 0, y, "head");
+        [[0, "Seen"], [2, "Record"], [3, "Win rate"]].forEach(function(column) { put(column[1], NUMBERS[column[0]], y, "head number"); });
+        y += 6;
+        rule(y);
+        p.gone.forEach(function(each) {
+            y += ROW;
+            put(names[each.column], 0, y);
+            put(played(each.record), NUMBERS[0], y, "number");
+            put(record_text(each.record), NUMBERS[2], y, "number");
+            put(rate_text(each.record), NUMBERS[3], y, "number");
+        });
     }
     function show(cell) {
+        if (cell.classList.contains("projected")) { show_projection(cell); return; }
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         var y = 14;
         put(cell.getAttribute("data-title"), 0, y, "heading");
-        if (cell === locked) put("Unlock", NUMBERS[3], y, "button");
+        if (cell === locked) button("Unlock", "unlock", y);
         for (var line of cell.getAttribute("data-summary").split("|")) {
             y += 20;
             y = put_wrapped(line, y, "summary");
@@ -327,7 +483,7 @@ let SCRIPT = """
         }
         var brackets = cell.getAttribute("data-brackets");
         if (brackets !== "") {
-            var names = panel.getAttribute("data-brackets").split("|");
+            var bracket_names = panel.getAttribute("data-brackets").split("|");
             y += 30;
             put("Row's record going in", 0, y, "head");
             [[0, "Seen"], [2, "Record"], [3, "Win rate"]].forEach(function(column) { put(column[1], NUMBERS[column[0]], y, "head number"); });
@@ -337,7 +493,7 @@ let SCRIPT = """
                 var fields = entry.split(",");
                 var classes = fields[0] === "0" ? "zero" : "";
                 y += ROW;
-                put(names[i], 0, y, classes);
+                put(bracket_names[i], 0, y, classes);
                 put(fields[0], NUMBERS[0], y, "number " + classes);
                 put(fields[1], NUMBERS[2], y, "number " + classes);
                 put(fields[2], NUMBERS[3], y, "number " + classes);
@@ -371,8 +527,12 @@ let SCRIPT = """
         clear();
     });
     window.addEventListener("click", function(e) {
-        if (e.target.classList && e.target.classList.contains("button")) {
-            unlock();
+        var action = e.target.classList && e.target.classList.contains("button") && e.target.getAttribute("data-action");
+        if (action === "restore") { removed = []; refresh(); return; }
+        if (action === "unlock") { unlock(); return; }
+        var label = label_of(e.target);
+        if (label) {
+            toggle(+(label.hasAttribute("data-row") ? label.getAttribute("data-row") : label.getAttribute("data-column")));
             return;
         }
         var cell = cell_of(e.target);
@@ -387,14 +547,19 @@ let SCRIPT = """
 # The word above the column of overall win rates.
 let OVERALL = "Overall";
 
-# The gap between the overall column and the matrix.
+# The word above the column of win rates with the removed archetypes taken out.
+let PROJECTED = "Projected";
+
+# The gap between the overall column and the projected one, and between that and the matrix.
+let PROJECTED_GAP: u64 = 4;
+
 let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
     let Matrix { names, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall } = self;
     let summaries = counts.map(|count| deck_summary(count, decks));
-    mut longest = OVERALL.len();
+    mut longest = PROJECTED.len();
     for (let each : names) {
         set longest = max(longest, each.len());
     }
@@ -415,7 +580,8 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     let heading_height = longest * 5 + MARGIN;
     let grid_width = names.len() * CELL;
     let overall_left = MARGIN + label_width;
-    let grid_left = overall_left + CELL + GAP;
+    let projected_left = overall_left + CELL + PROJECTED_GAP;
+    let grid_left = projected_left + CELL + GAP;
     let grid_top = TITLE_HEIGHT + heading_height;
     let panel_left = grid_left + grid_width + longest * 5 + MARGIN;
     let width = panel_left + PANEL_WIDTH + MARGIN;
@@ -426,6 +592,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     mut parts: str[] = [];
     set parts.push(
         `<text class="label" transform="translate({overall_left + CELL / 2},{grid_top - 8}) rotate(-45)">{OVERALL}</text>`,
+    );
+    set parts.push(
+        `<text class="label" transform="translate({projected_left + CELL / 2},{grid_top - 8}) rotate(-45)">{PROJECTED}</text>`,
     );
     for (let column, each : names) {
         let x = grid_left + column * CELL + CELL / 2;
@@ -438,7 +607,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         let row_name = names[row].value_or("");
         let summary = summaries[row].value_or("");
         set parts.push(
-            `<g class="label row-label" data-row="{row}"><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
+            `<g class="label row-label" data-row="{row}" data-name="{row_name.xml_escape()}"><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
@@ -450,6 +619,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         );
         set parts.push(
             `<g class="cell overall" data-row="{row}" data-info="{overall_info}" {overall_panel}><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(overall_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
+        );
+        set parts.push(
+            `<g class="cell projected" data-row="{row}"><title>{row_name.xml_escape()} without the removed archetypes' matches</title><rect x="{projected_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(projected_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
         );
         for (let column, cell : rows[row].value_or([])) {
             let column_name = names[column].value_or("");
@@ -528,6 +700,12 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-info="A overall: 100.0% (1-0-0)"`));
     assert(page.contains(`data-title="A overall"`));
     assert(page.split(`class="cell overall"`).len() == 3);
-    assert(page.split(`class="label"`).len() == 4);
+    assert(page.split(`class="label"`).len() == 5);
+
+    // The projected column: a cell for each archetype, which the page fills in as archetypes are
+    // removed, and the records it works from.
+    assert(page.split(`class="cell projected"`).len() == 3);
+    assert(page.contains(`data-record="1,0,0"`));
+    assert(page.contains(`data-name="B &amp; C"`));
     assert(page.split(`class="label row-label"`).len() == 3);
 })
