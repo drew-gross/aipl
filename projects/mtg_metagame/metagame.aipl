@@ -11,6 +11,7 @@ import {
     execute_program,
     extend,
     filter,
+    first,
     float_div as /,
     greater_than as >,
     has,
@@ -29,6 +30,7 @@ import {
     wrapping_mul as *,
 } from builtins;
 import {
+    elements,
     field,
     integer_field,
     list_field,
@@ -48,9 +50,17 @@ struct Record { win: i64, loss: i64, draw: i64 }
 # One line of a decklist: a card, how many copies, and its type line category.
 struct Card { name: str, count: u64, card_type: str }
 
-# One round played between two decks. `result` and `record` are the first deck's: the second
-# deck's are the other way round.
-struct Match { first_deck_id: str, second_deck_id: str, result: Result, record: Record, round: str }
+# One round played between two decks, at the tournament named `tournament`. `result` and `record`
+# are the first deck's: the second deck's are the other way round. `round` is the round's label,
+# `Round 3` or `Quarterfinals`.
+struct Match {
+    first_deck_id: str,
+    second_deck_id: str,
+    tournament: str,
+    result: Result,
+    record: Record,
+    round: str,
+}
 
 # A decklist. The id is text: the sources number decks with
 # integers and with strings.
@@ -96,10 +106,16 @@ pub fn add_records(a: Record, b: Record) -> Record {
     ) == Record { win: 11, loss: 22, draw: 33 });
 })
 
+# How many matches `self` counts.
+pub fn played(self: Record) -> i64 { self.win + self.loss + self.draw }.test({
+    assert(Record { win: 2, loss: 1, draw: 4 }.played() == 7);
+    assert(Record { win: 0, loss: 0, draw: 0 }.played() == 0);
+})
+
 # The share of its matches `self` won, as a fraction of 1 (an even record is 0.5), or `none` when
 # it has no match. A draw counts as half a win.
 pub fn win_rate(self: Record) -> Float? {
-    let played = self.win + self.loss + self.draw;
+    let played = self.played();
     let points = self.win * 2 + self.draw;
     if (played > 0) { some(points.to_float() / (played * 2).to_float()) } else { none }
 }.test({
@@ -157,20 +173,37 @@ fn decode_record(self: Json) -> Record!str {
     assert(decode_record(json) == ok(Record { win: 2, loss: 1, draw: 0 }));
 })
 
-# One round of the match history of the deck `owner`: a match against the opponent it names, or
-# `none` for a round with no opponent.
-fn decode_match(self: Json, owner: str) -> Match?!str {
+# The label of the round `self` records: the text it holds, or the first of a list of them when the
+# source split it, or nothing if it has none.
+fn round_label(self: Json) -> str {
+    let some(round) = self.field("round") else { return ""; };
+    if (let some(text) = round.scalar_text()) { return text; };
+    if (let some(first) = round.elements().value_or([]).first()) {
+        return first.scalar_text().value_or("");
+    };
+    ""
+}.test({
+    assert(round_label(parse("""{"round":"Round 1"}""")?) == "Round 1");
+    assert(round_label(parse("""{"round":["Semifinals"]}""")?) == "Semifinals");
+    assert(round_label(parse("""{"round":[]}""")?) == "");
+    assert(round_label(parse("""{"round":null}""")?) == "");
+    assert(round_label(parse("{}")?) == "");
+})
+
+# One round of the match history of the deck `owner`, at the tournament `tournament`: a match
+# against the opponent it names, or `none` for a round with no opponent.
+fn decode_match(self: Json, owner: str, tournament: str) -> Match?!str {
     let record = self.field("record").value_or_err(`missing "record"`)?;
     let result = self.text_field("result")?.decode_result()?;
     let decoded = decode_record(record)?;
-    // A round is a label, or a list of them when the source split it.
-    let round = self.optional_text_field("round").value_or("");
+    let round = self.round_label();
     ok(
         self
             .optional_text_field("opponent_deck_id")
             .map(|opponent| Match {
                 first_deck_id: owner,
                 second_deck_id: opponent,
+                tournament,
                 result,
                 record: decoded,
                 round,
@@ -180,9 +213,10 @@ fn decode_match(self: Json, owner: str) -> Match?!str {
     let json = parse(
         """{"opponent_deck_id":7,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"Round 1"}""",
     )?;
-    assert(decode_match(json, "3") == ok(some(Match {
+    assert(decode_match(json, "3", "t") == ok(some(Match {
         first_deck_id: "3",
         second_deck_id: "7",
+        tournament: "t",
         result: Win,
         record: Record { win: 2, loss: 0, draw: 0 },
         round: "Round 1",
@@ -190,7 +224,7 @@ fn decode_match(self: Json, owner: str) -> Match?!str {
     let bye = parse(
         """{"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0}}""",
     )?;
-    assert(decode_match(bye, "3") == ok(none));
+    assert(decode_match(bye, "3", "t") == ok(none));
 })
 
 # A deck, with its cards.
@@ -222,11 +256,12 @@ fn decode_deck(self: Json) -> Deck!str {
 # The rounds in the match history of the deck `self`, each against the opponent it names.
 fn decode_history(self: Json) -> Match[]!str {
     let owner = self.text_field("deck_id")?;
+    let tournament = self.optional_text_field("tournament").value_or("");
     let rounds = self.list_field("match_history")?;
-    ok(rounds.try_map(|round| round.decode_match(owner))?.collect_ok())
+    ok(rounds.try_map(|round| round.decode_match(owner, tournament))?.collect_ok())
 }.test({
     let json = parse("""
-        {"deck_id":"a","match_history":[
+        {"deck_id":"a","tournament":"t","match_history":[
           {"opponent_deck_id":"b","result":"loss","record":{"win":0,"loss":2,"draw":0},"round":"R1"},
           {"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"R2"}]}
     """)?;
@@ -234,6 +269,7 @@ fn decode_history(self: Json) -> Match[]!str {
         Match {
             first_deck_id: "a",
             second_deck_id: "b",
+            tournament: "t",
             result: Loss,
             record: Record { win: 0, loss: 2, draw: 0 },
             round: "R1",
@@ -257,6 +293,7 @@ fn without_mirrors(self: Match[]) -> Match[] {
     let win = Match {
         first_deck_id: "a",
         second_deck_id: "b",
+        tournament: "t",
         result: Win,
         record: Record { win: 2, loss: 0, draw: 0 },
         round: "R1",
@@ -264,6 +301,7 @@ fn without_mirrors(self: Match[]) -> Match[] {
     let loss = Match {
         first_deck_id: "b",
         second_deck_id: "a",
+        tournament: "t",
         result: Loss,
         record: Record { win: 0, loss: 2, draw: 0 },
         round: "R1",
@@ -306,6 +344,7 @@ fn check_decks_exist(self: Match[], decks: Deck[]) -> !str {
     let match_played = Match {
         first_deck_id: "a",
         second_deck_id: "b",
+        tournament: "t",
         result: Win,
         record: Record { win: 0, loss: 0, draw: 0 },
         round: "",

@@ -1,6 +1,7 @@
 # The winrate matrix as an SVG page: a heat map with a row and a column for each archetype, green
 # where the row's archetype wins, red where it loses. Hovering a cell lights up its row and column
-# and says what the pairing's record is, as a flamegraph does for a frame.
+# and fills a panel beside the matrix with the pairing's record and how it did in each round, counted
+# back from the end of the tournament.
 
 import {
     contains,
@@ -20,8 +21,8 @@ import {
     wrapping_sub as -,
 } from builtins;
 import { percent } from "./meta_share.aipl";
-import { Record } from "./metagame.aipl";
-import { Matrix, rate_text } from "./winrate_matrix.aipl";
+import { Record, played } from "./metagame.aipl";
+import { Cell, Matrix, rate_text, share_text } from "./winrate_matrix.aipl";
 
 # The size of a cell, and the space around the matrix, in pixels.
 let CELL: u64 = 64;
@@ -30,7 +31,8 @@ let MARGIN: u64 = 24;
 
 let TITLE_HEIGHT: u64 = 56;
 
-let DETAILS_HEIGHT: u64 = 40;
+# The width of the panel beside the matrix.
+let PANEL_WIDTH: u64 = 440;
 
 # The width in pixels one character of a label takes, for sizing the room it needs.
 let CHARACTER_WIDTH: u64 = 7;
@@ -71,7 +73,7 @@ fn channel(low: i64, middle: i64, high: i64, rate: i64) -> i64 {
 # The colour of a cell holding `self`: red for losing, white for even, green for winning, and grey
 # when it has no match. Its rate is the one `win_rate` gives, in thousandths.
 fn colour(self: Record) -> str {
-    let played = self.win + self.loss + self.draw;
+    let played = self.played();
     if (played == 0) { return "rgb(232,232,232)"; };
     let rate = (self.win * 2 + self.draw) * 500 / played;
     let red = channel(215, 247, 26, rate);
@@ -119,20 +121,77 @@ fn cell_labels(x: u64, y: u64, self: Record?) -> str {
     );
 })
 
-# What hovering a cell says: `row` against `column`, the win rate and the record.
-fn describe(row: str, column: str, cell: Record?) -> str {
+# What hovering a cell says, as the tooltip: `row` against `column`, the win rate and the record.
+fn describe(row: str, column: str, cell: Cell?) -> str {
     match (cell) {
-        some(record) => `{row} vs {column}: {record.rate_text()} ({record.record_text()})`,
+        some(found) => `{row} vs {column}: {found.record.rate_text()} ({found.record.record_text()})`,
         none => `{row} against itself is not counted`,
     }
 }.test({
+    let nothing = Record { win: 0, loss: 0, draw: 0 };
     assert(
-        describe("A", "B", some(Record { win: 2, loss: 1, draw: 0 })) == "A vs B: 66.7% (2-1-0)",
+        describe(
+            "A",
+            "B",
+            some(Cell { record: Record { win: 2, loss: 1, draw: 0 }, rounds: [] }),
+        ) == "A vs B: 66.7% (2-1-0)",
     );
     assert(
-        describe("A", "B", some(Record { win: 0, loss: 0, draw: 1 })) == "A vs B: 50.0% (0-0-1)",
+        describe(
+            "A",
+            "B",
+            some(Cell { record: Record { win: 0, loss: 0, draw: 1 }, rounds: [nothing] }),
+        ) == "A vs B: 50.0% (0-0-1)",
     );
     assert(describe("A", "A", none) == "A against itself is not counted");
+})
+
+# What the panel shows of the cell, as the attributes it carries: the `title`, a `summary` of
+# two lines apart by `|`, and the `rounds`: for each slot in `shown`, apart by `;`, how many times
+# the pairing met in it, its share of the metagame's matches in that slot, the record and the win
+# rate, apart by `,`. `slot_matches` is how many matches each slot has, out of `matches` in all.
+fn panel_attributes(
+    title: str,
+    Cell { record, rounds },
+    shown: u64[],
+    slot_matches: u64[],
+    matches: u64,
+) -> str {
+    let summary = `{record.rate_text()} win rate · {record.record_text()}|Seen in {record.played()} of {matches} matches · {record.share_text(matches)}`;
+    let entries = shown.map(|slot| {
+        let round = rounds[slot].value_or(Record { win: 0, loss: 0, draw: 0 });
+        if (round.played() == 0) {
+            "0,-,-,-"
+        } else {
+            `{round.played()},{round.share_text(slot_matches[slot].value_or(0))},{round.record_text()},{round.rate_text()}`
+        }
+    });
+    `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}"`
+}.test({
+    let nothing = Record { win: 0, loss: 0, draw: 0 };
+    let cell = Cell {
+        record: Record { win: 3, loss: 0, draw: 1 },
+        rounds: [Record { win: 1, loss: 0, draw: 0 }, nothing, Record { win: 2, loss: 0, draw: 1 }],
+    };
+    assert(
+        panel_attributes(
+            "A vs B",
+            cell,
+            [0, 2],
+            [2, 5, 4],
+            10,
+        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="1,50.0%,1-0-0,100.0%;3,75.0%,2-0-1,83.3%"`,
+    );
+    // A slot the pairing never met in is a row of dashes.
+    assert(
+        panel_attributes(
+            "A vs B",
+            cell,
+            [1],
+            [2, 5, 4],
+            10,
+        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="0,-,-,-"`,
+    );
 })
 
 # How big an archetype with `count` of `total` decks is, as its row label says.
@@ -142,15 +201,6 @@ fn deck_summary(count: u64, total: u64) -> str {
 }.test({
     assert(deck_summary(92, 353) == "92 decks · 26.1%");
     assert(deck_summary(1, 4) == "1 deck · 25.0%");
-})
-
-# What hovering the overall cell of `row` says: its record against every archetype, itself included.
-fn describe_overall(row: str, total: Record) -> str {
-    `{row} overall: {total.rate_text()} ({total.record_text()})`
-}.test({
-    assert(
-        describe_overall("A", Record { win: 3, loss: 1, draw: 2 }) == "A overall: 66.7% (3-1-2)",
-    );
 })
 
 # The styles of the page. A hovered cell sets `hot` on every cell and label sharing its row or
@@ -167,15 +217,24 @@ let STYLE = """
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
     .cell:hover rect { filter: saturate(1.6) brightness(0.84); }
     .label.hot { font-weight: bold; }
+    #panel { pointer-events: none; }
+    #panel .heading { font-size: 14px; font-weight: bold; }
+    #panel .summary { fill: #444; }
+    #panel .head { fill: #888; font-size: 11px; }
+    #panel .number { text-anchor: end; }
+    #panel .zero { opacity: 0.35; }
+    #panel line { stroke: #ccc; }
 """;
 
-# What hovering does: light up the cell's row and column, and write its description under the
-# matrix.
+# What hovering does: light up the cell's row and column, and fill the panel from the cell's
+# attributes. The panel follows the hovered row down the page, within the matrix's height.
 let SCRIPT = """
-    var root, details;
+    var root, panel;
+    var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
-        details = document.getElementById("details").firstChild;
+        panel = document.getElementById("panel");
+        clear();
     }
     function cell_of(node) {
         while (node && !(node.classList && node.classList.contains("cell"))) node = node.parentNode;
@@ -188,16 +247,66 @@ let SCRIPT = """
             each.classList.toggle("hot", hot);
         }
     }
+    function put(text, x, y, classes) {
+        var node = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        node.setAttribute("x", x);
+        node.setAttribute("y", y);
+        if (classes) node.setAttribute("class", classes);
+        node.textContent = text;
+        panel.appendChild(node);
+    }
+    function rule(y) {
+        var node = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        node.setAttribute("x1", 0);
+        node.setAttribute("x2", NUMBERS[3]);
+        node.setAttribute("y1", y);
+        node.setAttribute("y2", y);
+        panel.appendChild(node);
+    }
+    function clear() {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + panel.getAttribute("data-top") + ")");
+        put("Hover a cell for how the pairing did in each round.", 0, 14, "head");
+    }
+    function show(cell) {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        var y = 14;
+        put(cell.getAttribute("data-title"), 0, y, "heading");
+        for (var line of cell.getAttribute("data-summary").split("|")) {
+            y += 20;
+            put(line, 0, y, "summary");
+        }
+        var rounds = cell.getAttribute("data-rounds");
+        if (rounds !== "") {
+            var labels = panel.getAttribute("data-slots").split("|");
+            y += 30;
+            ["Seen", "Share", "Record", "Win rate"].forEach(function(name, i) { put(name, NUMBERS[i], y, "head number"); });
+            put("Round", 0, y, "head");
+            y += 6;
+            rule(y);
+            rounds.split(";").forEach(function(entry, i) {
+                var fields = entry.split(",");
+                var classes = fields[0] === "0" ? "zero" : "";
+                y += ROW;
+                put(labels[i], 0, y, classes);
+                fields.forEach(function(value, j) { put(value, NUMBERS[j], y, "number " + classes); });
+            });
+        }
+        var top = +cell.querySelector("rect").getAttribute("y") - 10;
+        top = Math.min(top, +panel.getAttribute("data-bottom") - y - 10);
+        top = Math.max(top, +panel.getAttribute("data-top"));
+        panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + top + ")");
+    }
     window.addEventListener("mouseover", function(e) {
         var cell = cell_of(e.target);
         if (!cell) return;
         light(cell.getAttribute("data-row"), cell.getAttribute("data-column"));
-        details.nodeValue = cell.getAttribute("data-info");
+        show(cell);
     });
     window.addEventListener("mouseout", function(e) {
         if (!cell_of(e.target)) return;
         light(null, null);
-        details.nodeValue = " ";
+        clear();
     });
 """;
 
@@ -209,26 +318,33 @@ let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, counts, total as decks, rows, overall } = self;
+    let Matrix { names, counts, total as decks, slots, slot_matches, matches, rows, overall } = self;
     let summaries = counts.map(|count| deck_summary(count, decks));
     mut longest = OVERALL.len();
     for (let each : names) {
         set longest = max(longest, each.len());
     }
-    // A column heading runs up and to the right at 45 degrees.
     mut label_characters = longest;
     for (let each : summaries) {
         // The summary is set smaller than a name.
         set label_characters = max(label_characters, each.len() * 6 / CHARACTER_WIDTH);
     }
+    // The slots some match fell in: the panel has a row for each.
+    mut shown: u64[] = [];
+    for (let slot, count : slot_matches) {
+        if (0 < count) { set shown.push(slot); };
+    }
+    let shown_slots = shown.map(|slot| slots[slot].value_or("").xml_escape()).join(sep="|");
+    // A column heading runs up and to the right at 45 degrees.
     let label_width = label_characters * CHARACTER_WIDTH + MARGIN;
     let heading_height = longest * 5 + MARGIN;
     let grid_width = names.len() * CELL;
     let overall_left = MARGIN + label_width;
     let grid_left = overall_left + CELL + GAP;
     let grid_top = TITLE_HEIGHT + heading_height;
-    let width = grid_left + grid_width + longest * 5 + MARGIN;
-    let height = grid_top + grid_width + DETAILS_HEIGHT;
+    let panel_left = grid_left + grid_width + longest * 5 + MARGIN;
+    let width = panel_left + PANEL_WIDTH + MARGIN;
+    let height = grid_top + grid_width + MARGIN;
     let middle = width / 2;
     mut parts: str[] = [];
     set parts.push(
@@ -240,25 +356,42 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             `<text class="label" data-column="{column}" transform="translate({x},{grid_top - 8}) rotate(-45)">{each.xml_escape()}</text>`,
         );
     }
-    for (let row, cells : rows) {
+    for (let row, total : overall) {
         let y = grid_top + row * CELL;
         let row_name = names[row].value_or("");
         let summary = summaries[row].value_or("");
         set parts.push(
             `<g class="label row-label" data-row="{row}"><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
         );
-        let total = overall[row].value_or(Record { win: 0, loss: 0, draw: 0 });
-        let overall_info = describe_overall(row_name, total).xml_escape();
-        set parts.push(
-            `<g class="cell overall" data-row="{row}" data-info="{overall_info}"><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.colour()}"/>{cell_labels(overall_left + CELL / 2, y + CELL / 2, some(total))}</g>`,
+        let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
+        let overall_panel = panel_attributes(
+            `{row_name} overall`,
+            total,
+            shown,
+            slot_matches,
+            matches,
         );
-        for (let column, cell : cells) {
+        set parts.push(
+            `<g class="cell overall" data-row="{row}" data-info="{overall_info}" {overall_panel}><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(overall_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
+        );
+        for (let column, cell : rows[row].value_or([])) {
             let column_name = names[column].value_or("");
             let info = describe(row_name, column_name, cell).xml_escape();
             let x = grid_left + column * CELL;
-            let fill = cell$colour().value_or("rgb(255,255,255)");
+            let fill = cell$record.value_or(Record { win: 0, loss: 0, draw: 0 }).colour();
+            let attributes = match (cell) {
+                some(found) => panel_attributes(
+                    `{row_name} vs {column_name}`,
+                    found,
+                    shown,
+                    slot_matches,
+                    matches,
+                ),
+                none => `data-title="{row_name.xml_escape()} against itself" data-summary="Not counted: every match between two decks of it is a win for one and a loss for the other." data-rounds=""`,
+            };
+            let shown_cell = cell$record;
             set parts.push(
-                `<g class="cell" data-row="{row}" data-column="{column}" data-info="{info}"><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{fill}"/>{cell_labels(x + CELL / 2, y + CELL / 2, cell)}</g>`,
+                `<g class="cell" data-row="{row}" data-column="{column}" data-info="{info}" {attributes}><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{if (cell == none) { "rgb(255,255,255)" } else { fill }}"/>{cell_labels(x + CELL / 2, y + CELL / 2, shown_cell)}</g>`,
             );
         }
     }
@@ -270,19 +403,28 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
 {parts.join(sep="\n")}
-<text id="details" x="{MARGIN}" y="{height - 14}"> </text>
+<g id="panel" data-left="{panel_left}" data-top="{grid_top}" data-bottom="{height}" data-slots="{shown_slots}"></g>
 </svg>
 `
 }.test({
+    let nothing = Record { win: 0, loss: 0, draw: 0 };
+    let won = Record { win: 1, loss: 0, draw: 0 };
+    let lost = Record { win: 0, loss: 1, draw: 0 };
     let matrix = Matrix {
         names: ["A", "B & C"],
         counts: [3, 1],
         total: 4,
+        slots: ["Finals", "Semifinals"],
+        slot_matches: [1, 0],
+        matches: 2,
         rows: [
-            [none, some(Record { win: 1, loss: 0, draw: 0 })],
-            [some(Record { win: 0, loss: 1, draw: 0 }), none],
+            [none, some(Cell { record: won, rounds: [won, nothing] })],
+            [some(Cell { record: lost, rounds: [lost, nothing] }), none],
         ],
-        overall: [Record { win: 1, loss: 0, draw: 0 }, Record { win: 0, loss: 1, draw: 0 }],
+        overall: [
+            Cell { record: won, rounds: [won, nothing] },
+            Cell { record: lost, rounds: [lost, nothing] },
+        ],
     };
     let page = winrate_svg(matrix, "m");
     let lines = page.split("\n");
@@ -292,6 +434,11 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-info="A vs B &amp; C: 100.0% (1-0-0)"`));
     assert(page.contains(`data-info="B &amp; C vs A: 0.0% (0-1-0)"`));
     assert(page.contains(`data-info="A against itself is not counted"`));
+    // The panel has what a cell says of each round some match fell in.
+    assert(page.contains(`data-title="A vs B &amp; C"`));
+    assert(page.contains(`data-rounds="1,100.0%,1-0-0,100.0%"`));
+    assert(page.contains(`data-slots="Finals"`));
+    assert(page.contains(`data-title="A against itself"`));
     // A row label has the archetype's deck count and share.
     assert(page.contains(">3 decks · 75.0%</text>"));
     assert(page.contains(">1 deck · 25.0%</text>"));
@@ -299,6 +446,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.split(`class="cell"`).len() == 5);
     // The overall column: a cell for each archetype, and its own heading.
     assert(page.contains(`data-info="A overall: 100.0% (1-0-0)"`));
+    assert(page.contains(`data-title="A overall"`));
     assert(page.split(`class="cell overall"`).len() == 3);
     assert(page.split(`class="label"`).len() == 4);
     assert(page.split(`class="label row-label"`).len() == 3);

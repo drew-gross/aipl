@@ -1,0 +1,184 @@
+# Where a round falls in its tournament, counted back from the end. A tournament of nine rounds and
+# one of fifteen differ in their first rounds but not in their last, so rounds are compared by how
+# far they are from the finals: the finals, the semifinals and the quarterfinals first, then the last
+# round of the main event, the one before it, and so on. A round's *slot* is that place, counted
+# from 0 for the finals.
+
+import {
+    distinct,
+    equal as ==,
+    get,
+    greater_than as >,
+    int_parse,
+    less_than as <,
+    logical_and as &&,
+    map,
+    max,
+    saturating_remainder as %,
+    split,
+    to_dict,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+import { Match, Record, Win } from "./metagame.aipl";
+
+# The slots of the playoff rounds, finals first.
+let FINALS: u64 = 0;
+
+let SEMIFINALS: u64 = 1;
+
+let QUARTERFINALS: u64 = 2;
+
+# The slot of the last round of the main event, which the rounds before it follow.
+let LAST_ROUND: u64 = 3;
+
+# The number in a round labelled `Round 7`, or `none` for any other label.
+pub fn round_number(self: str) -> u64? {
+    let [word, number] = self.split(" ") else { return none; };
+    if (word == "Round") { number.int_parse() } else { none }
+}.test({
+    assert(round_number("Round 7") == some(7));
+    assert(round_number("Round 12") == some(12));
+    assert(round_number("Finals") == none);
+    assert(round_number("Round x") == none);
+    assert(round_number("Round 1 2") == none);
+    assert(round_number("") == none);
+})
+
+# The number of the last round of the main event of the tournament `tournament`: the highest
+# `Round N` any match of it has, or 0 when none has.
+fn last_round(self: Match[], tournament: str) -> u64 {
+    mut last: u64 = 0;
+    for (let each : self) {
+        if (each.tournament == tournament) {
+            if (let some(number) = each.round.round_number()) { set last = max(last, number); };
+        };
+    }
+    last
+}.test({
+    fn at(tournament: str, round: str) -> Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament,
+        result: Win,
+        record: Record { win: 0, loss: 0, draw: 0 },
+        round,
+    }
+    let matches = [at("x", "Round 1"), at("x", "Round 9"), at("x", "Finals"), at("y", "Round 3")];
+    assert(matches.last_round("x") == 9);
+    assert(matches.last_round("y") == 3);
+    assert(matches.last_round("z") == 0);
+})
+
+# The number of the last round of the main event, for each tournament of `self`.
+pub fn last_rounds(self: Match[]) -> #{str: u64} {
+    let tournaments = self$tournament.distinct();
+    tournaments.map(|tournament| (tournament, self.last_round(tournament))).to_dict()
+}.test({
+    let match_played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament: "x",
+        result: Win,
+        record: Record { win: 0, loss: 0, draw: 0 },
+        round: "Round 4",
+    };
+    let other = Match { ..match_played, tournament: "y", round: "Round 2" };
+    let last = last_rounds([match_played, other, Match { ..match_played, round: "Round 1" }]);
+    assert(last.get("x") == some(4));
+    assert(last.get("y") == some(2));
+    assert(last.get("z") == none);
+})
+
+# How many slots a metagame whose tournaments' last rounds are `last_rounds` has: the three playoff
+# rounds and as many rounds before them as its longest tournament had.
+pub fn slot_count(last_rounds: #{str: u64}) -> u64 {
+    mut longest: u64 = 0;
+    for (let tournament, last : last_rounds) {
+        set longest = max(longest, last);
+    }
+    LAST_ROUND + longest
+}.test({
+    assert(slot_count(#{"x": 9, "y": 7}) == 12);
+    assert(slot_count(#{"x": 0}) == 3);
+})
+
+# The slot of `self`, given the last round of each tournament, or `none` for a round that is neither
+# a playoff round nor a numbered one of a tournament that has them.
+pub fn slot_of(self: Match, last_rounds: #{str: u64}) -> u64? {
+    if (self.round == "Finals") { return some(FINALS); };
+    if (self.round == "Semifinals") { return some(SEMIFINALS); };
+    if (self.round == "Quarterfinals") { return some(QUARTERFINALS); };
+    let some(number) = self.round.round_number() else { return none; };
+    let some(last) = last_rounds.get(self.tournament) else { return none; };
+    if (last < number) { return none; };
+    some(LAST_ROUND + last - number)
+}.test({
+    let match_played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament: "x",
+        result: Win,
+        record: Record { win: 0, loss: 0, draw: 0 },
+        round: "Finals",
+    };
+    let last: #{str: u64} = #{"x": 9};
+    assert(match_played.slot_of(last) == some(0));
+    assert(Match { ..match_played, round: "Semifinals" }.slot_of(last) == some(1));
+    assert(Match { ..match_played, round: "Quarterfinals" }.slot_of(last) == some(2));
+    // The last round of the main event, and the ones before it.
+    assert(Match { ..match_played, round: "Round 9" }.slot_of(last) == some(3));
+    assert(Match { ..match_played, round: "Round 8" }.slot_of(last) == some(4));
+    assert(Match { ..match_played, round: "Round 1" }.slot_of(last) == some(11));
+    // A tournament of fifteen rounds has its round 9 further from the end.
+    assert(Match { ..match_played, tournament: "y", round: "Round 9" }.slot_of(#{"y": 15}) == some(
+        9,
+    ));
+    assert(Match { ..match_played, round: "Round 10" }.slot_of(last) == none);
+    assert(Match { ..match_played, round: "Top 8" }.slot_of(last) == none);
+    assert(Match { ..match_played, tournament: "z", round: "Round 1" }.slot_of(last) == none);
+})
+
+# `n` with its ordinal suffix: `2nd`, `11th`, `23rd`.
+fn ordinal(n: u64) -> str {
+    let suffix = if (n % 100 > 10 && n % 100 < 14) {
+        "th"
+    } else if (n % 10 == 1) {
+        "st"
+    } else if (n % 10 == 2) {
+        "nd"
+    } else if (n % 10 == 3) {
+        "rd"
+    } else {
+        "th"
+    };
+    `{n}{suffix}`
+}.test({
+    assert(ordinal(1) == "1st");
+    assert(ordinal(2) == "2nd");
+    assert(ordinal(3) == "3rd");
+    assert(ordinal(4) == "4th");
+    assert(ordinal(11) == "11th");
+    assert(ordinal(12) == "12th");
+    assert(ordinal(13) == "13th");
+    assert(ordinal(21) == "21st");
+    assert(ordinal(112) == "112th");
+})
+
+# What a table calls the slot `self`: `Finals`, `Semifinals`, `Quarterfinals`, `Last round`,
+# `2nd last round` and so on.
+pub fn slot_label(self: u64) -> str {
+    if (self == FINALS) { return "Finals"; };
+    if (self == SEMIFINALS) { return "Semifinals"; };
+    if (self == QUARTERFINALS) { return "Quarterfinals"; };
+    let before = self - LAST_ROUND;
+    if (before == 0) { "Last round" } else { `{ordinal(before + 1)} last round` }
+}.test({
+    assert(slot_label(0) == "Finals");
+    assert(slot_label(1) == "Semifinals");
+    assert(slot_label(2) == "Quarterfinals");
+    assert(slot_label(3) == "Last round");
+    assert(slot_label(4) == "2nd last round");
+    assert(slot_label(5) == "3rd last round");
+    assert(slot_label(13) == "11th last round");
+})
