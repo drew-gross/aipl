@@ -116,8 +116,8 @@ fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
 fn winrate_listing(args: str[]) !read_files !execute_program -> str[]!str {
     let DeckOptions { metagame, archetypes } = parse_deck_options("winrate", args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
-    let Metagame { decks } = load_named(metagame)?;
-    ok(winrate_report(metagame, decks, identifiers))
+    let Metagame { decks, matches } = load_named(metagame)?;
+    ok(winrate_report(metagame, decks, matches, identifiers))
 }
 
 # The lines a command line asks for, or why it asks for none.

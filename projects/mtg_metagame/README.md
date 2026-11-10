@@ -40,7 +40,7 @@ a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this 
 | file | what it is |
 |---|---|
 | `main.aipl` | the command line: `cards`, `share` and `winrate` |
-| `metagame.aipl` | `Metagame`, `Deck`, `Card`, `Match`, `Record`; decoding them from JSON; `load_metagame` |
+| `metagame.aipl` | `Metagame` (its decks and the matches they played, each once), `Deck`, `Card`, `Match`, `Record`; decoding them from JSON; `load_metagame` |
 | `counted.aipl` | `Counted` (a name and a count) and `ranked`, the order the listings share |
 | `card_stats.aipl` | `card_counts`: copies played per card |
 | `archetypes.aipl` | the classifier: `Identifier`, `archetypes_of`, `load_identifiers` |

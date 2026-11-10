@@ -67,7 +67,6 @@ pub fn deck_of(main: str[], side: str[]) -> Deck {
     tournament: "",
     maindeck: main$as_card(),
     sideboard: side$as_card(),
-    matches: [],
 }.test({
     assert(deck_of(["A"], ["B", "C"]).sideboard$name == ["B", "C"]);
 })

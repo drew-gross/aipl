@@ -1,5 +1,6 @@
 # What the data directory holds: a metagame is the decks played at some
-# tournaments, each with its cards and how its matches went. `load_metagame`
+# tournaments, each with its cards, and the matches those decks played against each other.
+# `load_metagame`
 # reads one of the gzipped JSON files `tools/pkl_to_json.py` wrote.
 
 import {
@@ -8,10 +9,18 @@ import {
     collect_ok,
     equal as ==,
     execute_program,
+    extend,
+    filter,
     float_div as /,
     greater_than as >,
+    has,
+    less_than as <,
+    logical_not as !,
+    logical_or as ||,
+    map,
     not_equal as !=,
     to_float,
+    to_set,
     to_str,
     try_map,
     value_or,
@@ -29,7 +38,7 @@ import {
 } from "./json.aipl";
 import { Json, parse } from json;
 
-# How one match ended, from a deck's point of view.
+# How one match ended, from the point of view of the first deck in it.
 variant Result = Win | Loss | Draw
 
 # Matches (or games) won, lost and drawn.
@@ -38,10 +47,11 @@ struct Record { win: i64, loss: i64, draw: i64 }
 # One line of a decklist: a card, how many copies, and its type line category.
 struct Card { name: str, count: u64, card_type: str }
 
-# One round of a deck's tournament.
-struct Match { opponent_deck_id: str?, result: Result, record: Record, round: str }
+# One round played between two decks. `result` and `record` are the first deck's: the second
+# deck's are the other way round.
+struct Match { first_deck_id: str, second_deck_id: str, result: Result, record: Record, round: str }
 
-# A decklist and how it did. The id is text: the sources number decks with
+# A decklist. The id is text: the sources number decks with
 # integers and with strings.
 struct Deck {
     deck_id: str,
@@ -50,7 +60,6 @@ struct Deck {
     tournament: str,
     maindeck: Card[],
     sideboard: Card[],
-    matches: Match[],
 }
 
 # The cards of `self`'s main deck followed by its sideboard.
@@ -64,14 +73,15 @@ pub fn all_cards(self: Deck) -> Card[] { [..self.maindeck, ..self.sideboard] }.t
         tournament: "",
         maindeck: [island],
         sideboard: [bolt],
-        matches: [],
     };
     assert(deck.all_cards() == [island, bolt]);
     assert(Deck { ..deck, maindeck: [], sideboard: [] }.all_cards() == []);
 })
 
-# The decks of one or more tournaments. `name` is the file it was loaded from.
-struct Metagame { name: str, tournament_ids: str[], decks: Deck[] }
+# The decks of one or more tournaments and the matches they played. A match is held once, whichever
+# deck's history it came from; one whose opponent is not named (a bye) is not held. `name` is the
+# file it was loaded from.
+struct Metagame { name: str, tournament_ids: str[], decks: Deck[], matches: Match[] }
 
 # `a` and `b` counted together.
 pub fn add_records(a: Record, b: Record) -> Record {
@@ -143,29 +153,43 @@ fn decode_record(self: Json) -> Record!str {
     assert(decode_record(json) == ok(Record { win: 2, loss: 1, draw: 0 }));
 })
 
-# One round of a match history.
-fn decode_match(self: Json) -> Match!str {
+# One round of the match history of the deck `owner`: a match against the opponent it names, or
+# `none` for a round with no opponent.
+fn decode_match(self: Json, owner: str) -> Match?!str {
     let record = self.field("record").value_or_err(`missing "record"`)?;
-    ok(Match {
-        opponent_deck_id: self.optional_text_field("opponent_deck_id"),
-        result: self.text_field("result")?.decode_result()?,
-        record: decode_record(record)?,
-        // A round is a label, or a list of them when the source split it.
-        round: self.optional_text_field("round").value_or(""),
-    })
+    let result = self.text_field("result")?.decode_result()?;
+    let decoded = decode_record(record)?;
+    // A round is a label, or a list of them when the source split it.
+    let round = self.optional_text_field("round").value_or("");
+    ok(
+        self
+            .optional_text_field("opponent_deck_id")
+            .map(|opponent| Match {
+                first_deck_id: owner,
+                second_deck_id: opponent,
+                result,
+                record: decoded,
+                round,
+            }),
+    )
 }.test({
     let json = parse(
         """{"opponent_deck_id":7,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"Round 1"}""",
     )?;
-    assert(decode_match(json) == ok(Match {
-        opponent_deck_id: some("7"),
+    assert(decode_match(json, "3") == ok(some(Match {
+        first_deck_id: "3",
+        second_deck_id: "7",
         result: Win,
         record: Record { win: 2, loss: 0, draw: 0 },
         round: "Round 1",
-    }));
+    })));
+    let bye = parse(
+        """{"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0}}""",
+    )?;
+    assert(decode_match(bye, "3") == ok(none));
 })
 
-# A deck, with its cards and matches.
+# A deck, with its cards.
 fn decode_deck(self: Json) -> Deck!str {
     ok(Deck {
         deck_id: self.text_field("deck_id")?,
@@ -174,7 +198,6 @@ fn decode_deck(self: Json) -> Deck!str {
         tournament: self.optional_text_field("tournament").value_or(""),
         maindeck: self.list_field("maindeck")?.try_map(decode_card)?,
         sideboard: self.list_field("sideboard")?.try_map(decode_card)?,
-        matches: self.list_field("match_history")?.try_map(decode_match)?,
     })
 }.test({
     let json = parse("""
@@ -189,16 +212,79 @@ fn decode_deck(self: Json) -> Deck!str {
         tournament: "5",
         maindeck: [Card { name: "Island", count: 4, card_type: "Land" }],
         sideboard: [],
-        matches: [],
     }));
+})
+
+# The rounds in the match history of the deck `self`, each against the opponent it names.
+fn decode_history(self: Json) -> Match[]!str {
+    let owner = self.text_field("deck_id")?;
+    let rounds = self.list_field("match_history")?;
+    ok(rounds.try_map(|round| round.decode_match(owner))?.collect_ok())
+}.test({
+    let json = parse("""
+        {"deck_id":"a","match_history":[
+          {"opponent_deck_id":"b","result":"loss","record":{"win":0,"loss":2,"draw":0},"round":"R1"},
+          {"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"R2"}]}
+    """)?;
+    assert(decode_history(json) == ok([
+        Match {
+            first_deck_id: "a",
+            second_deck_id: "b",
+            result: Loss,
+            record: Record { win: 0, loss: 2, draw: 0 },
+            round: "R1",
+        },
+    ]));
+})
+
+# `self` with each match held once. Every deck's history lists its matches, so a match between two
+# decks that both have one is there twice, from each side: the copy the lower deck id has is the
+# one kept. A match whose opponent has no copy of it is kept.
+fn without_mirrors(self: Match[]) -> Match[] {
+    let listed = self
+        .map(|each| `{each.first_deck_id}|{each.second_deck_id}|{each.round}`)
+        .to_set();
+    self.filter(|each| {
+        each.first_deck_id < each.second_deck_id || !listed.has(
+            `{each.second_deck_id}|{each.first_deck_id}|{each.round}`,
+        )
+    })
+}.test({
+    let win = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        result: Win,
+        record: Record { win: 2, loss: 0, draw: 0 },
+        round: "R1",
+    };
+    let loss = Match {
+        first_deck_id: "b",
+        second_deck_id: "a",
+        result: Loss,
+        record: Record { win: 0, loss: 2, draw: 0 },
+        round: "R1",
+    };
+    assert([win, loss].without_mirrors() == [win]);
+    assert([loss, win].without_mirrors() == [win]);
+    // Only one deck's history has the match.
+    assert([loss].without_mirrors() == [loss]);
+    // A rematch in another round is another match.
+    let rematch = Match { ..win, round: "R2" };
+    assert([win, rematch, loss].without_mirrors() == [win, rematch]);
 })
 
 # A whole metagame document, as `tools/pkl_to_json.py` writes it.
 pub fn decode_metagame(self: Json) -> Metagame!str {
+    let decks = self.list_field("decks")?;
+    mut histories: Match[] = [];
+    for (let deck : decks) {
+        set histories.extend(deck.decode_history()?);
+    }
     ok(Metagame {
         name: self.text_field("name")?,
         tournament_ids: self.list_field("tournament_ids")?$scalar_text().collect_ok(),
-        decks: self.list_field("decks")?.try_map(decode_deck)?,
+        decks: decks.try_map(decode_deck)?,
+        matches: histories.without_mirrors(),
     })
 }.test({
     let json = parse("""{"name":"m","tournament_ids":[1,"b"],"decks":[]}""")?;
@@ -206,6 +292,7 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
         name: "m",
         tournament_ids: ["1", "b"],
         decks: [],
+        matches: [],
     }));
 })
 
