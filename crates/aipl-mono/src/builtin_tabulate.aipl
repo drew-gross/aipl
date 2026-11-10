@@ -10,16 +10,17 @@
 import {
     equal as ==,
     join,
+    left_fold,
     len,
     less_than as <,
     map,
-    maximum,
+    max,
     measure,
     repeat,
     saturating_sub as -,
-    value_or,
     wrapping_add as +,
     wrapping_mul as *,
+    zip_with,
 } from builtins;
 
 # `text` padded with spaces to `width`: on the left when `right`, else on the right. Text
@@ -43,30 +44,52 @@ fn rule(widths: u64[], fill: str) -> str {
     assert(rule([2], "=") == "+====+");
 })
 
-# One row's line: each cell padded to its column's width, between `|`s.
-fn cells_line(self: str[], widths: u64[], right: bool[]) -> str {
-    let parts = (0..self.len()).map(|i| {
-        padded(self[i].value_or(""), widths[i].value_or(0), right[i].value_or(false))
-    });
+# What a table needs to know of a column to draw a cell of it.
+struct Column { width: u64, right: bool }
+
+# One row's line: each cell padded to its column, between `|`s. A row with more cells than there
+# are columns is cut off at the last column.
+fn cells_line(self: str[], columns: Column[]) -> str {
+    let parts = self.zip_with(columns, |text, column| padded(text, column.width, column.right));
     `| {parts.join(sep=" | ")} |`
 }.test({
-    assert(["a", "b"].cells_line([3, 2], [false, true]) == "| a   |  b |");
+    let columns = [Column { width: 3, right: false }, Column { width: 2, right: true }];
+    assert(["a", "b"].cells_line(columns) == "| a   |  b |");
+    assert(["a", "b", "c"].cells_line(columns) == "| a   |  b |");
+})
+
+# `self` made `n` long by adding `filler` to the end; one already longer is left as it is.
+fn fitted<T: any>(self: T[], n: u64, filler: T) -> T[] {
+    [..self, ..[filler].repeat(n - self.len())]
+}.test({
+    assert([1, 2].fitted(4, 0) == [1, 2, 0, 0]);
+    assert([1, 2].fitted(1, 0) == [1, 2]);
+    let empty: i64[] = [];
+    assert(empty.fitted(2, 7) == [7, 7]);
 })
 
 # `rows` drawn as a table, as lines: a rule above, `headers` and a heavier rule under them,
 # the rows, and a rule below. Each column is as wide as its widest cell, padded on the right,
 # or on the left for a column `right_aligned` marks (a column it does not reach is on the
-# left). Callable as a method.
+# left). A row with fewer cells than `headers` has blanks for the rest, and one with more is cut
+# off. Callable as a method.
 pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> str[] {
+    let count = headers.len();
+    let cells = self$fitted(count, "");
     // A column is as wide as its widest cell, its header included.
-    let widths = (0..headers.len()).map(|i| {
-        [headers[i].value_or(""), ..self.map(|row| row[i].value_or(""))]$len().maximum().value_or(0)
-    });
+    let widths = cells.left_fold(
+        headers$len(),
+        |widths, row| { widths.zip_with(row, |width, cell| max(width, cell.len())) },
+    );
+    let columns = widths.zip_with(
+        right_aligned.fitted(count, false),
+        |width, right| { Column { width, right } },
+    );
     [
         rule(widths, "-"),
-        headers.cells_line(widths, right_aligned),
+        headers.cells_line(columns),
         rule(widths, "="),
-        ..self$cells_line(widths, right_aligned),
+        ..cells$cells_line(columns),
         rule(widths, "-"),
     ]
 }.test({
@@ -121,10 +144,10 @@ pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> st
         |rows| { rows.tabulate(headers, right_aligned=[false, true, true]) },
     );
 
-    // Allocations are exact: the widths, the three rules and the header line are the fixed part, and
-    // each row adds one line, so a temporary array optimized away shows up here.
-    assert(two.allocations == 32);
-    assert(eight.allocations == 86);
+    // Allocations are exact: the widths, the columns, the three rules and the header line are the fixed
+    // part, and each row adds its padded copy and its line, so a temporary array optimized away shows up here.
+    assert(two.allocations == 37);
+    assert(eight.allocations == 104);
 
     // Four times the rows costs under three times the instructions: the fixed part is shared and
     // nothing in a row's line depends on the number of rows.

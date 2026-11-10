@@ -25,12 +25,10 @@ projects:
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
     do something better to deal with decks that match multiple deck identifiers
-    options to sort by meta share or winrate
     make a better templating language (in aipl maybe?) for making the svgs
     winrate:
       use finals/semis/quarters in by-round panel
       mirror matches should still show W-L-D (draw count is interesting)
-      show meta share
       include links to games
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
@@ -123,7 +121,6 @@ benchmark:
 
 misc cleanup:
   TYPED_EXPR_PLAN.md
-  cell_text looks like it should be a fold. Also have a lint for this
   so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
   in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
@@ -522,6 +519,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  pad_left and pad_right functions
   better way to iterate over all pairs than 2 for loops (tuple_combinations()? product()?)
   better function for making an "index" (list of T to dict of T's ID to T)
   join() should get leading_sep and trailing_sep and then tabulate's rule() can get simpler

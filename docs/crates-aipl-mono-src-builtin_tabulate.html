@@ -22,6 +22,20 @@
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-Column">
+          <h3>
+            <a class="anchor" href="#item-Column">Column</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Column</code></pre>
+
+          <div class="doc"><p>What a table needs to know of a column to draw a cell of it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-tabulate">
           <h3>
             <a class="anchor" href="#item-tabulate">tabulate</a>
@@ -29,7 +43,7 @@
           </h3>
           <pre class="signature"><code>pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -&#62; str[]</code></pre>
 
-          <div class="doc"><p><code>rows</code> drawn as a table, as lines: a rule above, <code>headers</code> and a heavier rule under them, the rows, and a rule below. Each column is as wide as its widest cell, padded on the right, or on the left for a column <code>right_aligned</code> marks (a column it does not reach is on the left). Callable as a method.</p></div>
+          <div class="doc"><p><code>rows</code> drawn as a table, as lines: a rule above, <code>headers</code> and a heavier rule under them, the rows, and a rule below. Each column is as wide as its widest cell, padded on the right, or on the left for a column <code>right_aligned</code> marks (a column it does not reach is on the left). A row with fewer cells than <code>headers</code> has blanks for the rest, and one with more is cut off. Callable as a method.</p></div>
 
 
         </section>
@@ -76,9 +90,23 @@
             <a class="anchor" href="#item-cells_line">cells_line</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn cells_line(self: str[], widths: u64[], right: bool[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn cells_line(self: str[], columns: Column[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>One row's line: each cell padded to its column's width, between <code>|</code>s.</p></div>
+          <div class="doc"><p>One row's line: each cell padded to its column, between <code>|</code>s. A row with more cells than there are columns is cut off at the last column.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-fitted">
+          <h3>
+            <a class="anchor" href="#item-fitted">fitted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn fitted&#60;T: any&#62;(self: T[], n: u64, filler: T) -&#62; T[]</code></pre>
+
+          <div class="doc"><p><code>self</code> made <code>n</code> long by adding <code>filler</code> to the end; one already longer is left as it is.</p></div>
 
 
         </section>
