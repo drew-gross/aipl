@@ -249,55 +249,38 @@ fn record_of(self: Observation[]) -> Record {
     assert([win, loss, draw, win].record_of() == Record { win: 2, loss: 1, draw: 1 });
 })
 
-# What a pairing's matches came to when the player had `bracket` going into them.
-struct Bracketed { bracket: Bracket, record: Record }
-
 # How one archetype did against another, or against all: `record` is overall, `rounds` has the
 # record in each slot (see `rounds.aipl`), indexed by slot, and `brackets` the record at each
-# bracket the pairing met in, the highest first.
-struct Cell { record: Record, rounds: Record[], brackets: Bracketed[] }
+# bracket of the metagame, indexed alike.
+struct Cell { record: Record, rounds: Record[], brackets: Record[] }
 
-# The cell of `self`, for a metagame of `slot_count` slots.
-fn cell_of(self: Observation[], slot_count: u64) -> Cell {
+# The cell of `self`, for a metagame of `slot_count` slots and the brackets `brackets`.
+fn cell_of(self: Observation[], slot_count: u64, brackets: Bracket[]) -> Cell {
     record: self.record_of(),
     rounds: (0..slot_count).map(|slot| self.filter(|each| each.slot == some(slot)).record_of()),
-    brackets: self$bracket
-        .collect_ok()
-        .distinct()
-        .sort_by(is_above)
-        .map(|bracket| Bracketed {
-            bracket,
-            record: self.filter(|each| each.bracket == some(bracket)).record_of(),
-        }),
+    brackets: brackets.map(|bracket| self.filter(|each| each.bracket == some(bracket)).record_of()),
 }.test({
+    let upper = Bracket { win: 7, loss: 1 };
+    let lower = Bracket { win: 0, loss: 3 };
     let win = Observation {
         player: "a",
         opponent: "b",
         result: Win,
         slot: some(1),
-        bracket: some(Bracket { win: 0, loss: 3 }),
+        bracket: some(lower),
     };
-    let loss = Observation {
-        ..win,
-        result: Loss,
-        slot: some(0),
-        bracket: some(Bracket { win: 7, loss: 1 }),
-    };
-    let again = Observation { ..win, result: Win, bracket: some(Bracket { win: 7, loss: 1 }) };
+    let loss = Observation { ..win, result: Loss, slot: some(0), bracket: some(upper) };
+    let again = Observation { ..win, result: Win, bracket: some(upper) };
     let unplaced = Observation { ..win, slot: none, bracket: none };
     let nothing = Record { win: 0, loss: 0, draw: 0 };
-    assert([win, loss, unplaced, again].cell_of(3) == Cell {
+    let middle = Bracket { win: 3, loss: 3 };
+    assert([win, loss, unplaced, again].cell_of(3, [upper, middle, lower]) == Cell {
         record: Record { win: 3, loss: 1, draw: 0 },
         rounds: [Record { win: 0, loss: 1, draw: 0 }, Record { win: 2, loss: 0, draw: 0 }, nothing],
         brackets: [
-            Bracketed {
-                bracket: Bracket { win: 7, loss: 1 },
-                record: Record { win: 1, loss: 1, draw: 0 },
-            },
-            Bracketed {
-                bracket: Bracket { win: 0, loss: 3 },
-                record: Record { win: 1, loss: 0, draw: 0 },
-            },
+            Record { win: 1, loss: 1, draw: 0 },
+            nothing,
+            Record { win: 1, loss: 0, draw: 0 },
         ],
     });
 })
@@ -311,7 +294,8 @@ fn cell_of(self: Observation[], slot_count: u64) -> Cell {
 #
 # `counts` is how many decks each of `names` has, out of `total` decks. `slots` names the slots
 # rounds fall in, finals first, `slot_matches` is how many of the metagame's `matches` fall in each,
-# and each cell's `rounds` is indexed alike.
+# and each cell's `rounds` is indexed alike. `brackets` are the records going into a round that
+# some archetype had, highest first, and each cell's `brackets` is indexed alike.
 struct Matrix {
     names: str[],
     counts: u64[],
@@ -319,6 +303,7 @@ struct Matrix {
     slots: str[],
     slot_matches: u64[],
     matches: u64,
+    brackets: Bracket[],
     rows: Cell?[][],
     overall: Cell[],
 }
@@ -331,13 +316,14 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     let slot_count = slot_count(last_rounds);
     let seen = observations(decks, matches, identifiers, last_rounds)?;
     let placed = matches$slot_of(last_rounds);
+    let brackets = seen$bracket.collect_ok().distinct().sort_by(is_above);
     let rows = names.map(|player| {
         let mine = seen.filter(|each| each.player == player);
         names.map(|opponent| {
             let cell: Cell? = if (opponent == player) {
                 none
             } else {
-                some(mine.filter(|each| each.opponent == opponent).cell_of(slot_count))
+                some(mine.filter(|each| each.opponent == opponent).cell_of(slot_count, brackets))
             };
             cell
         })
@@ -349,8 +335,11 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         slots: (0..slot_count)$slot_label(),
         slot_matches: (0..slot_count).map(|slot| placed.count_if(|each| each == some(slot))),
         matches: matches.len(),
+        brackets,
         rows,
-        overall: names.map(|player| seen.filter(|each| each.player == player).cell_of(slot_count)),
+        overall: names.map(
+            |player| seen.filter(|each| each.player == player).cell_of(slot_count, brackets),
+        ),
     })
 }.test({
     let forest = Identifier {
@@ -379,21 +368,22 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         slots: ["Finals", "Semifinals", "Quarterfinals", "Last round", "2nd last round"],
         slot_matches: [1, 0, 0, 1, 1],
         matches: 3,
+        // Only the first deck of a match has a record going in here.
+        brackets: [Bracket { win: 0, loss: 0 }],
         rows: [
             [
                 none,
                 some(Cell {
                     record: Record { win: 2, loss: 0, draw: 0 },
                     rounds: [won, nothing, nothing, won, nothing],
-                    // Only the first deck of a match has a record going in here.
-                    brackets: [Bracketed { bracket: Bracket { win: 0, loss: 0 }, record: won }],
+                    brackets: [won],
                 }),
             ],
             [
                 some(Cell {
                     record: Record { win: 0, loss: 2, draw: 0 },
                     rounds: [lost, nothing, nothing, lost, nothing],
-                    brackets: [],
+                    brackets: [nothing],
                 }),
                 none,
             ],
@@ -402,17 +392,12 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             Cell {
                 record: Record { win: 3, loss: 1, draw: 0 },
                 rounds: [won, nothing, nothing, won, Record { win: 1, loss: 1, draw: 0 }],
-                brackets: [
-                    Bracketed {
-                        bracket: Bracket { win: 0, loss: 0 },
-                        record: Record { win: 2, loss: 0, draw: 0 },
-                    },
-                ],
+                brackets: [Record { win: 2, loss: 0, draw: 0 }],
             },
             Cell {
                 record: Record { win: 0, loss: 2, draw: 0 },
                 rounds: [lost, nothing, nothing, lost, nothing],
-                brackets: [],
+                brackets: [nothing],
             },
         ],
     }));

@@ -37,7 +37,8 @@ slot that is, and its record and win rate there. Metagames merging several tourn
 
 Under it the panel breaks the pairing down by the row archetype's record going into the match (`7-1`, `0-3`, ...), highest
 first, with how often the pairing met at that record and how it went, so a matchup that swings between the top and the bottom
-of the standings shows. The record is the player's own in the tournament so far, byes counted and draws left out, and only
+of the standings shows. The table lists every record any archetype had in the metagame, and one the pairing never met at is
+greyed out, as the round table's empty rounds are, so its rows stay in the same place from pairing to pairing. The record is the player's own in the tournament so far, byes counted and draws left out, and only
 numbered rounds of the main event have one; a match whose second deck has no history for the round is counted from the first
 deck's side only.
 
