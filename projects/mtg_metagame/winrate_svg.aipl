@@ -9,6 +9,7 @@ import {
     join,
     len,
     less_than as <,
+    map,
     max,
     push,
     saturating_divide as /,
@@ -18,6 +19,7 @@ import {
     wrapping_mul as *,
     wrapping_sub as -,
 } from builtins;
+import { percent } from "./meta_share.aipl";
 import { Record } from "./metagame.aipl";
 import { Matrix, rate_text } from "./winrate_matrix.aipl";
 
@@ -100,6 +102,15 @@ fn describe(row: str, column: str, cell: Record?) -> str {
     assert(describe("A", "A", none) == "A against itself is not counted");
 })
 
+# How big an archetype with `count` of `total` decks is, as its row label says.
+fn deck_summary(count: u64, total: u64) -> str {
+    let noun = if (count == 1) { "deck" } else { "decks" };
+    `{count} {noun} · {percent(count, total)}`
+}.test({
+    assert(deck_summary(92, 353) == "92 decks · 26.1%");
+    assert(deck_summary(1, 4) == "1 deck · 25.0%");
+})
+
 # What hovering the overall cell of `row` says: its record against every archetype, itself included.
 fn describe_overall(row: str, total: Record) -> str {
     let Record { win, loss, draw } = total;
@@ -119,6 +130,7 @@ let STYLE = """
     .cell rect { stroke: #fff; stroke-width: 1; }
     .cell text { text-anchor: middle; dominant-baseline: central; pointer-events: none; }
     .row-label { text-anchor: end; dominant-baseline: central; }
+    .row-label .detail { font-size: 11px; font-weight: normal; fill: #888; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
     .cell:hover rect { filter: saturate(1.6) brightness(0.84); }
     .label.hot { font-weight: bold; }
@@ -164,13 +176,19 @@ let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, rows, overall } = self;
+    let Matrix { names, counts, total as decks, rows, overall } = self;
+    let summaries = counts.map(|count| deck_summary(count, decks));
     mut longest = OVERALL.len();
     for (let each : names) {
         set longest = max(longest, each.len());
     }
     // A column heading runs up and to the right at 45 degrees.
-    let label_width = longest * CHARACTER_WIDTH + MARGIN;
+    mut label_characters = longest;
+    for (let each : summaries) {
+        // The summary is set smaller than a name.
+        set label_characters = max(label_characters, each.len() * 6 / CHARACTER_WIDTH);
+    }
+    let label_width = label_characters * CHARACTER_WIDTH + MARGIN;
     let heading_height = longest * 5 + MARGIN;
     let grid_width = names.len() * CELL;
     let overall_left = MARGIN + label_width;
@@ -192,8 +210,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     for (let row, cells : rows) {
         let y = grid_top + row * CELL;
         let row_name = names[row].value_or("");
+        let summary = summaries[row].value_or("");
         set parts.push(
-            `<text class="label row-label" data-row="{row}" x="{overall_left - 8}" y="{y + CELL / 2}">{row_name.xml_escape()}</text>`,
+            `<g class="label row-label" data-row="{row}"><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
         );
         let total = overall[row].value_or(Record { win: 0, loss: 0, draw: 0 });
         let overall_info = describe_overall(row_name, total).xml_escape();
@@ -225,6 +244,8 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 }.test({
     let matrix = Matrix {
         names: ["A", "B & C"],
+        counts: [3, 1],
+        total: 4,
         rows: [
             [none, some(Record { win: 1, loss: 0, draw: 0 })],
             [some(Record { win: 0, loss: 1, draw: 0 }), none],
@@ -239,6 +260,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-info="A vs B &amp; C: 100.0% (1-0-0)"`));
     assert(page.contains(`data-info="B &amp; C vs A: 0.0% (0-1-0)"`));
     assert(page.contains(`data-info="A against itself is not counted"`));
+    // A row label has the archetype's deck count and share.
+    assert(page.contains(">3 decks · 75.0%</text>"));
+    assert(page.contains(">1 deck · 25.0%</text>"));
     // One cell for each pairing, and a heading for each archetype on both axes.
     assert(page.split(`class="cell"`).len() == 5);
     // The overall column: a cell for each archetype, and its own heading.

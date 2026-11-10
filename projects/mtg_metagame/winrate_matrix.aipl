@@ -10,6 +10,7 @@ import {
     float_div as /,
     float_mul as *,
     get,
+    len,
     map,
     push,
     render,
@@ -168,11 +169,13 @@ fn record_of(self: Observation[]) -> Record {
 # holds every match between two decks of it from both sides, so it says nothing. `overall` has the
 # record of each of `names` against every archetype, its own included: a mirror match is one win
 # and one loss, which pulls the archetype's overall rate toward even as it does at an event.
-struct Matrix { names: str[], rows: Record?[][], overall: Record[] }
+# `counts` is how many decks each of `names` has, out of `total` decks.
+struct Matrix { names: str[], counts: u64[], total: u64, rows: Record?[][], overall: Record[] }
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
 pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Matrix!str {
-    let names = shares(decks, identifiers)$name;
+    let found = shares(decks, identifiers);
+    let names = found$name;
     let seen = observations(decks, matches, identifiers)?;
     let rows = names.map(|player| {
         let mine = seen.filter(|each| each.player == player);
@@ -186,7 +189,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         })
     });
     let overall = names.map(|player| seen.filter(|each| each.player == player).record_of());
-    ok(Matrix { names, rows, overall })
+    ok(Matrix { names, counts: found$count, total: decks.len(), rows, overall })
 }.test({
     let forest = Identifier {
         name: "Forest",
@@ -199,6 +202,8 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     let matches = [between("a", "b", Win), between("a", "c", Win)];
     assert(winrate_matrix(decks, matches, [forest]) == ok(Matrix {
         names: ["Forest", "Other"],
+        counts: [2, 1],
+        total: 3,
         rows: [
             [none, some(Record { win: 1, loss: 0, draw: 0 })],
             [some(Record { win: 0, loss: 1, draw: 0 }), none],

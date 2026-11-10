@@ -90,7 +90,7 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
 
 # `count` out of `total` as a percentage with one decimal: `33.3%`. Rounded as the
 # original's formatting is, half to even on the float's exact value.
-fn percent(count: u64, total: u64) -> str {
+pub fn percent(count: u64, total: u64) -> str {
     let share = count.to_float() / total.to_float();
     `{(share * 100.0).render(digits=1)}%`
 }.test({
