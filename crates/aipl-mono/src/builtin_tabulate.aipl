@@ -44,13 +44,13 @@ fn rule(widths: u64[], fill: str) -> str {
 })
 
 # One row's line: each cell padded to its column's width, between `|`s.
-fn cells_line(cells: str[], widths: u64[], right: bool[]) -> str {
-    let parts = (0..cells.len()).map(|i| {
-        padded(cells[i].value_or(""), widths[i].value_or(0), right[i].value_or(false))
+fn cells_line(self: str[], widths: u64[], right: bool[]) -> str {
+    let parts = (0..self.len()).map(|i| {
+        padded(self[i].value_or(""), widths[i].value_or(0), right[i].value_or(false))
     });
     `| {parts.join(sep=" | ")} |`
 }.test({
-    assert(cells_line(["a", "b"], [3, 2], [false, true]) == "| a   |  b |");
+    assert(["a", "b"].cells_line([3, 2], [false, true]) == "| a   |  b |");
 })
 
 # `rows` drawn as a table, as lines: a rule above, `headers` and a heavier rule under them,
@@ -64,9 +64,9 @@ pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> st
     });
     [
         rule(widths, "-"),
-        cells_line(headers, widths, right_aligned),
+        headers.cells_line(widths, right_aligned),
         rule(widths, "="),
-        ..self.map(|row| cells_line(row, widths, right_aligned)),
+        ..self$cells_line(widths, right_aligned),
         rule(widths, "-"),
     ]
 }.test({
