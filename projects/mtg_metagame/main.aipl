@@ -138,7 +138,8 @@ fn winrate_listing(args: str[]) !read_files !execute_program !write_files -> str
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks, matches } = load_named(metagame)?;
     let path = output.value_or(`winrate_{metagame}.svg`);
-    write_string_to_file(path, winrate_matrix(decks, matches, identifiers).winrate_svg(metagame))?;
+    let matrix = winrate_matrix(decks, matches, identifiers)?;
+    write_string_to_file(path, matrix.winrate_svg(metagame))?;
     ok([`wrote {path}`])
 }
 

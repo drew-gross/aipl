@@ -26,6 +26,7 @@ import {
     Result,
     Win,
     add_records,
+    unknown_deck,
     win_rate,
 } from "./metagame.aipl";
 
@@ -87,35 +88,32 @@ fn between(first: str, second: str, result: Result) -> Match {
     round: "",
 }
 
-# Every match of `matches` between two of `decks`, once for each pairing of an archetype of the
-# one deck and an archetype of the other, from each side. A match with a deck not in `decks` is
-# left out.
-fn observations(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Observation[] {
+# Every match of `matches`, once for each pairing of an archetype of the one deck and an archetype
+# of the other, from each side. A match with a deck not in `decks` is an error.
+fn observations(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Observation[]!str {
     let labelled: #{str: str[]} = decks
         .map(|deck| (deck.deck_id, deck.labels_of(identifiers)))
         .to_dict();
     mut out: Observation[] = [];
     for (let each : matches) {
-        if (let some(firsts) = labelled.get(each.first_deck_id)) {
-            if (let some(seconds) = labelled.get(each.second_deck_id)) {
-                for (let first : firsts) {
-                    for (let second : seconds) {
-                        set out.push(Observation {
-                            player: first,
-                            opponent: second,
-                            result: each.result,
-                        });
-                        set out.push(Observation {
-                            player: second,
-                            opponent: first,
-                            result: each.result.flipped(),
-                        });
-                    }
-                }
-            };
+        let some(firsts) = labelled.get(each.first_deck_id) else {
+            return err(unknown_deck(each.first_deck_id));
         };
+        let some(seconds) = labelled.get(each.second_deck_id) else {
+            return err(unknown_deck(each.second_deck_id));
+        };
+        for (let first : firsts) {
+            for (let second : seconds) {
+                set out.push(Observation { player: first, opponent: second, result: each.result });
+                set out.push(Observation {
+                    player: second,
+                    opponent: first,
+                    result: each.result.flipped(),
+                });
+            }
+        }
     }
-    out
+    ok(out)
 }.test({
     let forest = Identifier {
         name: "Forest",
@@ -125,11 +123,11 @@ fn observations(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> O
         maindeck_cards: [],
     };
     let decks = [deck_with("a", ["Forest"]), deck_with("b", ["Swamp"])];
-    let matches = [between("a", "b", Win), between("a", "zz", Loss)];
-    assert(observations(decks, matches, [forest]) == [
+    assert(observations(decks, [between("a", "b", Win)], [forest]) == ok([
         Observation { player: "Forest", opponent: "Other", result: Win },
         Observation { player: "Other", opponent: "Forest", result: Loss },
-    ]);
+    ]));
+    assert(observations(decks, [between("a", "zz", Loss)], [forest]) == err(unknown_deck("zz")));
 })
 
 # The win rate as a percentage with one decimal: `55.6%`.
@@ -173,9 +171,9 @@ fn record_of(self: Observation[]) -> Record {
 struct Matrix { names: str[], rows: Record?[][], overall: Record[] }
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
-pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Matrix {
+pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Matrix!str {
     let names = shares(decks, identifiers)$name;
-    let seen = observations(decks, matches, identifiers);
+    let seen = observations(decks, matches, identifiers)?;
     let rows = names.map(|player| {
         let mine = seen.filter(|each| each.player == player);
         names.map(|opponent| {
@@ -188,7 +186,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         })
     });
     let overall = names.map(|player| seen.filter(|each| each.player == player).record_of());
-    Matrix { names, rows, overall }
+    ok(Matrix { names, rows, overall })
 }.test({
     let forest = Identifier {
         name: "Forest",
@@ -199,12 +197,15 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     };
     let decks = [deck_with("a", ["Forest"]), deck_with("b", ["Swamp"]), deck_with("c", ["Forest"])];
     let matches = [between("a", "b", Win), between("a", "c", Win)];
-    assert(winrate_matrix(decks, matches, [forest]) == Matrix {
+    assert(winrate_matrix(decks, matches, [forest]) == ok(Matrix {
         names: ["Forest", "Other"],
         rows: [
             [none, some(Record { win: 1, loss: 0, draw: 0 })],
             [some(Record { win: 0, loss: 1, draw: 0 }), none],
         ],
         overall: [Record { win: 2, loss: 1, draw: 0 }, Record { win: 0, loss: 1, draw: 0 }],
-    });
+    }));
+    // A match with a deck the metagame does not have is an error.
+    assert(winrate_matrix(decks, [between("a", "zz", Win)], [forest]) == err(unknown_deck("zz")));
+    assert(winrate_matrix(decks, [between("zz", "a", Win)], [forest]) == err(unknown_deck("zz")));
 })

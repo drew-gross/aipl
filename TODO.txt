@@ -31,7 +31,8 @@ projects:
       show meta share
       dump winrate matrix to interactive svg
       include total match count (W - L - D)
-      in observations, a match with a deck not in decks should be an error. If it's a parsing problem, it's invalid data, and if it's a non-meta deck, those should be included.
+      include links to games
+      put more info in bottom thing (non-mirror winrate, seen-in-round, played-at-record)
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
 
@@ -522,6 +523,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  better way to iterate over all pairs than 2 for loops (tuple_combinations()? product()?)
   better function for making an "index" (list of T to dict of T's ID to T)
   join() should get leading_sep and trailing_sep and then tabulate's rule() can get simpler
   spreading optionals should make tabulate()'s widths computation simpler

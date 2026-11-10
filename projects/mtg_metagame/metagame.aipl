@@ -273,6 +273,45 @@ fn without_mirrors(self: Match[]) -> Match[] {
     assert([win, rematch, loss].without_mirrors() == [win, rematch]);
 })
 
+# The complaint about a match naming the deck `id`, which the metagame has none of.
+pub fn unknown_deck(id: str) -> str {
+    `a match names deck "{id}", which is not in the metagame`
+}.test({
+    assert(unknown_deck("7") == `a match names deck "7", which is not in the metagame`);
+})
+
+# `ok` when both decks of every match in `self` are among `decks`, and the complaint about the first
+# match that names one that is not otherwise.
+fn check_decks_exist(self: Match[], decks: Deck[]) -> !str {
+    let known: #{str} = decks$deck_id.to_set();
+    for (let each : self) {
+        if (!known.has(each.first_deck_id)) { return err(unknown_deck(each.first_deck_id)); };
+        if (!known.has(each.second_deck_id)) { return err(unknown_deck(each.second_deck_id)); };
+    }
+    ok()
+}.test({
+    let deck = Deck {
+        deck_id: "a",
+        name: "",
+        pilot: "",
+        tournament: "",
+        maindeck: [],
+        sideboard: [],
+    };
+    let other = Deck { ..deck, deck_id: "b" };
+    let match_played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        result: Win,
+        record: Record { win: 0, loss: 0, draw: 0 },
+        round: "",
+    };
+    assert([match_played].check_decks_exist([deck, other]) == ok());
+    assert([match_played].check_decks_exist([deck]) == err(unknown_deck("b")));
+    assert([match_played].check_decks_exist([other]) == err(unknown_deck("a")));
+    assert([].check_decks_exist([]) == ok());
+})
+
 # A whole metagame document, as `tools/pkl_to_json.py` writes it.
 pub fn decode_metagame(self: Json) -> Metagame!str {
     let decks = self.list_field("decks")?;
@@ -280,11 +319,14 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
     for (let deck : decks) {
         set histories.extend(deck.decode_history()?);
     }
+    let decoded = decks.try_map(decode_deck)?;
+    let matches = histories.without_mirrors();
+    matches.check_decks_exist(decoded)?;
     ok(Metagame {
         name: self.text_field("name")?,
         tournament_ids: self.list_field("tournament_ids")?$scalar_text().collect_ok(),
-        decks: decks.try_map(decode_deck)?,
-        matches: histories.without_mirrors(),
+        decks: decoded,
+        matches,
     })
 }.test({
     let json = parse("""{"name":"m","tournament_ids":[1,"b"],"decks":[]}""")?;
@@ -294,6 +336,13 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
         decks: [],
         matches: [],
     }));
+    // A match against a deck the document does not have is bad data.
+    let dangling = parse("""
+        {"name":"m","tournament_ids":[],"decks":[
+          {"deck_id":"a","maindeck":[],"sideboard":[],"match_history":[
+            {"opponent_deck_id":"zz","result":"win","record":{"win":2,"loss":0,"draw":0},"round":"R1"}]}]}
+    """)?;
+    assert(decode_metagame(dangling) == err(unknown_deck("zz")));
 })
 
 # The metagame in the gzipped JSON file at `path`. The file is unpacked by
