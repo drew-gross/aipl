@@ -1,0 +1,222 @@
+# The winrate matrix as an SVG page: a heat map with a row and a column for each archetype, green
+# where the row's archetype wins, red where it loses. Hovering a cell lights up its row and column
+# and says what the pairing's record is, as a flamegraph does for a frame.
+
+import {
+    contains,
+    equal as ==,
+    first,
+    join,
+    len,
+    less_than as <,
+    max,
+    push,
+    saturating_divide as /,
+    split,
+    value_or,
+    wrapping_add as +,
+    wrapping_mul as *,
+    wrapping_sub as -,
+} from builtins;
+import { Record } from "./metagame.aipl";
+import { Matrix, rate_text } from "./winrate_matrix.aipl";
+
+# The size of a cell, and the space around the matrix, in pixels.
+let CELL: u64 = 64;
+
+let MARGIN: u64 = 24;
+
+let TITLE_HEIGHT: u64 = 56;
+
+let DETAILS_HEIGHT: u64 = 40;
+
+# The width in pixels one character of a label takes, for sizing the room it needs.
+let CHARACTER_WIDTH: u64 = 7;
+
+# `self` as text safe inside an XML attribute or element.
+fn xml_escape(self: str) -> str {
+    self
+        .split("&")
+        .join(sep="&amp;")
+        .split("<")
+        .join(sep="&lt;")
+        .split(">")
+        .join(sep="&gt;")
+        .split(`"`)
+        .join(sep="&quot;")
+}.test({
+    assert(xml_escape("plain") == "plain");
+    assert(xml_escape("a & b <c>") == "a &amp; b &lt;c&gt;");
+    assert(xml_escape(`say "hi"`) == "say &quot;hi&quot;");
+})
+
+# One colour channel at `rate`, the share won in thousandths: `low` at none, `middle` at an even
+# record, `high` at all.
+fn channel(low: i64, middle: i64, high: i64, rate: i64) -> i64 {
+    if (rate < 500) {
+        low + (middle - low) * rate / 500
+    } else {
+        middle + (high - middle) * (rate - 500) / 500
+    }
+}.test({
+    assert(channel(200, 250, 100, 0) == 200);
+    assert(channel(200, 250, 100, 250) == 225);
+    assert(channel(200, 250, 100, 500) == 250);
+    assert(channel(200, 250, 100, 750) == 175);
+    assert(channel(200, 250, 100, 1000) == 100);
+})
+
+# The colour of a cell holding `self`: red for losing, white for even, green for winning, and grey
+# when no match was decided.
+fn colour(self: Record) -> str {
+    let decided = self.win + self.loss;
+    if (decided == 0) { return "rgb(232,232,232)"; };
+    let rate = self.win * 1000 / decided;
+    let red = channel(215, 247, 26, rate);
+    let green = channel(48, 247, 152, rate);
+    let blue = channel(39, 247, 80, rate);
+    `rgb({red},{green},{blue})`
+}.test({
+    assert(Record { win: 0, loss: 0, draw: 3 }.colour() == "rgb(232,232,232)");
+    assert(Record { win: 0, loss: 2, draw: 0 }.colour() == "rgb(215,48,39)");
+    assert(Record { win: 1, loss: 1, draw: 0 }.colour() == "rgb(247,247,247)");
+    assert(Record { win: 2, loss: 0, draw: 0 }.colour() == "rgb(26,152,80)");
+})
+
+# What hovering a cell says: `row` against `column`, the win rate and the record.
+fn describe(row: str, column: str, cell: Record?) -> str {
+    match (cell) {
+        some(Record { win, loss, draw }) => {
+            let rate = Record { win, loss, draw }.rate_text();
+            `{row} vs {column}: {rate} ({win}-{loss}-{draw})`
+        },
+        none => `{row} against itself is not counted`,
+    }
+}.test({
+    assert(
+        describe("A", "B", some(Record { win: 2, loss: 1, draw: 0 })) == "A vs B: 66.7% (2-1-0)",
+    );
+    assert(describe("A", "B", some(Record { win: 0, loss: 0, draw: 1 })) == "A vs B: - (0-0-1)");
+    assert(describe("A", "A", none) == "A against itself is not counted");
+})
+
+# The styles of the page. A hovered cell sets `focus` on the page and `hot` on every cell and
+# label sharing its row or column, and the rest dim.
+let STYLE = """
+    text { font-family: Verdana, sans-serif; font-size: 12px; fill: #222; }
+    #title { text-anchor: middle; font-size: 17px; }
+    #subtitle { text-anchor: middle; fill: #888; }
+    .cell rect { stroke: #fff; stroke-width: 1; }
+    .cell text { text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .row-label { text-anchor: end; dominant-baseline: central; }
+    .focus .cell, .focus .label { opacity: 0.3; }
+    .focus .hot { opacity: 1; }
+    .cell:hover rect { stroke: #000; stroke-width: 2; }
+    .label.hot { font-weight: bold; }
+""";
+
+# What hovering does: light up the cell's row and column, and write its description under the
+# matrix.
+let SCRIPT = """
+    var root, details;
+    function init(evt) {
+        root = evt.target;
+        details = document.getElementById("details").firstChild;
+    }
+    function cell_of(node) {
+        while (node && !(node.classList && node.classList.contains("cell"))) node = node.parentNode;
+        return node;
+    }
+    function light(row, column) {
+        for (var each of root.querySelectorAll(".cell, .label")) {
+            var hot = row !== null && (each.getAttribute("data-row") === row || each.getAttribute("data-column") === column);
+            each.classList.toggle("hot", hot);
+        }
+    }
+    window.addEventListener("mouseover", function(e) {
+        var cell = cell_of(e.target);
+        if (!cell) return;
+        root.classList.add("focus");
+        light(cell.getAttribute("data-row"), cell.getAttribute("data-column"));
+        details.nodeValue = cell.getAttribute("data-info");
+    });
+    window.addEventListener("mouseout", function(e) {
+        if (!cell_of(e.target)) return;
+        root.classList.remove("focus");
+        light(null, null);
+        details.nodeValue = " ";
+    });
+""";
+
+# The page for `self`, of the metagame `name`.
+pub fn winrate_svg(self: Matrix, name: str) -> str {
+    let Matrix { names, rows } = self;
+    mut longest: u64 = 0;
+    for (let each : names) {
+        set longest = max(longest, each.len());
+    }
+    // A column heading runs up and to the right at 45 degrees.
+    let label_width = longest * CHARACTER_WIDTH + MARGIN;
+    let heading_height = longest * 5 + MARGIN;
+    let grid_width = names.len() * CELL;
+    let grid_left = MARGIN + label_width;
+    let grid_top = TITLE_HEIGHT + heading_height;
+    let width = grid_left + grid_width + longest * 5 + MARGIN;
+    let height = grid_top + grid_width + DETAILS_HEIGHT;
+    let middle = width / 2;
+    mut parts: str[] = [];
+    for (let column, each : names) {
+        let x = grid_left + column * CELL + CELL / 2;
+        set parts.push(
+            `<text class="label" data-column="{column}" transform="translate({x},{grid_top - 8}) rotate(-45)">{each.xml_escape()}</text>`,
+        );
+    }
+    for (let row, cells : rows) {
+        let y = grid_top + row * CELL;
+        let row_name = names[row].value_or("");
+        set parts.push(
+            `<text class="label row-label" data-row="{row}" x="{grid_left - 8}" y="{y + CELL / 2}">{row_name.xml_escape()}</text>`,
+        );
+        for (let column, cell : cells) {
+            let column_name = names[column].value_or("");
+            let info = describe(row_name, column_name, cell).xml_escape();
+            let x = grid_left + column * CELL;
+            let fill = cell$colour().value_or("rgb(255,255,255)");
+            let shown = cell$rate_text().value_or("-");
+            set parts.push(
+                `<g class="cell" data-row="{row}" data-column="{column}" data-info="{info}"><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{fill}"/><text x="{x + CELL / 2}" y="{y + CELL / 2}">{shown}</text></g>`,
+            );
+        }
+    }
+    `<?xml version="1.0" standalone="no"?>
+<svg version="1.1" width="{width}" height="{height}" viewBox="0 0 {width} {height}" onload="init(evt)" xmlns="http://www.w3.org/2000/svg">
+<style type="text/css">{STYLE}</style>
+<script type="text/ecmascript"><![CDATA[{SCRIPT}]]></script>
+<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
+<text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
+<text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; draws left out</text>
+{parts.join(sep="\n")}
+<text id="details" x="{MARGIN}" y="{height - 14}"> </text>
+</svg>
+`
+}.test({
+    let matrix = Matrix {
+        names: ["A", "B & C"],
+        rows: [
+            [none, some(Record { win: 1, loss: 0, draw: 0 })],
+            [some(Record { win: 0, loss: 1, draw: 0 }), none],
+        ],
+    };
+    let page = winrate_svg(matrix, "m");
+    let lines = page.split("\n");
+    assert(lines.first() == some(`<?xml version="1.0" standalone="no"?>`));
+    assert(page.contains("Winrate Matrix from m"));
+    // A cell says its pairing, and a name is escaped.
+    assert(page.contains(`data-info="A vs B &amp; C: 100.0% (1-0-0)"`));
+    assert(page.contains(`data-info="B &amp; C vs A: 0.0% (0-1-0)"`));
+    assert(page.contains(`data-info="A against itself is not counted"`));
+    // One cell for each pairing, and a heading for each archetype on both axes.
+    assert(page.split(`class="cell"`).len() == 5);
+    assert(page.split(`class="label"`).len() == 3);
+    assert(page.split(`class="label row-label"`).len() == 3);
+})

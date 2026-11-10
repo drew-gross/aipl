@@ -8,6 +8,7 @@ import {
     first,
     len,
     less_than as <,
+    logical_and as &&,
     not_equal as !=,
     print,
     read_file_to_string,
@@ -15,6 +16,7 @@ import {
     value_or,
     value_or_err,
     wrapping_increment as ++,
+    write_string_to_file,
 } from builtins;
 import { load_identifiers } from "./archetypes.aipl";
 import { card_counts } from "./card_stats.aipl";
@@ -22,13 +24,14 @@ import { Counted } from "./counted.aipl";
 import { optional_text_field } from "./json.aipl";
 import { share_report } from "./meta_share.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
-import { winrate_report } from "./winrate_matrix.aipl";
+import { winrate_matrix } from "./winrate_matrix.aipl";
+import { winrate_svg } from "./winrate_svg.aipl";
 import { Json, parse } from json;
 
 let USAGE = """
     usage: mtg_metagame cards <metagame>
            mtg_metagame share <metagame> [--archetypes <config>]
-           mtg_metagame winrate <metagame> [--archetypes <config>]
+           mtg_metagame winrate <metagame> [--archetypes <config>] [--output <file.svg>]
 """;
 
 # The archetype list `share` uses when `--archetypes` is not given.
@@ -63,20 +66,25 @@ fn cards_listing(args: str[]) !read_files !execute_program -> str[]!str {
     ok(card_counts(decks)$card_line())
 }
 
-# What `share` or `winrate` was asked: the metagame, and the archetype list to classify its decks with.
-struct DeckOptions { metagame: str, archetypes: str }
+# What `share` or `winrate` was asked: the metagame, the archetype list to classify its decks with,
+# and where `winrate` writes its page (`none` for the default, named after the metagame).
+struct DeckOptions { metagame: str, archetypes: str, output: str? }
 
-# The options of the command `command` in `args`: one metagame, and `--archetypes <config>`, in
-# any order.
+# The options of the command `command` in `args`: one metagame, `--archetypes <config>`, and for
+# `winrate` `--output <file>`, in any order.
 fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
     mut metagame = "";
     mut archetypes = DEFAULT_ARCHETYPES;
+    mut output: str? = none;
     mut i: u64 = 0;
     while (i < args.len()) {
         let arg = args[i].value_or("");
         if (arg == "--archetypes") {
             set i++;
             set archetypes = args[i].value_or_err("--archetypes needs the name of a list")?;
+        } else if (arg == "--output" && command == "winrate") {
+            set i++;
+            set output = some(args[i].value_or_err("--output needs the name of a file")?);
         } else {
             if (arg.starts_with("--")) { return err(`unknown option "{arg}"`); };
             if (metagame != "") { return err(`unexpected argument "{arg}"`); };
@@ -85,16 +93,27 @@ fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
         set i++;
     }
     if (metagame == "") { return err(`{command} needs a metagame`); };
-    ok(DeckOptions { metagame, archetypes })
+    ok(DeckOptions { metagame, archetypes, output })
 }.test({
     assert(parse_deck_options("share", ["m"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Standard2026Q4RC",
+        output: none,
     }));
     assert(parse_deck_options("share", ["--archetypes", "Modern2026Q3RC", "m"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Modern2026Q3RC",
+        output: none,
     }));
+    assert(parse_deck_options("winrate", ["m", "--output", "out.svg"]) == ok(DeckOptions {
+        metagame: "m",
+        archetypes: "Standard2026Q4RC",
+        output: some("out.svg"),
+    }));
+    assert(parse_deck_options("winrate", ["m", "--output"]) == err(
+        "--output needs the name of a file",
+    ));
+    assert(parse_deck_options("share", ["m", "--output", "x"]) == err(`unknown option "--output"`));
     assert(parse_deck_options("share", []) == err("share needs a metagame"));
     assert(parse_deck_options("winrate", []) == err("winrate needs a metagame"));
     assert(parse_deck_options("share", ["m", "n"]) == err(`unexpected argument "n"`));
@@ -112,16 +131,19 @@ fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
     ok(share_report(metagame, decks, identifiers))
 }
 
-# The winrate matrix for the metagame named by `args`, one line each.
-fn winrate_listing(args: str[]) !read_files !execute_program -> str[]!str {
-    let DeckOptions { metagame, archetypes } = parse_deck_options("winrate", args)?;
+# Write the winrate matrix for the metagame named by `args` as an SVG page, to the file `--output`
+# names or `winrate_<metagame>.svg`, and say where it went.
+fn winrate_listing(args: str[]) !read_files !execute_program !write_files -> str[]!str {
+    let DeckOptions { metagame, archetypes, output } = parse_deck_options("winrate", args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks, matches } = load_named(metagame)?;
-    ok(winrate_report(metagame, decks, matches, identifiers))
+    let path = output.value_or(`winrate_{metagame}.svg`);
+    write_string_to_file(path, winrate_matrix(decks, matches, identifiers).winrate_svg(metagame))?;
+    ok([`wrote {path}`])
 }
 
 # The lines a command line asks for, or why it asks for none.
-fn run(args: str[]) !read_files !execute_program -> str[]!str {
+fn run(args: str[]) !read_files !execute_program !write_files -> str[]!str {
     let some(command) = args.first() else { return err(USAGE); };
     let rest = args.drop_first();
     match (command) {
@@ -133,9 +155,9 @@ fn run(args: str[]) !read_files !execute_program -> str[]!str {
 }
 
 # Run a command: `cards <metagame>` lists every card played, `share <metagame>` the share of
-# the field each archetype is, `winrate <metagame>` how each archetype does against each other. The metagame is a file in `data/` (without its `.json.gz`), or
+# the field each archetype is, `winrate <metagame>` writes an SVG page of how each archetype does against each other. The metagame is a file in `data/` (without its `.json.gz`), or
 # one of the names in `data/index.json`.
-fn main(args: str[]) !prints !read_files !execute_program -> i64 {
+fn main(args: str[]) !prints !read_files !execute_program !write_files -> i64 {
     match (run(args)) {
         ok(lines) => {
             for (let line : lines) {

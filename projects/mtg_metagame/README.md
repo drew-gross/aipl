@@ -22,10 +22,13 @@ Order by Metagame %
 …
 ```
 
-`winrate <metagame> [--archetypes <config>]` prints the winrate matrix: a row per archetype (most decks
-first, `Other` last) giving the share of its decided matches it won against each archetype in the
-columns. A match counts toward every pairing of its deck's archetypes and its opponent's, draws are
-left out, and `-` is a pairing with no decided match or an archetype against itself.
+`winrate <metagame> [--archetypes <config>] [--output <file.svg>]` writes the winrate matrix as an SVG
+page (default `winrate_<metagame>.svg`) and prints where it went: a heat map with a row per archetype
+(most decks first, `Other` last) and a column for each, coloured by the share of the row's decided
+matches it won against the column's, green for winning and red for losing. Open it in a browser:
+hovering a cell lights up its row and column and says the record underneath. A match counts toward
+every pairing of one deck's archetypes and the other's, from both sides. Draws are left out, and `-`
+is a pairing with no decided match or an archetype against itself.
 
 `cards` lists every card played in a metagame, most copies first (main decks and
 sideboards together; equal counts in name order). `share` classifies each deck into
@@ -45,7 +48,8 @@ a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this 
 | `card_stats.aipl` | `card_counts`: copies played per card |
 | `archetypes.aipl` | the classifier: `Identifier`, `archetypes_of`, `load_identifiers` |
 | `meta_share.aipl` | `shares`, the percentage, `share_report` (the table itself is the `tabulate` library) |
-| `winrate_matrix.aipl` | `observations` (each match per archetype pairing), `winrate_report` |
+| `winrate_matrix.aipl` | `observations` (each match per archetype pairing), `winrate_matrix` |
+| `winrate_svg.aipl` | `winrate_svg`: the matrix as an SVG page |
 | `json.aipl` | accessors over the tree `parse` from the `json` library builds: `field`, `text_field`, `integer_field`, `list_field` |
 
 The files are unpacked by running `gzip -dc` (`execute_program`): nothing here

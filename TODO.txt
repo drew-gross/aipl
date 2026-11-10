@@ -24,14 +24,14 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
+    make a better templating language (in aipl maybe?) for making the svgs
     matches seems odd for a member of Deck, we should just parse the file into a raw list of matches and analyze that
     winrate:
-      ignore mirror matches
       dump winrate matrix to interactive svg
       include total winrate
       even column sizes
       include total match count (W - L - D)
-    split out the logic for rendering stuff into a table
+      in observations, a match with a deck not in decks should be an error. If it's a parsing problem, it's invalid data, and if it's a non-meta deck, those should be included.
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
 
@@ -522,6 +522,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  better function for making an "index" (list of T to dict of T's ID to T)
   join() should get leading_sep and trailing_sep and then tabulate's rule() can get simpler
   spreading optionals should make tabulate()'s widths computation simpler
   make try_left_fold and try_right_fold for use when the lambda returns an error

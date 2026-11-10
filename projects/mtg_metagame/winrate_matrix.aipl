@@ -10,11 +10,9 @@ import {
     float_div as /,
     float_mul as *,
     get,
-    len,
     map,
     push,
     render,
-    repeat,
     to_dict,
 } from builtins;
 import { Identifier, archetypes_of, deck_of, label } from "./archetypes.aipl";
@@ -30,7 +28,6 @@ import {
     add_records,
     win_rate,
 } from "./metagame.aipl";
-import { tabulate } from tabulate;
 
 # One match, from the point of view of an archetype the player's deck is, against an archetype
 # the opponent's deck is.
@@ -141,58 +138,54 @@ fn percent_text(self: Float) -> str { `{(self * 100.0).render(digits=1)}%` }.tes
     assert(percent_text(2.0 / 3.0) == "66.7%");
 })
 
-# What a cell of the matrix says about `self`: the win rate, or `-` when none of the matches
-# was decided.
-fn cell_text(self: Observation[]) -> str {
+# What a cell says about `self`: the win rate, or `-` when none of the matches was decided.
+pub fn rate_text(self: Record) -> str {
+    if (let some(rate) = self.win_rate()) { rate.percent_text() } else { "-" }
+}.test({
+    assert(Record { win: 0, loss: 0, draw: 0 }.rate_text() == "-");
+    assert(Record { win: 0, loss: 0, draw: 4 }.rate_text() == "-");
+    assert(Record { win: 1, loss: 1, draw: 1 }.rate_text() == "50.0%");
+    assert(Record { win: 2, loss: 1, draw: 0 }.rate_text() == "66.7%");
+})
+
+# The total of what `self` says about how its row's archetype did against its column's.
+fn record_of(self: Observation[]) -> Record {
     mut total = Record { win: 0, loss: 0, draw: 0 };
     for (let each : self) {
         set total = add_records(total, each.result.as_record());
     }
-    if (let some(rate) = total.win_rate()) { rate.percent_text() } else { "-" }
+    total
 }.test({
     let nothing: Observation[] = [];
-    assert(nothing.cell_text() == "-");
+    assert(nothing.record_of() == Record { win: 0, loss: 0, draw: 0 });
     let draw = Observation { player: "a", opponent: "b", result: Draw };
-    assert([draw].cell_text() == "-");
     let win = Observation { ..draw, result: Win };
     let loss = Observation { ..draw, result: Loss };
-    assert([win, loss, draw].cell_text() == "50.0%");
-    assert([win, win, loss].cell_text() == "66.7%");
+    assert([win, loss, draw, win].record_of() == Record { win: 2, loss: 1, draw: 1 });
 })
 
-# The matrix on `decks`, loaded from the metagame `name`, as lines: a row for each archetype
-# (most decks first) giving its win rate against each archetype in the columns, or `-` against
-# itself.
-pub fn winrate_report(
-    name: str,
-    decks: Deck[],
-    matches: Match[],
-    identifiers: Identifier[],
-) -> str[] {
+# How each archetype did against each other one. `names` are the archetypes, most decks first, and
+# `rows` has a row for each, each with a cell for each of `names`: the record of the row's
+# archetype against the column's, or `none` where they are the same archetype. Such a pairing
+# holds every match between two decks of it from both sides, so it says nothing.
+struct Matrix { names: str[], rows: Record?[][] }
+
+# The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
+pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Matrix {
     let names = shares(decks, identifiers)$name;
     let seen = observations(decks, matches, identifiers);
     let rows = names.map(|player| {
         let mine = seen.filter(|each| each.player == player);
-        [
-            player,
-            ..names.map(|opponent| {
-                // An archetype against itself is held from both sides, so its rate is always even.
-                if (opponent == player) {
-                    "-"
-                } else {
-                    mine.filter(|each| each.opponent == opponent).cell_text()
-                }
-            }),
-        ]
+        names.map(|opponent| {
+            let cell: Record? = if (opponent == player) {
+                none
+            } else {
+                some(mine.filter(|each| each.opponent == opponent).record_of())
+            };
+            cell
+        })
     });
-    [
-        `Winrate Matrix from {name}`,
-        "Win rate of the row's archetype against the column's, draws left out",
-        ..rows.tabulate(
-            ["Archetype", ..names],
-            right_aligned=[false, ..[true].repeat(names.len())],
-        ),
-    ]
+    Matrix { names, rows }
 }.test({
     let forest = Identifier {
         name: "Forest",
@@ -203,14 +196,11 @@ pub fn winrate_report(
     };
     let decks = [deck_with("a", ["Forest"]), deck_with("b", ["Swamp"]), deck_with("c", ["Forest"])];
     let matches = [between("a", "b", Win), between("a", "c", Win)];
-    assert(winrate_report("m", decks, matches, [forest]) == [
-        "Winrate Matrix from m",
-        "Win rate of the row's archetype against the column's, draws left out",
-        "+-----------+--------+--------+",
-        "| Archetype | Forest |  Other |",
-        "+===========+========+========+",
-        "| Forest    |      - | 100.0% |",
-        "| Other     |   0.0% |      - |",
-        "+-----------+--------+--------+",
-    ]);
+    assert(winrate_matrix(decks, matches, [forest]) == Matrix {
+        names: ["Forest", "Other"],
+        rows: [
+            [none, some(Record { win: 1, loss: 0, draw: 0 })],
+            [some(Record { win: 0, loss: 1, draw: 0 }), none],
+        ],
+    });
 })
