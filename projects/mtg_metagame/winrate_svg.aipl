@@ -255,6 +255,10 @@ let STYLE = """
     .cell.removed { opacity: 0.25; }
     svg:not(.locked-view) .cell:hover rect, .cell.locked rect { filter: saturate(1.6) brightness(0.84); }
     .label.hot { font-weight: bold; }
+    #sorts { fill: #888; }
+    .sort { fill: #1a6fb5; cursor: pointer; }
+    .sort:hover { text-decoration: underline; }
+    .sort.active { fill: #222; font-weight: bold; cursor: default; text-decoration: none; }
     #panel { pointer-events: none; }
     #panel .button { pointer-events: all; cursor: pointer; text-anchor: end; font-weight: bold; fill: #1a6fb5; }
     #panel .fold { pointer-events: all; cursor: pointer; }
@@ -276,7 +280,7 @@ let STYLE = """
 # other archetype's overall record would be without its matches against the removed ones. The
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
-    var root, panel, locked = null, removed = [], names = [], folded = [];
+    var root, panel, locked = null, removed = [], names = [], folded = [], sorting = "share";
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
@@ -284,7 +288,29 @@ let SCRIPT = """
         for (var each of root.querySelectorAll(".row-label")) names[+each.getAttribute("data-row")] = each.getAttribute("data-name");
         var saved = /removed=([\d,]+)/.exec(location.hash);
         if (saved) removed = saved[1].split(",").map(Number).filter(function(i) { return i < names.length; });
+        var sort = /sort=(share|winrate)/.exec(location.hash);
+        if (sort) sorting = sort[1];
+        apply_sort();
         refresh();
+    }
+    // Lay the rows and columns out in the order `sorting` names, by moving them from where the page
+    // drew them (meta share order): a row or column keeps its index, which the cells' attributes use.
+    function apply_sort() {
+        var records = [], order = names.map(function(name, i) { return i; });
+        for (var cell of root.querySelectorAll(".cell.overall")) records[+cell.getAttribute("data-row")] = record_of(cell);
+        if (sorting === "winrate") {
+            var key = function(i) { return played(records[i]) === 0 ? -1 : rate_of(records[i]); };
+            order.sort(function(a, b) { return key(b) - key(a) || a - b; });
+        }
+        var position = [], size = +root.querySelector(".cell.overall rect").getAttribute("height");
+        order.forEach(function(index, at) { position[index] = at; });
+        for (var each of root.querySelectorAll("[data-row], [data-column]")) {
+            if (!each.classList.contains("label") && !each.classList.contains("cell")) continue;
+            var row = each.getAttribute("data-row"), column = each.getAttribute("data-column");
+            var dx = column === null ? 0 : (position[+column] - column) * size, dy = row === null ? 0 : (position[+row] - row) * size;
+            each.setAttribute("transform", dx || dy ? "translate(" + dx + "," + dy + ")" : "");
+        }
+        for (var option of root.querySelectorAll(".sort")) option.classList.toggle("active", option.getAttribute("data-sort") === sorting);
     }
     function ancestor(node, test) {
         while (node && !(node.classList && test(node))) node = node.parentNode;
@@ -433,7 +459,10 @@ let SCRIPT = """
             set_labels(cell, rate_text(p.now), played(p.now) === 0 ? null : removed.length === 0 ? record_text(p.now) : delta_text(p));
         }
         try {
-            history.replaceState(null, "", removed.length ? "#removed=" + removed.join(",") : location.pathname + location.search);
+            var kept = [];
+            if (removed.length) kept.push("removed=" + removed.join(","));
+            if (sorting !== "share") kept.push("sort=" + sorting);
+            history.replaceState(null, "", kept.length ? "#" + kept.join("&") : location.pathname + location.search);
         } catch (error) {}
         if (locked) show(locked); else clear();
     }
@@ -559,6 +588,8 @@ let SCRIPT = """
         clear();
     });
     window.addEventListener("click", function(e) {
+        var order = e.target.getAttribute && e.target.getAttribute("data-sort");
+        if (order) { sorting = order; apply_sort(); refresh(); return; }
         var key = e.target.getAttribute && e.target.getAttribute("data-fold");
         if (key) {
             var at = folded.indexOf(key);
@@ -694,6 +725,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
+<text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan></text>
 {parts.join(sep="\n")}
 <g id="panel" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}" data-brackets="{bracket_labels}"></g>
 </svg>
@@ -737,6 +769,8 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     // A row label has the archetype's deck count and share.
     assert(page.contains(">3 decks · 75.0%</text>"));
     assert(page.contains(">1 deck · 25.0%</text>"));
+    // The sort options are there to click.
+    assert(page.contains(`data-sort="winrate">win rate</tspan>`));
     // One cell for each pairing, and a heading for each archetype on both axes.
     assert(page.split(`class="cell"`).len() == 5);
     // The overall column: a cell for each archetype, and its own heading.
