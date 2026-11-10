@@ -87,13 +87,42 @@ fn colour(self: Record) -> str {
     assert(Record { win: 2, loss: 0, draw: 0 }.colour() == "rgb(26,152,80)");
 })
 
+# `self` as wins, losses and draws: `3-0-1`.
+fn record_text(self: Record) -> str {
+    let Record { win, loss, draw } = self;
+    `{win}-{loss}-{draw}`
+}.test({
+    assert(Record { win: 3, loss: 0, draw: 1 }.record_text() == "3-0-1");
+})
+
+# What a cell centred on (`x`, `y`) shows of `self`: its win rate and, smaller beneath, its record.
+# An archetype against itself (`none`) and a pairing that never met show only a `-`.
+fn cell_labels(x: u64, y: u64, self: Record?) -> str {
+    let some(record) = self else { return `<text x="{x}" y="{y}">-</text>`; };
+    if (record.win + record.loss + record.draw == 0) { return `<text x="{x}" y="{y}">-</text>`; };
+    `<text x="{x}" y="{y - 7}">{record.rate_text()}</text><text class="detail" x="{x}" y="{y + 9}">{record.record_text()}</text>`
+}.test({
+    assert(cell_labels(10, 20, none) == `<text x="10" y="20">-</text>`);
+    assert(
+        cell_labels(
+            10,
+            20,
+            some(Record { win: 0, loss: 0, draw: 0 }),
+        ) == `<text x="10" y="20">-</text>`,
+    );
+    assert(
+        cell_labels(
+            10,
+            20,
+            some(Record { win: 3, loss: 0, draw: 1 }),
+        ) == `<text x="10" y="13">87.5%</text><text class="detail" x="10" y="29">3-0-1</text>`,
+    );
+})
+
 # What hovering a cell says: `row` against `column`, the win rate and the record.
 fn describe(row: str, column: str, cell: Record?) -> str {
     match (cell) {
-        some(Record { win, loss, draw }) => {
-            let rate = Record { win, loss, draw }.rate_text();
-            `{row} vs {column}: {rate} ({win}-{loss}-{draw})`
-        },
+        some(record) => `{row} vs {column}: {record.rate_text()} ({record.record_text()})`,
         none => `{row} against itself is not counted`,
     }
 }.test({
@@ -117,8 +146,7 @@ fn deck_summary(count: u64, total: u64) -> str {
 
 # What hovering the overall cell of `row` says: its record against every archetype, itself included.
 fn describe_overall(row: str, total: Record) -> str {
-    let Record { win, loss, draw } = total;
-    `{row} overall: {total.rate_text()} ({win}-{loss}-{draw})`
+    `{row} overall: {total.rate_text()} ({total.record_text()})`
 }.test({
     assert(
         describe_overall("A", Record { win: 3, loss: 1, draw: 2 }) == "A overall: 66.7% (3-1-2)",
@@ -133,6 +161,7 @@ let STYLE = """
     #subtitle { text-anchor: middle; fill: #888; }
     .cell rect { stroke: #fff; stroke-width: 1; }
     .cell text { text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .cell .detail { font-size: 10px; fill: #222; opacity: 0.85; }
     .row-label { text-anchor: end; dominant-baseline: central; }
     .row-label .detail { font-size: 11px; font-weight: normal; fill: #888; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
@@ -221,16 +250,15 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         let total = overall[row].value_or(Record { win: 0, loss: 0, draw: 0 });
         let overall_info = describe_overall(row_name, total).xml_escape();
         set parts.push(
-            `<g class="cell overall" data-row="{row}" data-info="{overall_info}"><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.colour()}"/><text x="{overall_left + CELL / 2}" y="{y + CELL / 2}">{total.rate_text()}</text></g>`,
+            `<g class="cell overall" data-row="{row}" data-info="{overall_info}"><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.colour()}"/>{cell_labels(overall_left + CELL / 2, y + CELL / 2, some(total))}</g>`,
         );
         for (let column, cell : cells) {
             let column_name = names[column].value_or("");
             let info = describe(row_name, column_name, cell).xml_escape();
             let x = grid_left + column * CELL;
             let fill = cell$colour().value_or("rgb(255,255,255)");
-            let shown = cell$rate_text().value_or("-");
             set parts.push(
-                `<g class="cell" data-row="{row}" data-column="{column}" data-info="{info}"><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{fill}"/><text x="{x + CELL / 2}" y="{y + CELL / 2}">{shown}</text></g>`,
+                `<g class="cell" data-row="{row}" data-column="{column}" data-info="{info}"><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{fill}"/>{cell_labels(x + CELL / 2, y + CELL / 2, cell)}</g>`,
             );
         }
     }

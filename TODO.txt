@@ -29,10 +29,9 @@ projects:
     make a better templating language (in aipl maybe?) for making the svgs
     matches seems odd for a member of Deck, we should just parse the file into a raw list of matches and analyze that
     winrate:
+      mirror matches should still show W-L-D (draw count is interesting)
       show meta share
       clicking on a cell should lock it so you can go to the links
-      dump winrate matrix to interactive svg
-      include total match count (W - L - D)
       include links to games
       put more info in bottom thing (non-mirror winrate, seen-in-round, played-at-record)
     accept paths, don't do munging
