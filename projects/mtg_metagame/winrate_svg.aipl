@@ -239,9 +239,12 @@ let STYLE = """
     .row-label { text-anchor: end; dominant-baseline: central; }
     .row-label .detail { font-size: 11px; font-weight: normal; fill: #888; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
-    .cell:hover rect { filter: saturate(1.6) brightness(0.84); }
+    .cell { cursor: pointer; }
+    svg:not(.locked-view) .cell:hover rect, .cell.locked rect { filter: saturate(1.6) brightness(0.84); }
     .label.hot { font-weight: bold; }
     #panel { pointer-events: none; }
+    #panel .button { pointer-events: all; cursor: pointer; text-anchor: end; font-weight: bold; fill: #1a6fb5; }
+    #panel .button:hover { text-decoration: underline; }
     #panel .heading { font-size: 14px; font-weight: bold; }
     #panel .summary { fill: #444; }
     #panel .head { fill: #888; font-size: 11px; }
@@ -252,8 +255,10 @@ let STYLE = """
 
 # What hovering does: light up the cell's row and column, and fill the panel, which stays at the
 # top of the page, from the cell's attributes. A line wider than the panel is wrapped at a space.
+# Clicking a cell locks the panel on it, whatever the mouse then passes over, until the Unlock
+# button, the same cell or the Escape key is clicked or pressed.
 let SCRIPT = """
-    var root, panel;
+    var root, panel, locked = null;
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
@@ -307,12 +312,13 @@ let SCRIPT = """
     function clear() {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + panel.getAttribute("data-top") + ")");
-        put("Hover a cell for how the pairing did in each round.", 0, 14, "head");
+        put("Hover a cell for how the pairing did in each round, or click one to lock it.", 0, 14, "head");
     }
     function show(cell) {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         var y = 14;
         put(cell.getAttribute("data-title"), 0, y, "heading");
+        if (cell === locked) put("Unlock", NUMBERS[3], y, "button");
         for (var line of cell.getAttribute("data-summary").split("|")) {
             y += 20;
             y = put_wrapped(line, y, "summary");
@@ -352,16 +358,43 @@ let SCRIPT = """
             });
         }
     }
+    function lock(cell) {
+        unlock();
+        locked = cell;
+        cell.classList.add("locked");
+        root.classList.add("locked-view");
+        light(cell.getAttribute("data-row"), cell.getAttribute("data-column"));
+        show(cell);
+    }
+    function unlock() {
+        if (locked) locked.classList.remove("locked");
+        locked = null;
+        root.classList.remove("locked-view");
+        light(null, null);
+        clear();
+    }
     window.addEventListener("mouseover", function(e) {
         var cell = cell_of(e.target);
-        if (!cell) return;
+        if (!cell || locked) return;
         light(cell.getAttribute("data-row"), cell.getAttribute("data-column"));
         show(cell);
     });
     window.addEventListener("mouseout", function(e) {
-        if (!cell_of(e.target)) return;
+        if (!cell_of(e.target) || locked) return;
         light(null, null);
         clear();
+    });
+    window.addEventListener("click", function(e) {
+        if (e.target.classList && e.target.classList.contains("button")) {
+            unlock();
+            return;
+        }
+        var cell = cell_of(e.target);
+        if (!cell) return;
+        if (cell === locked) unlock(); else lock(cell);
+    });
+    window.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") unlock();
     });
 """;
 
