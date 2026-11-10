@@ -42,6 +42,8 @@ removed decks' matches are dropped, and nobody is assumed to switch to anything 
 matches each removal took out of that row. Click a name again to bring it back, or use Restore all in the panel; the
 removed archetypes are kept in the page's address (`#removed=1,4`), so a reload or a shared link keeps them.
 
+The top-left links sort the rows and columns by meta share (the default), overall win rate, or projected win rate (the removed archetypes last); the choice is kept in the address too (`&sort=winrate`).
+
 Under it the panel breaks the pairing down by the row archetype's record going into the match (`7-1`, `0-3`, ...), highest
 first, with how often the pairing met at that record and how it went, so a matchup that swings between the top and the bottom
 of the standings shows. The table lists every record any archetype had in the metagame, and one the pairing never met at is

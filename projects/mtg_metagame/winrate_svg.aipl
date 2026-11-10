@@ -288,9 +288,8 @@ let SCRIPT = """
         for (var each of root.querySelectorAll(".row-label")) names[+each.getAttribute("data-row")] = each.getAttribute("data-name");
         var saved = /removed=([\d,]+)/.exec(location.hash);
         if (saved) removed = saved[1].split(",").map(Number).filter(function(i) { return i < names.length; });
-        var sort = /sort=(share|winrate)/.exec(location.hash);
+        var sort = /sort=(share|winrate|projected)/.exec(location.hash);
         if (sort) sorting = sort[1];
-        apply_sort();
         refresh();
     }
     // Lay the rows and columns out in the order `sorting` names, by moving them from where the page
@@ -298,8 +297,13 @@ let SCRIPT = """
     function apply_sort() {
         var records = [], order = names.map(function(name, i) { return i; });
         for (var cell of root.querySelectorAll(".cell.overall")) records[+cell.getAttribute("data-row")] = record_of(cell);
-        if (sorting === "winrate") {
-            var key = function(i) { return played(records[i]) === 0 ? -1 : rate_of(records[i]); };
+        if (sorting !== "share") {
+            // Projected order puts the removed archetypes last, below those with no matches.
+            var key = function(i) {
+                if (sorting === "projected" && removed.indexOf(i) >= 0) return -2;
+                var record = sorting === "projected" ? project(i).now : records[i];
+                return played(record) === 0 ? -1 : rate_of(record);
+            };
             order.sort(function(a, b) { return key(b) - key(a) || a - b; });
         }
         var position = [], size = +root.querySelector(".cell.overall rect").getAttribute("height");
@@ -443,6 +447,7 @@ let SCRIPT = """
     }
     function refresh() {
         removed.sort(function(a, b) { return a - b; });
+        apply_sort();
         for (var each of root.querySelectorAll(".cell, .label")) {
             var row = each.getAttribute("data-row"), column = each.getAttribute("data-column");
             each.classList.toggle("removed", (row !== null && removed.indexOf(+row) >= 0) || (column !== null && removed.indexOf(+column) >= 0));
@@ -589,7 +594,7 @@ let SCRIPT = """
     });
     window.addEventListener("click", function(e) {
         var order = e.target.getAttribute && e.target.getAttribute("data-sort");
-        if (order) { sorting = order; apply_sort(); refresh(); return; }
+        if (order) { sorting = order; refresh(); return; }
         var key = e.target.getAttribute && e.target.getAttribute("data-fold");
         if (key) {
             var at = folded.indexOf(key);
@@ -725,7 +730,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
-<text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan></text>
+<text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan> · <tspan class="sort" data-sort="projected">projected</tspan></text>
 {parts.join(sep="\n")}
 <g id="panel" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}" data-brackets="{bracket_labels}"></g>
 </svg>
@@ -771,6 +776,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(">1 deck · 25.0%</text>"));
     // The sort options are there to click.
     assert(page.contains(`data-sort="winrate">win rate</tspan>`));
+    assert(page.contains(`data-sort="projected">projected</tspan>`));
     // One cell for each pairing, and a heading for each archetype on both axes.
     assert(page.split(`class="cell"`).len() == 5);
     // The overall column: a cell for each archetype, and its own heading.
