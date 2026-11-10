@@ -30,8 +30,6 @@ projects:
     winrate:
       show meta share
       dump winrate matrix to interactive svg
-      include total winrate
-      even column sizes
       include total match count (W - L - D)
       in observations, a match with a deck not in decks should be an error. If it's a parsing problem, it's invalid data, and if it's a non-meta deck, those should be included.
     accept paths, don't do munging

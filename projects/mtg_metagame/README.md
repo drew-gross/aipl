@@ -27,7 +27,7 @@ page (default `winrate_<metagame>.svg`) and prints where it went: a heat map wit
 (most decks first, `Other` last) and a column for each, coloured by the share of the row's decided
 matches it won against the column's, green for winning and red for losing. Open it in a browser:
 hovering a cell lights up its row and column and says the record underneath. A match counts toward
-every pairing of one deck's archetypes and the other's, from both sides. Draws are left out, and `-`
+every pairing of one deck's archetypes and the other's, from both sides. The first column is each archetype's overall win rate against every archetype, mirror matches included (one win and one loss each, which is what they do to an expected win rate at an event). Draws are left out, and `-`
 is a pairing with no decided match or an archetype against itself.
 
 `cards` lists every card played in a metagame, most copies first (main decks and

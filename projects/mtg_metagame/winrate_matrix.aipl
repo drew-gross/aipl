@@ -167,8 +167,10 @@ fn record_of(self: Observation[]) -> Record {
 # How each archetype did against each other one. `names` are the archetypes, most decks first, and
 # `rows` has a row for each, each with a cell for each of `names`: the record of the row's
 # archetype against the column's, or `none` where they are the same archetype. Such a pairing
-# holds every match between two decks of it from both sides, so it says nothing.
-struct Matrix { names: str[], rows: Record?[][] }
+# holds every match between two decks of it from both sides, so it says nothing. `overall` has the
+# record of each of `names` against every archetype, its own included: a mirror match is one win
+# and one loss, which pulls the archetype's overall rate toward even as it does at an event.
+struct Matrix { names: str[], rows: Record?[][], overall: Record[] }
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
 pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Matrix {
@@ -185,7 +187,8 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             cell
         })
     });
-    Matrix { names, rows }
+    let overall = names.map(|player| seen.filter(|each| each.player == player).record_of());
+    Matrix { names, rows, overall }
 }.test({
     let forest = Identifier {
         name: "Forest",
@@ -202,5 +205,6 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             [none, some(Record { win: 1, loss: 0, draw: 0 })],
             [some(Record { win: 0, loss: 1, draw: 0 }), none],
         ],
+        overall: [Record { win: 2, loss: 1, draw: 0 }, Record { win: 0, loss: 1, draw: 0 }],
     });
 })

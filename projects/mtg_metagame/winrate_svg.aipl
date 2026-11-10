@@ -100,6 +100,16 @@ fn describe(row: str, column: str, cell: Record?) -> str {
     assert(describe("A", "A", none) == "A against itself is not counted");
 })
 
+# What hovering the overall cell of `row` says: its record against every archetype, itself included.
+fn describe_overall(row: str, total: Record) -> str {
+    let Record { win, loss, draw } = total;
+    `{row} overall: {total.rate_text()} ({win}-{loss}-{draw})`
+}.test({
+    assert(
+        describe_overall("A", Record { win: 3, loss: 1, draw: 2 }) == "A overall: 75.0% (3-1-2)",
+    );
+})
+
 # The styles of the page. A hovered cell sets `hot` on every cell and label sharing its row or
 # column, and those are deepened in colour, the hovered cell most of all.
 let STYLE = """
@@ -128,7 +138,8 @@ let SCRIPT = """
     }
     function light(row, column) {
         for (var each of root.querySelectorAll(".cell, .label")) {
-            var hot = row !== null && (each.getAttribute("data-row") === row || each.getAttribute("data-column") === column);
+            var hot = (row !== null && each.getAttribute("data-row") === row)
+                || (column !== null && each.getAttribute("data-column") === column);
             each.classList.toggle("hot", hot);
         }
     }
@@ -145,10 +156,16 @@ let SCRIPT = """
     });
 """;
 
+# The word above the column of overall win rates.
+let OVERALL = "Overall";
+
+# The gap between the overall column and the matrix.
+let GAP: u64 = 10;
+
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, rows } = self;
-    mut longest: u64 = 0;
+    let Matrix { names, rows, overall } = self;
+    mut longest = OVERALL.len();
     for (let each : names) {
         set longest = max(longest, each.len());
     }
@@ -156,12 +173,16 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     let label_width = longest * CHARACTER_WIDTH + MARGIN;
     let heading_height = longest * 5 + MARGIN;
     let grid_width = names.len() * CELL;
-    let grid_left = MARGIN + label_width;
+    let overall_left = MARGIN + label_width;
+    let grid_left = overall_left + CELL + GAP;
     let grid_top = TITLE_HEIGHT + heading_height;
     let width = grid_left + grid_width + longest * 5 + MARGIN;
     let height = grid_top + grid_width + DETAILS_HEIGHT;
     let middle = width / 2;
     mut parts: str[] = [];
+    set parts.push(
+        `<text class="label" transform="translate({overall_left + CELL / 2},{grid_top - 8}) rotate(-45)">{OVERALL}</text>`,
+    );
     for (let column, each : names) {
         let x = grid_left + column * CELL + CELL / 2;
         set parts.push(
@@ -172,7 +193,12 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         let y = grid_top + row * CELL;
         let row_name = names[row].value_or("");
         set parts.push(
-            `<text class="label row-label" data-row="{row}" x="{grid_left - 8}" y="{y + CELL / 2}">{row_name.xml_escape()}</text>`,
+            `<text class="label row-label" data-row="{row}" x="{overall_left - 8}" y="{y + CELL / 2}">{row_name.xml_escape()}</text>`,
+        );
+        let total = overall[row].value_or(Record { win: 0, loss: 0, draw: 0 });
+        let overall_info = describe_overall(row_name, total).xml_escape();
+        set parts.push(
+            `<g class="cell overall" data-row="{row}" data-info="{overall_info}"><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.colour()}"/><text x="{overall_left + CELL / 2}" y="{y + CELL / 2}">{total.rate_text()}</text></g>`,
         );
         for (let column, cell : cells) {
             let column_name = names[column].value_or("");
@@ -203,6 +229,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             [none, some(Record { win: 1, loss: 0, draw: 0 })],
             [some(Record { win: 0, loss: 1, draw: 0 }), none],
         ],
+        overall: [Record { win: 1, loss: 0, draw: 0 }, Record { win: 0, loss: 1, draw: 0 }],
     };
     let page = winrate_svg(matrix, "m");
     let lines = page.split("\n");
@@ -214,6 +241,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-info="A against itself is not counted"`));
     // One cell for each pairing, and a heading for each archetype on both axes.
     assert(page.split(`class="cell"`).len() == 5);
-    assert(page.split(`class="label"`).len() == 3);
+    // The overall column: a cell for each archetype, and its own heading.
+    assert(page.contains(`data-info="A overall: 100.0% (1-0-0)"`));
+    assert(page.split(`class="cell overall"`).len() == 3);
+    assert(page.split(`class="label"`).len() == 4);
     assert(page.split(`class="label row-label"`).len() == 3);
 })
