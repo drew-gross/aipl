@@ -118,7 +118,7 @@ impl Probe {
         }
         let instance = |base: &str, args: &[ConcreteTy]| {
             let written: Vec<Type> = args.iter().map(|a| a.to_type()).collect();
-            Some(crate::check::generic_instance_name(base, &written))
+            Some(crate::typing::generic_instance_name(base, &written))
         };
         let Some(want) = want.concretize_with(
             &|v| {
@@ -265,70 +265,6 @@ fn bind(declared: &Ty, actual: &Type, out: &mut Substitution) {
     }
 }
 
-/// How the pinner's types compare with the stamps the checker leaves on the program
-/// (`Expr::ty`), node by node.
-#[derive(Default, Debug)]
-pub struct StampReport {
-    /// Stamped expressions with a pinned counterpart.
-    pub compared: usize,
-    pub agreed: usize,
-    /// Stamped expressions the pinned function has no node for at that span.
-    pub unmatched: usize,
-    /// Every stamped expression, by form.
-    pub forms: BTreeMap<String, usize>,
-    /// Disagreements by form of expression and the two types: count and one example.
-    pub disagreements: BTreeMap<String, (usize, String)>,
-}
-
-/// Compare every stamped expression of `stamped` (the checker's output) with the pinned type of the
-/// node at the same span in the same function.
-pub fn compare_stamps(stamped: &aipl_syntax::ast::Program, pinned: &TProgram) -> StampReport {
-    let probe = Probe::new(pinned);
-    let mut report = StampReport::default();
-    for item in &stamped.items {
-        let aipl_syntax::ast::Item::Fn(f) = item else {
-            continue;
-        };
-        let Some(pf) = probe.fns.get(&f.name.text) else {
-            continue;
-        };
-        let mut stack = vec![&f.body];
-        while let Some(e) = stack.pop() {
-            stack.extend(crate::children(e));
-            let Some(stamp) = e.ty.as_deref() else {
-                continue;
-            };
-            *report.forms.entry(form(&e.kind)).or_default() += 1;
-            let Some(Some(want)) = pf.nodes.get(&(e.span.start, e.span.end, form(&e.kind))) else {
-                report.unmatched += 1;
-                let why = match pf.nodes.get(&(e.span.start, e.span.end, form(&e.kind))) {
-                    Some(None) => "span shared by nodes of different types",
-                    _ => "no pinned node at the span",
-                };
-                let key = format!("unmatched {}: {why}", form(&e.kind));
-                let example = format!("{} @ {}..{}", f.name.text, e.span.start, e.span.end);
-                report.disagreements.entry(key).or_insert((0, example)).0 += 1;
-                continue;
-            };
-            report.compared += 1;
-            let (got, want) = (canon(&norm(stamp)), canon(&want.to_type()));
-            if got == want {
-                report.agreed += 1;
-                continue;
-            }
-            let key = format!(
-                "{}: stamp {}, pinned {}",
-                form(&e.kind),
-                aipl_syntax::type_name(&got),
-                aipl_syntax::type_name(&want)
-            );
-            let example = format!("{} @ {}..{}", f.name.text, e.span.start, e.span.end);
-            report.disagreements.entry(key).or_insert((0, example)).0 += 1;
-        }
-    }
-    report
-}
-
 /// A type with a generic application whose arguments are all known written as the instance it
 /// names, the one spelling both sides use for it.
 fn canon(t: &Type) -> Type {
@@ -339,7 +275,7 @@ fn canon(t: &Type) -> Type {
             if args.iter().any(has_variable) {
                 Type::Generic(base.clone(), args)
             } else {
-                Type::Named(crate::check::generic_instance_name(base, &args))
+                Type::Named(crate::typing::generic_instance_name(base, &args))
             }
         }
         Type::Case(t) => Type::Case(b(t)),

@@ -3,8 +3,8 @@
 //! cases, a tuple's elements), so they are written against [`MatchInfo`] and shared by whoever can
 //! answer them.
 
-use crate::check::{is_typevar, is_unit, tyname};
 use crate::patterns;
+use crate::typing::{is_typevar, is_unit, tyname};
 use aipl_syntax::ast::{MatchArm, Pattern, Primitive, Type};
 use aipl_syntax::{is_str_repr, Error, Span};
 use std::collections::HashSet;

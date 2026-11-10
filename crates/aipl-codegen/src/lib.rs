@@ -2995,9 +2995,7 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     if !findings.is_empty() {
         return Err(findings);
     }
-    // The checker is run for what every written name resolved to, and still has the last word on
-    // a program it finds something wrong with that the pinner does not.
-    let resolutions = aipl_mono::check_resolved(&check_program)?;
+    let resolutions = pinned.resolutions.clone();
     // `check_program` is the synthesized builtin decls followed by the real program; take back
     // the second half.
     let mut program = Program {
@@ -3062,18 +3060,8 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     Ok(probe.finish())
 }
 
-/// The checker's stamps (`Expr::ty`) against the pinner's types; see `aipl_mono::probe`.
-pub fn stamp_agreement(program: &Program) -> Result<aipl_mono::probe::StampReport, Vec<Error>> {
-    let frontend = frontend(program)?;
-    let pinned = aipl_mono::pin::pin(&frontend.check_program);
-    Ok(aipl_mono::probe::compare_stamps(
-        &frontend.program,
-        &pinned.program,
-    ))
-}
-
 /// `program` with every expression's stamp (`Expr::ty`) replaced by what the pinner makes of the
-/// program as it now stands. `builtins` are the declarations the checker put ahead of the program. A function that no longer pins keeps the stamps it had.
+/// program as it now stands. `builtins` are the declarations put ahead of the program. A function that no longer pins keeps the stamps it had.
 fn repin(builtins: &[Item], mut program: Program) -> Program {
     let mut items = builtins.to_vec();
     items.extend(program.items.iter().cloned());

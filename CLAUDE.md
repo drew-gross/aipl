@@ -700,7 +700,7 @@ wherever in the block it sits: a *statement* `match`/`if` nested inside an
 expression block is a fine *kind* (it isn't required to produce a value), but a
 `set` inside it still can't reach past the enclosing expression.
 
-The rule lives in `no_outer_assign` (`crates/aipl-mono/src/check.rs`), reached
+The rule lives in `no_outer_assign` (`crates/aipl-mono/src/typing.rs`), reached
 from each of the four forms once its position is known to be `Pos::Value`; add a
 new block-holding form to `ValueForm` beside it rather than letting it default to
 unrestricted.

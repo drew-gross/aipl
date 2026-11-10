@@ -229,9 +229,17 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
           declared return type is B`, `fn "f" arg 0: expected A, got B`, `binding "x" is declared A, ..`), so 84 of the
           135 rejected `tests/cases` programs read exactly as before and the rest are refilled. `oracle_report` now
           compares the pinner with `check_resolved` directly.
-  - [ ] **4c. Name resolutions from the pinner** (`aipl_syntax::resolution`, read by the LSP and index), after which
-        `Cx` and its ~6,000 lines go and the helpers the pinner shares (`coerce`, `validate_type`, `MatchInfo`,
-        `generic_instance_name`, ...) move to a module of their own.
+  - [x] **4c. Name resolutions from the pinner; the checker is gone** (Session 13). The pinner records what each
+        written name refers to (`Pinner::resolve`, `Pinned::resolutions`): locals by binder (`Binding::binder`), functions,
+        constructors and cases (patterns: `begin_pattern`/`note_case`, `TypeView::noted` for nested ones), structs and
+        fields. Measured against the checker over `tests/cases` before it went: 11,853 resolutions, the pinner lacked 23
+        and added 46, all of them the checker's quirks (a parameter default's names were filed under the previous
+        function; a refined scrutinee's cases were not resolved; tuple fields were named by instance) or inside a
+        builtin's own test blocks. `frontend` takes them from the pinner, the language-server tests pass on them, and
+        `check_resolved`, `Cx` and the oracle that held the pinner to it are deleted: `check.rs` (7,700 lines) is
+        `typing.rs` (1,500), what the pinner and monomorphization share about types (names, `coerce`, written-type
+        validation by `TypeValidator`, `no_outer_assign`, the shape-changing builtin signatures). Its checker-only
+        stamp comparison (`stamp_agreement`) went with it.
   - [ ] **4d. Delete the pseudo-types** (`NoneInner`, `EmptyArrayArg`, `NoneLiteralArg`, `pseudo_marker`) and make
         `Expr::ty` mandatory by switching the passes to `TExpr`. Behaviour-changing wins on exact types
         (`fold_extends`' receiver rule, the `tuple_windows` optional carry) are follow-ups with their own measurements.
@@ -367,3 +375,5 @@ pins the lowered program from `lowered_for_check` and counts a miss when the pin
   takes the enclosing site span, `settle` collects instead of stopping at the first bound error.
 - Session 13 (continued): 4b is done: the pinner is the type checker `frontend` reports. `Cx` is left for the name
   resolutions and as a fallback; 4c moves the resolutions to the pinner and deletes it.
+- Session 13 (continued): 4c. The checker is deleted. `frontend` is `pin` plus erasing refinements; what is
+  left of stage 4 is 4d (the pseudo-types and a mandatory `Expr::ty`).

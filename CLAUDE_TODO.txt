@@ -9,6 +9,29 @@ type checker:
   `set self[(0, 0)] = ..` types the tuple literal as i64, then rejects it as the index (needs a (u64, u64) annotation)
   a `Span` cannot become an array: `[..names.range()]` fails with "__aipl_arr_reserve expects an array, got Span", so `names.zip(positions)` has no positions array; card_stats.aipl still builds (name, i) pairs by hand
 
+error messages (regressions when the pinner replaced the checker's reporting; the old text is in git history of tests/cases/**/err_*):
+  lost hints: `unknown type "Span"` no longer says the type is a builtin and how to import it; an unimported variant constructor no longer says it isn't in scope / to import it or write `Variant.A`
+  `unknown type "X"` in a signature lost the `fn "area":` context, and for an imported signature it is reported twice (at the call and at the declaration)
+  bare `any` in a return type: was "declare <T: any> and return T", now `body returns any$1[], but the declared return type is any$2[]` (internal names, span moved off the type)
+  desugared names leak: `binding "__spat$376" is declared Q, but its value is P` (destructure, for-destructure) and `binding "__spread_base$0" ...` (spread) lost "two structs that merely share field names are not interchangeable"
+  `without []` mismatches: `its value is i64[]: nothing shows it is not []` says nothing a user can act on (was `its value is []`); a refinement is dropped from one side (`body returns Shape, ... Shape without Square without Dot`, `Shape has no constructor "Circle"`, `field access on non-struct value of type Shape` lost "(only Circle)"); `nonempty_first` lost "expects a non-empty array"
+  builtins that take several shapes now name one: `len/map/zip_with/union expects ...` became `fn "map" arg 0: expected i64[], got i64` (map also takes an optional or a Span; union wants a set; the element type i64 is invented from the literal)
+  a slice of a non-array reports `fn "len" arg 0: expected i64[], got i64` (the user never called len); `slice end: expected i64, got char` and a `Span` field mismatch became `an index must be an integer, got X` (lost slice/field context)
+  generic conflicts: `conflicting types for "T" in "value_or": i64 vs char` became `arg 1: expected i64, got char` (why i64? it doesn't say T is shared), and the span moved from the whole call to the argument; `padded` now points at the declaration's default
+  function values: `fn "twice" returns i64, but bool is expected here` / `fn "pair" takes 2 parameter(s), but a function taking 1 is expected` / `fn "inc" expects a i64 argument...` became `fn "filter" arg 1: expected (i64) -> bool, got (i64) -> i64`: the function passed is no longer named, nor which part (parameter vs result) differs
+  shim closures: `the closure bound to "print" returns str, but "print" returns ()` became `lambda body returns str, but () was expected` (which operation is gone); `lambda parameter "x" is annotated str, but i64 was expected` became `the closure parameter does not fit (i64 is not str)` (direction flipped, name lost)
+  `cannot infer type parameter "A" of generic variant "Build"` is no longer reported at all (a lambda's body pins it in the pinner); decide whether that is the rule, and say so in a case
+  `let r: u8 = identity(300)` was a narrowing error with the `.narrow()` hint, now `integer literal 300 does not fit in u8` pointing inside the call
+  narrow: the three explanations (no target / target not an optional integer / receiver not an integer, with the `?`/`value_or`/`match` advice) became `body returns i64?, but the declared return type is str?` and `"narrow" converts an integer`
+  `?`: two messages (optional needs an optional return; result needs a result return, "or in a test") merged into the vague "`?` needs an optional or result in a function returning one"
+  operators: `arithmetic operand: expected i64, got ()` now has the sides swapped in sense (`expected (), got i64`, `expected i32, got i8`); `"+" is integer addition, but this operand is str; build a string with a template` lost its advice; error carets for `true + false` / `1 && 2` now cover the whole expression
+  noise from the unifier leaks into messages: `(str is not an integer type)`, `(a number cannot be this type)` in `if let` branches, tuple elements (`to_set`/`to_array`, which also lost the "to make a set/array" and the tuple's types), pattern literals; `the argument of "extend": a number cannot be this type` says nothing (was `expects i64[], i64, or i64?, got str[]`)
+  set/dict element rules are now prefixed by the enclosing function (`fn "subject": an ordered set ...`) instead of the construct (`set literal:`, `"to_set":`)
+  type-argument counts: `takes no type arguments` became `takes 0 type argument(s) (), got 1`; the lists lost defaults (`(T, U, V = u8)` is `(T, U, V)`); `but str was given` became `but was inferred as str`
+  arity/field wording: `constructor "Circle" expects 1 argument(s), got 2` and `"err" expects 1 argument, got 0` lost the count given; `struct "Pair" field "b" has no default and was not provided` became `missing field "b" of "Pair"`; `struct Point has no field "z"` lost its quotes; `constructor "Circle" argument:` became `a constructor argument:`; the `write "A(..)"` hint on a nullary-for-payload arm is gone
+  `set n.x = ..` on a non-struct: `field assignment target must be a struct, "p.x" has type i64` became `field access on non-struct value of type i64` (no variable, no assignment)
+  `grid_get` literal without a grid: was "cannot infer a type for T in __builtin_grid_get", now names `grid_get` which the user didn't write
+
 effects / shims:
   undeclared-effect error in a test should say to add a `shim`
 

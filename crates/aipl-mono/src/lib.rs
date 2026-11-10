@@ -26,12 +26,12 @@ use std::{
     sync::OnceLock,
 };
 
-mod check;
 mod match_check;
 mod patterns;
 pub mod pin;
 pub mod probe;
-pub use check::{attribute, check_resolved, set_mangle};
+mod typing;
+pub use typing::{attribute, set_mangle};
 
 mod fold;
 pub use fold::{fold_constants, fold_matches_post_mono};
@@ -662,7 +662,7 @@ pub fn lower_tuples(program: &Program) -> Program {
 /// mangles never contain a `$` themselves — `mangle_type` flattens one to `_` —
 /// so the split is exact.
 pub(crate) fn tuple_instance_arity(inst: &str) -> Option<usize> {
-    inst.strip_prefix(&format!("{}$", check::TUPLE_TEMPLATE))
+    inst.strip_prefix(&format!("{}$", typing::TUPLE_TEMPLATE))
         .map(|rest| rest.split('$').count())
 }
 
@@ -676,7 +676,7 @@ pub(crate) fn tuple_instance_arity(inst: &str) -> Option<usize> {
 /// to the template of its own arity.
 fn tuple_instance_of(inst: &str, base: &str) -> bool {
     match tuple_instance_arity(inst) {
-        Some(n) => base == format!("{}{n}", check::TUPLE_TEMPLATE),
+        Some(n) => base == format!("{}{n}", typing::TUPLE_TEMPLATE),
         None => inst.starts_with(&format!("{base}$")),
     }
 }
@@ -693,7 +693,7 @@ fn tuple_var_name(i: usize) -> String {
 /// template's arity *is* the digits in its name, so there is nothing to keep in
 /// step.
 pub(crate) fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
-    let Some(arity) = name.strip_prefix(check::TUPLE_TEMPLATE) else {
+    let Some(arity) = name.strip_prefix(typing::TUPLE_TEMPLATE) else {
         return Vec::new();
     };
     // A concrete tuple's struct also starts with the prefix, but what follows is
@@ -756,7 +756,7 @@ fn lt_ty(
             // would have built, because `generic_instance_name` sends a tuple
             // base back through `tuple_struct_name`.
             if lowered.iter().any(ty_has_var) {
-                let name = format!("{}{}", check::TUPLE_TEMPLATE, lowered.len());
+                let name = format!("{}{}", typing::TUPLE_TEMPLATE, lowered.len());
                 if !fields_map.contains_key(&name) {
                     order.push(name.clone());
                     let fs: Vec<FieldDecl> = (0..lowered.len())
@@ -770,7 +770,7 @@ fn lt_ty(
                 }
                 return Type::Generic(name, lowered);
             }
-            let name = check::tuple_struct_name(&lowered);
+            let name = typing::tuple_struct_name(&lowered);
             if !fields_map.contains_key(&name) {
                 order.push(name.clone());
                 let fs: Vec<FieldDecl> = lowered
@@ -1227,7 +1227,7 @@ impl GenericLowerer {
     /// type variables and recursively lowers the resulting field/payload types
     /// (so a field of a nested generic type instantiates that one too).
     fn instantiate(&mut self, base: &str, args: &[Type]) -> Result<String, Error> {
-        let name = check::generic_instance_name(base, args);
+        let name = typing::generic_instance_name(base, args);
         if self.seen.contains(&name) {
             return Ok(name);
         }
@@ -1547,7 +1547,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
             })
         })()
         .map_err(|e| match (declared_name, declared_at) {
-            (Some(name), Some(span)) => check::attribute(e.or_at(span), name, &program.sources),
+            (Some(name), Some(span)) => typing::attribute(e.or_at(span), name, &program.sources),
             _ => e,
         })?;
         items.push(lowered);
@@ -1641,7 +1641,7 @@ pub fn monomorphize_probed(
                 // Both rejections below are about the signature as written, which
                 // carries no span of its own: they point at the name.
                 let at_name = |e: Error| {
-                    check::attribute(e.or_at(f.name.span.clone()), &f.name, &program.sources)
+                    typing::attribute(e.or_at(f.name.span.clone()), &f.name, &program.sources)
                 };
                 if is_generic(f) {
                     generics.insert(f.name.text.clone(), normalize(f).map_err(at_name)?);
@@ -1683,9 +1683,9 @@ pub fn monomorphize_probed(
     }
     // Register the constructors of concrete, non-instance variants. A generic-
     // variant instance's constructors are shared by name across instances and
-    // resolved by type (see `check::is_variant_instance`), so they're skipped.
+    // resolved by type (see `typing::is_variant_instance`), so they're skipped.
     for (vn, cases) in &variants {
-        if check::is_variant_instance(vn, &generic_variants) {
+        if typing::is_variant_instance(vn, &generic_variants) {
             continue;
         }
         for (c, _) in cases {
@@ -2091,13 +2091,13 @@ fn variadic_shape(arg_ty: &Type, seq_ty: &Type) -> VShape {
         // Checked before the str-shaped branch, which would otherwise read it
         // as one element of a `char` sequence.
         VShape::Seq
-    } else if is_str_repr(seq_ty) || check::is_char_array(seq_ty) {
+    } else if is_str_repr(seq_ty) || typing::is_char_array(seq_ty) {
         // A `char` sequence is str-shaped however it is spelled. A *declared*
         // `char*` parameter has sequence type `str`, but a generic `T*` keeps
         // `T[]` and only becomes `char[]` once `T` is substituted — the same
         // representation, so both have to take this branch or a `str` argument
         // to a `T = char` instance is misread as a single element.
-        if is_str_repr(arg_ty) || check::is_char_array(arg_ty) {
+        if is_str_repr(arg_ty) || typing::is_char_array(arg_ty) {
             VShape::Seq
         } else {
             VShape::Elem
@@ -2593,7 +2593,7 @@ struct Mono<'a> {
     /// in progress, read back by [`Mono::fn_arg_return`] so a lambda whose only
     /// mention of its error type is a `?` still pins a higher-order function's
     /// error variable. Mirrors the checker's own `try_errs` — see
-    /// [`check::err_side_from_tries`].
+    /// [`typing::err_side_from_tries`].
     try_errs: Vec<Type>,
     /// Compares each inferred type with the pinner's; see [`probe`].
     probe: Option<&'a probe::Probe>,
@@ -2945,7 +2945,7 @@ impl Mono<'_> {
                 }
                 let mark = self.try_errs.len();
                 let (_, ty) = self.infer(body, &benv)?;
-                let ty = check::err_side_from_tries(ty, &self.try_errs[mark..]);
+                let ty = typing::err_side_from_tries(ty, &self.try_errs[mark..]);
                 self.try_errs.truncate(mark);
                 Ok(Some(ty))
             }
@@ -5302,19 +5302,19 @@ impl Mono<'_> {
         let src = &atys[1];
         // The sequence reading wins any tie, so nothing that compiles today
         // changes meaning.
-        if check::coerce(src, &seq_ty).is_ok() {
+        if typing::coerce(src, &seq_ty).is_ok() {
             return None;
         }
         let opt_elem = Type::Optional(Box::new(elem.clone()));
         let shape = if matches!(aipl_syntax::unrefined(src), Type::Optional(_))
-            && check::coerce(src, &opt_elem).is_ok()
+            && typing::coerce(src, &opt_elem).is_ok()
         {
             VShape::Opt
         } else {
             // A bare literal source flexes to the element's width, so
             // `u8_array.extend(7)` is an element and not a mismatch.
             let flexed = aipl_syntax::flex_int_ty(&rargs[1], src, &elem);
-            if check::coerce(&flexed, &elem).is_ok() {
+            if typing::coerce(&flexed, &elem).is_ok() {
                 VShape::Elem
             } else {
                 // Fits no shape: leave the call alone and let the error it
@@ -5417,7 +5417,7 @@ impl Mono<'_> {
     /// the simple forms every later pass knows — a `Match` per constructor
     /// test, an `if` per literal test, a `let` per binder — so codegen never
     /// sees a nested pattern. The checker has already proved the arms
-    /// exhaustive and each reachable (`check::check_nested_exhaustive`), which
+    /// exhaustive and each reachable (`typing::check_nested_exhaustive`), which
     /// is what lets the tree be built without a fallthrough.
     ///
     /// The scrutinee is bound to a temporary once and the tree reads it
@@ -5443,7 +5443,7 @@ impl Mono<'_> {
         // (see the checker's `check_scrutinee`): its elements are inferred on
         // their own and become the tree's first columns, and no struct exists.
         let elementwise: Option<Vec<(Expr, Type)>> = match &scrut.kind {
-            ExprKind::TupleLit(elems) if check::matches_elementwise(arms, elems.len()) => Some(
+            ExprKind::TupleLit(elems) if typing::matches_elementwise(arms, elems.len()) => Some(
                 elems
                     .iter()
                     .map(|e| self.infer(e, env))
@@ -5716,7 +5716,7 @@ impl Mono<'_> {
     /// Register (if new) the monomorphic instance of generic `base` applied to
     /// concrete `args`, returning its synthetic name.
     fn instantiate_generic(&mut self, base: &str, args: &[Type]) -> Result<String, Error> {
-        let name = check::generic_instance_name(base, args);
+        let name = typing::generic_instance_name(base, args);
         if self.structs.contains_key(&name)
             || self.syn_structs.contains_key(&name)
             || self.variants.contains_key(&name)
@@ -5860,7 +5860,7 @@ impl Mono<'_> {
                 }
                 self.bind_field(pr, ar, vars, map);
             }
-            _ => check::collect_var_bindings(field_ty, value_ty, vars, map),
+            _ => typing::collect_var_bindings(field_ty, value_ty, vars, map),
         }
     }
 
@@ -5896,7 +5896,7 @@ impl Mono<'_> {
                             self.bind_field(&fd.ty, ity, &vars, &mut map);
                         }
                     }
-                    if let Some(args) = check::collect_args(&tmpl.type_vars, &map) {
+                    if let Some(args) = typing::collect_args(&tmpl.type_vars, &map) {
                         return Some((base.clone(), args));
                     }
                 }
@@ -5919,7 +5919,7 @@ impl Mono<'_> {
                             }
                         }
                     }
-                    if let Some(args) = check::collect_args(&tmpl.type_vars, &map) {
+                    if let Some(args) = typing::collect_args(&tmpl.type_vars, &map) {
                         return Some((base.clone(), args));
                     }
                 }
@@ -5974,14 +5974,14 @@ impl Mono<'_> {
         let mut map: HashMap<String, Type> = HashMap::new();
         let mut rargs = Vec::with_capacity(args.len());
         // A bare integer literal payload is deferred to the fallback chain below
-        // rather than pinning here — see `check::literal_pins_nothing`. The
+        // rather than pinning here — see `typing::literal_pins_nothing`. The
         // checker does the same, and the two must agree: it accepting a program
         // mono then rejects is a crash after a clean check.
         let mut deferred: Vec<(&Type, Type)> = Vec::new();
         for (arg, pty) in args.iter().zip(case.payload.iter().map(|p| &p.ty)) {
             let (ra, at) = self.infer(arg, env)?;
             let at = decay_concat(at);
-            if check::literal_pins_nothing(arg, pty, &vars) {
+            if typing::literal_pins_nothing(arg, pty, &vars) {
                 deferred.push((pty, at));
             } else {
                 self.bind_field(pty, &at, &vars, &mut map);
@@ -6395,7 +6395,7 @@ impl Mono<'_> {
         // (a joined `str`) the arguments leave open.
         let result_only = matches!(&expr.kind, ExprKind::Call(callee, ..)
         if self.generics.get(callee.name()).is_some_and(|g| {
-            check::has_function_result_var(&g.sig) && !check::has_return_only_var(&g.sig)
+            typing::has_function_result_var(&g.sig) && !typing::has_return_only_var(&g.sig)
         }));
         let prev_expected = expr
             .ty
@@ -6556,7 +6556,7 @@ impl Mono<'_> {
                     elem_tys.push(decay_concat(t));
                     relems.push(re);
                 }
-                let name = check::tuple_struct_name(&elem_tys);
+                let name = typing::tuple_struct_name(&elem_tys);
                 // Only add to syn_structs if not already injected by lower_tuples.
                 if !self.structs.contains_key(&name) && !self.syn_structs.contains_key(&name) {
                     let fields: Vec<(String, Type, Option<Expr>)> = elem_tys
@@ -7151,7 +7151,7 @@ impl Mono<'_> {
             ExprKind::Match(scrut, arms)
                 if arms.iter().any(|a| a.pattern.is_nested())
                     || matches!(&scrut.kind, ExprKind::TupleLit(es)
-                        if check::matches_elementwise(arms, es.len())) =>
+                        if typing::matches_elementwise(arms, es.len())) =>
             {
                 // A nested pattern anywhere: the whole match is compiled to a
                 // decision tree of the simple forms (see `infer_nested_match`).
@@ -8003,8 +8003,8 @@ fn bind(
         // `__none__?`, an empty `[]`'s `__none__[]` — says less than one
         // without: it agrees with any binding of the same shape, and defers to
         // it. `x.value_or(none)` with `x: T?` binds `T` from `x`.
-        Some(prev) if has_placeholder(ty) && check::coerce(ty, prev).is_ok() => Ok(()),
-        Some(prev) if has_placeholder(prev) && check::coerce(prev, ty).is_ok() => {
+        Some(prev) if has_placeholder(ty) && typing::coerce(ty, prev).is_ok() => Ok(()),
+        Some(prev) if has_placeholder(prev) && typing::coerce(prev, ty).is_ok() => {
             map.insert(v.to_string(), ty.clone());
             Ok(())
         }
@@ -8218,7 +8218,7 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     let sig = builtin_sig(name)?;
     // A mutating builtin (`mut self`) is *declared* void — it mutates in place
     // — but a call yields the mutated receiver, exactly like a user mutating
-    // method (the same rule `check::return_ty_of` applies). The in-place `set`
+    // method (the same rule `typing::return_ty_of` applies). The in-place `set`
     // writeback discards it; expression position gets the copy-and-modify
     // result. Deriving this from `is_mutating` rather than naming the builtin
     // means a future `mut self` builtin needs no arm here.

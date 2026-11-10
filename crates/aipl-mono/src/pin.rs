@@ -1,10 +1,9 @@
 //! The type pinner: types a lowered program by unification and hands back a [`TProgram`], a tree
 //! in which every node carries a final type and no placeholder can be written down.
 //!
-//! This is the first stage of the typed-IR project (`TYPED_IR.md`). It runs *beside* the checker in
-//! `check.rs`, which stays the authority on what compiles; nothing consumes the pinner's output
-//! yet. The pinner is held to the checker by the oracle test: over every program the checker
-//! accepts it must pin, and every program it rejects it must reject.
+//! This is the type checker of the typed-IR project (`TYPED_IR.md`): what it rejects is what does
+//! not compile, and what it pins is what every later pass reads. It also records what each written
+//! name refers to ([`Pinned::resolutions`]), which the language server and the index read.
 //!
 //! **How a type is found.** Every expression gets an inference type ([`It`]) whose leaves may be
 //! variables. A variable stands for what is not yet known: an integer literal's width, the element
@@ -19,18 +18,18 @@
 //! a value fits an optional). [`Pinner::coerce`] is where a value meets the type its position
 //! declares, and the only place those are allowed.
 //!
-//! **Gaps.** A form the pinner does not type yet is a [`Failure::Gap`] naming it, never a guess, so
-//! the oracle reports exactly how much of the corpus is covered.
+//! **Gaps.** A form the pinner does not type is a [`Failure::Gap`] naming it, never a guess.
 
 use std::collections::{HashMap, HashSet};
 
-use crate::check::{
+use crate::typing::{
     check_result_inspected, display, no_outer_assign, optional_map_signature, span_map_signature,
     undeclared_effect_message, Pos, ValueForm,
 };
 use aipl_syntax::ast::{
     Callee, Expr, ExprKind, Function, Item, Pattern, Primitive, Program, Signature, Type,
 };
+use aipl_syntax::resolution::{Resolution, Target};
 use aipl_syntax::typed::{
     PinnedOrder, TCaseParam, TExpr, TExprKind, TFieldDecl, TFunction, TItem, TLambdaParam,
     TMatchArm, TParam, TPattern, TProgram, TSignature, TStructDecl, TTypeParam, TVariantCase,
@@ -398,7 +397,7 @@ impl Table {
                 } else {
                     // Every argument is known: the application is the instance it names.
                     let written: Vec<Type> = args.iter().map(TyRepr::to_type).collect();
-                    let name = crate::check::generic_instance_name(&base, &written);
+                    let name = crate::typing::generic_instance_name(&base, &written);
                     self.instances
                         .borrow_mut()
                         .insert(name.clone(), (base, args));
@@ -514,6 +513,8 @@ struct Sig {
 struct Decls {
     /// Filled by every function pinned: see [`Table::instances`].
     instances: std::cell::RefCell<Instances>,
+    /// What every written name in the functions pinned so far was taken to refer to.
+    resolutions: std::cell::RefCell<Vec<Resolution>>,
     sigs: HashMap<String, Sig>,
     /// Field name, type and whether it has a default, in declaration order.
     structs: HashMap<String, Vec<(String, Type, bool)>>,
@@ -526,8 +527,6 @@ struct Decls {
     generic_variants: HashMap<String, aipl_syntax::ast::VariantDecl>,
     /// A generic variant's constructor (`Case@Variant`) -> the template it belongs to.
     generic_ctors: HashMap<String, String>,
-    /// Every signature as declared, for validating written types (`check::validate_type`).
-    plain_sigs: HashMap<String, Signature>,
 }
 
 impl Decls {
@@ -551,24 +550,21 @@ impl Decls {
         for case in &template.cases {
             if let Some((_, payload)) = cases.iter().find(|(n, _)| *n == case.name.text) {
                 for (slot, instance) in case.payload.iter().zip(payload) {
-                    crate::check::collect_var_bindings(&slot.ty, instance, &vars, &mut bound);
+                    crate::typing::collect_var_bindings(&slot.ty, instance, &vars, &mut bound);
                 }
             }
         }
-        crate::check::collect_args(&template.type_vars, &bound)
+        crate::typing::collect_args(&template.type_vars, &bound)
     }
 
     /// Whether `t`, as written, may appear in a declaration or annotation.
     fn validate(&self, t: &Type, type_params: &[String], ctx: &str, at: &Span) -> Res<()> {
-        crate::check::validate_type(
-            &crate::check::DeclTables {
+        crate::typing::validate_type(
+            &crate::typing::DeclTables {
                 structs: &self.structs,
                 variants: &self.variants,
-                ctors: &self.ctors,
                 generic_structs: &self.generic_structs,
                 generic_variants: &self.generic_variants,
-                generic_ctors: &self.generic_ctors,
-                sigs: &self.plain_sigs,
             },
             t,
             type_params,
@@ -578,10 +574,17 @@ impl Decls {
     }
 }
 
+/// `span`, unless it is the placeholder for a name written nowhere.
+fn written(span: &Span) -> Option<Span> {
+    (span.start < span.end).then(|| span.clone())
+}
+
 #[derive(Clone)]
 struct Binding {
     ty: It,
     mutable: bool,
+    /// Where the name was introduced, if it is written anywhere.
+    binder: Option<Span>,
 }
 
 struct Pinner<'a> {
@@ -618,6 +621,10 @@ struct Pinner<'a> {
     in_test: bool,
     /// Each `narrow` call's target integer type and span: where its value goes has to say which.
     narrows: Vec<(It, Span)>,
+    /// What each written name was taken to refer to, for the language server.
+    resolutions: Vec<Resolution>,
+    /// The names the pattern being typed writes, and how many of each case have been met.
+    pattern_names: (aipl_syntax::ast::WrittenNames, HashMap<String, usize>),
     /// Errors in statements the walk went on past: see [`Pinner::recover`].
     errors: Vec<Error>,
 }
@@ -643,6 +650,8 @@ pub struct Pinned {
     pub failures: Vec<(String, Failure)>,
     /// The generic applications behind the instance names in [`Pinned::program`]'s types.
     pub instances: Instances,
+    /// What each name written in a pinned function's body was taken to refer to.
+    pub resolutions: Vec<Resolution>,
 }
 
 /// Pin every function of `program`. Functions are independent: one that fails is reported and
@@ -650,6 +659,7 @@ pub struct Pinned {
 pub fn pin(program: &Program) -> Pinned {
     let mut decls = Decls {
         instances: Default::default(),
+        resolutions: Default::default(),
         sigs: HashMap::new(),
         structs: HashMap::new(),
         variants: HashMap::new(),
@@ -658,7 +668,6 @@ pub fn pin(program: &Program) -> Pinned {
         generic_structs: HashMap::new(),
         generic_variants: HashMap::new(),
         generic_ctors: HashMap::new(),
-        plain_sigs: HashMap::new(),
     };
     for item in &program.items {
         match item {
@@ -666,7 +675,6 @@ pub fn pin(program: &Program) -> Pinned {
                 decls
                     .sigs
                     .insert(f.name.text.clone(), Sig { sig: f.sig.clone() });
-                decls.plain_sigs.insert(f.name.text.clone(), f.sig.clone());
             }
             Item::Struct(s) if s.is_generic() => {
                 decls.generic_templates.insert(s.name.text.clone());
@@ -737,13 +745,15 @@ pub fn pin(program: &Program) -> Pinned {
             Item::Struct(s) if s.type_vars.iter().any(|tp| tp.default.is_some()) => {
                 failures.push((
                     s.name.text.clone(),
-                    Failure::Rejected(crate::check::defaults_only_on_functions("struct", &s.name)),
+                    Failure::Rejected(crate::typing::defaults_only_on_functions("struct", &s.name)),
                 ));
             }
             Item::Variant(v) if v.type_vars.iter().any(|tp| tp.default.is_some()) => {
                 failures.push((
                     v.name.text.clone(),
-                    Failure::Rejected(crate::check::defaults_only_on_functions("variant", &v.name)),
+                    Failure::Rejected(crate::typing::defaults_only_on_functions(
+                        "variant", &v.name,
+                    )),
                 ));
             }
             Item::Struct(s) if !s.is_generic() && declaration_error(&decls, item).is_some() => {
@@ -779,6 +789,7 @@ pub fn pin(program: &Program) -> Pinned {
         },
         failures,
         instances: decls.instances.take(),
+        resolutions: aipl_syntax::resolution::settled(decls.resolutions.take()),
     }
 }
 
@@ -976,6 +987,8 @@ fn pinner_for<'a>(
         in_test: false,
         errors: Vec::new(),
         narrows: Vec::new(),
+        resolutions: Vec::new(),
+        pattern_names: Default::default(),
     }
 }
 
@@ -1024,6 +1037,7 @@ fn pin_slot_default(
             Binding {
                 ty: t,
                 mutable: false,
+                binder: None,
             },
         );
     }
@@ -1107,6 +1121,7 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
             Binding {
                 ty,
                 mutable: param.mutable,
+                binder: written(&param.name_span.0),
             },
         );
     }
@@ -1141,12 +1156,13 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
                         Binding {
                             ty: t.clone(),
                             mutable: false,
+                            binder: written(&q.name_span.0),
                         },
                     )
                 })
                 .collect();
             let e = p.expr(default)?;
-            if !crate::check::mentions_typevar(&param.ty) {
+            if !crate::typing::mentions_typevar(&param.ty) {
                 let what = format!(
                     "default for fn {:?} parameter {:?}",
                     display(&f.name.text),
@@ -1171,6 +1187,7 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     // Recovery left placeholders in the tree, which is not worth finishing.
     p.stop_if_recovered(&f.body.span)?;
     let body = p.finish(body, &f.body.span)?;
+    decls.resolutions.borrow_mut().append(&mut p.resolutions);
     let defaults = defaults
         .into_iter()
         .map(|d| d.map(|d| p.finish(d, &f.name.span)).transpose())
@@ -1257,8 +1274,8 @@ fn check_type_param_defaults(p: &Pinner, f: &Function) -> Res<()> {
             Some(default) => {
                 defaulted = true;
                 let own: Vec<&str> = f.sig.type_vars.iter().map(|t| t.name.as_str()).collect();
-                if crate::check::mentions_typevar(default)
-                    || crate::check::names_a_type_named(default, &own)
+                if crate::typing::mentions_typevar(default)
+                    || crate::typing::names_a_type_named(default, &own)
                 {
                     return reject(
                         format!(
@@ -1662,7 +1679,7 @@ impl Pinner<'_> {
     }
 
     /// A value of type `actual` where `expected` is declared: unification plus the widenings the
-    /// language allows at such a position (`check.rs`'s `coerce` is the specification).
+    /// language allows at such a position (`typing.rs`'s `coerce` is the specification).
     fn coerce<'s>(
         &mut self,
         actual: &It,
@@ -1850,10 +1867,12 @@ impl Pinner<'_> {
             ExprKind::Str(s) => self.node(K::Str(s.clone()), It::Prim(Primitive::Str), e),
             ExprKind::Char(c) => self.node(K::Char(*c), It::Prim(Primitive::Char), e),
             ExprKind::Unit => self.node(K::Unit, It::Unit, e),
-            ExprKind::Ident(name) => match self.env.get(name) {
+            ExprKind::Ident(name) => match self.env.get(name).cloned() {
                 Some(b) => {
-                    let ty = b.ty.clone();
-                    self.node(K::Ident(name.clone()), ty, e)
+                    if let Some(binder) = b.binder {
+                        self.resolve(&e.name_span, Target::Local(binder));
+                    }
+                    self.node(K::Ident(name.clone()), b.ty, e)
                 }
                 None => return self.reference(e, name),
             },
@@ -1998,7 +2017,15 @@ impl Pinner<'_> {
                         &v.span,
                     );
                 }
-                let old = self.env.insert(name.clone(), Binding { ty, mutable });
+                let binder = written(&e.name_span.as_deref().cloned().unwrap_or_default());
+                let old = self.env.insert(
+                    name.clone(),
+                    Binding {
+                        ty,
+                        mutable,
+                        binder,
+                    },
+                );
                 let body = self.expr_at(body_src, pos)?;
                 if let It::Res(..) = self.table.shallow(&v.ty) {
                     let shown = Type::Result(Box::new(Type::Unit), Box::new(Type::Unit));
@@ -2028,6 +2055,13 @@ impl Pinner<'_> {
                     let Some(b) = self.env.get(root).cloned() else {
                         return reject(format!("set: undeclared variable {root:?}"), &lhs.span);
                     };
+                    if let Some(binder) = &b.binder {
+                        let mut base = &**lhs;
+                        while let ExprKind::Field(obj, _) = &base.kind {
+                            base = obj;
+                        }
+                        self.resolve(&base.name_span, Target::Local(binder.clone()));
+                    }
                     if !b.mutable {
                         return reject(
                             format!(
@@ -2079,9 +2113,13 @@ impl Pinner<'_> {
                         )
                     }
                 };
-                let mut scope = vec![(var.clone(), elem)];
+                let mut scope = vec![(
+                    var.clone(),
+                    elem,
+                    written(&e.name_span.as_deref().cloned().unwrap_or_default()),
+                )];
                 if let Some(i) = index {
-                    scope.push((i.clone(), key));
+                    scope.push((i.clone(), key, None));
                 }
                 let (saved, body) = self.scoped(scope, |p| p.expr_at(body, Pos::Discard))?;
                 self.restore(saved);
@@ -2092,6 +2130,16 @@ impl Pinner<'_> {
                 )
             }
             ExprKind::Construct(name, inits) => {
+                self.resolve(&e.name_span, Target::Struct(name.clone()));
+                for init in inits.iter().filter(|i| !i.name.is_empty()) {
+                    self.resolve_at(
+                        &init.name.span,
+                        Target::Field {
+                            owner: name.clone(),
+                            field: init.name.text.clone(),
+                        },
+                    );
+                }
                 let (fields, targs, result) = if let Some(f) = self.decls.structs.get(name) {
                     (f.clone(), HashMap::new(), It::Named(name.clone()))
                 } else if let Some(t) = self.decls.generic_structs.get(name).cloned() {
@@ -2154,16 +2202,16 @@ impl Pinner<'_> {
                 // is not a tuple fails on a field access the user never wrote.
                 if let ExprKind::Ident(n) = &obj.kind {
                     let pattern = if n.starts_with(aipl_syntax::LET_TUPLE_BASE_PREFIX) {
-                        Some(crate::check::TuplePattern::Let)
+                        Some(crate::typing::TuplePattern::Let)
                     } else if n.starts_with(aipl_syntax::FOR_TUPLE_BASE_PREFIX) {
-                        Some(crate::check::TuplePattern::For)
+                        Some(crate::typing::TuplePattern::For)
                     } else {
                         None
                     };
                     if let Some(pattern) = pattern {
                         let t = self.table.shallow(&x.ty);
                         let tuple = match &t {
-                            It::Gen(base, _) => base.starts_with(crate::check::TUPLE_TEMPLATE),
+                            It::Gen(base, _) => base.starts_with(crate::typing::TUPLE_TEMPLATE),
                             It::Named(n) => n.starts_with("__tuple$"),
                             _ => false,
                         };
@@ -2180,6 +2228,15 @@ impl Pinner<'_> {
                             self.table.show(&owner)
                         ),
                         &x.span,
+                    );
+                }
+                if let Some(declaring) = self.declaring_struct(&owner) {
+                    self.resolve(
+                        &e.name_span,
+                        Target::Field {
+                            owner: declaring,
+                            field: field.clone(),
+                        },
                     );
                 }
                 let ty = self.field_type(&owner, field, &e.span)?;
@@ -2331,7 +2388,7 @@ impl Pinner<'_> {
                     out.push(self.expr(item)?);
                 }
                 let tys: Vec<It> = out.iter().map(|i| i.ty.clone()).collect();
-                let template = format!("{}{}", crate::check::TUPLE_TEMPLATE, tys.len());
+                let template = format!("{}{}", crate::typing::TUPLE_TEMPLATE, tys.len());
                 self.node(K::TupleLit(out), It::Gen(template, tys), e)
             }
             ExprKind::Shim(effect, bindings, body) => {
@@ -2375,14 +2432,24 @@ impl Pinner<'_> {
             ExprKind::IfLet(arm, scrut, else_src) => {
                 let scrut = self.expr(scrut)?;
                 let st = self.known(&scrut.ty, &scrut.span)?;
+                self.begin_pattern(arm);
                 let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
                 if arm.pattern.is_nested() {
-                    let view = TypeView { decls: self.decls };
+                    let view = TypeView::new(self.decls);
                     let ty = self.refined_type(&st);
-                    crate::match_check::bind_nested(&view, &arm.pattern, &ty, arm.span.clone())
-                        .map_err(Failure::Rejected)?;
+                    let bound =
+                        crate::match_check::bind_nested(&view, &arm.pattern, &ty, arm.span.clone());
+                    self.take_notes(&view);
+                    bound.map_err(Failure::Rejected)?;
                 }
                 let declared: HashSet<String> = arm.pattern.bindings().into_iter().collect();
+                let binds = binds
+                    .into_iter()
+                    .map(|(n, t)| {
+                        let binder = arm.written.binder(&n);
+                        (n, t, binder)
+                    })
+                    .collect();
                 let (saved, body) = self.scoped(binds, |p| p.expr_at(&arm.body, pos))?;
                 self.restore(saved);
                 let otherwise = self.expr_at(else_src, pos)?;
@@ -2464,7 +2531,15 @@ impl Pinner<'_> {
                             &arm.span,
                         );
                     }
+                    self.begin_pattern(arm);
                     let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
+                    let binds = binds
+                        .into_iter()
+                        .map(|(n, t)| {
+                            let binder = arm.written.binder(&n);
+                            (n, t, binder)
+                        })
+                        .collect();
                     let (saved, body) = self.scoped(binds, |p| p.expr_at(&arm.body, pos))?;
                     self.restore(saved);
                     if !aipl_syntax::diverges(&arm.body) {
@@ -2488,9 +2563,9 @@ impl Pinner<'_> {
                 let mut scope = Vec::new();
                 let mut typed = Vec::new();
                 for param in params {
-                    let written = param.ty.as_ref().expect("checked above");
-                    let t = self.lower(written, &HashMap::new(), &param.span)?;
-                    scope.push((param.name.clone(), t.clone()));
+                    let annotation = param.ty.as_ref().expect("checked above");
+                    let t = self.lower(annotation, &HashMap::new(), &param.span)?;
+                    scope.push((param.name.clone(), t.clone(), written(&param.span)));
                     ptys.push(t.clone());
                     typed.push(TLambdaParam {
                         name: param.name.clone(),
@@ -2543,7 +2618,7 @@ impl Pinner<'_> {
     /// or the struct a tuple of known elements lowers to.
     fn tuple_elems(&mut self, t: &It, span: &Span) -> Res<Option<Vec<It>>> {
         match t {
-            It::Gen(base, args) if base.starts_with(crate::check::TUPLE_TEMPLATE) => {
+            It::Gen(base, args) if base.starts_with(crate::typing::TUPLE_TEMPLATE) => {
                 Ok(Some(args.clone()))
             }
             It::Named(n) if n.starts_with("__tuple$") => {
@@ -2659,6 +2734,13 @@ impl Pinner<'_> {
     fn reference(&mut self, e: &Expr, name: &str) -> Res<TExpr<It>> {
         if let Some(variant) = self.decls.ctors.get(name).cloned() {
             let bare = name.split('@').next().unwrap_or(name);
+            self.resolve(
+                &e.name_span,
+                Target::Case {
+                    variant: variant.clone(),
+                    case: bare.to_string(),
+                },
+            );
             let payload = self.decls.variants[&variant]
                 .iter()
                 .find(|(c, _)| c == bare)
@@ -2676,6 +2758,13 @@ impl Pinner<'_> {
             let tmpl = self.decls.generic_variants[&base].clone();
             let (vars, _) = self.fresh_args(&tmpl.type_vars);
             let bare = name.split('@').next().unwrap_or(name);
+            self.resolve(
+                &e.name_span,
+                Target::Case {
+                    variant: base.clone(),
+                    case: bare.to_string(),
+                },
+            );
             let payload = tmpl
                 .cases
                 .iter()
@@ -2692,6 +2781,7 @@ impl Pinner<'_> {
         }
         if let Some(sig) = self.decls.sigs.get(name).cloned() {
             let sig = sig.sig;
+            self.resolve(&e.name_span, Target::Function(name.to_string()));
             if sig.is_generic() {
                 return reject(
                     format!(
@@ -2754,11 +2844,11 @@ impl Pinner<'_> {
                     .map(|t| {
                         !sig.params
                             .iter()
-                            .any(|p| crate::check::mentions_type_named(&p.ty, &t.name))
+                            .any(|p| crate::typing::mentions_type_named(&p.ty, &t.name))
                             && sig
                                 .return_ty
                                 .as_ref()
-                                .is_some_and(|r| crate::check::mentions_type_named(r, &t.name))
+                                .is_some_and(|r| crate::typing::mentions_type_named(r, &t.name))
                     })
                     .collect(),
                 defaults: sig.type_vars.iter().map(|t| t.default.clone()).collect(),
@@ -2862,7 +2952,7 @@ impl Pinner<'_> {
                         .get(n)
                         .map(|f| f.iter().map(|(n, _, _)| n.clone()).collect())
                         .unwrap_or_default(),
-                    It::Gen(n, _) if n.starts_with(crate::check::TUPLE_TEMPLATE) => {
+                    It::Gen(n, _) if n.starts_with(crate::typing::TUPLE_TEMPLATE) => {
                         let count = match &owner {
                             It::Gen(_, a) => a.len(),
                             _ => 0,
@@ -2900,7 +2990,7 @@ impl Pinner<'_> {
             It::Case(t) => Type::Case(boxed(&t)),
             It::Res(a, b) => Type::Result(boxed(&a), boxed(&b)),
             It::Dict(k, v) => Type::Dict(boxed(&k), boxed(&v)),
-            It::Gen(base, args) if base.starts_with(crate::check::TUPLE_TEMPLATE) => {
+            It::Gen(base, args) if base.starts_with(crate::typing::TUPLE_TEMPLATE) => {
                 Type::Generic(base, args.iter().map(|a| self.refined_type(a)).collect())
             }
             other => self.table.resolve(&other).to_type(),
@@ -2909,16 +2999,23 @@ impl Pinner<'_> {
 
     /// The checks on a `match` that depend on its patterns alone: each arm's patterns fit the
     /// scrutinee, every case is covered once, nothing is unreachable.
-    fn match_rules(&self, st: &It, arms: &[aipl_syntax::ast::MatchArm], span: &Span) -> Res<()> {
-        let view = TypeView { decls: self.decls };
+    fn match_rules(
+        &mut self,
+        st: &It,
+        arms: &[aipl_syntax::ast::MatchArm],
+        span: &Span,
+    ) -> Res<()> {
+        let view = TypeView::new(self.decls);
         let ty = self.refined_type(st);
         let rejected = |e| Failure::Rejected(e);
         if arms.iter().any(|a| a.pattern.is_nested()) {
             let mut rows = Vec::new();
             for arm in arms {
-                let (pat, _) =
-                    crate::match_check::bind_nested(&view, &arm.pattern, &ty, arm.span.clone())
-                        .map_err(rejected)?;
+                self.begin_pattern(arm);
+                let bound =
+                    crate::match_check::bind_nested(&view, &arm.pattern, &ty, arm.span.clone());
+                self.take_notes(&view);
+                let (pat, _) = bound.map_err(rejected)?;
                 rows.push(vec![pat]);
             }
             crate::match_check::check_nested_exhaustive(&view, &rows, &ty, arms, span.clone())
@@ -2966,7 +3063,7 @@ impl Pinner<'_> {
             _ => return Ok(ret),
         };
         let elem_ty = self.table.resolve(&elem).to_type();
-        let view = TypeView { decls: self.decls };
+        let view = TypeView::new(self.decls);
         // Inside a generic body the variant is a type variable and has no cases to name.
         let Some(cases) = crate::match_check::MatchInfo::cases_of(&view, &elem_ty) else {
             return Ok(ret);
@@ -3264,6 +3361,93 @@ impl Pinner<'_> {
         Ok(())
     }
 
+    /// Start typing the pattern of `arm`: its names are the ones to resolve.
+    fn begin_pattern(&mut self, arm: &aipl_syntax::ast::MatchArm) {
+        self.pattern_names = (arm.written.clone(), HashMap::new());
+    }
+
+    /// Note that the pattern being typed names case `bare` of the variant `owner`, at the next
+    /// place the pattern writes that case.
+    fn note_case(&mut self, owner: String, bare: &str) {
+        let (written, seen) = &mut self.pattern_names;
+        let nth = seen.entry(bare.to_string()).or_insert(0);
+        let at = written
+            .cases
+            .iter()
+            .filter(|c| c.text == bare)
+            .nth(*nth)
+            .map(|c| c.span.clone());
+        *nth += 1;
+        if let Some(at) = at {
+            self.resolve_at(
+                &at,
+                Target::Case {
+                    variant: owner,
+                    case: bare.to_string(),
+                },
+            );
+        }
+    }
+
+    /// Take the cases a [`TypeView`] was told about.
+    fn take_notes(&mut self, view: &TypeView<'_>) {
+        for (ty, bare) in view.noted.take() {
+            let owner = match &ty {
+                Type::Named(n) => Some(self.template_of(n)),
+                Type::Generic(base, _) => Some(base.clone()),
+                _ => None,
+            };
+            if let Some(owner) = owner {
+                self.note_case(owner, &bare);
+            }
+        }
+    }
+
+    /// Note that the name written at `named` refers to `target`.
+    fn resolve(&mut self, named: &Option<Box<Span>>, target: Target) {
+        if let Some(at) = named {
+            self.resolve_at(at, target);
+        }
+    }
+
+    /// [`Pinner::resolve`] for a name whose span is held bare; an empty one is the "written
+    /// nowhere" placeholder and records nothing.
+    fn resolve_at(&mut self, at: &Span, target: Target) {
+        if at.start < at.end {
+            self.resolutions.push(Resolution {
+                in_fn: self.fn_name.clone(),
+                at: at.clone(),
+                target,
+            });
+        }
+    }
+
+    /// The template a generic instance (`Opt$i64`) was made from; any other name is its own.
+    fn template_of(&self, name: &str) -> String {
+        if let Some((base, _)) = self.table.instances.borrow().get(name).or(self
+            .decls
+            .instances
+            .borrow()
+            .get(name))
+        {
+            return base.clone();
+        }
+        match name.split_once('$') {
+            Some((base, _)) if self.decls.generic_templates.contains(base) => base.to_string(),
+            _ => name.to_string(),
+        }
+    }
+
+    /// The item that declares the struct `ty` names: the struct itself, or the template an
+    /// instance was made from. `None` for a type that is no struct.
+    fn declaring_struct(&self, ty: &It) -> Option<String> {
+        match self.table.shallow(ty) {
+            It::Named(n) => Some(self.template_of(&n)),
+            It::Gen(base, _) => Some(base),
+            _ => None,
+        }
+    }
+
     /// Go on past a statement the program got wrong. The error is kept, and a node of a type
     /// nothing is known about stands where the statement was, so the statements after it are
     /// still checked. A form the pinner cannot type once an error is held is taken as a
@@ -3303,15 +3487,20 @@ impl Pinner<'_> {
     /// Bring `bindings` into scope for `f`, handing back what they shadowed.
     fn scoped<R>(
         &mut self,
-        bindings: Vec<(String, It)>,
+        bindings: Vec<(String, It, Option<Span>)>,
         f: impl FnOnce(&mut Self) -> Res<R>,
     ) -> Res<(Vec<(String, Option<Binding>)>, R)> {
         let saved = bindings
             .into_iter()
-            .map(|(name, ty)| {
-                let old = self
-                    .env
-                    .insert(name.clone(), Binding { ty, mutable: false });
+            .map(|(name, ty, binder)| {
+                let old = self.env.insert(
+                    name.clone(),
+                    Binding {
+                        ty,
+                        mutable: false,
+                        binder,
+                    },
+                );
                 (name, old)
             })
             .collect::<Vec<_>>();
@@ -3529,6 +3718,11 @@ impl Pinner<'_> {
                     );
                 }
                 let bare = name.split('@').next().unwrap_or(name);
+                if matches!(st, It::Named(_) | It::Gen(..)) {
+                    if let Some(owner) = self.declaring_struct(st) {
+                        self.note_case(owner, bare);
+                    }
+                }
                 let payload = self.ctor_payload(st, bare, span)?;
                 if *ignore_payload && payload.is_empty() {
                     return reject(
@@ -3658,7 +3852,7 @@ impl Pinner<'_> {
     /// template's fields (or payloads) the instance's.
     fn link_instance(&mut self, inst: &str, base: &str, targs: &[It]) -> Result<(), String> {
         let is_instance = inst.split('$').next() == Some(base)
-            || (base.starts_with(crate::check::TUPLE_TEMPLATE) && inst.starts_with("__tuple$"));
+            || (base.starts_with(crate::typing::TUPLE_TEMPLATE) && inst.starts_with("__tuple$"));
         if !is_instance {
             return Err(format!("{inst} is not an instance of {base}"));
         }
@@ -3680,7 +3874,7 @@ impl Pinner<'_> {
     }
 
     fn link_fields(&mut self, inst: &str, base: &str, targs: &[It]) -> Result<(), String> {
-        if base.starts_with(crate::check::TUPLE_TEMPLATE) {
+        if base.starts_with(crate::typing::TUPLE_TEMPLATE) {
             let elems = self
                 .tuple_elems(&It::Named(inst.to_string()), &Span::default())
                 .map_err(|_| "a tuple element".to_string())?
@@ -3769,7 +3963,10 @@ impl Pinner<'_> {
             )
         };
         // A local that holds a function is called by its name.
-        if let Some(Binding { ty, .. }) = self.env.get(name).cloned() {
+        if let Some(Binding { ty, binder, .. }) = self.env.get(name).cloned() {
+            if let Some(binder) = binder {
+                self.resolve(&e.name_span, Target::Local(binder));
+            }
             let It::Fn(ptys, ret) = self.table.shallow(&ty) else {
                 return reject(format!("{name:?} is not a function"), &e.span);
             };
@@ -3799,6 +3996,9 @@ impl Pinner<'_> {
                     &args[0].span,
                 );
             }
+        }
+        if matches!(callee, Callee::Some | Callee::IntParse) {
+            self.resolve(&e.name_span, Target::Function(name.to_string()));
         }
         match callee {
             Callee::Some if args.len() == 1 => {
@@ -4038,7 +4238,7 @@ impl Pinner<'_> {
                 for (t, a) in [(&lt, &args[0]), (&rt, &args[1])] {
                     if is_float(self, t) {
                         if let Some(bo) = op {
-                            crate::check::reject_float_operand(bo, &as_type(self, t), &a.span)
+                            crate::typing::reject_float_operand(bo, &as_type(self, t), &a.span)
                                 .map_err(Failure::Rejected)?;
                         }
                         let word = spelling.unwrap_or("+");
@@ -4178,6 +4378,13 @@ impl Pinner<'_> {
         if let Some(base) = self.decls.generic_ctors.get(name).cloned() {
             let tmpl = self.decls.generic_variants[&base].clone();
             let bare = name.split('@').next().unwrap_or(name);
+            self.resolve(
+                &e.name_span,
+                Target::Case {
+                    variant: base.clone(),
+                    case: bare.to_string(),
+                },
+            );
             let Some(case) = tmpl.cases.iter().find(|c| c.name.text == bare) else {
                 return reject(format!("{base:?} has no case {bare:?}"), &e.span);
             };
@@ -4203,6 +4410,13 @@ impl Pinner<'_> {
         // A variant constructor `Case@Variant(..)`.
         if let Some(variant) = self.decls.ctors.get(name).cloned() {
             let bare = name.split('@').next().unwrap_or(name);
+            self.resolve(
+                &e.name_span,
+                Target::Case {
+                    variant: variant.clone(),
+                    case: bare.to_string(),
+                },
+            );
             let payload = self.decls.variants[&variant]
                 .iter()
                 .find(|(c, _)| c == bare)
@@ -4232,6 +4446,15 @@ impl Pinner<'_> {
                     let owner = self.table.shallow(&recv.ty);
                     if let Ok(field) = self.field_type(&owner, name, &e.span) {
                         if let It::Fn(ptys, ret) = self.table.shallow(&field) {
+                            if let Some(declaring) = self.declaring_struct(&owner) {
+                                self.resolve(
+                                    &e.name_span,
+                                    Target::Field {
+                                        owner: declaring,
+                                        field: name.to_string(),
+                                    },
+                                );
+                            }
                             if ptys.len() != args.len() - 1 {
                                 return reject(
                                     format!(
@@ -4266,6 +4489,7 @@ impl Pinner<'_> {
             }
             return reject(msg, &e.span);
         };
+        self.resolve(&e.name_span, Target::Function(name.to_string()));
         let mut sig = sig.sig;
         // `(row, column).is_in_bounds_of(grid)`, and `grid.try_set((row, column), value)`.
         if *callee == Callee::IsInBoundsOf && args.len() == 2 {
@@ -4531,6 +4755,7 @@ impl Pinner<'_> {
                 && !self.decls.generic_ctors.contains_key(name)
             {
                 if let Some(sig) = self.decls.sigs.get(name).map(|s| s.sig.clone()) {
+                    self.resolve(&arg.name_span, Target::Function(name.clone()));
                     for effect in &sig.effects {
                         if !self.effects.contains(effect) {
                             return reject(
@@ -4584,6 +4809,7 @@ impl Pinner<'_> {
                         Binding {
                             ty: pty.clone(),
                             mutable: false,
+                            binder: written(&param.span),
                         },
                     ),
                 ));
@@ -4672,6 +4898,17 @@ fn check_literals(e: &TExpr<Ty>, site: &Span) -> Res<()> {
 /// The declarations seen as the match rules need them (`match_check`).
 struct TypeView<'a> {
     decls: &'a Decls,
+    /// The cases the patterns checked against it named, in the order they did.
+    noted: std::cell::RefCell<Vec<(Type, String)>>,
+}
+
+impl<'a> TypeView<'a> {
+    fn new(decls: &'a Decls) -> Self {
+        TypeView {
+            decls,
+            noted: Default::default(),
+        }
+    }
 }
 
 impl crate::patterns::TypeInfo for TypeView<'_> {
@@ -4709,6 +4946,10 @@ impl crate::patterns::TypeInfo for TypeView<'_> {
 }
 
 impl crate::match_check::MatchInfo for TypeView<'_> {
+    fn note_case(&self, ty: &Type, bare: &str) {
+        self.noted.borrow_mut().push((ty.clone(), bare.to_string()));
+    }
+
     fn cases_of(&self, ty: &Type) -> Option<Vec<(String, Vec<Type>)>> {
         match ty {
             // `V without C` has the cases of `V` less `C`.
@@ -4721,7 +4962,7 @@ impl crate::match_check::MatchInfo for TypeView<'_> {
             Type::Named(n) => self.decls.variants.get(n).cloned(),
             Type::Generic(base, args) => {
                 let tmpl = self.decls.generic_variants.get(base)?;
-                let map = crate::check::zip_type_args(&tmpl.type_vars, args);
+                let map = crate::typing::zip_type_args(&tmpl.type_vars, args);
                 Some(
                     tmpl.cases
                         .iter()
@@ -4751,7 +4992,7 @@ impl crate::match_check::MatchInfo for TypeView<'_> {
                     .map(|(_, t, _)| t.clone())
                     .collect(),
             ),
-            Type::Generic(base, args) if base.starts_with(crate::check::TUPLE_TEMPLATE) => {
+            Type::Generic(base, args) if base.starts_with(crate::typing::TUPLE_TEMPLATE) => {
                 Some(args.clone())
             }
             _ => None,

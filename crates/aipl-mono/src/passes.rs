@@ -331,7 +331,7 @@ pub fn optimize<P: Optimizable>(
 ///
 /// The checker resolves these from the expected type and writes the answer onto
 /// the expression ([`Expr::ty`]) precisely so that a later pass may move them.
-/// `crate::check::needs_lock` is the candidate set, and its own doc notes it is
+/// `crate::typing::needs_lock` is the candidate set, and its own doc notes it is
 /// "deliberately the same set the inliner used to refuse to move". Codegen
 /// reads the record back (`let locked = expr.ty...`) and for some of them picks
 /// the *runtime representation* from it: an empty `#{}` is the shared empty
@@ -458,7 +458,7 @@ fn collect_lost(
 
 /// Whether `e`'s type comes from where it sits rather than from what it says.
 fn is_context_typed(e: &Expr) -> bool {
-    crate::check::needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some()
+    crate::typing::needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some()
 }
 
 /// How a context-typed expression reads in the panic message. Its kind and
