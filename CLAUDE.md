@@ -65,6 +65,15 @@ them stopped *compiling*, because a test target that is never built cannot fail.
 So a bare `cargo nextest run` is **not** the same set the gate runs; scope an
 inner-loop run with `-E` rather than by dropping the flags.
 
+**A change confined to one project skips it.** When the whole change is inside a single
+`projects/<name>/` directory (the TODO texts may change too), finish with `./aipl check` run in
+that directory instead of `cargo handoff`. Verify the condition with
+`scripts/project_only_change.sh`, never by eye: it reads git (staged, unstaged and untracked) and
+exits 0 printing the project name when every changed path is under that one project, apart from
+`TODO.txt` and `CLAUDE_TODO.txt`; exit 1 names what is outside (or the second project) and means
+hand off as usual; exit 2 means only TODO texts changed. A compiler change is never project-only,
+since the project's `aipl` binary is built from it.
+
 **Where it lives.** `cargo handoff` is a cargo alias (`.cargo/config.toml`) for
 `cargo run -p handoff`; the gate is the `handoff` crate. Its ordering rationale
 lives in the module docs of `handoff/src/main.rs`, the output parsing that
