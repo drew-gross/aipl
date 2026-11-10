@@ -213,6 +213,26 @@ fn deck_summary(count: u64, total: u64) -> str {
     assert(deck_summary(1, 4) == "1 deck · 25.0%");
 })
 
+# The heading of the column starting at `left`, sitting on `bottom` and `rise` tall, with `attributes`
+# on it: a tile the width of the column whose sides lean up and to the right at 45 degrees, as the
+# name written along its middle does, so the headings fit side by side the way the cells do and
+# the whole tile is what a click lands on.
+fn column_heading(attributes: str, left: u64, bottom: u64, rise: u64, text: str) -> str {
+    let top = bottom - rise;
+    let corners = `{left},{bottom} {left + CELL},{bottom} {left + CELL + rise},{top} {left + rise},{top}`;
+    `<g class="label"{attributes}><polygon class="hit" points="{corners}"/><text transform="translate({left + CELL / 2},{bottom}) rotate(-45)" x="14" y="0">{text.xml_escape()}</text></g>`
+}.test({
+    assert(
+        column_heading(
+            ` data-column="2"`,
+            100,
+            50,
+            20,
+            "A & B",
+        ) == `<g class="label" data-column="2"><polygon class="hit" points="100,50 164,50 184,30 120,30"/><text transform="translate(132,50) rotate(-45)" x="14" y="0">A &amp; B</text></g>`,
+    );
+})
+
 # The styles of the page. A hovered cell sets `hot` on every cell and label sharing its row or
 # column, and those are deepened in colour, the hovered cell most of all.
 let STYLE = """
@@ -227,6 +247,10 @@ let STYLE = """
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
     .cell { cursor: pointer; }
     .label[data-row], .label[data-column] { cursor: pointer; }
+    .label .hit { fill: #f3f3f3; stroke: #fff; stroke-width: 1; }
+    .label[data-row]:hover .hit, .label[data-column]:hover .hit { fill: #e2e2e2; }
+    .label.hot .hit { fill: #e9e9e9; }
+    .label:not(.row-label) text { dominant-baseline: central; }
     .label.removed { text-decoration: line-through; opacity: 0.4; }
     .cell.removed { opacity: 0.25; }
     svg:not(.locked-view) .cell:hover rect, .cell.locked rect { filter: saturate(1.6) brightness(0.84); }
@@ -553,6 +577,9 @@ let PROJECTED = "Projected";
 # The gap between the overall column and the projected one, and between that and the matrix.
 let PROJECTED_GAP: u64 = 4;
 
+# The space between the headings and the matrix.
+let HEADING_GAP: u64 = 4;
+
 let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
@@ -583,31 +610,32 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     let projected_left = overall_left + CELL + PROJECTED_GAP;
     let grid_left = projected_left + CELL + GAP;
     let grid_top = TITLE_HEIGHT + heading_height;
-    let panel_left = grid_left + grid_width + longest * 5 + MARGIN;
+    // The last column's heading leans out over `rise` to the right of the matrix; the panel starts past it.
+    let panel_left = grid_left + grid_width + longest * 5 + MARGIN * 2;
     let width = panel_left + PANEL_WIDTH + MARGIN;
     // The panel is at the top, and the page is as tall as the longest panel needs.
     let panel_height = PANEL_FIXED_HEIGHT + (shown.len() + brackets.len()) * PANEL_ROW;
     let height = max(grid_top + grid_width + MARGIN, TITLE_HEIGHT + panel_height + MARGIN);
     let middle = width / 2;
     mut parts: str[] = [];
-    set parts.push(
-        `<text class="label" transform="translate({overall_left + CELL / 2},{grid_top - 8}) rotate(-45)">{OVERALL}</text>`,
-    );
-    set parts.push(
-        `<text class="label" transform="translate({projected_left + CELL / 2},{grid_top - 8}) rotate(-45)">{PROJECTED}</text>`,
-    );
+    let rise = heading_height - HEADING_GAP;
+    set parts.push(column_heading("", overall_left, grid_top - HEADING_GAP, rise, OVERALL));
+    set parts.push(column_heading("", projected_left, grid_top - HEADING_GAP, rise, PROJECTED));
     for (let column, each : names) {
-        let x = grid_left + column * CELL + CELL / 2;
-        set parts.push(
-            `<text class="label" data-column="{column}" transform="translate({x},{grid_top - 8}) rotate(-45)">{each.xml_escape()}</text>`,
-        );
+        set parts.push(column_heading(
+            ` data-column="{column}"`,
+            grid_left + column * CELL,
+            grid_top - HEADING_GAP,
+            rise,
+            each,
+        ));
     }
     for (let row, total : overall) {
         let y = grid_top + row * CELL;
         let row_name = names[row].value_or("");
         let summary = summaries[row].value_or("");
         set parts.push(
-            `<g class="label row-label" data-row="{row}" data-name="{row_name.xml_escape()}"><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
+            `<g class="label row-label" data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
