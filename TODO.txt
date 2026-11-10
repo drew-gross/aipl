@@ -33,7 +33,6 @@ projects:
       show meta share
       clicking on a cell should lock it so you can go to the links
       include links to games
-      put more info in bottom thing (non-mirror winrate, seen-in-round, played-at-record)
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
 

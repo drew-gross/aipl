@@ -26,7 +26,7 @@ Order by Metagame %
 page (default `winrate_<metagame>.svg`) and prints where it went: a heat map with a row per archetype
 (most decks first, `Other` last) and a column for each, coloured by the share of the row's
 matches it won against the column's, green for winning and red for losing. Open it in a browser:
-hovering a cell lights up its row and column and fills a panel beside the matrix, following the row: the pairing's record, win rate and share of all matches, and a table of how often it met in each round (see below). A match counts toward
+hovering a cell lights up its row and column and fills a panel at the top right: the pairing's record, win rate and share of all matches, and a table of how often it met in each round (see below). A match counts toward
 every pairing of one deck's archetypes and the other's, from both sides. The first column is each archetype's overall win rate against every archetype, mirror matches included (one win and one loss each, which is what they do to an expected win rate at an event). A draw counts as half a win, and `-`
 is a pairing with no match or an archetype against itself.
 

@@ -226,8 +226,8 @@ let STYLE = """
     #panel line { stroke: #ccc; }
 """;
 
-# What hovering does: light up the cell's row and column, and fill the panel from the cell's
-# attributes. The panel follows the hovered row down the page, within the matrix's height.
+# What hovering does: light up the cell's row and column, and fill the panel, which stays at the
+# top of the page, from the cell's attributes. A line wider than the panel is wrapped at a space.
 let SCRIPT = """
     var root, panel;
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
@@ -254,6 +254,23 @@ let SCRIPT = """
         if (classes) node.setAttribute("class", classes);
         node.textContent = text;
         panel.appendChild(node);
+        return node;
+    }
+    function put_wrapped(text, y, classes) {
+        var node = put("", 0, y, classes), line = "";
+        for (var word of text.split(" ")) {
+            var tried = line === "" ? word : line + " " + word;
+            node.textContent = tried;
+            if (line !== "" && node.getComputedTextLength() > NUMBERS[3]) {
+                node.textContent = line;
+                y += ROW;
+                node = put(word, 0, y, classes);
+                line = word;
+            } else {
+                line = tried;
+            }
+        }
+        return y;
     }
     function rule(y) {
         var node = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -274,7 +291,7 @@ let SCRIPT = """
         put(cell.getAttribute("data-title"), 0, y, "heading");
         for (var line of cell.getAttribute("data-summary").split("|")) {
             y += 20;
-            put(line, 0, y, "summary");
+            y = put_wrapped(line, y, "summary");
         }
         var rounds = cell.getAttribute("data-rounds");
         if (rounds !== "") {
@@ -292,10 +309,6 @@ let SCRIPT = """
                 fields.forEach(function(value, j) { put(value, NUMBERS[j], y, "number " + classes); });
             });
         }
-        var top = +cell.querySelector("rect").getAttribute("y") - 10;
-        top = Math.min(top, +panel.getAttribute("data-bottom") - y - 10);
-        top = Math.max(top, +panel.getAttribute("data-top"));
-        panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + top + ")");
     }
     window.addEventListener("mouseover", function(e) {
         var cell = cell_of(e.target);
@@ -403,7 +416,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
 {parts.join(sep="\n")}
-<g id="panel" data-left="{panel_left}" data-top="{grid_top}" data-bottom="{height}" data-slots="{shown_slots}"></g>
+<g id="panel" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}"></g>
 </svg>
 `
 }.test({
