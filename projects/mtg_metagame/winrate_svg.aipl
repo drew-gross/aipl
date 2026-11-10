@@ -22,7 +22,8 @@ import {
 } from builtins;
 import { percent } from "./meta_share.aipl";
 import { Record, played } from "./metagame.aipl";
-import { Cell, Matrix, rate_text, share_text } from "./winrate_matrix.aipl";
+import { Bracket, bracket_text } from "./rounds.aipl";
+import { Bracketed, Cell, Matrix, rate_text, share_text } from "./winrate_matrix.aipl";
 
 # The size of a cell, and the space around the matrix, in pixels.
 let CELL: u64 = 64;
@@ -30,6 +31,11 @@ let CELL: u64 = 64;
 let MARGIN: u64 = 24;
 
 let TITLE_HEIGHT: u64 = 56;
+
+# The height of a panel's headings, summary and table headers, and of each row of its tables.
+let PANEL_FIXED_HEIGHT: u64 = 220;
+
+let PANEL_ROW: u64 = 18;
 
 # The width of the panel beside the matrix.
 let PANEL_WIDTH: u64 = 440;
@@ -133,14 +139,18 @@ fn describe(row: str, column: str, cell: Cell?) -> str {
         describe(
             "A",
             "B",
-            some(Cell { record: Record { win: 2, loss: 1, draw: 0 }, rounds: [] }),
+            some(Cell { record: Record { win: 2, loss: 1, draw: 0 }, rounds: [], brackets: [] }),
         ) == "A vs B: 66.7% (2-1-0)",
     );
     assert(
         describe(
             "A",
             "B",
-            some(Cell { record: Record { win: 0, loss: 0, draw: 1 }, rounds: [nothing] }),
+            some(Cell {
+                record: Record { win: 0, loss: 0, draw: 1 },
+                rounds: [nothing],
+                brackets: [],
+            }),
         ) == "A vs B: 50.0% (0-0-1)",
     );
     assert(describe("A", "A", none) == "A against itself is not counted");
@@ -149,10 +159,12 @@ fn describe(row: str, column: str, cell: Cell?) -> str {
 # What the panel shows of the cell, as the attributes it carries: the `title`, a `summary` of
 # two lines apart by `|`, and the `rounds`: for each slot in `shown`, apart by `;`, how many times
 # the pairing met in it, its share of the metagame's matches in that slot, the record and the win
-# rate, apart by `,`. `slot_matches` is how many matches each slot has, out of `matches` in all.
+# rate, apart by `,`. The `brackets` are the same for each record the row's archetype had going in:
+# its name, how many times the pairing met, the record and the win rate. `slot_matches` is how many
+# matches each slot has, out of `matches` in all.
 fn panel_attributes(
     title: str,
-    Cell { record, rounds },
+    Cell { record, rounds, brackets },
     shown: u64[],
     slot_matches: u64[],
     matches: u64,
@@ -166,12 +178,26 @@ fn panel_attributes(
             `{round.played()},{round.share_text(slot_matches[slot].value_or(0))},{round.record_text()},{round.rate_text()}`
         }
     });
-    `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}"`
+    let at_record = brackets.map(|each| {
+        let Bracketed { bracket, record } = each;
+        `{bracket.bracket_text()},{record.played()},{record.record_text()},{record.rate_text()}`
+    });
+    `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}" data-brackets="{at_record.join(sep=";")}"`
 }.test({
     let nothing = Record { win: 0, loss: 0, draw: 0 };
     let cell = Cell {
         record: Record { win: 3, loss: 0, draw: 1 },
         rounds: [Record { win: 1, loss: 0, draw: 0 }, nothing, Record { win: 2, loss: 0, draw: 1 }],
+        brackets: [
+            Bracketed {
+                bracket: Bracket { win: 7, loss: 1 },
+                record: Record { win: 3, loss: 0, draw: 0 },
+            },
+            Bracketed {
+                bracket: Bracket { win: 0, loss: 3 },
+                record: Record { win: 0, loss: 0, draw: 1 },
+            },
+        ],
     };
     assert(
         panel_attributes(
@@ -180,7 +206,7 @@ fn panel_attributes(
             [0, 2],
             [2, 5, 4],
             10,
-        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="1,50.0%,1-0-0,100.0%;3,75.0%,2-0-1,83.3%"`,
+        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="1,50.0%,1-0-0,100.0%;3,75.0%,2-0-1,83.3%" data-brackets="7-1,3,3-0-0,100.0%;0-3,1,0-0-1,50.0%"`,
     );
     // A slot the pairing never met in is a row of dashes.
     assert(
@@ -190,7 +216,7 @@ fn panel_attributes(
             [1],
             [2, 5, 4],
             10,
-        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="0,-,-,-"`,
+        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="0,-,-,-" data-brackets="7-1,3,3-0-0,100.0%;0-3,1,0-0-1,50.0%"`,
     );
 })
 
@@ -309,6 +335,22 @@ let SCRIPT = """
                 fields.forEach(function(value, j) { put(value, NUMBERS[j], y, "number " + classes); });
             });
         }
+        var brackets = cell.getAttribute("data-brackets");
+        if (brackets !== "") {
+            y += 30;
+            put("Row's record going in", 0, y, "head");
+            [[0, "Seen"], [2, "Record"], [3, "Win rate"]].forEach(function(column) { put(column[1], NUMBERS[column[0]], y, "head number"); });
+            y += 6;
+            rule(y);
+            brackets.split(";").forEach(function(entry) {
+                var fields = entry.split(",");
+                y += ROW;
+                put(fields[0], 0, y);
+                put(fields[1], NUMBERS[0], y, "number");
+                put(fields[2], NUMBERS[2], y, "number");
+                put(fields[3], NUMBERS[3], y, "number");
+            });
+        }
     }
     window.addEventListener("mouseover", function(e) {
         var cell = cell_of(e.target);
@@ -347,6 +389,18 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     for (let slot, count : slot_matches) {
         if (0 < count) { set shown.push(slot); };
     }
+    // The most rows a pairing's panel has under its round table: a row for each bracket it met in.
+    mut most_brackets: u64 = 0;
+    for (let each : overall) {
+        set most_brackets = max(most_brackets, each.brackets.len());
+    }
+    for (let cells : rows) {
+        for (let cell : cells) {
+            if (let some(found) = cell) {
+                set most_brackets = max(most_brackets, found.brackets.len());
+            };
+        }
+    }
     let shown_slots = shown.map(|slot| slots[slot].value_or("").xml_escape()).join(sep="|");
     // A column heading runs up and to the right at 45 degrees.
     let label_width = label_characters * CHARACTER_WIDTH + MARGIN;
@@ -357,7 +411,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     let grid_top = TITLE_HEIGHT + heading_height;
     let panel_left = grid_left + grid_width + longest * 5 + MARGIN;
     let width = panel_left + PANEL_WIDTH + MARGIN;
-    let height = grid_top + grid_width + MARGIN;
+    // The panel is at the top, and the page is as tall as the longest panel needs.
+    let panel_height = PANEL_FIXED_HEIGHT + (shown.len() + most_brackets) * PANEL_ROW;
+    let height = max(grid_top + grid_width + MARGIN, TITLE_HEIGHT + panel_height + MARGIN);
     let middle = width / 2;
     mut parts: str[] = [];
     set parts.push(
@@ -400,7 +456,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
                     slot_matches,
                     matches,
                 ),
-                none => `data-title="{row_name.xml_escape()} against itself" data-summary="Not counted: every match between two decks of it is a win for one and a loss for the other." data-rounds=""`,
+                none => `data-title="{row_name.xml_escape()} against itself" data-summary="Not counted: every match between two decks of it is a win for one and a loss for the other." data-rounds="" data-brackets=""`,
             };
             let shown_cell = cell$record;
             set parts.push(
@@ -431,12 +487,12 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         slot_matches: [1, 0],
         matches: 2,
         rows: [
-            [none, some(Cell { record: won, rounds: [won, nothing] })],
-            [some(Cell { record: lost, rounds: [lost, nothing] }), none],
+            [none, some(Cell { record: won, rounds: [won, nothing], brackets: [] })],
+            [some(Cell { record: lost, rounds: [lost, nothing], brackets: [] }), none],
         ],
         overall: [
-            Cell { record: won, rounds: [won, nothing] },
-            Cell { record: lost, rounds: [lost, nothing] },
+            Cell { record: won, rounds: [won, nothing], brackets: [] },
+            Cell { record: lost, rounds: [lost, nothing], brackets: [] },
         ],
     };
     let page = winrate_svg(matrix, "m");

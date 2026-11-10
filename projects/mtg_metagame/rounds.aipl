@@ -12,6 +12,8 @@ import {
     int_parse,
     less_than as <,
     logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
     map,
     max,
     saturating_remainder as %,
@@ -20,7 +22,7 @@ import {
     wrapping_add as +,
     wrapping_sub as -,
 } from builtins;
-import { Match, Record, Win } from "./metagame.aipl";
+import { Match, Record, Win, no_matches } from "./metagame.aipl";
 
 # The slots of the playoff rounds, finals first.
 let FINALS: u64 = 0;
@@ -60,6 +62,8 @@ fn last_round(self: Match[], tournament: str) -> u64 {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament,
+        first_before: no_matches(),
+        second_before: none,
         result: Win,
         record: Record { win: 0, loss: 0, draw: 0 },
         round,
@@ -79,6 +83,8 @@ pub fn last_rounds(self: Match[]) -> #{str: u64} {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "x",
+        first_before: no_matches(),
+        second_before: none,
         result: Win,
         record: Record { win: 0, loss: 0, draw: 0 },
         round: "Round 4",
@@ -118,6 +124,8 @@ pub fn slot_of(self: Match, last_rounds: #{str: u64}) -> u64? {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "x",
+        first_before: no_matches(),
+        second_before: none,
         result: Win,
         record: Record { win: 0, loss: 0, draw: 0 },
         round: "Finals",
@@ -182,3 +190,66 @@ pub fn slot_label(self: u64) -> str {
     assert(slot_label(5) == "3rd last round");
     assert(slot_label(13) == "11th last round");
 })
+
+# The wins and losses a player had going into a round of the main event, draws left out: `7-1`.
+struct Bracket { win: i64, loss: i64 }
+
+# `self` as written: `7-1`.
+pub fn bracket_text(self: Bracket) -> str { `{self.win}-{self.loss}` }.test({
+    assert(Bracket { win: 7, loss: 1 }.bracket_text() == "7-1");
+})
+
+# Whether a table lists `self` above `other`: the bracket with more wins, and of two with as many
+# the one with fewer losses.
+pub fn is_above(self: Bracket, other: Bracket) -> bool {
+    self.win > other.win || (self.win == other.win && self.loss < other.loss)
+}.test({
+    assert(Bracket { win: 7, loss: 1 }.is_above(Bracket { win: 0, loss: 3 }));
+    assert(!Bracket { win: 0, loss: 3 }.is_above(Bracket { win: 7, loss: 1 }));
+    assert(Bracket { win: 3, loss: 0 }.is_above(Bracket { win: 3, loss: 1 }));
+    assert(!Bracket { win: 3, loss: 1 }.is_above(Bracket { win: 3, loss: 1 }));
+})
+
+# The bracket of a player who had `before` going into `self`, or `none` when `self` is not a
+# numbered round of the main event: a playoff round has no bracket.
+fn bracket_in(self: Match, Record { win, loss }) -> Bracket? {
+    if (self.round.round_number() == none) { return none; };
+    some(Bracket { win, loss })
+}.test({
+    let match_played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament: "x",
+        first_before: no_matches(),
+        second_before: none,
+        result: Win,
+        record: no_matches(),
+        round: "Round 4",
+    };
+    let before = Record { win: 2, loss: 1, draw: 1 };
+    assert(match_played.bracket_in(before) == some(Bracket { win: 2, loss: 1 }));
+    assert(Match { ..match_played, round: "Finals" }.bracket_in(before) == none);
+})
+
+# The bracket of the first deck of `self`, going into it.
+pub fn first_bracket(self: Match) -> Bracket? { self.bracket_in(self.first_before) }.test({
+    let match_played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament: "x",
+        first_before: Record { win: 3, loss: 1, draw: 0 },
+        second_before: some(Record { win: 1, loss: 3, draw: 2 }),
+        result: Win,
+        record: no_matches(),
+        round: "Round 5",
+    };
+    assert(match_played.first_bracket() == some(Bracket { win: 3, loss: 1 }));
+    assert(match_played.second_bracket() == some(Bracket { win: 1, loss: 3 }));
+    assert(Match { ..match_played, second_before: none }.second_bracket() == none);
+})
+
+# The bracket of the second deck of `self`, going into it, if its own history has the round.
+pub fn second_bracket(self: Match) -> Bracket? {
+    let some(before) = self.second_before else { return none; };
+    self.bracket_in(before)
+}

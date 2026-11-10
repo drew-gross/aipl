@@ -35,6 +35,12 @@ of the bracket instead of at round 1: finals, semifinals and quarterfinals first
 2nd last, and so on. Each row says how many times the pairing met in that slot, what share of the metagame's matches in the
 slot that is, and its record and win rate there. Metagames merging several tournaments are counted per tournament.
 
+Under it the panel breaks the pairing down by the row archetype's record going into the match (`7-1`, `0-3`, ...), highest
+first, with how often the pairing met at that record and how it went, so a matchup that swings between the top and the bottom
+of the standings shows. The record is the player's own in the tournament so far, byes counted and draws left out, and only
+numbered rounds of the main event have one; a match whose second deck has no history for the round is counted from the first
+deck's side only.
+
 `cards` lists every card played in a metagame, most copies first (main decks and
 sideboards together; equal counts in name order). `share` classifies each deck into
 archetypes and prints how much of the field each is. A deck counts in every archetype it
@@ -54,7 +60,7 @@ a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this 
 | `archetypes.aipl` | the classifier: `Identifier`, `archetypes_of`, `load_identifiers` |
 | `meta_share.aipl` | `shares`, the percentage, `share_report` (the table itself is the `tabulate` library) |
 | `winrate_matrix.aipl` | `observations` (each match per archetype pairing), `winrate_matrix` |
-| `rounds.aipl` | `slot_of`: where a match's round falls counted back from the end of its tournament, and `slot_label` |
+| `rounds.aipl` | `slot_of`: where a match's round falls counted back from the end of its tournament, `slot_label`, and the `Bracket` (record going in) of a match |
 | `winrate_svg.aipl` | `winrate_svg`: the matrix as an SVG page |
 | `json.aipl` | accessors over the tree `parse` from the `json` library builds: `field`, `text_field`, `integer_field`, `list_field` |
 

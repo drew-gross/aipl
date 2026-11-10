@@ -13,6 +13,7 @@ import {
     filter,
     first,
     float_div as /,
+    get,
     greater_than as >,
     has,
     less_than as <,
@@ -20,6 +21,8 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
+    push,
+    to_dict,
     to_float,
     to_set,
     to_str,
@@ -52,11 +55,15 @@ struct Card { name: str, count: u64, card_type: str }
 
 # One round played between two decks, at the tournament named `tournament`. `result` and `record`
 # are the first deck's: the second deck's are the other way round. `round` is the round's label,
-# `Round 3` or `Quarterfinals`.
+# `Round 3` or `Quarterfinals`. `first_before` and `second_before` are what each deck's matches
+# came to before this round, byes included, or `none` for a second deck whose own history does not
+# have the round.
 struct Match {
     first_deck_id: str,
     second_deck_id: str,
     tournament: str,
+    first_before: Record,
+    second_before: Record?,
     result: Result,
     record: Record,
     round: str,
@@ -104,6 +111,11 @@ pub fn add_records(a: Record, b: Record) -> Record {
         Record { win: 1, loss: 2, draw: 3 },
         Record { win: 10, loss: 20, draw: 30 },
     ) == Record { win: 11, loss: 22, draw: 33 });
+})
+
+# A record of no matches.
+pub fn no_matches() -> Record { win: 0, loss: 0, draw: 0 }.test({
+    assert(no_matches().played() == 0);
 })
 
 # How many matches `self` counts.
@@ -190,41 +202,65 @@ fn round_label(self: Json) -> str {
     assert(round_label(parse("{}")?) == "");
 })
 
-# One round of the match history of the deck `owner`, at the tournament `tournament`: a match
-# against the opponent it names, or `none` for a round with no opponent.
-fn decode_match(self: Json, owner: str, tournament: str) -> Match?!str {
+# `self` as the record of a single match.
+pub fn as_record(self: Result) -> Record {
+    match (self) {
+        Win => Record { win: 1, loss: 0, draw: 0 },
+        Loss => Record { win: 0, loss: 1, draw: 0 },
+        Draw => Record { win: 0, loss: 0, draw: 1 },
+    }
+}.test({
+    assert(Win.as_record() == Record { win: 1, loss: 0, draw: 0 });
+    assert(Loss.as_record() == Record { win: 0, loss: 1, draw: 0 });
+    assert(Draw.as_record() == Record { win: 0, loss: 0, draw: 1 });
+})
+
+# One round of the match history of the deck `owner`, at the tournament `tournament`, when the
+# deck's matches came to `before`: how it ended, and the match against the opponent it names, or
+# `none` for a round with no opponent.
+fn decode_match(self: Json, owner: str, tournament: str, before: Record) -> (Result, Match?)!str {
     let record = self.field("record").value_or_err(`missing "record"`)?;
     let result = self.text_field("result")?.decode_result()?;
     let decoded = decode_record(record)?;
     let round = self.round_label();
-    ok(
+    ok((
+        result,
         self
             .optional_text_field("opponent_deck_id")
             .map(|opponent| Match {
                 first_deck_id: owner,
                 second_deck_id: opponent,
                 tournament,
+                first_before: before,
+                second_before: none,
                 result,
                 record: decoded,
                 round,
             }),
-    )
+    ))
 }.test({
     let json = parse(
         """{"opponent_deck_id":7,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"Round 1"}""",
     )?;
-    assert(decode_match(json, "3", "t") == ok(some(Match {
-        first_deck_id: "3",
-        second_deck_id: "7",
-        tournament: "t",
-        result: Win,
-        record: Record { win: 2, loss: 0, draw: 0 },
-        round: "Round 1",
-    })));
+    let before = Record { win: 1, loss: 2, draw: 0 };
+    assert(decode_match(json, "3", "t", before) == ok((
+        Win,
+        some(Match {
+            first_deck_id: "3",
+            second_deck_id: "7",
+            tournament: "t",
+            first_before: before,
+            second_before: none,
+            result: Win,
+            record: Record { win: 2, loss: 0, draw: 0 },
+            round: "Round 1",
+        }),
+    )));
     let bye = parse(
         """{"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0}}""",
     )?;
-    assert(decode_match(bye, "3", "t") == ok(none));
+    let no_match: Match? = none;
+    assert(decode_match(bye, "3", "t", before) == ok((Win, no_match)));
 })
 
 # A deck, with its cards.
@@ -253,26 +289,48 @@ fn decode_deck(self: Json) -> Deck!str {
     }));
 })
 
-# The rounds in the match history of the deck `self`, each against the opponent it names.
+# The rounds in the match history of the deck `self`, each against the opponent it names. The
+# history is in the order played, and a round with no opponent (a bye) counts toward the record
+# the next round starts from.
 fn decode_history(self: Json) -> Match[]!str {
     let owner = self.text_field("deck_id")?;
     let tournament = self.optional_text_field("tournament").value_or("");
-    let rounds = self.list_field("match_history")?;
-    ok(rounds.try_map(|round| round.decode_match(owner, tournament))?.collect_ok())
+    mut standing = no_matches();
+    mut found: Match[] = [];
+    for (let round : self.list_field("match_history")?) {
+        let (result, played) = round.decode_match(owner, tournament, standing)?;
+        if (let some(each) = played) { set found.push(each); };
+        set standing = add_records(standing, result.as_record());
+    }
+    ok(found)
 }.test({
     let json = parse("""
         {"deck_id":"a","tournament":"t","match_history":[
           {"opponent_deck_id":"b","result":"loss","record":{"win":0,"loss":2,"draw":0},"round":"R1"},
-          {"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"R2"}]}
+          {"opponent_deck_id":null,"result":"win","record":{"win":2,"loss":0,"draw":0},"round":"R2"},
+          {"opponent_deck_id":"c","result":"win","record":{"win":2,"loss":1,"draw":0},"round":"R3"}]}
     """)?;
     assert(decode_history(json) == ok([
         Match {
             first_deck_id: "a",
             second_deck_id: "b",
             tournament: "t",
+            first_before: no_matches(),
+            second_before: none,
             result: Loss,
             record: Record { win: 0, loss: 2, draw: 0 },
             round: "R1",
+        },
+        // The bye in round 2 counts as a win toward the record the next round starts from.
+        Match {
+            first_deck_id: "a",
+            second_deck_id: "c",
+            tournament: "t",
+            first_before: Record { win: 1, loss: 1, draw: 0 },
+            second_before: none,
+            result: Win,
+            record: Record { win: 2, loss: 1, draw: 0 },
+            round: "R3",
         },
     ]));
 })
@@ -294,6 +352,8 @@ fn without_mirrors(self: Match[]) -> Match[] {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "t",
+        first_before: no_matches(),
+        second_before: none,
         result: Win,
         record: Record { win: 2, loss: 0, draw: 0 },
         round: "R1",
@@ -302,6 +362,8 @@ fn without_mirrors(self: Match[]) -> Match[] {
         first_deck_id: "b",
         second_deck_id: "a",
         tournament: "t",
+        first_before: no_matches(),
+        second_before: none,
         result: Loss,
         record: Record { win: 0, loss: 2, draw: 0 },
         round: "R1",
@@ -313,6 +375,11 @@ fn without_mirrors(self: Match[]) -> Match[] {
     // A rematch in another round is another match.
     let rematch = Match { ..win, round: "R2" };
     assert([win, rematch, loss].without_mirrors() == [win, rematch]);
+})
+
+# What names the round `round` of the deck `deck`'s history.
+fn standing_key(deck: str, round: str) -> str { `{deck}|{round}` }.test({
+    assert(standing_key("a", "Round 1") == "a|Round 1");
 })
 
 # The complaint about a match naming the deck `id`, which the metagame has none of.
@@ -345,6 +412,8 @@ fn check_decks_exist(self: Match[], decks: Deck[]) -> !str {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "t",
+        first_before: no_matches(),
+        second_before: none,
         result: Win,
         record: Record { win: 0, loss: 0, draw: 0 },
         round: "",
@@ -363,7 +432,15 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
         set histories.extend(deck.decode_history()?);
     }
     let decoded = decks.try_map(decode_deck)?;
-    let matches = histories.without_mirrors();
+    let standings: #{str: Record} = histories
+        .map(|each| (standing_key(each.first_deck_id, each.round), each.first_before))
+        .to_dict();
+    let matches = histories
+        .without_mirrors()
+        .map(|each| Match {
+            ..each,
+            second_before: standings.get(standing_key(each.second_deck_id, each.round)),
+        });
     matches.check_decks_exist(decoded)?;
     ok(Metagame {
         name: self.text_field("name")?,
@@ -379,6 +456,19 @@ pub fn decode_metagame(self: Json) -> Metagame!str {
         decks: [],
         matches: [],
     }));
+    // Each deck's record going into the round is its own: a lost bye and a won one differ.
+    let met = parse("""
+        {"name":"m","tournament_ids":[],"decks":[
+          {"deck_id":"a","maindeck":[],"sideboard":[],"match_history":[
+            {"opponent_deck_id":null,"result":"loss","record":{"win":0,"loss":0,"draw":0},"round":"Round 1"},
+            {"opponent_deck_id":"b","result":"win","record":{"win":2,"loss":0,"draw":0},"round":"Round 2"}]},
+          {"deck_id":"b","maindeck":[],"sideboard":[],"match_history":[
+            {"opponent_deck_id":null,"result":"win","record":{"win":0,"loss":0,"draw":0},"round":"Round 1"},
+            {"opponent_deck_id":"a","result":"loss","record":{"win":0,"loss":2,"draw":0},"round":"Round 2"}]}]}
+    """)?;
+    let Metagame { matches } = decode_metagame(met)?;
+    assert(matches$first_before == [Record { win: 0, loss: 1, draw: 0 }]);
+    assert(matches$second_before == [some(Record { win: 1, loss: 0, draw: 0 })]);
     // A match against a deck the document does not have is bad data.
     let dangling = parse("""
         {"name":"m","tournament_ids":[],"decks":[

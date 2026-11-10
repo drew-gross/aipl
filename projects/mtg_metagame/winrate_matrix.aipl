@@ -4,6 +4,7 @@
 
 import {
     IEEE754Float64 as Float,
+    collect_ok,
     count_if,
     distinct,
     equal as ==,
@@ -15,6 +16,7 @@ import {
     map,
     push,
     render,
+    sort_by,
     to_dict,
     to_float,
 } from builtins;
@@ -29,16 +31,28 @@ import {
     Result,
     Win,
     add_records,
+    as_record,
+    no_matches,
     played,
     unknown_deck,
     win_rate,
 } from "./metagame.aipl";
-import { last_rounds, slot_count, slot_label, slot_of } from "./rounds.aipl";
+import {
+    Bracket,
+    first_bracket,
+    is_above,
+    last_rounds,
+    second_bracket,
+    slot_count,
+    slot_label,
+    slot_of,
+} from "./rounds.aipl";
 
 # One match, from the point of view of an archetype the player's deck is, against an archetype
 # the opponent's deck is. `slot` is where the match's round falls counting back from the end of its
-# tournament, if it does (see `rounds.aipl`).
-struct Observation { player: str, opponent: str, result: Result, slot: u64? }
+# tournament, if it does, and `bracket` the player's record going into it, if it is a numbered round
+# and the player's history says (see `rounds.aipl`).
+struct Observation { player: str, opponent: str, result: Result, slot: u64?, bracket: Bracket? }
 
 # How the same match ended for the other side.
 fn flipped(self: Result) -> Result {
@@ -51,19 +65,6 @@ fn flipped(self: Result) -> Result {
     assert(Win.flipped() == Loss);
     assert(Loss.flipped() == Win);
     assert(Draw.flipped() == Draw);
-})
-
-# `self` as the record of a single match.
-fn as_record(self: Result) -> Record {
-    match (self) {
-        Win => Record { win: 1, loss: 0, draw: 0 },
-        Loss => Record { win: 0, loss: 1, draw: 0 },
-        Draw => Record { win: 0, loss: 0, draw: 1 },
-    }
-}.test({
-    assert(Win.as_record() == Record { win: 1, loss: 0, draw: 0 });
-    assert(Loss.as_record() == Record { win: 0, loss: 1, draw: 0 });
-    assert(Draw.as_record() == Record { win: 0, loss: 0, draw: 1 });
 })
 
 # The names of the archetypes `self` is, each once, as a report reads them.
@@ -95,6 +96,8 @@ fn between_in(first: str, second: str, result: Result, round: str) -> Match {
     first_deck_id: first,
     second_deck_id: second,
     tournament: "t",
+    first_before: no_matches(),
+    second_before: none,
     result,
     record: Record { win: 0, loss: 0, draw: 0 },
     round,
@@ -121,6 +124,8 @@ fn observations(
             return err(unknown_deck(each.second_deck_id));
         };
         let slot = each.slot_of(last_rounds);
+        let first_bracket = each.first_bracket();
+        let second_bracket = each.second_bracket();
         for (let first : firsts) {
             for (let second : seconds) {
                 set out.push(Observation {
@@ -128,12 +133,14 @@ fn observations(
                     opponent: second,
                     result: each.result,
                     slot,
+                    bracket: first_bracket,
                 });
                 set out.push(Observation {
                     player: second,
                     opponent: first,
                     result: each.result.flipped(),
                     slot,
+                    bracket: second_bracket,
                 });
             }
         }
@@ -150,19 +157,49 @@ fn observations(
     let decks = [deck_with("a", ["Forest"]), deck_with("b", ["Swamp"])];
     let last: #{str: u64} = #{"t": 5};
     assert(observations(decks, [between("a", "b", Win)], [forest], last) == ok([
-        Observation { player: "Forest", opponent: "Other", result: Win, slot: none },
-        Observation { player: "Other", opponent: "Forest", result: Loss, slot: none },
+        Observation { player: "Forest", opponent: "Other", result: Win, slot: none, bracket: none },
+        Observation {
+            player: "Other",
+            opponent: "Forest",
+            result: Loss,
+            slot: none,
+            bracket: none,
+        },
     ]));
     // A match is in the slot its round falls in, from both sides.
     let semifinal = between_in("a", "b", Loss, "Semifinals");
     assert(observations(decks, [semifinal], [forest], last) == ok([
-        Observation { player: "Forest", opponent: "Other", result: Loss, slot: some(1) },
-        Observation { player: "Other", opponent: "Forest", result: Win, slot: some(1) },
+        Observation {
+            player: "Forest",
+            opponent: "Other",
+            result: Loss,
+            slot: some(1),
+            bracket: none,
+        },
+        Observation {
+            player: "Other",
+            opponent: "Forest",
+            result: Win,
+            slot: some(1),
+            bracket: none,
+        },
     ]));
     let round_four = between_in("a", "b", Win, "Round 4");
     assert(observations(decks, [round_four], [forest], last) == ok([
-        Observation { player: "Forest", opponent: "Other", result: Win, slot: some(4) },
-        Observation { player: "Other", opponent: "Forest", result: Loss, slot: some(4) },
+        Observation {
+            player: "Forest",
+            opponent: "Other",
+            result: Win,
+            slot: some(4),
+            bracket: some(Bracket { win: 0, loss: 0 }),
+        },
+        Observation {
+            player: "Other",
+            opponent: "Forest",
+            result: Loss,
+            slot: some(4),
+            bracket: none,
+        },
     ]));
     assert(observations(decks, [between("a", "zz", Loss)], [forest], last) == err(unknown_deck(
         "zz",
@@ -206,28 +243,62 @@ fn record_of(self: Observation[]) -> Record {
 }.test({
     let nothing: Observation[] = [];
     assert(nothing.record_of() == Record { win: 0, loss: 0, draw: 0 });
-    let draw = Observation { player: "a", opponent: "b", result: Draw, slot: none };
+    let draw = Observation { player: "a", opponent: "b", result: Draw, slot: none, bracket: none };
     let win = Observation { ..draw, result: Win };
     let loss = Observation { ..draw, result: Loss };
     assert([win, loss, draw, win].record_of() == Record { win: 2, loss: 1, draw: 1 });
 })
 
-# How one archetype did against another, or against all: `record` is overall, and `rounds` has the
-# record in each slot (see `rounds.aipl`), indexed by slot.
-struct Cell { record: Record, rounds: Record[] }
+# What a pairing's matches came to when the player had `bracket` going into them.
+struct Bracketed { bracket: Bracket, record: Record }
+
+# How one archetype did against another, or against all: `record` is overall, `rounds` has the
+# record in each slot (see `rounds.aipl`), indexed by slot, and `brackets` the record at each
+# bracket the pairing met in, the highest first.
+struct Cell { record: Record, rounds: Record[], brackets: Bracketed[] }
 
 # The cell of `self`, for a metagame of `slot_count` slots.
 fn cell_of(self: Observation[], slot_count: u64) -> Cell {
     record: self.record_of(),
     rounds: (0..slot_count).map(|slot| self.filter(|each| each.slot == some(slot)).record_of()),
+    brackets: self$bracket
+        .collect_ok()
+        .distinct()
+        .sort_by(is_above)
+        .map(|bracket| Bracketed {
+            bracket,
+            record: self.filter(|each| each.bracket == some(bracket)).record_of(),
+        }),
 }.test({
-    let win = Observation { player: "a", opponent: "b", result: Win, slot: some(1) };
-    let loss = Observation { ..win, result: Loss, slot: some(0) };
-    let unplaced = Observation { ..win, slot: none };
+    let win = Observation {
+        player: "a",
+        opponent: "b",
+        result: Win,
+        slot: some(1),
+        bracket: some(Bracket { win: 0, loss: 3 }),
+    };
+    let loss = Observation {
+        ..win,
+        result: Loss,
+        slot: some(0),
+        bracket: some(Bracket { win: 7, loss: 1 }),
+    };
+    let again = Observation { ..win, result: Win, bracket: some(Bracket { win: 7, loss: 1 }) };
+    let unplaced = Observation { ..win, slot: none, bracket: none };
     let nothing = Record { win: 0, loss: 0, draw: 0 };
-    assert([win, loss, unplaced].cell_of(3) == Cell {
-        record: Record { win: 2, loss: 1, draw: 0 },
-        rounds: [Record { win: 0, loss: 1, draw: 0 }, Record { win: 1, loss: 0, draw: 0 }, nothing],
+    assert([win, loss, unplaced, again].cell_of(3) == Cell {
+        record: Record { win: 3, loss: 1, draw: 0 },
+        rounds: [Record { win: 0, loss: 1, draw: 0 }, Record { win: 2, loss: 0, draw: 0 }, nothing],
+        brackets: [
+            Bracketed {
+                bracket: Bracket { win: 7, loss: 1 },
+                record: Record { win: 1, loss: 1, draw: 0 },
+            },
+            Bracketed {
+                bracket: Bracket { win: 0, loss: 3 },
+                record: Record { win: 1, loss: 0, draw: 0 },
+            },
+        ],
     });
 })
 
@@ -314,12 +385,15 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
                 some(Cell {
                     record: Record { win: 2, loss: 0, draw: 0 },
                     rounds: [won, nothing, nothing, won, nothing],
+                    // Only the first deck of a match has a record going in here.
+                    brackets: [Bracketed { bracket: Bracket { win: 0, loss: 0 }, record: won }],
                 }),
             ],
             [
                 some(Cell {
                     record: Record { win: 0, loss: 2, draw: 0 },
                     rounds: [lost, nothing, nothing, lost, nothing],
+                    brackets: [],
                 }),
                 none,
             ],
@@ -328,10 +402,17 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             Cell {
                 record: Record { win: 3, loss: 1, draw: 0 },
                 rounds: [won, nothing, nothing, won, Record { win: 1, loss: 1, draw: 0 }],
+                brackets: [
+                    Bracketed {
+                        bracket: Bracket { win: 0, loss: 0 },
+                        record: Record { win: 2, loss: 0, draw: 0 },
+                    },
+                ],
             },
             Cell {
                 record: Record { win: 0, loss: 2, draw: 0 },
                 rounds: [lost, nothing, nothing, lost, nothing],
+                brackets: [],
             },
         ],
     }));
