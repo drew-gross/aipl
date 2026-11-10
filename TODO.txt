@@ -24,9 +24,11 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
+    options to sort by meta share or winrate
     make a better templating language (in aipl maybe?) for making the svgs
     matches seems odd for a member of Deck, we should just parse the file into a raw list of matches and analyze that
     winrate:
+      show meta share
       dump winrate matrix to interactive svg
       include total winrate
       even column sizes
