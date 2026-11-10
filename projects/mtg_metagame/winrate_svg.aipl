@@ -87,12 +87,12 @@ fn colour(self: Record) -> str {
     let blue = channel(39, 247, 80, rate);
     `rgb({red},{green},{blue})`
 }.test({
-    assert(Record { win: 0, loss: 0, draw: 0 }.colour() == "rgb(232,232,232)");
+    assert(Record {}.colour() == "rgb(232,232,232)");
     // A draw is half a win, so draws alone are an even record.
-    assert(Record { win: 0, loss: 0, draw: 3 }.colour() == "rgb(247,247,247)");
-    assert(Record { win: 0, loss: 2, draw: 0 }.colour() == "rgb(215,48,39)");
-    assert(Record { win: 1, loss: 1, draw: 0 }.colour() == "rgb(247,247,247)");
-    assert(Record { win: 2, loss: 0, draw: 0 }.colour() == "rgb(26,152,80)");
+    assert(Record { draw: 3 }.colour() == "rgb(247,247,247)");
+    assert(Record { loss: 2 }.colour() == "rgb(215,48,39)");
+    assert(Record { win: 1, loss: 1 }.colour() == "rgb(247,247,247)");
+    assert(Record { win: 2 }.colour() == "rgb(26,152,80)");
 })
 
 # `self` as wins, losses and draws: `3-0-1`.
@@ -100,7 +100,7 @@ fn record_text(self: Record) -> str {
     let Record { win, loss, draw } = self;
     `{win}-{loss}-{draw}`
 }.test({
-    assert(Record { win: 3, loss: 0, draw: 1 }.record_text() == "3-0-1");
+    assert(Record { win: 3, draw: 1 }.record_text() == "3-0-1");
 })
 
 # What a cell centred on (`x`, `y`) shows of `self`: its win rate and, smaller beneath, its record.
@@ -111,18 +111,12 @@ fn cell_labels(x: u64, y: u64, self: Record?) -> str {
     `<text x="{x}" y="{y - 7}">{record.rate_text()}</text><text class="detail" x="{x}" y="{y + 9}">{record.record_text()}</text>`
 }.test({
     assert(cell_labels(10, 20, none) == `<text x="10" y="20">-</text>`);
+    assert(cell_labels(10, 20, some(Record {})) == `<text x="10" y="20">-</text>`);
     assert(
         cell_labels(
             10,
             20,
-            some(Record { win: 0, loss: 0, draw: 0 }),
-        ) == `<text x="10" y="20">-</text>`,
-    );
-    assert(
-        cell_labels(
-            10,
-            20,
-            some(Record { win: 3, loss: 0, draw: 1 }),
+            some(Record { win: 3, draw: 1 }),
         ) == `<text x="10" y="13">87.5%</text><text class="detail" x="10" y="29">3-0-1</text>`,
     );
 })
@@ -134,23 +128,19 @@ fn describe(row: str, column: str, cell: Cell?) -> str {
         none => `{row} against itself is not counted`,
     }
 }.test({
-    let nothing = Record { win: 0, loss: 0, draw: 0 };
+    let nothing = Record {};
     assert(
         describe(
             "A",
             "B",
-            some(Cell { record: Record { win: 2, loss: 1, draw: 0 }, rounds: [], brackets: [] }),
+            some(Cell { record: Record { win: 2, loss: 1 }, rounds: [], brackets: [] }),
         ) == "A vs B: 66.7% (2-1-0)",
     );
     assert(
         describe(
             "A",
             "B",
-            some(Cell {
-                record: Record { win: 0, loss: 0, draw: 1 },
-                rounds: [nothing],
-                brackets: [],
-            }),
+            some(Cell { record: Record { draw: 1 }, rounds: [nothing], brackets: [] }),
         ) == "A vs B: 50.0% (0-0-1)",
     );
     assert(describe("A", "A", none) == "A against itself is not counted");
@@ -171,7 +161,7 @@ fn panel_attributes(
 ) -> str {
     let summary = `{record.rate_text()} win rate · {record.record_text()}|Seen in {record.played()} of {matches} matches · {record.share_text(matches)}`;
     let entries = shown.map(|slot| {
-        let round = rounds[slot].value_or(Record { win: 0, loss: 0, draw: 0 });
+        let round = rounds[slot].value_or(Record {});
         if (round.played() == 0) {
             "0,-,-,-"
         } else {
@@ -187,15 +177,11 @@ fn panel_attributes(
     });
     `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}" data-brackets="{at_record.join(sep=";")}"`
 }.test({
-    let nothing = Record { win: 0, loss: 0, draw: 0 };
+    let nothing = Record {};
     let cell = Cell {
-        record: Record { win: 3, loss: 0, draw: 1 },
-        rounds: [Record { win: 1, loss: 0, draw: 0 }, nothing, Record { win: 2, loss: 0, draw: 1 }],
-        brackets: [
-            Record { win: 3, loss: 0, draw: 0 },
-            nothing,
-            Record { win: 0, loss: 0, draw: 1 },
-        ],
+        record: Record { win: 3, draw: 1 },
+        rounds: [Record { win: 1 }, nothing, Record { win: 2, draw: 1 }],
+        brackets: [Record { win: 3 }, nothing, Record { draw: 1 }],
     };
     assert(
         panel_attributes(
@@ -469,7 +455,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             let column_name = names[column].value_or("");
             let info = describe(row_name, column_name, cell).xml_escape();
             let x = grid_left + column * CELL;
-            let fill = cell$record.value_or(Record { win: 0, loss: 0, draw: 0 }).colour();
+            let fill = cell$record.value_or(Record {}).colour();
             let attributes = match (cell) {
                 some(found) => panel_attributes(
                     `{row_name} vs {column_name}`,
@@ -498,9 +484,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 </svg>
 `
 }.test({
-    let nothing = Record { win: 0, loss: 0, draw: 0 };
-    let won = Record { win: 1, loss: 0, draw: 0 };
-    let lost = Record { win: 0, loss: 1, draw: 0 };
+    let nothing = Record {};
+    let won = Record { win: 1 };
+    let lost = Record { loss: 1 };
     let matrix = Matrix {
         names: ["A", "B & C"],
         counts: [3, 1],

@@ -33,9 +33,9 @@ import { Json, parse } from json;
 struct Identifier {
     name: str,
     cards: str[],
-    not_cards: str[],
-    any_cards: str[],
-    maindeck_cards: str[],
+    not_cards: str[] = [],
+    any_cards: str[] = [],
+    maindeck_cards: str[] = [],
 }
 
 # The names of the cards a deck holds: in its main deck, and in its main deck or sideboard.
@@ -47,37 +47,16 @@ fn holdings(self: Deck) -> Holdings {
     let side = self.sideboard$name.to_set();
     Holdings { main, held: main.union(side) }
 }.test({
-    let Holdings { main, held } = deck_of(["Island"], ["Swamp"]).holdings();
+    let deck = Deck {
+        deck_id: "d",
+        maindeck: [Card { name: "Island" }],
+        sideboard: [Card { name: "Swamp" }],
+    };
+    let Holdings { main, held } = deck.holdings();
     assert(main.has("Island"));
     assert(!main.has("Swamp"));
     assert(held.has("Island") && held.has("Swamp"));
 })
-
-# A single copy of the card called `self`.
-fn as_card(self: str) -> Card { name: self, count: 1, card_type: "Land" }.test({
-    assert("Island".as_card().name == "Island");
-})
-
-# A deck with the named cards in its main deck and in its sideboard, for tests that need
-# one.
-pub fn deck_of(main: str[], side: str[]) -> Deck {
-    deck_id: "d",
-    name: "Some Deck",
-    pilot: "",
-    tournament: "",
-    maindeck: main$as_card(),
-    sideboard: side$as_card(),
-}.test({
-    assert(deck_of(["A"], ["B", "C"]).sideboard$name == ["B", "C"]);
-})
-
-# An identifier asking for `cards`, `not_cards`, `any_cards` and `maindeck_cards`, in that order.
-fn identifier(
-    cards: str[],
-    not_cards: str[],
-    any_cards: str[],
-    maindeck_cards: str[],
-) -> Identifier { name: "Archetype", cards, not_cards, any_cards, maindeck_cards }
 
 # Whether a deck with `Holdings { main, held }` is the archetype `self`.
 fn matches(self: Identifier, Holdings { main, held }) -> bool {
@@ -87,25 +66,30 @@ fn matches(self: Identifier, Holdings { main, held }) -> bool {
         c,
     )) && (self.any_cards.is_empty() || self.any_cards.any(|c| held.has(c)))
 }.test({
-    let nothing: str[] = [];
-    let deck = deck_of(["Island", "Bolt"], ["Negate"]).holdings();
+    let deck = Deck {
+        deck_id: "d",
+        maindeck: [Card { name: "Island" }, Card { name: "Bolt" }],
+        sideboard: [Card { name: "Negate" }],
+    }.holdings();
 
     // `cards` may be in either part; `maindeck_cards` only in the main deck.
-    assert(identifier(["Island", "Negate"], nothing, nothing, nothing).matches(deck));
-    assert(!identifier(["Island", "Duress"], nothing, nothing, nothing).matches(deck));
-    assert(identifier(nothing, nothing, nothing, ["Bolt"]).matches(deck));
-    assert(!identifier(nothing, nothing, nothing, ["Negate"]).matches(deck));
+    assert(Identifier { name: "x", cards: ["Island", "Negate"] }.matches(deck));
+    assert(!Identifier { name: "x", cards: ["Island", "Duress"] }.matches(deck));
+    assert(Identifier { name: "x", cards: [], maindeck_cards: ["Bolt"] }.matches(deck));
+    assert(!Identifier { name: "x", cards: [], maindeck_cards: ["Negate"] }.matches(deck));
 
     // A card named in `not_cards` rules the deck out, wherever it is.
-    assert(!identifier(["Island"], ["Negate"], nothing, nothing).matches(deck));
-    assert(identifier(["Island"], ["Duress"], nothing, nothing).matches(deck));
+    assert(!Identifier { name: "x", cards: ["Island"], not_cards: ["Negate"] }.matches(deck));
+    assert(Identifier { name: "x", cards: ["Island"], not_cards: ["Duress"] }.matches(deck));
 
     // One of `any_cards`, when there are some.
-    assert(identifier(nothing, nothing, ["Duress", "Bolt"], nothing).matches(deck));
-    assert(!identifier(nothing, nothing, ["Duress", "Thoughtseize"], nothing).matches(deck));
+    assert(Identifier { name: "x", cards: [], any_cards: ["Duress", "Bolt"] }.matches(deck));
+    assert(!Identifier { name: "x", cards: [], any_cards: ["Duress", "Thoughtseize"] }.matches(
+        deck,
+    ));
 
     // Asking for nothing matches everything.
-    assert(identifier(nothing, nothing, nothing, nothing).matches(deck));
+    assert(Identifier { name: "x", cards: [] }.matches(deck));
 })
 
 # An archetype a deck is: one an identifier names (`Meta`), or, when none did, `Other`, carrying
@@ -132,24 +116,30 @@ pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> Archetype[] {
     let found: #<{str} = identifiers.filter(|i| i.matches(deck_holdings))$name.to_set();
     if (found.is_empty()) { [Other(self.name)] } else { found.to_array()$Meta() }
 }.test({
-    let landfall = Identifier { ..identifier(["Forest"], [], [], []), name: "Landfall" };
-    let mono = Identifier { ..identifier(["Forest"], ["Island"], [], []), name: "Mono-G" };
-    let control = Identifier { ..identifier(["Island"], [], [], []), name: "Control" };
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
+    let mono = Identifier { name: "Mono-G", cards: ["Forest"], not_cards: ["Island"] };
+    let control = Identifier { name: "Control", cards: ["Island"] };
     let identifiers = [landfall, mono, control];
 
     // Every match, once, in name order; matching twice under one name counts once.
-    assert(deck_of(["Forest"], []).archetypes_of(identifiers) == [
-        Meta("Landfall"),
-        Meta("Mono-G"),
-    ]);
-    assert(deck_of(["Forest", "Island"], []).archetypes_of(identifiers) == [
-        Meta("Control"),
-        Meta("Landfall"),
-    ]);
-    assert(deck_of(["Forest"], []).archetypes_of([landfall, landfall]) == [Meta("Landfall")]);
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.archetypes_of(
+        identifiers,
+    ) == [Meta("Landfall"), Meta("Mono-G")]);
+    assert(Deck {
+        deck_id: "d",
+        maindeck: [Card { name: "Forest" }, Card { name: "Island" }],
+    }.archetypes_of(identifiers) == [Meta("Control"), Meta("Landfall")]);
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.archetypes_of([
+        landfall,
+        landfall,
+    ]) == [Meta("Landfall")]);
 
     // None: `Other`, with the deck's own name.
-    assert(deck_of(["Swamp"], []).archetypes_of(identifiers) == [Other("Some Deck")]);
+    assert(Deck {
+        deck_id: "d",
+        name: "Some Deck",
+        maindeck: [Card { name: "Swamp" }],
+    }.archetypes_of(identifiers) == [Other("Some Deck")]);
 })
 
 # `self` as an identifier.
@@ -169,7 +159,6 @@ fn decode_identifier(self: Json) -> Identifier!str {
     assert(decode_identifier(json) == ok(Identifier {
         name: "Landfall",
         cards: ["Forest"],
-        not_cards: [],
         any_cards: ["A", "B"],
         maindeck_cards: ["Earthbender Ascension"],
     }));

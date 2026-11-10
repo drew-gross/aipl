@@ -36,7 +36,7 @@ pub fn card_counts(decks: Deck[]) -> Counted[] {
     names.zip_with(totals, |name, count| { Counted { name, count } }).ranked()
 }.test({
     let deck = |main: Card[], side: Card[]| {
-        Deck { deck_id: "", name: "", pilot: "", tournament: "", maindeck: main, sideboard: side }
+        Deck { deck_id: "", maindeck: main, sideboard: side }
     };
     let island = |n: u64| { Card { name: "Island", count: n, card_type: "Land" } };
     let bolt = |n: u64| { Card { name: "Bolt", count: n, card_type: "Instant" } };

@@ -25,7 +25,6 @@ projects:
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
     do something better to deal with decks that match multiple deck identifiers
-    compute rows record from the data, not just assume 9-2 to 0-3
     options to sort by meta share or winrate
     make a better templating language (in aipl maybe?) for making the svgs
     winrate:
@@ -35,6 +34,7 @@ projects:
       include links to games
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
+    scrapers
 
 floats:
   trig operations (sine, cosine, etc. NOT sin, cos. User can import as if they want abbreviations)

@@ -16,9 +16,9 @@ import {
     render,
     to_float,
 } from builtins;
-import { Identifier, Meta, Other, archetypes_of, deck_of, label } from "./archetypes.aipl";
+import { Identifier, Meta, Other, archetypes_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
-import { Deck } from "./metagame.aipl";
+import { Card, Deck } from "./metagame.aipl";
 import { tabulate } from tabulate;
 
 # The decks of each archetype, most decks first, then the decks that are none of `identifiers`
@@ -37,19 +37,13 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
     if (0 < others) { [..named, Counted { name: "Other", count: others }] } else { named }
 }.test({
     let nothing: str[] = [];
-    let landfall = Identifier {
-        name: "Landfall",
-        cards: ["Forest"],
-        not_cards: nothing,
-        any_cards: nothing,
-        maindeck_cards: nothing,
-    };
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
     let mono = Identifier { ..landfall, name: "Mono-G", not_cards: ["Island"] };
     let decks = [
-        deck_of(["Forest"], []),
-        deck_of(["Forest", "Island"], []),
-        deck_of(["Forest"], []),
-        deck_of(["Swamp"], []),
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }, Card { name: "Island" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
     ];
 
     // Each archetype once per deck, most decks first, and the decks that are none of them as
@@ -62,10 +56,10 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
 
     // `Other` stays last when it is the largest, and decks with different names are one row.
     let many = [
-        deck_of(["Swamp"], []),
-        deck_of(["Forest"], []),
-        deck_of(["Mountain"], []),
-        deck_of(["Island"], []),
+        Deck { deck_id: "d", name: "Dredge", maindeck: [Card { name: "Swamp" }] },
+        Deck { deck_id: "d", name: "Elves", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "d", name: "Burn", maindeck: [Card { name: "Mountain" }] },
+        Deck { deck_id: "d", name: "Control", maindeck: [Card { name: "Island" }] },
     ];
     assert(shares(many, [landfall]) == [
         Counted { name: "Landfall", count: 1 },
@@ -74,14 +68,18 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
 
     // No decks, or no deck that is none of them: no `Other` row.
     assert(shares([], [landfall]) == []);
-    assert(shares([deck_of(["Forest"], [])], [landfall]) == [
+    assert(shares([Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }], [landfall]) == [
         Counted { name: "Landfall", count: 1 },
     ]);
 
     // `Other` is told from an archetype by its case, not by what it is called: an archetype
     // an identifier names "Other" is a `Meta` one, ranked with the rest, and the two stay two.
     let named_other = Identifier { ..landfall, name: "Other" };
-    let both = [deck_of(["Forest"], []), deck_of(["Swamp"], []), deck_of(["Swamp"], [])];
+    let both = [
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
+    ];
     assert(shares(both, [named_other]) == [
         Counted { name: "Other", count: 1 },
         Counted { name: "Other", count: 2 },
@@ -121,14 +119,12 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[
     ]
 }.test({
     let nothing: str[] = [];
-    let landfall = Identifier {
-        name: "Landfall",
-        cards: ["Forest"],
-        not_cards: nothing,
-        any_cards: nothing,
-        maindeck_cards: nothing,
-    };
-    let decks = [deck_of(["Forest"], []), deck_of(["Swamp"], []), deck_of(["Forest"], [])];
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
+    let decks = [
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
+    ];
     // Shares are of all the decks, and the `Other` decks are one row at the end.
     assert(share_report("a_meta", decks, [landfall]) == [
         "Metagame Breakdown from a_meta",

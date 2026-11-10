@@ -20,9 +20,10 @@ import {
     to_dict,
     to_float,
 } from builtins;
-import { Identifier, archetypes_of, deck_of, label } from "./archetypes.aipl";
+import { Identifier, archetypes_of, label } from "./archetypes.aipl";
 import { shares } from "./meta_share.aipl";
 import {
+    Card,
     Deck,
     Draw,
     Loss,
@@ -32,7 +33,6 @@ import {
     Win,
     add_records,
     as_record,
-    no_matches,
     played,
     unknown_deck,
     win_rate,
@@ -71,37 +71,14 @@ fn flipped(self: Result) -> Result {
 fn labels_of(self: Deck, identifiers: Identifier[]) -> str[] {
     self.archetypes_of(identifiers)$label().distinct()
 }.test({
-    let landfall = Identifier {
-        name: "Landfall",
-        cards: ["Forest"],
-        not_cards: [],
-        any_cards: [],
-        maindeck_cards: [],
-    };
-    assert(deck_of(["Forest"], []).labels_of([landfall]) == ["Landfall"]);
-    assert(deck_of(["Swamp"], []).labels_of([landfall]) == ["Other"]);
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.labels_of([landfall]) == [
+        "Landfall",
+    ]);
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] }.labels_of([landfall]) == [
+        "Other",
+    ]);
 })
-
-# A deck with the id `id` and the cards `cards`, for tests.
-fn deck_with(id: str, cards: str[]) -> Deck { ..deck_of(cards, []), deck_id: id }
-
-# The match between the decks `first` and `second` that `result` says how `first` did in, for
-# tests.
-fn between(first: str, second: str, result: Result) -> Match {
-    between_in(first, second, result, "")
-}
-
-# The same in the round `round` of the tournament `t`, for tests.
-fn between_in(first: str, second: str, result: Result, round: str) -> Match {
-    first_deck_id: first,
-    second_deck_id: second,
-    tournament: "t",
-    first_before: no_matches(),
-    second_before: none,
-    result,
-    record: Record { win: 0, loss: 0, draw: 0 },
-    round,
-}
 
 # Every match of `matches`, once for each pairing of an archetype of the one deck and an archetype
 # of the other, from each side. A match with a deck not in `decks` is an error. `last_rounds` is
@@ -147,16 +124,21 @@ fn observations(
     }
     ok(out)
 }.test({
-    let forest = Identifier {
-        name: "Forest",
-        cards: ["Forest"],
-        not_cards: [],
-        any_cards: [],
-        maindeck_cards: [],
+    let forest = Identifier { name: "Forest", cards: ["Forest"] };
+    let decks = [
+        Deck { deck_id: "a", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "b", maindeck: [Card { name: "Swamp" }] },
+    ];
+    let played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament: "t",
+        first_before: Record {},
+        record: Record {},
+        result: Win,
     };
-    let decks = [deck_with("a", ["Forest"]), deck_with("b", ["Swamp"])];
     let last: #{str: u64} = #{"t": 5};
-    assert(observations(decks, [between("a", "b", Win)], [forest], last) == ok([
+    assert(observations(decks, [played], [forest], last) == ok([
         Observation { player: "Forest", opponent: "Other", result: Win, slot: none, bracket: none },
         Observation {
             player: "Other",
@@ -167,7 +149,7 @@ fn observations(
         },
     ]));
     // A match is in the slot its round falls in, from both sides.
-    let semifinal = between_in("a", "b", Loss, "Semifinals");
+    let semifinal = Match { ..played, result: Loss, round: "Semifinals" };
     assert(observations(decks, [semifinal], [forest], last) == ok([
         Observation {
             player: "Forest",
@@ -184,7 +166,7 @@ fn observations(
             bracket: none,
         },
     ]));
-    let round_four = between_in("a", "b", Win, "Round 4");
+    let round_four = Match { ..played, round: "Round 4" };
     assert(observations(decks, [round_four], [forest], last) == ok([
         Observation {
             player: "Forest",
@@ -201,9 +183,12 @@ fn observations(
             bracket: none,
         },
     ]));
-    assert(observations(decks, [between("a", "zz", Loss)], [forest], last) == err(unknown_deck(
-        "zz",
-    )));
+    assert(observations(
+        decks,
+        [Match { ..played, second_deck_id: "zz", result: Loss }],
+        [forest],
+        last,
+    ) == err(unknown_deck("zz")));
 })
 
 # The win rate as a percentage with one decimal: `55.6%`.
@@ -216,33 +201,33 @@ fn percent_text(self: Float) -> str { `{(self * 100.0).render(digits=1)}%` }.tes
 pub fn rate_text(self: Record) -> str {
     if (let some(rate) = self.win_rate()) { rate.percent_text() } else { "-" }
 }.test({
-    assert(Record { win: 0, loss: 0, draw: 0 }.rate_text() == "-");
-    assert(Record { win: 0, loss: 0, draw: 0 }.rate_text() == "-");
-    assert(Record { win: 0, loss: 0, draw: 4 }.rate_text() == "50.0%");
-    assert(Record { win: 3, loss: 0, draw: 1 }.rate_text() == "87.5%");
+    assert(Record {}.rate_text() == "-");
+    assert(Record {}.rate_text() == "-");
+    assert(Record { draw: 4 }.rate_text() == "50.0%");
+    assert(Record { win: 3, draw: 1 }.rate_text() == "87.5%");
     assert(Record { win: 1, loss: 1, draw: 1 }.rate_text() == "50.0%");
-    assert(Record { win: 2, loss: 1, draw: 0 }.rate_text() == "66.7%");
+    assert(Record { win: 2, loss: 1 }.rate_text() == "66.7%");
 })
 
 # What share of `total` matches `self` counts, as a percentage: `12.5%`, or `-` when there are none.
 pub fn share_text(self: Record, total: u64) -> str {
     if (total == 0) { "-" } else { (self.played().to_float() / total.to_float()).percent_text() }
 }.test({
-    assert(Record { win: 1, loss: 0, draw: 0 }.share_text(0) == "-");
-    assert(Record { win: 1, loss: 1, draw: 0 }.share_text(8) == "25.0%");
-    assert(Record { win: 0, loss: 0, draw: 0 }.share_text(8) == "0.0%");
+    assert(Record { win: 1 }.share_text(0) == "-");
+    assert(Record { win: 1, loss: 1 }.share_text(8) == "25.0%");
+    assert(Record {}.share_text(8) == "0.0%");
 })
 
 # The total of what `self` says about how its row's archetype did against its column's.
 fn record_of(self: Observation[]) -> Record {
-    mut total = Record { win: 0, loss: 0, draw: 0 };
+    mut total = Record {};
     for (let each : self) {
         set total = add_records(total, each.result.as_record());
     }
     total
 }.test({
     let nothing: Observation[] = [];
-    assert(nothing.record_of() == Record { win: 0, loss: 0, draw: 0 });
+    assert(nothing.record_of() == Record {});
     let draw = Observation { player: "a", opponent: "b", result: Draw, slot: none, bracket: none };
     let win = Observation { ..draw, result: Win };
     let loss = Observation { ..draw, result: Loss };
@@ -272,16 +257,12 @@ fn cell_of(self: Observation[], slot_count: u64, brackets: Bracket[]) -> Cell {
     let loss = Observation { ..win, result: Loss, slot: some(0), bracket: some(upper) };
     let again = Observation { ..win, result: Win, bracket: some(upper) };
     let unplaced = Observation { ..win, slot: none, bracket: none };
-    let nothing = Record { win: 0, loss: 0, draw: 0 };
+    let nothing = Record {};
     let middle = Bracket { win: 3, loss: 3 };
     assert([win, loss, unplaced, again].cell_of(3, [upper, middle, lower]) == Cell {
-        record: Record { win: 3, loss: 1, draw: 0 },
-        rounds: [Record { win: 0, loss: 1, draw: 0 }, Record { win: 2, loss: 0, draw: 0 }, nothing],
-        brackets: [
-            Record { win: 1, loss: 1, draw: 0 },
-            nothing,
-            Record { win: 1, loss: 0, draw: 0 },
-        ],
+        record: Record { win: 3, loss: 1 },
+        rounds: [Record { loss: 1 }, Record { win: 2 }, nothing],
+        brackets: [Record { win: 1, loss: 1 }, nothing, Record { win: 1 }],
     });
 })
 
@@ -342,25 +323,31 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         ),
     })
 }.test({
-    let forest = Identifier {
-        name: "Forest",
-        cards: ["Forest"],
-        not_cards: [],
-        any_cards: [],
-        maindeck_cards: [],
-    };
-    let decks = [deck_with("a", ["Forest"]), deck_with("b", ["Swamp"]), deck_with("c", ["Forest"])];
+    let forest = Identifier { name: "Forest", cards: ["Forest"] };
+    let decks = [
+        Deck { deck_id: "a", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "b", maindeck: [Card { name: "Swamp" }] },
+        Deck { deck_id: "c", maindeck: [Card { name: "Forest" }] },
+    ];
 
     // A tournament of two rounds and a final: Forest beat Other in the final and in round 2, and
     // beat another Forest in round 1.
+    let played = Match {
+        first_deck_id: "a",
+        second_deck_id: "b",
+        tournament: "t",
+        first_before: Record {},
+        record: Record {},
+        result: Win,
+    };
     let matches = [
-        between_in("a", "c", Win, "Round 1"),
-        between_in("a", "b", Win, "Round 2"),
-        between_in("a", "b", Win, "Finals"),
+        Match { ..played, second_deck_id: "c", round: "Round 1" },
+        Match { ..played, round: "Round 2" },
+        Match { ..played, round: "Finals" },
     ];
-    let nothing = Record { win: 0, loss: 0, draw: 0 };
-    let won = Record { win: 1, loss: 0, draw: 0 };
-    let lost = Record { win: 0, loss: 1, draw: 0 };
+    let nothing = Record {};
+    let won = Record { win: 1 };
+    let lost = Record { loss: 1 };
     assert(winrate_matrix(decks, matches, [forest]) == ok(Matrix {
         names: ["Forest", "Other"],
         counts: [2, 1],
@@ -374,14 +361,14 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             [
                 none,
                 some(Cell {
-                    record: Record { win: 2, loss: 0, draw: 0 },
+                    record: Record { win: 2 },
                     rounds: [won, nothing, nothing, won, nothing],
                     brackets: [won],
                 }),
             ],
             [
                 some(Cell {
-                    record: Record { win: 0, loss: 2, draw: 0 },
+                    record: Record { loss: 2 },
                     rounds: [lost, nothing, nothing, lost, nothing],
                     brackets: [nothing],
                 }),
@@ -390,18 +377,26 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         ],
         overall: [
             Cell {
-                record: Record { win: 3, loss: 1, draw: 0 },
-                rounds: [won, nothing, nothing, won, Record { win: 1, loss: 1, draw: 0 }],
-                brackets: [Record { win: 2, loss: 0, draw: 0 }],
+                record: Record { win: 3, loss: 1 },
+                rounds: [won, nothing, nothing, won, Record { win: 1, loss: 1 }],
+                brackets: [Record { win: 2 }],
             },
             Cell {
-                record: Record { win: 0, loss: 2, draw: 0 },
+                record: Record { loss: 2 },
                 rounds: [lost, nothing, nothing, lost, nothing],
                 brackets: [nothing],
             },
         ],
     }));
     // A match with a deck the metagame does not have is an error.
-    assert(winrate_matrix(decks, [between("a", "zz", Win)], [forest]) == err(unknown_deck("zz")));
-    assert(winrate_matrix(decks, [between("zz", "a", Win)], [forest]) == err(unknown_deck("zz")));
+    assert(winrate_matrix(
+        decks,
+        [Match { ..played, second_deck_id: "zz" }],
+        [forest],
+    ) == err(unknown_deck("zz")));
+    assert(winrate_matrix(
+        decks,
+        [Match { ..played, first_deck_id: "zz" }],
+        [forest],
+    ) == err(unknown_deck("zz")));
 })

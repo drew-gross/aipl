@@ -22,7 +22,7 @@ import {
     wrapping_add as +,
     wrapping_sub as -,
 } from builtins;
-import { Match, Record, Win, no_matches } from "./metagame.aipl";
+import { Match, Record, Win } from "./metagame.aipl";
 
 # The slots of the playoff rounds, finals first.
 let FINALS: u64 = 0;
@@ -58,17 +58,19 @@ fn last_round(self: Match[], tournament: str) -> u64 {
     }
     last
 }.test({
-    fn at(tournament: str, round: str) -> Match {
+    let played = Match {
         first_deck_id: "a",
         second_deck_id: "b",
-        tournament,
-        first_before: no_matches(),
-        second_before: none,
+        first_before: Record {},
+        record: Record {},
         result: Win,
-        record: Record { win: 0, loss: 0, draw: 0 },
-        round,
-    }
-    let matches = [at("x", "Round 1"), at("x", "Round 9"), at("x", "Finals"), at("y", "Round 3")];
+    };
+    let matches = [
+        Match { ..played, tournament: "x", round: "Round 1" },
+        Match { ..played, tournament: "x", round: "Round 9" },
+        Match { ..played, tournament: "x", round: "Finals" },
+        Match { ..played, tournament: "y", round: "Round 3" },
+    ];
     assert(matches.last_round("x") == 9);
     assert(matches.last_round("y") == 3);
     assert(matches.last_round("z") == 0);
@@ -83,11 +85,10 @@ pub fn last_rounds(self: Match[]) -> #{str: u64} {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "x",
-        first_before: no_matches(),
-        second_before: none,
         result: Win,
-        record: Record { win: 0, loss: 0, draw: 0 },
         round: "Round 4",
+        first_before: Record {},
+        record: Record {},
     };
     let other = Match { ..match_played, tournament: "y", round: "Round 2" };
     let last = last_rounds([match_played, other, Match { ..match_played, round: "Round 1" }]);
@@ -124,11 +125,10 @@ pub fn slot_of(self: Match, last_rounds: #{str: u64}) -> u64? {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "x",
-        first_before: no_matches(),
-        second_before: none,
         result: Win,
-        record: Record { win: 0, loss: 0, draw: 0 },
         round: "Finals",
+        first_before: Record {},
+        record: Record {},
     };
     let last: #{str: u64} = #{"x": 9};
     assert(match_played.slot_of(last) == some(0));
@@ -220,11 +220,10 @@ fn bracket_in(self: Match, Record { win, loss }) -> Bracket? {
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "x",
-        first_before: no_matches(),
-        second_before: none,
         result: Win,
-        record: no_matches(),
         round: "Round 4",
+        first_before: Record {},
+        record: Record {},
     };
     let before = Record { win: 2, loss: 1, draw: 1 };
     assert(match_played.bracket_in(before) == some(Bracket { win: 2, loss: 1 }));
@@ -237,11 +236,11 @@ pub fn first_bracket(self: Match) -> Bracket? { self.bracket_in(self.first_befor
         first_deck_id: "a",
         second_deck_id: "b",
         tournament: "x",
-        first_before: Record { win: 3, loss: 1, draw: 0 },
+        first_before: Record { win: 3, loss: 1 },
         second_before: some(Record { win: 1, loss: 3, draw: 2 }),
         result: Win,
-        record: no_matches(),
         round: "Round 5",
+        record: Record {},
     };
     assert(match_played.first_bracket() == some(Bracket { win: 3, loss: 1 }));
     assert(match_played.second_bracket() == some(Bracket { win: 1, loss: 3 }));

@@ -346,21 +346,28 @@ fn attach_trivia<K: variant>(toks: Token<K>[], trivia: Token<K>[]) -> (Cst[][], 
     }
     (attached, trailing)
 }.test({
-    // A token at a span, for the attachment test — only the position matters to it.
-    fn tok_at(span: Span) -> Token<Tok> { kind: Punct, text: SpanStr { text: "", span } }
-
     // Two tokens with trivia before each and one trailing record: each record
     // lands in front of the first token that starts after it, and what is left
-    // is the tail.
-    let toks = [tok_at(2..3), tok_at(6..7)];
-    let trivia = [tok_at(0..2), tok_at(3..6), tok_at(7..8)];
+    // is the tail. Only a token's position matters to the attachment, so they say nothing else.
+    let toks = [
+        Token { kind: Punct, text: SpanStr { text: "", span: 2..3 } },
+        Token { kind: Punct, text: SpanStr { text: "", span: 6..7 } },
+    ];
+    let trivia = [
+        Token { kind: Punct, text: SpanStr { text: "", span: 0..2 } },
+        Token { kind: Punct, text: SpanStr { text: "", span: 3..6 } },
+        Token { kind: Punct, text: SpanStr { text: "", span: 7..8 } },
+    ];
     let (attached, trailing) = attach_trivia(toks, trivia);
     assert(attached == [[Trivia(0..2), Leaf(2..3)], [Trivia(3..6), Leaf(6..7)]]);
     assert(trailing == [Trivia(7..8)]);
 
     // No trivia at all: a leaf per token and nothing trailing.
     let bare: Token<Tok>[] = [];
-    let (only_leaves, nothing) = attach_trivia([tok_at(0..1)], bare);
+    let (only_leaves, nothing) = attach_trivia(
+        [Token { kind: Punct, text: SpanStr { text: "", span: 0..1 } }],
+        bare,
+    );
     assert(only_leaves == [[Leaf(0..1)]]);
     let no_trailing: Cst[] = [];
     assert(nothing == no_trailing);
@@ -1501,8 +1508,6 @@ pub fn parse<K: variant, A: any>(
         layout: Inline,
     }
 
-    fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
-
     // The message a failed parse reports — and a distinguishable string when it
     // unexpectedly succeeded, so a broken assertion says which way it broke.
     fn msg_of(src: str, g: Grammar<Tok, Node>, start: str) -> str {
@@ -1571,7 +1576,7 @@ pub fn parse<K: variant, A: any>(
 
     // ---- Term: any token of a kind, payload ignored ----
     let r_word: Rule<Tok> = Term(Word);
-    let g_word = g_of([one("w", r_word)]);
+    let g_word = Grammar { prods: [one("w", r_word)] };
     assert(shown("abc", g_word, "w")? == "(w abc)");
     assert(msg_of("123", g_word, "w") == "expected Word, found `123`");
     assert(msg_of("", g_word, "w") == "expected Word, found end of input");
@@ -1582,13 +1587,13 @@ pub fn parse<K: variant, A: any>(
 
     // ---- Literal: one token by its text ----
     let r_open: Rule<Tok> = Literal("(");
-    let g_open = g_of([one("o", r_open)]);
+    let g_open = Grammar { prods: [one("o", r_open)] };
     assert(shown("(", g_open, "o")? == "(o ()");
     assert(msg_of("x", g_open, "o") == "expected `(`, found `x`");
 
     // ---- Then: a sequence, children concatenated ----
     let r_pair: Rule<Tok> = Then([Term(Word), Term(Num)]);
-    let g_pair = g_of([one("p", r_pair)]);
+    let g_pair = Grammar { prods: [one("p", r_pair)] };
     assert(shown("ab 12", g_pair, "p")? == "(p ab 12)");
 
     // A failure part-way through rewinds the whole sequence, but the deepest
@@ -1597,23 +1602,31 @@ pub fn parse<K: variant, A: any>(
 
     // ---- OneOf: ordered choice, and the expected *set* it leaves behind ----
     let r_atom: Rule<Tok> = OneOf([Term(Word), Term(Num), Literal("(")]);
-    let g_atom = g_of([one("a", r_atom)]);
+    let g_atom = Grammar { prods: [one("a", r_atom)] };
     assert(shown("x", g_atom, "a")? == "(a x)");
     assert(shown("7", g_atom, "a")? == "(a 7)");
     // Three alternatives, three expectations, Oxford-joined.
     assert(msg_of("]", g_atom, "a") == "expected Num, Word, or `(`, found `]`");
     // Two joins with "or"; a repeated expectation is deduped, not doubled.
     let r_dup: Rule<Tok> = OneOf([Term(Word), Term(Num), Term(Word)]);
-    assert(msg_of("]", g_of([one("a", r_dup)]), "a") == "expected Num or Word, found `]`");
+    assert(
+        msg_of("]", Grammar { prods: [one("a", r_dup)] }, "a") == "expected Num or Word, found `]`",
+    );
 
     // ---- Many: zero-or-more and one-or-more ----
     let r_many: Rule<Tok> = Many(Term(Word));
-    let g_many = g_of([one("m", r_many)]);
+    let g_many = Grammar { prods: [one("m", r_many)] };
     assert(shown("a b c", g_many, "m")? == "(m a b c)");
     assert(shown("", g_many, "m")? == "(m)");
     let r_many1: Rule<Tok> = Many(Term(Word), min=1);
-    assert(shown("a", g_of([one("m", r_many1)]), "m")? == "(m a)");
-    assert(msg_of("", g_of([one("m", r_many1)]), "m") == "expected Word, found end of input");
+    assert(shown("a", Grammar { prods: [one("m", r_many1)] }, "m")? == "(m a)");
+    assert(
+        msg_of(
+            "",
+            Grammar { prods: [one("m", r_many1)] },
+            "m",
+        ) == "expected Word, found end of input",
+    );
 
     // A rule that can match empty input would repeat forever. It is refused,
     // not hung on — the driver's counterpart of the lexer's "no matcher matches
@@ -1622,7 +1635,7 @@ pub fn parse<K: variant, A: any>(
     assert(
         msg_of(
             "x",
-            g_of([one("l", r_loop)]),
+            Grammar { prods: [one("l", r_loop)] },
             "l",
         ) == "a repetition matched empty input, which would repeat forever",
     );
@@ -1633,7 +1646,7 @@ pub fn parse<K: variant, A: any>(
     // the enclosing rule's. Here the enclosing rule takes it, which is the whole
     // observable difference between a bound and no bound.
     let r_two: Rule<Tok> = Then([Many(Term(Word), max=2), Many(Term(Num))]);
-    let g_two = g_of([one("t", r_two)]);
+    let g_two = Grammar { prods: [one("t", r_two)] };
     assert(shown("a b", g_two, "t")? == "(t a b)");
     assert(shown("a b 1 2", g_two, "t")? == "(t a b 1 2)");
 
@@ -1646,13 +1659,13 @@ pub fn parse<K: variant, A: any>(
     // cannot repeat. This is the shape `only` in `grammar_aipl.aipl` is built
     // from — a bracket pair around something that may be empty.
     let r_once: Rule<Tok> = Many(Maybe(Term(Word)), min=1, max=1);
-    let g_once = g_of([one("o", r_once)]);
+    let g_once = Grammar { prods: [one("o", r_once)] };
     assert(shown("x", g_once, "o")? == "(o x)");
     assert(shown("", g_once, "o")? == "(o)");
 
     // ---- Maybe: present and absent ----
     let r_opt: Rule<Tok> = Then([Term(Word), Maybe(Term(Num))]);
-    let g_opt = g_of([one("m", r_opt)]);
+    let g_opt = Grammar { prods: [one("m", r_opt)] };
     assert(shown("a 1", g_opt, "m")? == "(m a 1)");
     assert(shown("a", g_opt, "m")? == "(m a)");
 
@@ -1663,7 +1676,7 @@ pub fn parse<K: variant, A: any>(
     // Annotated, like every other rule here: nothing inside `Then` mentions `K`,
     // and there is more than one `Rule` instance in scope for it to fall back on.
     let r_list: Rule<Tok> = Then([Literal("("), Many(Named("item")), Literal(")")]);
-    let g_sexp = g_of([one("list", r_list), one("item", r_item)]);
+    let g_sexp = Grammar { prods: [one("list", r_list), one("item", r_item)] };
     assert(shown("(a b)", g_sexp, "list")? == "(list ( (item a) (item b) ))");
     assert(
         shown(
@@ -1678,7 +1691,7 @@ pub fn parse<K: variant, A: any>(
     let comma: Rule<Tok> = Literal(",");
     let nums = Many(Term(Num), sep=comma, trailing_sep=false);
     let r_nums: Rule<Tok> = Then([Literal("["), nums, Literal("]")]);
-    let g_nums = g_of([one("l", r_nums)]);
+    let g_nums = Grammar { prods: [one("l", r_nums)] };
     assert(shown("[1, 2, 3]", g_nums, "l")? == "(l [ 1 , 2 , 3 ])");
     // An empty list is a list.
     assert(shown("[]", g_nums, "l")? == "(l [ ])");
@@ -1688,7 +1701,7 @@ pub fn parse<K: variant, A: any>(
     assert(msg_of("[1, 2,]", g_nums, "l") == "expected Num, found `]`");
     let trail = Many(Term(Num), sep=comma);
     let r_trail: Rule<Tok> = Then([Literal("["), trail, Literal("]")]);
-    assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
+    assert(shown("[1, 2,]", Grammar { prods: [one("l", r_trail)] }, "l")? == "(l [ 1 , 2 , ])");
 
     // The bound and the trailing separator together. Reaching `max` ends the
     // list, and a separator after the last item is still the list's own — it
@@ -1696,7 +1709,7 @@ pub fn parse<K: variant, A: any>(
     // `trailing_sep` decides it exactly as it does when the items simply run out.
     let bounded = Many(Term(Num), sep=comma, max=2);
     let r_bounded: Rule<Tok> = Then([Literal("["), bounded, Literal("]")]);
-    let g_bounded = g_of([one("l", r_bounded)]);
+    let g_bounded = Grammar { prods: [one("l", r_bounded)] };
     assert(shown("[1, 2]", g_bounded, "l")? == "(l [ 1 , 2 ])");
     assert(shown("[1, 2,]", g_bounded, "l")? == "(l [ 1 , 2 , ])");
 
@@ -1706,7 +1719,7 @@ pub fn parse<K: variant, A: any>(
     // The same list refusing the trailing separator leaves it behind instead.
     let bounded_strict = Many(Term(Num), sep=comma, max=2, trailing_sep=false);
     let r_bstrict: Rule<Tok> = Then([Literal("["), bounded_strict, Literal("]")]);
-    let g_bstrict = g_of([one("l", r_bstrict)]);
+    let g_bstrict = Grammar { prods: [one("l", r_bstrict)] };
     assert(msg_of("[1, 2,]", g_bstrict, "l") == "expected `]`, found `,`");
 
     // ---- The leading separator ----
@@ -1716,7 +1729,7 @@ pub fn parse<K: variant, A: any>(
     let pipe: Rule<Tok> = Literal("+");
     let led = Many(Term(Num), min=1, sep=pipe, trailing_sep=false, leading_sep=true);
     let r_led: Rule<Tok> = Then([Literal("["), led, Literal("]")]);
-    let g_led = g_of([one("l", r_led)]);
+    let g_led = Grammar { prods: [one("l", r_led)] };
     assert(shown("[1 + 2]", g_led, "l")? == "(l [ 1 + 2 ])");
     assert(shown("[+ 1 + 2]", g_led, "l")? == "(l [ + 1 + 2 ])");
     assert(shown("[+ 1]", g_led, "l")? == "(l [ + 1 ])");
@@ -1725,14 +1738,14 @@ pub fn parse<K: variant, A: any>(
     // Without it, the same list refuses the opening separator.
     let unled = Many(Term(Num), min=1, sep=pipe, trailing_sep=false);
     let r_unled: Rule<Tok> = Then([Literal("["), unled, Literal("]")]);
-    let g_unled = g_of([one("l", r_unled)]);
+    let g_unled = Grammar { prods: [one("l", r_unled)] };
     assert(msg_of("[+ 1]", g_unled, "l") == "expected Num, found `+`");
 
     // ---- Climb: precedence and associativity ----
     let plus = Prec { power: 1, right: false, ops: ["+"] };
     let times = Prec { power: 2, right: false, ops: ["*"] };
     let r_expr: Rule<Tok> = Climb(Term(Num), [plus, times]);
-    let g_expr = g_of([one("e", r_expr)]);
+    let g_expr = Grammar { prods: [one("e", r_expr)] };
     // A bare atom climbs to itself: no operator, no extra node.
     assert(shown("1", g_expr, "e")? == "(e 1)");
     // `*` binds tighter, so it nests inside the `+`.
@@ -1744,7 +1757,13 @@ pub fn parse<K: variant, A: any>(
     // The same level marked right-associative nests the other way.
     let rpow = Prec { power: 1, right: true, ops: ["*"] };
     let r_pow: Rule<Tok> = Climb(Term(Num), [rpow]);
-    assert(shown("1 * 2 * 3", g_of([one("e", r_pow)]), "e")? == "(e (e 1) * (e (e 2) * (e 3)))");
+    assert(
+        shown(
+            "1 * 2 * 3",
+            Grammar { prods: [one("e", r_pow)] },
+            "e",
+        )? == "(e (e 1) * (e (e 2) * (e 3)))",
+    );
 
     // An operator with nothing after it leaves the operator unconsumed, so the
     // leftover-input check fires at the `+` — but the missing operand was
@@ -1759,9 +1778,11 @@ pub fn parse<K: variant, A: any>(
     // partly-matched one still reports the finer expectation.
     let r_stmt: Rule<Tok> = Then([Named("expr"), Literal(";")]);
     let r_alt: Rule<Tok> = OneOf([Term(Word), Term(Num)]);
-    let plain = g_of([one("stmt", r_stmt), one("expr", r_alt)]);
+    let plain = Grammar { prods: [one("stmt", r_stmt), one("expr", r_alt)] };
     assert(msg_of("]", plain, "stmt") == "expected Num or Word, found `]`");
-    let labelled = g_of([one("stmt", r_stmt), labelled_prod("expr", r_alt, "an expression")]);
+    let labelled = Grammar {
+        prods: [one("stmt", r_stmt), labelled_prod("expr", r_alt, "an expression")],
+    };
     assert(msg_of("]", labelled, "stmt") == "expected an expression, found `]`");
     // Got somewhere, so the label steps aside for what actually went wrong.
     assert(msg_of("a ]", labelled, "stmt") == "expected `;`, found `]`");
@@ -1797,9 +1818,9 @@ pub fn parse<K: variant, A: any>(
         Atom("c"),
     ]));
     // A `build` that refuses fails the parse with its own error, unchanged.
-    let refuser = g_of([
-        Production { name: "w", rule: r_word, build: TryMk(refuse), layout: Inline },
-    ]);
+    let refuser = Grammar {
+        prods: [Production { name: "w", rule: r_word, build: TryMk(refuse), layout: Inline }],
+    };
     assert(parsed("abc", refuser, "w") == err(ParseError { message: "refused", span: 0..3 }));
 
     // ---- Kid: the one child, with the count checked by the driver ----
@@ -1811,12 +1832,14 @@ pub fn parse<K: variant, A: any>(
     // of in every lowering that reaches for a child which might not be there.
     let r_one_w: Rule<Tok> = Named("w");
     let r_two_w: Rule<Tok> = Then([Named("w"), Named("w")]);
-    let g_kid = g_of([
-        Production { name: "pass", rule: r_one_w, build: Kid, layout: Inline },
-        Production { name: "two_kids", rule: r_two_w, build: Kid, layout: Inline },
-        Production { name: "no_kid", rule: r_word, build: Kid, layout: Inline },
-        one("w", r_word),
-    ]);
+    let g_kid = Grammar {
+        prods: [
+            Production { name: "pass", rule: r_one_w, build: Kid, layout: Inline },
+            Production { name: "two_kids", rule: r_two_w, build: Kid, layout: Inline },
+            Production { name: "no_kid", rule: r_word, build: Kid, layout: Inline },
+            one("w", r_word),
+        ],
+    };
     assert(parsed("abc", g_kid, "pass")? == Atom("abc"));
     assert(parsed("a b", g_kid, "two_kids") == err(ParseError {
         message: "a `Kid` lowering wants exactly one child; this production matched 2",
@@ -1838,7 +1861,7 @@ pub fn parse<K: variant, A: any>(
     // not the token after it.
     let r_old: Rule<Tok> = Then([Term(Num), Refuse(Msg("write the number as a word"))]);
     let r_form: Rule<Tok> = OneOf([Term(Word), r_old]);
-    let g_form = g_of([one("f", r_form)]);
+    let g_form = Grammar { prods: [one("f", r_form)] };
     assert(shown("abc", g_form, "f")? == "(f abc)");
     assert(parsed("42", g_form, "f") == err(ParseError {
         message: "write the number as a word",
@@ -1846,7 +1869,7 @@ pub fn parse<K: variant, A: any>(
     }));
     // The span covers everything the sequence matched, not only its last token.
     let r_two: Rule<Tok> = Then([Term(Num), Term(Num), Refuse(Msg("one number, not two"))]);
-    assert(parsed("1 23", g_of([one("t", r_two)]), "t") == err(ParseError {
+    assert(parsed("1 23", Grammar { prods: [one("t", r_two)] }, "t") == err(ParseError {
         message: "one number, not two",
         span: 0..4,
     }));
@@ -1854,10 +1877,11 @@ pub fn parse<K: variant, A: any>(
     // Neither a choice nor a repetition backtracks out of a refusal: reaching
     // it is the error, wherever it sits.
     let r_list: Rule<Tok> = Many(Named("f"));
-    assert(parsed("abc 42 def", g_of([one("f", r_form), one("l", r_list)]), "l") == err(ParseError {
-        message: "write the number as a word",
-        span: 4..6,
-    }));
+    assert(parsed(
+        "abc 42 def",
+        Grammar { prods: [one("f", r_form), one("l", r_list)] },
+        "l",
+    ) == err(ParseError { message: "write the number as a word", span: 4..6 }));
 
     // A form that is not reached is not refused: input the earlier alternative
     // takes never gets there, and neither does input that matches nothing.
@@ -1866,11 +1890,11 @@ pub fn parse<K: variant, A: any>(
     // Reached with nothing matched in front of it, the error points at the
     // token that was next — or at end of input.
     let r_bare: Rule<Tok> = Refuse(Msg("nothing goes here"));
-    assert(parsed("abc", g_of([one("b", r_bare)]), "b") == err(ParseError {
+    assert(parsed("abc", Grammar { prods: [one("b", r_bare)] }, "b") == err(ParseError {
         message: "nothing goes here",
         span: 0..3,
     }));
-    assert(parsed("", g_of([one("b", r_bare)]), "b") == err(ParseError {
+    assert(parsed("", Grammar { prods: [one("b", r_bare)] }, "b") == err(ParseError {
         message: "nothing goes here",
         span: 0..0,
     }));
@@ -1880,13 +1904,13 @@ pub fn parse<K: variant, A: any>(
     // source had and none where there was none — and `""` when nothing was
     // matched in front of it.
     let r_named: Rule<Tok> = Then([Term(Num), Refuse(Fn(as_word))]);
-    assert(msg_of("42", g_of([one("n", r_named)]), "n") == "write 42 as a word");
+    assert(msg_of("42", Grammar { prods: [one("n", r_named)] }, "n") == "write 42 as a word");
     let r_pair: Rule<Tok> = Then([Term(Num), Term(Num), Refuse(Fn(as_word))]);
-    assert(msg_of("1 23", g_of([one("n", r_pair)]), "n") == "write 1 23 as a word");
+    assert(msg_of("1 23", Grammar { prods: [one("n", r_pair)] }, "n") == "write 1 23 as a word");
     let r_glued: Rule<Tok> = Then([Literal("("), Term(Num), Literal(")"), Refuse(Fn(as_word))]);
-    assert(msg_of("(1)", g_of([one("n", r_glued)]), "n") == "write (1) as a word");
+    assert(msg_of("(1)", Grammar { prods: [one("n", r_glued)] }, "n") == "write (1) as a word");
     let r_empty: Rule<Tok> = Refuse(Fn(as_word));
-    assert(msg_of("42", g_of([one("n", r_empty)]), "n") == "write  as a word");
+    assert(msg_of("42", Grammar { prods: [one("n", r_empty)] }, "n") == "write  as a word");
 
     // Pruning sees a refusal as unable to start anything, so an analysed
     // grammar refuses exactly where a one-shot parse does.
@@ -1912,7 +1936,7 @@ pub fn parse<K: variant, A: any>(
         spaced=true,
     );
     let g_item: Rule<Tok> = OneOf([Term(Word), Named("list")]);
-    let g_grp = g_of([one("list", g_list), one("item", g_item)]);
+    let g_grp = Grammar { prods: [one("list", g_list), one("item", g_item)] };
 
     // The tree shows the brackets as a group — `[..]` in `show` — with the items
     // between them, and the source still comes back whole.
@@ -2002,7 +2026,7 @@ pub fn parse<K: variant, A: any>(
     // same tree, no errors.
     let e_stmts: Rule<Tok> = Many(Named("stmt"));
     let e_stmt: Rule<Tok> = Then([Term(Word), Expect(Literal(";"))]);
-    let g_e = g_of([one("stmts", e_stmts), one("stmt", e_stmt)]);
+    let g_e = Grammar { prods: [one("stmts", e_stmts), one("stmt", e_stmt)] };
     assert(tree_of("a; b;", g_e, "stmts") == "(stmts (stmt a ;) (stmt b ;))");
     assert(errors_of("a; b;", g_e, "stmts") == []);
 
@@ -2048,8 +2072,12 @@ pub fn parse<K: variant, A: any>(
     let e_second: Rule<Tok> = Then([Term(Word), Refuse(Msg("the second alternative was tried"))]);
     let e_plain: Rule<Tok> = OneOf([Then([Term(Word), Literal(";")]), e_second]);
     let e_commit: Rule<Tok> = OneOf([Then([Term(Word), Expect(Literal(";"))]), e_second]);
-    assert(errors_of("a", g_of([one("s", e_plain)]), "s") == ["the second alternative was tried"]);
-    assert(errors_of("a", g_of([one("s", e_commit)]), "s") == ["expected `;`, found end of input"]);
+    assert(errors_of("a", Grammar { prods: [one("s", e_plain)] }, "s") == [
+        "the second alternative was tried",
+    ]);
+    assert(errors_of("a", Grammar { prods: [one("s", e_commit)] }, "s") == [
+        "expected `;`, found end of input",
+    ]);
 
     // That is the contract, and it cuts both ways: put where a later alternative
     // *would* have taken the input, `Expect` turns a program that parses into an
@@ -2057,8 +2085,10 @@ pub fn parse<K: variant, A: any>(
     let e_other: Rule<Tok> = Then([Term(Word), Literal("+")]);
     let e_plain_other: Rule<Tok> = OneOf([Then([Term(Word), Literal(";")]), e_other]);
     let e_commit_other: Rule<Tok> = OneOf([Then([Term(Word), Expect(Literal(";"))]), e_other]);
-    assert(errors_of("a +", g_of([one("s", e_plain_other)]), "s") == []);
-    assert(errors_of("a +", g_of([one("s", e_commit_other)]), "s") == ["expected `;`, found `+`"]);
+    assert(errors_of("a +", Grammar { prods: [one("s", e_plain_other)] }, "s") == []);
+    assert(errors_of("a +", Grammar { prods: [one("s", e_commit_other)] }, "s") == [
+        "expected `;`, found `+`",
+    ]);
 
     // What it does not do is outlive its path. An error recorded inside an
     // alternative that then fails is discarded with it: the parse did not go that
@@ -2067,7 +2097,7 @@ pub fn parse<K: variant, A: any>(
         Then([Term(Word), Expect(Literal(";")), Literal("+")]),
         Then([Term(Word), Term(Num)]),
     ]);
-    let g_abandoned = g_of([one("s", e_abandoned)]);
+    let g_abandoned = Grammar { prods: [one("s", e_abandoned)] };
     assert(errors_of("a 1", g_abandoned, "s") == []);
     assert(tree_of("a 1", g_abandoned, "s") == "(s a 1)");
 
@@ -2082,7 +2112,7 @@ pub fn parse<K: variant, A: any>(
     //
     // Through a bracketed group, which joins the runs of its open, body and close.
     let e_block: Rule<Tok> = Many(Named("stmt"), nested_in=(Literal("("), Literal(")")));
-    let g_block = g_of([one("block", e_block), one("stmt", e_stmt)]);
+    let g_block = Grammar { prods: [one("block", e_block), one("stmt", e_stmt)] };
     assert(errors_of("(a b;)", g_block, "block") == ["expected `;`, found `b`"]);
     assert(
         tree_of("(a b;)", g_block, "block") == "(block [( (stmt a <missing `;`>) (stmt b ;) )])",
@@ -2096,13 +2126,13 @@ pub fn parse<K: variant, A: any>(
         Term(Num),
         Then([Literal("("), Named("expr"), Expect(Literal(")"))]),
     ]);
-    let g_climb = g_of([one("expr", e_expr), one("atom", e_atom)]);
+    let g_climb = Grammar { prods: [one("expr", e_expr), one("atom", e_atom)] };
     assert(errors_of("1 + (2 + 3", g_climb, "expr") == ["expected `)`, found end of input"]);
     assert(errors_of("1 + (2 + 3)", g_climb, "expr") == []);
 
     // Through a separated, repeated list.
     let e_list: Rule<Tok> = Many(Named("stmt"), sep=Literal(","));
-    let g_list_e = g_of([one("list", e_list), one("stmt", e_stmt)]);
+    let g_list_e = Grammar { prods: [one("list", e_list), one("stmt", e_stmt)] };
     assert(errors_of("a, b;, c", g_list_e, "list").len() == 2);
 
     // A total miss still reports what was met on the way to it. The group here
@@ -2126,7 +2156,9 @@ pub fn parse<K: variant, A: any>(
     // One error to a token: the second `Expect` failing at the token the first
     // just failed at is the same slip, and the first speaks for it.
     let e_twice: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Expect(Literal(","))]);
-    assert(errors_of("a", g_of([one("t", e_twice)]), "t") == ["expected `;`, found end of input"]);
+    assert(errors_of("a", Grammar { prods: [one("t", e_twice)] }, "t") == [
+        "expected `;`, found end of input",
+    ]);
 
     // An `Expect` around a rule that gets part of the way blames where it stopped,
     // not where it began.
@@ -2134,21 +2166,23 @@ pub fn parse<K: variant, A: any>(
         Term(Word),
         Expect(Then([Literal("("), Term(Num), Literal(")")])),
     ]);
-    assert(errors_of("a ( b", g_of([one("c", e_call)]), "c") == ["expected Num, found `b`"]);
+    assert(errors_of("a ( b", Grammar { prods: [one("c", e_call)] }, "c") == [
+        "expected Num, found `b`",
+    ]);
 
     // A `Refuse` still ends the parse, and the error it ends it with is last: the
     // `Expect`s met before it are errors too, and are reported ahead of it.
     let e_refused: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Refuse(Msg("stop"))]);
-    assert(errors_of("a", g_of([one("r", e_refused)]), "r") == [
+    assert(errors_of("a", Grammar { prods: [one("r", e_refused)] }, "r") == [
         "expected `;`, found end of input",
         "stop",
     ]);
-    assert(tree_of("a", g_of([one("r", e_refused)]), "r") == "no tree");
+    assert(tree_of("a", Grammar { prods: [one("r", e_refused)] }, "r") == "no tree");
 
     // ... however many, and in source order. This refusal spans everything the
     // sequence matched before it, so it is the last error and the slips come first.
     let e_gated: Rule<Tok> = Then([Many(Named("stmt")), Refuse(Msg("stop"))]);
-    let g_gate = g_of([one("gated", e_gated), one("stmt", e_stmt)]);
+    let g_gate = Grammar { prods: [one("gated", e_gated), one("stmt", e_stmt)] };
     assert(errors_of("a b c;", g_gate, "gated") == [
         "expected `;`, found `b`",
         "expected `;`, found `c`",
@@ -2162,7 +2196,7 @@ pub fn parse<K: variant, A: any>(
         Expect(Literal("+")),
         Expect(Then([Term(Num), Term(Num), Refuse(Msg("stop"))])),
     ]);
-    assert(errors_of("a 1 2", g_of([one("i", e_inside)]), "i") == [
+    assert(errors_of("a 1 2", Grammar { prods: [one("i", e_inside)] }, "i") == [
         "expected `+`, found `1`",
         "stop",
     ]);
@@ -2170,15 +2204,17 @@ pub fn parse<K: variant, A: any>(
     // A refusal at the very token a slip was reported at says it better, and
     // replaces it: its message was written for the case.
     let e_here: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Maybe(Refuse(Msg("stop")))]);
-    assert(errors_of("a b", g_of([one("h", e_here)]), "h") == ["stop"]);
+    assert(errors_of("a b", Grammar { prods: [one("h", e_here)] }, "h") == ["stop"]);
 
     // What a grammar fault does not do is blame the input: it is the call's.
     let e_unlinked: Rule<Tok> = Then([Term(Word), Expect(Literal(";")), Named("nope")]);
-    assert(errors_of("a", g_of([one("u", e_unlinked)]), "u") == [`aborted: no rule named "nope"`]);
+    assert(errors_of("a", Grammar { prods: [one("u", e_unlinked)] }, "u") == [
+        `aborted: no rule named "nope"`,
+    ]);
 
     // It can match nothing, so a repetition of one is refused rather than spun on.
     let e_forever: Rule<Tok> = Many(Expect(Literal(";")));
-    assert(errors_of("a", g_of([one("f", e_forever)]), "f") == [
+    assert(errors_of("a", Grammar { prods: [one("f", e_forever)] }, "f") == [
         "aborted: a repetition matched empty input, which would repeat forever",
     ]);
 
@@ -2187,7 +2223,7 @@ pub fn parse<K: variant, A: any>(
     // A production that opens with an `Expect` can begin with whatever follows it,
     // so FIRST-set pruning must not rule it out on the token that is there.
     let e_lead: Rule<Tok> = Then([Expect(Literal("(")), Term(Word)]);
-    let g_lead = g_of([one("top", Then([Named("lead")])), one("lead", e_lead)]);
+    let g_lead = Grammar { prods: [one("top", Then([Named("lead")])), one("lead", e_lead)] };
     assert(errors_of("a", g_lead, "top") == ["expected `(`, found `a`"]);
     assert(errors_of_prepared("a", g_lead, "top") == ["expected `(`, found `a`"]);
     assert(errors_of_prepared("(a", g_lead, "top") == []);

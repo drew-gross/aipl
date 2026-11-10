@@ -4,23 +4,23 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 963 str -> str?
-; entry strip_test_sections 1018 str -> str
-; entry split_test_sections 1017 str -> __tuple$str$str
-; entry source_loc 1008 str __builtin_Span -> str
+; entry parse_test_section_header 960 str -> str?
+; entry strip_test_sections 1015 str -> str
+; entry split_test_sections 1014 str -> __tuple$str$str
+; entry source_loc 1005 str __builtin_Span -> str
 ; entry caret_block 136 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 259 str #{str:str} -> unit!Error
-; entry normalize_output 921 str -> str
-; entry int_fits 555 i64 str -> bool
-; entry is_operator_name 556 str -> bool
-; entry aipl_token_scopes 593 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 260 str str -> str[]!Error
+; entry fill_or_add_sections_file 258 str #{str:str} -> unit!Error
+; entry normalize_output 920 str -> str
+; entry int_fits 554 i64 str -> bool
+; entry is_operator_name 555 str -> bool
+; entry aipl_token_scopes 592 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 259 str str -> str[]!Error
 ; entry companion_files 138 str -> __m25__Companion[]!str
-; entry parse_spec 956 str -> __m26__Spec!str
-; entry parse_and_partial_load 954 str -> __m110__PartialLoad!__m27__ParseFailure
-; entry fn_role 273 str -> __m44__FnRole
-; entry test_fn_name 264 str -> str
-; entry format_source 298 str u64 -> str!__m113__FmtError
+; entry parse_spec 953 str -> __m26__Spec!str
+; entry parse_and_partial_load 951 str -> __m110__PartialLoad!__m27__ParseFailure
+; entry fn_role 272 str -> __m44__FnRole
+; entry test_fn_name 263 str -> str
+; entry format_source 297 str u64 -> str!__m113__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -493,4 +493,4 @@
 ; data 342 __tostr_lit_100 66616c7365
 
 ; __m115____test$all$is_nine
-; source-fingerprint 268351785880438599
+; source-fingerprint 1885974257070207671
