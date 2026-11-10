@@ -25,7 +25,7 @@ Order by Metagame %
 `winrate <metagame> [--archetypes <config>]` prints the winrate matrix: a row per archetype (most decks
 first, `Other` last) giving the share of its decided matches it won against each archetype in the
 columns. A match counts toward every pairing of its deck's archetypes and its opponent's, draws are
-left out, and `-` is a pairing with no decided match.
+left out, and `-` is a pairing with no decided match or an archetype against itself.
 
 `cards` lists every card played in a metagame, most copies first (main decks and
 sideboards together; equal counts in name order). `share` classifies each deck into

@@ -161,7 +161,8 @@ fn cell_text(self: Observation[]) -> str {
 })
 
 # The matrix on `decks`, loaded from the metagame `name`, as lines: a row for each archetype
-# (most decks first) giving its win rate against each archetype in the columns.
+# (most decks first) giving its win rate against each archetype in the columns, or `-` against
+# itself.
 pub fn winrate_report(
     name: str,
     decks: Deck[],
@@ -172,7 +173,17 @@ pub fn winrate_report(
     let seen = observations(decks, matches, identifiers);
     let rows = names.map(|player| {
         let mine = seen.filter(|each| each.player == player);
-        [player, ..names.map(|opponent| mine.filter(|each| each.opponent == opponent).cell_text())]
+        [
+            player,
+            ..names.map(|opponent| {
+                // An archetype against itself is held from both sides, so its rate is always even.
+                if (opponent == player) {
+                    "-"
+                } else {
+                    mine.filter(|each| each.opponent == opponent).cell_text()
+                }
+            }),
+        ]
     });
     [
         `Winrate Matrix from {name}`,
@@ -198,7 +209,7 @@ pub fn winrate_report(
         "+-----------+--------+--------+",
         "| Archetype | Forest |  Other |",
         "+===========+========+========+",
-        "| Forest    |  50.0% | 100.0% |",
+        "| Forest    |      - | 100.0% |",
         "| Other     |   0.0% |      - |",
         "+-----------+--------+--------+",
     ]);

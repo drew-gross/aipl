@@ -116,6 +116,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 benchmark:
+  add a --build-flamegraph command to aipl run (and check?)
   summarize wall time metrics of performance sections
   --save/--compare option so users can monitor over time
 
