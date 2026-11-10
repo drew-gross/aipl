@@ -735,9 +735,6 @@ pub mod ast {
             | Type::Named(_)
             // A variable `any` already normalized into is no longer an `any`.
             | Type::TypeVar(_)
-            | Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
             | Type::Unknown
             | Type::ConcatStr => false,
             Type::Any => true,
@@ -1004,7 +1001,7 @@ pub mod ast {
     /// `Type::Primitive(..)` is what used to be `Type::Named("i64")` and the
     /// like. (User structs, variants, generic type parameters, and the builtin
     /// `Error` type remain `Type::Named(String)`; the compiler's pseudo-type
-    /// sentinels — `Any`, `NoneInner`, etc. — have their own `Type` variants.)
+    /// sentinels — `Any`, `ConcatStr`, etc. — have their own `Type` variants.)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Primitive {
         I8,
@@ -1170,7 +1167,7 @@ pub mod ast {
         Primitive(Primitive),
         /// A name that isn't a primitive: a user struct or variant, or the
         /// builtin `Error` type. (Compiler pseudo-type sentinels that used to
-        /// overload this — `__none__`, `any`, etc. — have their own dedicated
+        /// overload this — `any`, etc. — have their own dedicated
         /// variants below instead, and so does a generic type parameter: see
         /// [`Type::TypeVar`].)
         Named(String),
@@ -1268,19 +1265,6 @@ pub mod ast {
         /// replaces each occurrence with a synthetic named type variable before
         /// anything else sees it.
         Any,
-        /// The placeholder element/inner of an untyped `none`, empty array
-        /// literal (`[]`), or the empty brace literal (`#{}`) — coerces to
-        /// any element/inner type at the use site (see [`crate::is_none_inner`]).
-        NoneInner,
-        /// Monomorphization-only: the pseudo-type a generic's type variable is
-        /// bound to when the only argument that could pin it is an empty array
-        /// literal (see the fallback pass in `instantiate_types`). Substituted
-        /// back to `Array(NoneInner)` once it lands in a container, so existing
-        /// codegen treats it as an ordinary empty array.
-        EmptyArrayArg,
-        /// Monomorphization-only: like `EmptyArrayArg`, but for a bare `none`
-        /// literal — substituted back to `Optional(NoneInner)`.
-        NoneLiteralArg,
         /// Checker-only: a type it cannot pin down — chiefly the result of a
         /// generic call whose type variables this pass does not instantiate, and
         /// what `subst_vars` yields for a variable nothing bound. It is a
@@ -1357,11 +1341,6 @@ pub mod ast {
     /// `unreachable!()`, and the compiler enforces that it never receives one
     /// rather than the author remembering to panic.
     ///
-    /// The context-decided placeholders — `NoneInner`, `EmptyArrayArg`,
-    /// `NoneLiteralArg` — *are* here, because they genuinely reach codegen: an
-    /// empty `[]` still has an element type of some kind when its drop function
-    /// is picked. They are a different axis from abstractness (undecided rather
-    /// than universally quantified) and want their own treatment eventually.
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum ConcreteType {
         Unit,
@@ -1378,9 +1357,6 @@ pub mod ast {
         /// at runtime and the name is only needed to render a case back
         /// (`case_name`) and to keep two variants' cases from comparing equal.
         Case(String),
-        NoneInner,
-        EmptyArrayArg,
-        NoneLiteralArg,
         ConcatStr,
     }
 
@@ -1403,9 +1379,6 @@ pub mod ast {
                 Type::Unit => ConcreteType::Unit,
                 Type::Primitive(p) => ConcreteType::Primitive(*p),
                 Type::Named(n) => ConcreteType::Named(n.clone()),
-                Type::NoneInner => ConcreteType::NoneInner,
-                Type::EmptyArrayArg => ConcreteType::EmptyArrayArg,
-                Type::NoneLiteralArg => ConcreteType::NoneLiteralArg,
                 Type::ConcatStr => ConcreteType::ConcatStr,
                 // A refinement has its base's representation, and by the time
                 // anything asks for a concrete type it has been erased anyway
@@ -1446,9 +1419,6 @@ pub mod ast {
                 ConcreteType::Primitive(p) => Type::Primitive(*p),
                 ConcreteType::Named(n) => Type::Named(n.clone()),
                 ConcreteType::Case(n) => Type::Case(Box::new(Type::Named(n.clone()))),
-                ConcreteType::NoneInner => Type::NoneInner,
-                ConcreteType::EmptyArrayArg => Type::EmptyArrayArg,
-                ConcreteType::NoneLiteralArg => Type::NoneLiteralArg,
                 ConcreteType::ConcatStr => Type::ConcatStr,
                 ConcreteType::Optional(i) => Type::Optional(Box::new(i.widen())),
                 ConcreteType::Array(i) => Type::Array(Box::new(i.widen())),
@@ -3829,10 +3799,6 @@ pub mod concrete {
         matches!(t, ConcreteType::ConcatStr)
     }
 
-    pub fn is_none_inner(t: &ConcreteType) -> bool {
-        matches!(t, ConcreteType::NoneInner)
-    }
-
     pub fn is_int_ty(t: &ConcreteType) -> bool {
         matches!(t, ConcreteType::Primitive(p) if p.is_int())
     }
@@ -3899,9 +3865,6 @@ pub mod concrete {
             }
             // Spelled exactly as the abstract `type_name` spells them, so a
             // diagnostic reads the same whichever side of mono produced it.
-            ConcreteType::NoneInner => "__none__".into(),
-            ConcreteType::EmptyArrayArg => "EmptyArray".into(),
-            ConcreteType::NoneLiteralArg => "NoneLiteral".into(),
             ConcreteType::ConcatStr => "__concat_str__".into(),
         }
     }
@@ -4003,9 +3966,6 @@ pub fn raw_type_name(t: &Type) -> String {
             format!("{name}<{as_}>")
         }
         Type::Any => "any".into(),
-        Type::NoneInner => "__none__".into(),
-        Type::EmptyArrayArg => "EmptyArray".into(),
-        Type::NoneLiteralArg => "NoneLiteral".into(),
         Type::ConcatStr => "__concat_str__".into(),
     }
 }
@@ -4060,9 +4020,6 @@ pub fn type_name(t: &Type) -> String {
             format!("{name}<{as_}>")
         }
         Type::Any => "any".into(),
-        Type::NoneInner => "__none__".into(),
-        Type::EmptyArrayArg => "EmptyArray".into(),
-        Type::NoneLiteralArg => "NoneLiteral".into(),
         Type::ConcatStr => "__concat_str__".into(),
     }
 }
@@ -4110,20 +4067,6 @@ pub fn is_set_elem(t: &Type) -> bool {
 /// structs), validated separately.
 pub fn is_dict_key(t: &Type) -> bool {
     is_set_elem(t)
-}
-
-/// Marker for the inner type of bare `none`. Implicitly converts to
-/// any `Optional<T>` via `expect_type`. Users can't write this — `none`
-pub fn is_none_inner(t: &Type) -> bool {
-    matches!(t, Type::NoneInner)
-}
-
-pub fn is_empty_array_arg(t: &Type) -> bool {
-    matches!(t, Type::EmptyArrayArg)
-}
-
-pub fn is_none_literal_arg(t: &Type) -> bool {
-    matches!(t, Type::NoneLiteralArg)
 }
 
 // ---------- Builtin registry ----------
@@ -4418,9 +4361,6 @@ pub fn erase_refinement_ty(t: &Type) -> Type {
         | T::Named(_)
         | T::TypeVar(_)
         | T::Any
-        | T::NoneInner
-        | T::EmptyArrayArg
-        | T::NoneLiteralArg
         | T::Unknown
         | T::ConcatStr => t.clone(),
         T::Case(v) => T::Case(Box::new(erase_refinement_ty(v))),
@@ -4507,13 +4447,7 @@ pub fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
             name.clone(),
             args.iter().map(|a| subst_type_params(a, map)).collect(),
         ),
-        Type::Unit
-        | Type::Primitive(_)
-        | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => t.clone(),
+        Type::Unit | Type::Primitive(_) | Type::Any | Type::ConcatStr => t.clone(),
     }
 }
 
@@ -4623,9 +4557,6 @@ fn arm_type_decls(program: &mut ast::Program) -> Vec<ast::RefinementDecl> {
             | Type::Named(_)
             | Type::TypeVar(_)
             | Type::Any
-            | Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
             | Type::Unknown
             | Type::ConcatStr => {}
         }
@@ -4755,9 +4686,6 @@ fn expand_refinement_ty(
         | T::Named(_)
         | T::TypeVar(_)
         | T::Any
-        | T::NoneInner
-        | T::EmptyArrayArg
-        | T::NoneLiteralArg
         | T::Unknown
         | T::ConcatStr => t.clone(),
     })
@@ -5048,11 +4976,8 @@ pub fn mentions_typevar(t: &ast::Type) -> bool {
         T::Unit
         | T::Primitive(_)
         | T::Named(_)
-        | T::NoneInner
-        | T::EmptyArrayArg
         // Not a type parameter: a wildcard is what the checker reaches for when
         // it *cannot* pin a type down, not a parameter waiting to be substituted.
-        | T::NoneLiteralArg
         | T::Unknown
         | T::ConcatStr => false,
     }

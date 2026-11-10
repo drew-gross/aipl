@@ -1,7 +1,6 @@
 //! Does monomorphization's own inference agree with the pinner?
 //!
-//! Stage 2 of `TYPED_IR.md` replaces `Mono::infer`'s types with the pinner's. Before anything is
-//! rewritten, this measures the gap: while a program is monomorphized, every expression `infer`
+//! While a program is monomorphized, every expression `infer`
 //! types is looked up in the pinned program by function and span, the pinned type is made concrete
 //! with the instance's type arguments, and the two are compared.
 //!

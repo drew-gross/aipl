@@ -1,5 +1,5 @@
 //! The pinner (`aipl_mono::pin`): what it makes of the parts of a program, and how its types
-//! compare with monomorphization's inference. See `TYPED_IR.md`.
+//! compare with monomorphization's inference.
 
 use aipl::mono::pin::{pin, Failure};
 use aipl::DebugOptions;

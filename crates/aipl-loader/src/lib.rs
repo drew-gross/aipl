@@ -1676,9 +1676,6 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         Type::Unit => Type::Unit,
         Type::Primitive(p) => Type::Primitive(*p),
         Type::Any => Type::Any,
-        Type::NoneInner => Type::NoneInner,
-        Type::EmptyArrayArg => Type::EmptyArrayArg,
-        Type::NoneLiteralArg => Type::NoneLiteralArg,
         Type::Unknown => Type::Unknown,
         Type::ConcatStr => Type::ConcatStr,
         // `Case<V>` names `V`, which resolves through the view like any other

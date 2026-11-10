@@ -125,8 +125,8 @@ use aipl_syntax::{
     },
     binop_spelling,
     concrete::{
-        error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner,
-        is_set_elem, is_str_repr, is_unit, type_name,
+        error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_set_elem,
+        is_str_repr, is_unit, type_name,
     },
 };
 use aipl_syntax::{DebugOptions, Error, Span};
@@ -7983,13 +7983,8 @@ fn set_scalar(builder: &mut FunctionBuilder, var: Variable, v: Value) {
 }
 
 /// Whether a value of type `actual` may flow where `expected` is wanted.
-/// `none` (`Optional(__none__)`) and the empty array literal `[]`
-/// (`Array(__none__)`) carry the placeholder element `__none__`, which unifies
-/// with any concrete element in either direction — recursively through matching
-/// optional/array layers, so e.g. `some(some(none))` (`__none__???`) fits
-/// `i64???` and `[[]]` fits `i64[][]`.
 fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
-    if actual == expected || is_none_inner(actual) || is_none_inner(expected) {
+    if actual == expected {
         return true;
     }
     // `str`, `Error`, and the internal concat-str all share a representation and
@@ -8021,17 +8016,10 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
     match (actual, expected) {
         (ConcreteType::Optional(a), ConcreteType::Optional(b)) => coercible(a, b),
         (ConcreteType::Array(a), ConcreteType::Array(b)) => coercible(a, b),
-        // The empty `#{}` is the empty literal for a set *and* a dict, and it
-        // reaches codegen as `#{__none__}` — the type only an empty brace pair
-        // produces. Mirrors the checker's rule in `coerce`.
-        (ConcreteType::Set(a, _), ConcreteType::Dict(_, _)) if is_none_inner(a) => true,
-        // An empty `#{}` is any set, on either side (a binding seeded with one
-        // has no order yet), and so is a `to_set` whose order context is still
-        // deciding; otherwise the orders are part of the type.
+        // A `to_set` whose order context is still deciding is any set; otherwise the
+        // orders are part of the type.
         (ConcreteType::Set(a, oa), ConcreteType::Set(b, ob))
-            if is_none_inner(a)
-                || is_none_inner(b)
-                || *oa == aipl_syntax::ast::SetOrder::Context
+            if *oa == aipl_syntax::ast::SetOrder::Context
                 || *ob == aipl_syntax::ast::SetOrder::Context =>
         {
             coercible(a, b)
@@ -8060,15 +8048,11 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
 }
 
 /// Merge two branch/arm types (an `if`'s arms, a `match`'s arms): the common
-/// type both coerce to, or `None` if they're incompatible. A `__none__` element
-/// on either side takes the other's, recursively through matching layers (the
-/// type-level counterpart of `coercible`).
+/// type both coerce to, or `None` if they're incompatible (the type-level
+/// counterpart of `coercible`).
 fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
-    if a == b || is_none_inner(b) {
+    if a == b {
         return Some(a.clone());
-    }
-    if is_none_inner(a) {
-        return Some(b.clone());
     }
     // A `Case<V>` compared against a tag: mono lowered a constructor reference to
     // a plain integer, so `k == Str` arrives here as `Case<V>` against `i64`.
@@ -8102,7 +8086,7 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
             Some(ConcreteType::Array(Box::new(merge_types(x, y)?)))
         }
         (ConcreteType::Set(x, ox), ConcreteType::Set(y, oy)) => {
-            let order = if is_none_inner(x) || *ox == aipl_syntax::ast::SetOrder::Context {
+            let order = if *ox == aipl_syntax::ast::SetOrder::Context {
                 *oy
             } else {
                 *ox
@@ -9594,7 +9578,7 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
         // bare `none` optional's payload is garbage), so this reaches codegen
         // (e.g. picking an empty array literal's element drop-fn) but is
         // always vacuously drop-free.
-        ConcreteType::Primitive(_) | ConcreteType::Unit | ConcreteType::NoneInner => false,
+        ConcreteType::Primitive(_) | ConcreteType::Unit => false,
         // Already handled by the `is_str_repr` guard above.
         ConcreteType::ConcatStr => unreachable!(),
         ConcreteType::Named(n) => match structs.get(n) {
@@ -9619,12 +9603,6 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
         ConcreteType::Fn(_, _) => false,
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         // Generic applications are lowered to Named by lower_generics before codegen.
-        // `Any`/`EmptyArrayArg`/`NoneLiteralArg` are resolved away by
-        // monomorphization (the latter two collapse to `Array`/`Optional` of
-        // `NoneInner` — see `subst_vars`) — codegen never sees them directly.
-        ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
-            unreachable!("compiler pseudo-type reached codegen")
-        }
     }
 }
 
@@ -9657,7 +9635,6 @@ fn is_composite(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
 /// not — the same append, in the same generic, at `T = __none__`.
 fn is_storable_elem(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     is_array_elem(ty)
-        || is_none_inner(ty)
         || matches!(ty, ConcreteType::Optional(_))
         || matches!(ty, ConcreteType::Named(n) if structs.contains_key(n))
 }
@@ -9790,7 +9767,7 @@ fn settle_array_slot<M: Module>(
     let ConcreteType::Array(elem) = ty else {
         return;
     };
-    if !is_block_array(ty) || is_none_inner(elem) {
+    if !is_block_array(ty) {
         return;
     }
     let lend = emit_needs_block(builder, addr);
@@ -9911,7 +9888,6 @@ fn compile_with_or_self<M: Module>(
     (arr_v, arr_ty): (Value, &ConcreteType),
     (idx_v, val_v, val_ty): (Value, Value, &ConcreteType),
     result_arr_ty: &ConcreteType,
-    empty_receiver: bool,
 ) -> Result<(Value, ConcreteType), Error> {
     let Cx {
         structs, builtins, ..
@@ -9922,60 +9898,56 @@ fn compile_with_or_self<M: Module>(
     let elem = (**elem).clone();
     let merge = builder.create_block();
     builder.append_block_param(merge, types::I64);
-    if empty_receiver {
-        // Nothing to replace: the receiver, retyped by the value, is the answer.
-        builder.ins().jump(merge, &[BlockArg::Value(arr_v)]);
+    let view = arr_view(builder, arr_v, arr_ty, structs);
+    let in_range = builder.ins().icmp(IntCC::UnsignedLessThan, idx_v, view.len);
+    let hit_b = builder.create_block();
+    let miss_b = builder.create_block();
+    builder.ins().brif(in_range, hit_b, &[], miss_b, &[]);
+
+    builder.switch_to_block(hit_b);
+    builder.seal_block(hit_b);
+    let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
+    let out_slot = value_slot(builder, arr_ty, structs);
+    let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
+    builtins.call_void(
+        module,
+        builder,
+        "aipl_arr_writable",
+        &[owned, arr_v, drop_fn, retain_fn, esz],
+    );
+    let base = writable_elems(builder, owned, arr_ty);
+    if is_bit_packed(&elem) {
+        let byte_off = builder.ins().ushr_imm_u(idx_v, 3);
+        let byte_addr = builder.ins().iadd(base, byte_off);
+        let byte = builder
+            .ins()
+            .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
+        let byte = builder.ins().uextend(types::I64, byte);
+        let bit = builder.ins().band_imm_u(idx_v, 7);
+        let one = builder.ins().iconst(types::I64, 1);
+        let mask = builder.ins().ishl(one, bit);
+        let keep = builder.ins().bnot(mask);
+        let cleared = builder.ins().band(byte, keep);
+        let set = builder.ins().ishl(val_v, bit);
+        let updated = builder.ins().bor(cleared, set);
+        builder
+            .ins()
+            .istore8(MemFlagsData::trusted(), updated, byte_addr, 0);
     } else {
-        let view = arr_view(builder, arr_v, arr_ty, structs);
-        let in_range = builder.ins().icmp(IntCC::UnsignedLessThan, idx_v, view.len);
-        let hit_b = builder.create_block();
-        let miss_b = builder.create_block();
-        builder.ins().brif(in_range, hit_b, &[], miss_b, &[]);
-
-        builder.switch_to_block(hit_b);
-        builder.seal_block(hit_b);
-        let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
-        let out_slot = value_slot(builder, arr_ty, structs);
-        let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
-        builtins.call_void(
-            module,
-            builder,
-            "aipl_arr_writable",
-            &[owned, arr_v, drop_fn, retain_fn, esz],
-        );
-        let base = writable_elems(builder, owned, arr_ty);
-        if is_bit_packed(&elem) {
-            let byte_off = builder.ins().ushr_imm_u(idx_v, 3);
-            let byte_addr = builder.ins().iadd(base, byte_off);
-            let byte = builder
-                .ins()
-                .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
-            let byte = builder.ins().uextend(types::I64, byte);
-            let bit = builder.ins().band_imm_u(idx_v, 7);
-            let one = builder.ins().iconst(types::I64, 1);
-            let mask = builder.ins().ishl(one, bit);
-            let keep = builder.ins().bnot(mask);
-            let cleared = builder.ins().band(byte, keep);
-            let set = builder.ins().ishl(val_v, bit);
-            let updated = builder.ins().bor(cleared, set);
-            builder
-                .ins()
-                .istore8(MemFlagsData::trusted(), updated, byte_addr, 0);
-        } else {
-            let stride = array_elem_size(&elem, structs);
-            let off = builder.ins().imul_imm_s(idx_v, stride);
-            let addr = builder.ins().iadd(base, off);
-            let old = load_elem_at(builder, base, idx_v, &elem, stride, None, structs);
-            emit_retain(builder, module, builtins, structs, val_v, val_ty);
-            emit_drop(builder, module, builtins, structs, old, &elem);
-            store_elem(builder, addr, val_v, val_ty, stride, structs);
-        }
-        builder.ins().jump(merge, &[BlockArg::Value(owned)]);
-
-        builder.switch_to_block(miss_b);
-        builder.seal_block(miss_b);
-        builder.ins().jump(merge, &[BlockArg::Value(arr_v)]);
+        let stride = array_elem_size(&elem, structs);
+        let off = builder.ins().imul_imm_s(idx_v, stride);
+        let addr = builder.ins().iadd(base, off);
+        let old = load_elem_at(builder, base, idx_v, &elem, stride, None, structs);
+        emit_retain(builder, module, builtins, structs, val_v, val_ty);
+        emit_drop(builder, module, builtins, structs, old, &elem);
+        store_elem(builder, addr, val_v, val_ty, stride, structs);
     }
+    builder.ins().jump(merge, &[BlockArg::Value(owned)]);
+
+    builder.switch_to_block(miss_b);
+    builder.seal_block(miss_b);
+    builder.ins().jump(merge, &[BlockArg::Value(arr_v)]);
+
     builder.switch_to_block(merge);
     builder.seal_block(merge);
     let result = builder.block_params(merge)[0];
@@ -10339,8 +10311,7 @@ fn emit_inline_array(builder: &mut FunctionBuilder, vals: &[Value], width: i64) 
 /// of the new one then see through the placeholder type.
 fn may_be_inline(ty: &ConcreteType) -> bool {
     is_block_array(ty)
-        && matches!(ty, ConcreteType::Array(e) if is_none_inner(e)
-            || matches!(**e, ConcreteType::Primitive(p) if p.is_int()))
+        && matches!(ty, ConcreteType::Array(e) if matches!(**e, ConcreteType::Primitive(p) if p.is_int()))
 }
 
 /// Whether the array value at `v` is inline: the tag in the top byte of its last
@@ -10383,77 +10354,6 @@ fn emit_needs_block(builder: &mut FunctionBuilder, v: Value) -> Value {
 fn is_inline_optional(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Optional(inner)
         if matches!(**inner, ConcreteType::Primitive(p) if p != Primitive::Str))
-}
-
-/// A bare `[]` literal has no element type to infer from, so it's built as the
-/// generic (array-shaped) empty collection — `ConcreteType::Array(NoneInner)` — same
-/// as an empty `i64[]`/`bool[]`/etc., since those all happen to share one
-/// physical empty-array representation. `char[]` doesn't: it's str-shaped
-/// (see `is_char_array`), so an empty array-shaped value passed where a
-/// `char[]` is expected would misinterpret the header layout downstream. This
-/// substitutes the canonical empty `str` value (inline, length 0) in that one
-/// case, freeing the now-unused throwaway empty array block first. A known
-/// narrow gap: only call sites that route through this (currently just
-/// function-call arguments) get the fixup — an empty literal flowing into a
-/// `char[]`-typed struct field or `return` isn't covered.
-fn coerce_empty_to_char_array<M: Module>(
-    builder: &mut FunctionBuilder,
-    module: &mut M,
-    builtins: &Builtins,
-    scopes: &mut [Vec<Tracked>],
-    v: Value,
-    actual: &ConcreteType,
-    expected: &ConcreteType,
-) -> Value {
-    // The same substitution a `#{char}` needs, and for the same reason: an
-    // empty `#{}` is the shared empty *array* block, and a char set is the
-    // 256-bit bitfield — copying 32 bytes out of an 8-byte block header is what
-    // reading one as the other does. Reached when the literal's own type was
-    // never locked (a generic instance's `mut out: #{T} = #{}`), so the binding
-    // learns the element type from its annotation rather than from the value.
-    // The empty set is what zeroed memory already reads as, and the block it
-    // replaces is static and untracked, so nothing is allocated or released.
-    let is_empty_set = matches!(actual, ConcreteType::Set(inner, _) if is_none_inner(inner));
-    if is_char_set(expected) && is_empty_set {
-        return charset_slot(builder);
-    }
-    let is_empty_placeholder = matches!(actual, ConcreteType::Array(inner) if is_none_inner(inner));
-    if is_char_array(expected) && is_empty_placeholder {
-        let block = arr_ptr(builder, v);
-        builtins.call_void(module, builder, "aipl_array_dec", &[block]);
-        // The empty `[]` was a freshly allocated, tracked temporary; we've just
-        // consumed (dec'd) it in favor of the empty str, so drop its tracking
-        // entry — otherwise scope exit decs it a second time, a double-free
-        // once its now-freed block is reused.
-        if let Some(scope) = scopes.last_mut() {
-            if let Some(pos) = scope
-                .iter()
-                .rposition(|t| matches!(t.owned, Owned::Value(x) if x == v))
-            {
-                scope.remove(pos);
-            }
-        }
-        // The empty `str` is the zeroed 24-byte value (`str24::Str::empty`),
-        // addressed like every wide value. It used to be the tagged ABI's
-        // inline sentinel word, which the wide runtime dereferenced as a
-        // pointer — reached only when the literal arrived unlocked, as it does
-        // in a generic instance whose `mut out: U[] = []` became `char[]`.
-        let slot = builder.create_sized_stack_slot(StackSlotData::new(
-            StackSlotKind::ExplicitSlot,
-            str24::STR_SIZE as u32,
-            3,
-        ));
-        let addr = builder.ins().stack_addr(types::I64, slot, 0);
-        let zero = builder.ins().iconst(types::I64, 0);
-        for i in 0..(str24::STR_SIZE / 8) {
-            builder
-                .ins()
-                .store(MemFlagsData::trusted(), zero, addr, (i * 8) as i32);
-        }
-        addr
-    } else {
-        v
-    }
 }
 
 /// The byte length of the `str` value at `ptr`, computed in IR — the runtime's
@@ -11493,11 +11393,6 @@ fn emit_rc_w<M: Module>(
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         // Already handled by the `is_str_repr` guard above.
         ConcreteType::ConcatStr => unreachable!(),
-        // `needs_drop` panics on these (resolved away by monomorphization), so
-        // the guard above already returned.
-        ConcreteType::NoneInner | ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
-            unreachable!()
-        }
     }
 }
 
@@ -11703,6 +11598,12 @@ const CHARSET_WORDS: usize = charset::CHARSET_SIZE / 8;
 
 /// A fresh, zeroed `#{char}`: four words of stack, which *is* the empty set —
 /// the representation is chosen so zeroed memory already reads as one.
+/// The concrete type the pinner gave `expr`, which is what a context-typed literal (`[]`, `#{}`,
+/// `none`, a bare `ok`/`err`) has no elements of its own to say.
+fn stamped_ty(expr: &Expr) -> Option<ConcreteType> {
+    expr.ty.as_ref().and_then(|t| t.to_concrete())
+}
+
 fn charset_slot(builder: &mut FunctionBuilder) -> Value {
     let slot = builder.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,
@@ -11854,9 +11755,7 @@ fn emit_arr_starts_ends<M: Module>(
     // no element type to compare, so length-fits is the whole answer (and `lb`
     // is 0, so it's `true`). Skip the element loop — `emit_eq` can't lower a
     // `__none__` element.
-    if is_none_inner(elem) {
-        return Ok(builder.ins().uextend(types::I64, fits));
-    }
+
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().stack_store(types::I64, zero, res, 0);
@@ -12075,54 +11974,50 @@ fn emit_eq_body<M: Module>(
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
             // Both empty (untyped element) → length equality is the whole answer,
             // and there's no element type to recurse into.
-            if is_none_inner(elem) {
-                builder.ins().uextend(types::I64, len_eq)
-            } else {
-                let res = i64_slot(builder);
-                let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                let pre = builder.create_block();
-                let merge = builder.create_block();
-                builder.ins().brif(len_eq, pre, &[], merge, &[]);
-                builder.switch_to_block(pre);
-                builder.seal_block(pre);
-                let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().stack_store(types::I64, one, res, 0); // optimistic: all-equal
-                let idx = i64_slot(builder);
-                builder.ins().stack_store(types::I64, zero, idx, 0);
-                let header = builder.create_block();
-                let body = builder.create_block();
-                let exit = builder.create_block();
-                builder.ins().jump(header, &[]);
-                builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
-                let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
-                builder.ins().brif(more, body, &[], exit, &[]);
-                builder.switch_to_block(body);
-                builder.seal_block(body);
-                let el = load_view_elem(builder, lv, i, elem, structs);
-                let er = load_view_elem(builder, rv, i, elem, structs);
-                let ee = emit_eq(module, builder, cx, el, er, elem)?;
-                let cont = builder.create_block();
-                let neq = builder.create_block();
-                builder.ins().brif(ee, cont, &[], neq, &[]);
-                builder.switch_to_block(neq);
-                builder.seal_block(neq);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                builder.ins().jump(exit, &[]);
-                builder.switch_to_block(cont);
-                builder.seal_block(cont);
-                let next = builder.ins().iadd_imm_s(i, 1);
-                builder.ins().stack_store(types::I64, next, idx, 0);
-                builder.ins().jump(header, &[]);
-                builder.seal_block(header);
-                builder.switch_to_block(exit);
-                builder.seal_block(exit);
-                builder.ins().jump(merge, &[]);
-                builder.switch_to_block(merge);
-                builder.seal_block(merge);
-                builder.ins().stack_load(types::I64, types::I64, res, 0)
-            }
+            let res = i64_slot(builder);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            let pre = builder.create_block();
+            let merge = builder.create_block();
+            builder.ins().brif(len_eq, pre, &[], merge, &[]);
+            builder.switch_to_block(pre);
+            builder.seal_block(pre);
+            let one = builder.ins().iconst(types::I64, 1);
+            builder.ins().stack_store(types::I64, one, res, 0); // optimistic: all-equal
+            let idx = i64_slot(builder);
+            builder.ins().stack_store(types::I64, zero, idx, 0);
+            let header = builder.create_block();
+            let body = builder.create_block();
+            let exit = builder.create_block();
+            builder.ins().jump(header, &[]);
+            builder.switch_to_block(header);
+            let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
+            let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
+            builder.ins().brif(more, body, &[], exit, &[]);
+            builder.switch_to_block(body);
+            builder.seal_block(body);
+            let el = load_view_elem(builder, lv, i, elem, structs);
+            let er = load_view_elem(builder, rv, i, elem, structs);
+            let ee = emit_eq(module, builder, cx, el, er, elem)?;
+            let cont = builder.create_block();
+            let neq = builder.create_block();
+            builder.ins().brif(ee, cont, &[], neq, &[]);
+            builder.switch_to_block(neq);
+            builder.seal_block(neq);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            builder.ins().jump(exit, &[]);
+            builder.switch_to_block(cont);
+            builder.seal_block(cont);
+            let next = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, next, idx, 0);
+            builder.ins().jump(header, &[]);
+            builder.seal_block(header);
+            builder.switch_to_block(exit);
+            builder.seal_block(exit);
+            builder.ins().jump(merge, &[]);
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         ConcreteType::Set(elem, _) if **elem == ConcreteType::Primitive(Primitive::Char) => {
             emit_charset_eq(builder, lv, rv)
@@ -12137,67 +12032,63 @@ fn emit_eq_body<M: Module>(
             let ll = lview.len;
             let rl = value_view(builder, rv, ty).len;
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
-            if is_none_inner(elem) {
-                builder.ins().uextend(types::I64, len_eq)
-            } else {
-                let res = i64_slot(builder);
-                let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                let pre = builder.create_block();
-                let merge = builder.create_block();
-                builder.ins().brif(len_eq, pre, &[], merge, &[]);
-                builder.switch_to_block(pre);
-                builder.seal_block(pre);
-                let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().stack_store(types::I64, one, res, 0);
-                let esz = builder
-                    .ins()
-                    .iconst(types::I64, runtime_elem_size(elem, structs));
-                let idx = i64_slot(builder);
-                builder.ins().stack_store(types::I64, zero, idx, 0);
-                let header = builder.create_block();
-                let body = builder.create_block();
-                let exit = builder.create_block();
-                builder.ins().jump(header, &[]);
-                builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
-                let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
-                builder.ins().brif(more, body, &[], exit, &[]);
-                builder.switch_to_block(body);
-                builder.seal_block(body);
-                let el = load_view_elem(builder, lview, i, elem, structs);
-                let xslot = value_slot(builder, elem, structs);
-                let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
-                store_array_elem(builder, xptr, el, elem, structs);
-                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
-                let eq_fn = set_eq_fn_addr(builder, module, cx, elem);
-                let (name, args) = set_call(
-                    "aipl_set_contains",
-                    eq_fn,
-                    4,
-                    vec![rv_value, xptr, esz, str_cmp],
-                );
-                let c = builtins.call(module, builder, name, &args);
-                let cont = builder.create_block();
-                let missing = builder.create_block();
-                builder.ins().brif(c, cont, &[], missing, &[]);
-                builder.switch_to_block(missing);
-                builder.seal_block(missing);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                builder.ins().jump(exit, &[]);
-                builder.switch_to_block(cont);
-                builder.seal_block(cont);
-                let next = builder.ins().iadd_imm_s(i, 1);
-                builder.ins().stack_store(types::I64, next, idx, 0);
-                builder.ins().jump(header, &[]);
-                builder.seal_block(header);
-                builder.switch_to_block(exit);
-                builder.seal_block(exit);
-                builder.ins().jump(merge, &[]);
-                builder.switch_to_block(merge);
-                builder.seal_block(merge);
-                builder.ins().stack_load(types::I64, types::I64, res, 0)
-            }
+            let res = i64_slot(builder);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            let pre = builder.create_block();
+            let merge = builder.create_block();
+            builder.ins().brif(len_eq, pre, &[], merge, &[]);
+            builder.switch_to_block(pre);
+            builder.seal_block(pre);
+            let one = builder.ins().iconst(types::I64, 1);
+            builder.ins().stack_store(types::I64, one, res, 0);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(elem, structs));
+            let idx = i64_slot(builder);
+            builder.ins().stack_store(types::I64, zero, idx, 0);
+            let header = builder.create_block();
+            let body = builder.create_block();
+            let exit = builder.create_block();
+            builder.ins().jump(header, &[]);
+            builder.switch_to_block(header);
+            let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
+            let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
+            builder.ins().brif(more, body, &[], exit, &[]);
+            builder.switch_to_block(body);
+            builder.seal_block(body);
+            let el = load_view_elem(builder, lview, i, elem, structs);
+            let xslot = value_slot(builder, elem, structs);
+            let xptr = builder.ins().stack_addr(types::I64, xslot, 0);
+            store_array_elem(builder, xptr, el, elem, structs);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+            let eq_fn = set_eq_fn_addr(builder, module, cx, elem);
+            let (name, args) = set_call(
+                "aipl_set_contains",
+                eq_fn,
+                4,
+                vec![rv_value, xptr, esz, str_cmp],
+            );
+            let c = builtins.call(module, builder, name, &args);
+            let cont = builder.create_block();
+            let missing = builder.create_block();
+            builder.ins().brif(c, cont, &[], missing, &[]);
+            builder.switch_to_block(missing);
+            builder.seal_block(missing);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            builder.ins().jump(exit, &[]);
+            builder.switch_to_block(cont);
+            builder.seal_block(cont);
+            let next = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, next, idx, 0);
+            builder.ins().jump(header, &[]);
+            builder.seal_block(header);
+            builder.switch_to_block(exit);
+            builder.seal_block(exit);
+            builder.ins().jump(merge, &[]);
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_struct).is_some() => {
             // Clone field (offset, type) pairs so we don't borrow `structs` across
@@ -12294,84 +12185,80 @@ fn emit_eq_body<M: Module>(
             let lelems = lview.base;
             let rl = value_view(builder, rv, ty).len;
             let len_eq = builder.ins().icmp(IntCC::Equal, ll, rl);
-            if is_none_inner(k) {
-                builder.ins().uextend(types::I64, len_eq)
-            } else {
-                let pair_size = dict_pair_size(k, v, structs);
-                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(k));
-                let psz = builder.ins().iconst(types::I64, pair_size);
-                let res = i64_slot(builder);
-                let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                let pre = builder.create_block();
-                let merge = builder.create_block();
-                builder.ins().brif(len_eq, pre, &[], merge, &[]);
-                builder.switch_to_block(pre);
-                builder.seal_block(pre);
-                let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().stack_store(types::I64, one, res, 0); // optimistic
-                let idx = i64_slot(builder);
-                builder.ins().stack_store(types::I64, zero, idx, 0);
-                let header = builder.create_block();
-                let body = builder.create_block();
-                let exit = builder.create_block();
-                builder.ins().jump(header, &[]);
-                builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
-                let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
-                builder.ins().brif(more, body, &[], exit, &[]);
-                builder.switch_to_block(body);
-                builder.seal_block(body);
-                // Address of left pair `i`, its key (offset 0) and value (8).
-                let off = builder.ins().imul_imm_s(i, pair_size);
-                let lpair = builder.ins().iadd(lelems, off);
-                let key = component(builder, lpair, 0, k, structs);
-                let kslot = value_slot(builder, k, structs);
-                let kptr = builder.ins().stack_addr(types::I64, kslot, 0);
-                store_array_elem(builder, kptr, key, k, structs);
-                let rslot = builtins.call(
-                    module,
-                    builder,
-                    "aipl_dict_get",
-                    &[rv_value, kptr, psz, str_cmp],
-                );
-                let found = builder.ins().icmp_imm_s(IntCC::NotEqual, rslot, 0);
-                let cmp_b = builder.create_block();
-                let missing = builder.create_block();
-                builder.ins().brif(found, cmp_b, &[], missing, &[]);
-                builder.switch_to_block(missing);
-                builder.seal_block(missing);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                builder.ins().jump(exit, &[]);
-                builder.switch_to_block(cmp_b);
-                builder.seal_block(cmp_b);
-                // Right value is at the slot's offset 0; left at the pair's key
-                // width, which is 8 for every key but a wide `str`
-                // (`dict_key_size` — the same rule the runtime's `dict_get` uses
-                // to find the value it returns).
-                let lval = component(builder, lpair, dict_key_size(k, structs) as u32, v, structs);
-                let rval = component(builder, rslot, 0, v, structs);
-                let ve = emit_eq(module, builder, cx, lval, rval, v)?;
-                let cont = builder.create_block();
-                let neq = builder.create_block();
-                builder.ins().brif(ve, cont, &[], neq, &[]);
-                builder.switch_to_block(neq);
-                builder.seal_block(neq);
-                builder.ins().stack_store(types::I64, zero, res, 0);
-                builder.ins().jump(exit, &[]);
-                builder.switch_to_block(cont);
-                builder.seal_block(cont);
-                let next = builder.ins().iadd_imm_s(i, 1);
-                builder.ins().stack_store(types::I64, next, idx, 0);
-                builder.ins().jump(header, &[]);
-                builder.seal_block(header);
-                builder.switch_to_block(exit);
-                builder.seal_block(exit);
-                builder.ins().jump(merge, &[]);
-                builder.switch_to_block(merge);
-                builder.seal_block(merge);
-                builder.ins().stack_load(types::I64, types::I64, res, 0)
-            }
+            let pair_size = dict_pair_size(k, v, structs);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(k));
+            let psz = builder.ins().iconst(types::I64, pair_size);
+            let res = i64_slot(builder);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            let pre = builder.create_block();
+            let merge = builder.create_block();
+            builder.ins().brif(len_eq, pre, &[], merge, &[]);
+            builder.switch_to_block(pre);
+            builder.seal_block(pre);
+            let one = builder.ins().iconst(types::I64, 1);
+            builder.ins().stack_store(types::I64, one, res, 0); // optimistic
+            let idx = i64_slot(builder);
+            builder.ins().stack_store(types::I64, zero, idx, 0);
+            let header = builder.create_block();
+            let body = builder.create_block();
+            let exit = builder.create_block();
+            builder.ins().jump(header, &[]);
+            builder.switch_to_block(header);
+            let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
+            let more = builder.ins().icmp(IntCC::SignedLessThan, i, ll);
+            builder.ins().brif(more, body, &[], exit, &[]);
+            builder.switch_to_block(body);
+            builder.seal_block(body);
+            // Address of left pair `i`, its key (offset 0) and value (8).
+            let off = builder.ins().imul_imm_s(i, pair_size);
+            let lpair = builder.ins().iadd(lelems, off);
+            let key = component(builder, lpair, 0, k, structs);
+            let kslot = value_slot(builder, k, structs);
+            let kptr = builder.ins().stack_addr(types::I64, kslot, 0);
+            store_array_elem(builder, kptr, key, k, structs);
+            let rslot = builtins.call(
+                module,
+                builder,
+                "aipl_dict_get",
+                &[rv_value, kptr, psz, str_cmp],
+            );
+            let found = builder.ins().icmp_imm_s(IntCC::NotEqual, rslot, 0);
+            let cmp_b = builder.create_block();
+            let missing = builder.create_block();
+            builder.ins().brif(found, cmp_b, &[], missing, &[]);
+            builder.switch_to_block(missing);
+            builder.seal_block(missing);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            builder.ins().jump(exit, &[]);
+            builder.switch_to_block(cmp_b);
+            builder.seal_block(cmp_b);
+            // Right value is at the slot's offset 0; left at the pair's key
+            // width, which is 8 for every key but a wide `str`
+            // (`dict_key_size` — the same rule the runtime's `dict_get` uses
+            // to find the value it returns).
+            let lval = component(builder, lpair, dict_key_size(k, structs) as u32, v, structs);
+            let rval = component(builder, rslot, 0, v, structs);
+            let ve = emit_eq(module, builder, cx, lval, rval, v)?;
+            let cont = builder.create_block();
+            let neq = builder.create_block();
+            builder.ins().brif(ve, cont, &[], neq, &[]);
+            builder.switch_to_block(neq);
+            builder.seal_block(neq);
+            builder.ins().stack_store(types::I64, zero, res, 0);
+            builder.ins().jump(exit, &[]);
+            builder.switch_to_block(cont);
+            builder.seal_block(cont);
+            let next = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, next, idx, 0);
+            builder.ins().jump(header, &[]);
+            builder.seal_block(header);
+            builder.switch_to_block(exit);
+            builder.seal_block(exit);
+            builder.ins().jump(merge, &[]);
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            builder.ins().stack_load(types::I64, types::I64, res, 0)
         }
         ConcreteType::Result(ok_ty, err_ty) => {
             // Equal iff same tag and the active payload (by that side's type)
@@ -12400,7 +12287,7 @@ fn emit_eq_body<M: Module>(
             // A side that is unit (void-Ok `!E`) carries no payload, and a
             // `__none__` side is unconstructible (so its branch is dead) — either
             // way equal tags suffice, so compare the payload only for real types.
-            let payload_trivial = |t: &ConcreteType| is_unit(t) || is_none_inner(t);
+            let payload_trivial = |t: &ConcreteType| is_unit(t);
             builder.switch_to_block(ok_b);
             builder.seal_block(ok_b);
             let e = if payload_trivial(ok_ty) {
@@ -12567,20 +12454,12 @@ fn emit_hash<M: Module>(
             // An array value may be a window, so it is read through its view.
             let view = arr_view(builder, v, ty, structs);
             let seed = emit_scalar_hash(builder, view.len);
-            if is_none_inner(elem) {
-                seed
-            } else {
-                emit_seq_hash(module, builder, builtins, structs, view, elem, seed, false)?
-            }
+            emit_seq_hash(module, builder, builtins, structs, view, elem, seed, false)?
         }
         ConcreteType::Set(elem, _) => {
             let view = value_view(builder, v, ty);
             let seed = emit_scalar_hash(builder, view.len);
-            if is_none_inner(elem) {
-                seed
-            } else {
-                emit_seq_hash(module, builder, builtins, structs, view, elem, seed, true)?
-            }
+            emit_seq_hash(module, builder, builtins, structs, view, elem, seed, true)?
         }
         // Hashing inlines the structure, which can't terminate on a recursive
         // type; a per-type hash helper (like `to_str`/`eq`) would be needed.
@@ -12665,53 +12544,49 @@ fn emit_hash<M: Module>(
             let view = value_view(builder, v, ty);
             let len = view.len;
             let seed = emit_scalar_hash(builder, len);
-            if is_none_inner(key_ty) {
-                seed
-            } else {
-                let pair_size = dict_pair_size(key_ty, val_ty, structs);
-                let acc = i64_slot(builder);
-                builder.ins().stack_store(types::I64, seed, acc, 0);
-                let idx = i64_slot(builder);
-                let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(types::I64, zero, idx, 0);
-                let elems = view.base;
-                let header = builder.create_block();
-                let body = builder.create_block();
-                let exit = builder.create_block();
-                builder.ins().jump(header, &[]);
-                builder.switch_to_block(header);
-                let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
-                let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
-                builder.ins().brif(more, body, &[], exit, &[]);
-                builder.switch_to_block(body);
-                builder.seal_block(body);
-                let off = builder.ins().imul_imm_s(i, pair_size);
-                let pair = builder.ins().iadd(elems, off);
-                let kv = component(builder, pair, 0, key_ty, structs);
-                let kh = emit_hash(module, builder, builtins, structs, kv, key_ty)?;
-                // Value at the key's width — see `dict_key_size`.
-                let vv = component(
-                    builder,
-                    pair,
-                    dict_key_size(key_ty, structs) as u32,
-                    val_ty,
-                    structs,
-                );
-                let vh = emit_hash(module, builder, builtins, structs, vv, val_ty)?;
-                let pseed = builder.ins().iconst(types::I64, HASH_SEED);
-                let pk = emit_hash_combine(builder, pseed, kh);
-                let ph = emit_hash_combine(builder, pk, vh);
-                let cur = builder.ins().stack_load(types::I64, types::I64, acc, 0);
-                let new = builder.ins().iadd(cur, ph); // commutative over pairs
-                builder.ins().stack_store(types::I64, new, acc, 0);
-                let next = builder.ins().iadd_imm_s(i, 1);
-                builder.ins().stack_store(types::I64, next, idx, 0);
-                builder.ins().jump(header, &[]);
-                builder.seal_block(header);
-                builder.switch_to_block(exit);
-                builder.seal_block(exit);
-                builder.ins().stack_load(types::I64, types::I64, acc, 0)
-            }
+            let pair_size = dict_pair_size(key_ty, val_ty, structs);
+            let acc = i64_slot(builder);
+            builder.ins().stack_store(types::I64, seed, acc, 0);
+            let idx = i64_slot(builder);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(types::I64, zero, idx, 0);
+            let elems = view.base;
+            let header = builder.create_block();
+            let body = builder.create_block();
+            let exit = builder.create_block();
+            builder.ins().jump(header, &[]);
+            builder.switch_to_block(header);
+            let i = builder.ins().stack_load(types::I64, types::I64, idx, 0);
+            let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
+            builder.ins().brif(more, body, &[], exit, &[]);
+            builder.switch_to_block(body);
+            builder.seal_block(body);
+            let off = builder.ins().imul_imm_s(i, pair_size);
+            let pair = builder.ins().iadd(elems, off);
+            let kv = component(builder, pair, 0, key_ty, structs);
+            let kh = emit_hash(module, builder, builtins, structs, kv, key_ty)?;
+            // Value at the key's width — see `dict_key_size`.
+            let vv = component(
+                builder,
+                pair,
+                dict_key_size(key_ty, structs) as u32,
+                val_ty,
+                structs,
+            );
+            let vh = emit_hash(module, builder, builtins, structs, vv, val_ty)?;
+            let pseed = builder.ins().iconst(types::I64, HASH_SEED);
+            let pk = emit_hash_combine(builder, pseed, kh);
+            let ph = emit_hash_combine(builder, pk, vh);
+            let cur = builder.ins().stack_load(types::I64, types::I64, acc, 0);
+            let new = builder.ins().iadd(cur, ph); // commutative over pairs
+            builder.ins().stack_store(types::I64, new, acc, 0);
+            let next = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, next, idx, 0);
+            builder.ins().jump(header, &[]);
+            builder.seal_block(header);
+            builder.switch_to_block(exit);
+            builder.seal_block(exit);
+            builder.ins().stack_load(types::I64, types::I64, acc, 0)
         }
         ConcreteType::Result(ok_ty, err_ty) => {
             // hash(tag) combined with the active payload's hash (by its type).
@@ -12728,7 +12603,7 @@ fn emit_hash<M: Module>(
             builder.ins().brif(is_ok, ok_b, &[], err_b, &[]);
             // A unit (void-Ok) or `__none__` (unconstructible) side carries no
             // payload — its hash is just the tag's.
-            let payload_trivial = |t: &ConcreteType| is_unit(t) || is_none_inner(t);
+            let payload_trivial = |t: &ConcreteType| is_unit(t);
             builder.switch_to_block(ok_b);
             builder.seal_block(ok_b);
             if !payload_trivial(ok_ty) {
@@ -13655,11 +13530,6 @@ fn emit_render<M: Module>(
         // read via the same byte cursor `for`-loop iteration uses, since
         // `value` is a real `str` underneath, not a generic array block.
         _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
-        // An untyped empty array (`[]`, or a `join` of nothing) has no elements to
-        // render and no element type to render them with: it is `[]`.
-        ConcreteType::Array(elem) if is_none_inner(elem) => {
-            emit_lit(module, builder, cx, sink, b"[]")?
-        }
         ConcreteType::Array(elem) => {
             let view = arr_view(builder, value, ty, cx.structs);
             emit_render_seq(module, builder, cx, view, elem, sink, b'[', b']')?
@@ -13891,7 +13761,10 @@ fn const_array_words(elems: &[Expr]) -> Option<(Vec<i64>, ConcreteType)> {
         }
         words.push(w);
     }
-    let elem = kind.map_or(ConcreteType::NoneInner, ConcreteType::Primitive);
+    let elem = kind.map_or(
+        ConcreteType::Primitive(Primitive::I64),
+        ConcreteType::Primitive,
+    );
     Some((words, elem))
 }
 
@@ -13939,7 +13812,13 @@ fn emit_const_empty<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
 ) -> Result<Value, Error> {
-    emit_const_array(module, builder, cx, &[], &ConcreteType::NoneInner)
+    emit_const_array(
+        module,
+        builder,
+        cx,
+        &[],
+        &ConcreteType::Primitive(Primitive::I64),
+    )
 }
 
 /// Materialize a constant array literal as a static data object and return its
@@ -14264,7 +14143,7 @@ fn emit_render_result<M: Module>(
 
     // A unit (void-Ok `!E`) side renders as `ok()`; a `__none__` side is
     // unconstructible (dead branch) — render the bare ctor either way.
-    let payload_trivial = |t: &ConcreteType| is_unit(t) || is_none_inner(t);
+    let payload_trivial = |t: &ConcreteType| is_unit(t);
     builder.switch_to_block(ok_b);
     builder.seal_block(ok_b);
     let len = if payload_trivial(ok_ty) {
@@ -14654,9 +14533,7 @@ fn emit_render_seq<M: Module>(
 ) -> Result<Value, Error> {
     // An untyped element (`__none__`) means an empty `[]`/`#{}` literal — render
     // it directly, since the element type has no renderer to recurse into.
-    if is_none_inner(elem_ty) {
-        return emit_lit(module, builder, cx, sink, &[open, close]);
-    }
+
     // Running byte length, in a slot so it carries across the loop's back-edge.
     let len_slot =
         builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
@@ -14819,9 +14696,7 @@ fn emit_render_dict<M: Module>(
     sink: Sink,
 ) -> Result<Value, Error> {
     // An untyped empty dict literal has no key/value renderer to recurse into.
-    if is_none_inner(key_ty) {
-        return emit_lit(module, builder, cx, sink, b"{}");
-    }
+
     let pair_size = dict_pair_size(key_ty, val_ty, cx.structs);
     let key_size = dict_key_size(key_ty, cx.structs);
     let len_slot =
@@ -15566,9 +15441,6 @@ fn type_symbol(ty: &ConcreteType) -> String {
         // variant has to make a decision here rather than silently collapsing
         // onto another type's symbol.
         ConcreteType::Unit => "unit".to_string(),
-        ConcreteType::NoneInner => "none".to_string(),
-        ConcreteType::EmptyArrayArg => "empty_arr".to_string(),
-        ConcreteType::NoneLiteralArg => "none_lit".to_string(),
         ConcreteType::ConcatStr => "concat_str".to_string(),
     }
 }
@@ -16203,10 +16075,7 @@ fn emit_arr_contains_seq<M: Module>(
     // Both arrays are the untyped empty literal (`[].contains([])`): the empty
     // needle matches, and there's no element type to compare. Skip the loops —
     // `emit_eq` can't lower a `__none__` element.
-    if is_none_inner(elem) {
-        let empty = builder.ins().icmp_imm_s(IntCC::Equal, lb, 0);
-        return Ok(builder.ins().uextend(types::I64, empty));
-    }
+
     let res = i64_slot(builder);
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().stack_store(types::I64, zero, res, 0);
@@ -16327,7 +16196,6 @@ fn compile_indirect_call<M: Module>(
             &format!("function value {name:?} arg {idx}"),
             arg.span.clone(),
         )?;
-        let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, expected);
         arg_fresh.push(owned_temp_since(scopes, before, v));
         arg_values.push(v);
     }
@@ -16438,7 +16306,6 @@ fn compile_call<M: Module>(
             &format!("fn {disp:?} arg {idx}"),
             arg.span.clone(),
         )?;
-        let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, expected);
         // Whether this arg is a fresh temporary we exclusively own, captured now
         // before later args grow the scope past its tracking entry (the hand-off
         // below runs after all args are evaluated).
@@ -16736,7 +16603,6 @@ fn compile_call_expr<M: Module>(
             &format!("{} arg {idx}", display_name(name)),
             arg.span.clone(),
         )?;
-        let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, expected);
         let binding = format!("__shim_arg{idx}");
         shim_env.insert(binding.clone(), EnvBinding::Immut(v, actual));
         bound.push(Expr::new(ExprKind::Ident(binding), arg.span.clone()));
@@ -17468,25 +17334,13 @@ fn compile_call_expr_direct<M: Module>(
             let (idx_v, idx_ty) = compile_expr(module, builder, cx, scopes, index)?;
             expect_len_operand(&idx_ty, "with index", index.span.clone())?;
             let (val_v, val_ty) = compile_expr(module, builder, cx, scopes, value)?;
-            // An empty literal has no element type of its own; the value gives the
-            // result one. It has no element to replace, so the answer is `none`.
-            let empty_receiver = is_none_inner(&elem);
-            let val_ty = if empty_receiver {
-                val_ty
-            } else {
-                let val_ty = flex_int_ty(value, &val_ty, &elem);
-                expect_type(&val_ty, &elem, "with value", value.span.clone())?;
-                val_ty
-            };
+            let val_ty = flex_int_ty(value, &val_ty, &elem);
+            expect_type(&val_ty, &elem, "with value", value.span.clone())?;
             hand_off_arg(
                 builder, module, builtins, structs, scopes, arr_v, &arr_ty, moved,
             );
 
-            let result_arr_ty = if empty_receiver {
-                ConcreteType::Array(Box::new(val_ty.clone()))
-            } else {
-                arr_ty.clone()
-            };
+            let result_arr_ty = arr_ty.clone();
             if or_self {
                 return compile_with_or_self(
                     module,
@@ -17496,7 +17350,6 @@ fn compile_call_expr_direct<M: Module>(
                     (arr_v, &arr_ty),
                     (idx_v, val_v, &val_ty),
                     &result_arr_ty,
-                    empty_receiver,
                 );
             }
             let result_ty = ConcreteType::Optional(Box::new(result_arr_ty.clone()));
@@ -17511,61 +17364,57 @@ fn compile_call_expr_direct<M: Module>(
 
             let miss_b = builder.create_block();
             let merge = builder.create_block();
-            if empty_receiver {
-                builder.ins().jump(miss_b, &[]);
-            } else {
-                let view = arr_view(builder, arr_v, &arr_ty, structs);
-                let in_range = builder.ins().icmp(IntCC::UnsignedLessThan, idx_v, view.len);
-                let hit_b = builder.create_block();
-                builder.ins().brif(in_range, hit_b, &[], miss_b, &[]);
+            let view = arr_view(builder, arr_v, &arr_ty, structs);
+            let in_range = builder.ins().icmp(IntCC::UnsignedLessThan, idx_v, view.len);
+            let hit_b = builder.create_block();
+            builder.ins().brif(in_range, hit_b, &[], miss_b, &[]);
 
-                builder.switch_to_block(hit_b);
-                builder.seal_block(hit_b);
-                let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
-                let out_slot = value_slot(builder, &arr_ty, structs);
-                let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
-                builtins.call_void(
-                    module,
-                    builder,
-                    "aipl_arr_writable",
-                    &[owned, arr_v, drop_fn, retain_fn, esz],
-                );
-                let base = writable_elems(builder, owned, &arr_ty);
-                if is_bit_packed(&elem) {
-                    // A bit in a byte: clear it, then set it to the value.
-                    let byte_off = builder.ins().ushr_imm_u(idx_v, 3);
-                    let byte_addr = builder.ins().iadd(base, byte_off);
-                    let byte = builder
-                        .ins()
-                        .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
-                    let byte = builder.ins().uextend(types::I64, byte);
-                    let bit = builder.ins().band_imm_u(idx_v, 7);
-                    let one = builder.ins().iconst(types::I64, 1);
-                    let mask = builder.ins().ishl(one, bit);
-                    let keep = builder.ins().bnot(mask);
-                    let cleared = builder.ins().band(byte, keep);
-                    let set = builder.ins().ishl(val_v, bit);
-                    let updated = builder.ins().bor(cleared, set);
-                    builder
-                        .ins()
-                        .istore8(MemFlagsData::trusted(), updated, byte_addr, 0);
-                } else {
-                    // Retain the new element, release the old, *then* write the
-                    // slot — `__map_set`'s order, for the same reason: the old
-                    // element may be read out of the slot by address.
-                    let stride = array_elem_size(&elem, structs);
-                    let off = builder.ins().imul_imm_s(idx_v, stride);
-                    let addr = builder.ins().iadd(base, off);
-                    let old = load_elem_at(builder, base, idx_v, &elem, stride, None, structs);
-                    emit_retain(builder, module, builtins, structs, val_v, &val_ty);
-                    emit_drop(builder, module, builtins, structs, old, &elem);
-                    store_elem(builder, addr, val_v, &val_ty, stride, structs);
-                }
+            builder.switch_to_block(hit_b);
+            builder.seal_block(hit_b);
+            let (drop_fn, retain_fn, esz) = array_descriptors(builder, module, cx, &elem);
+            let out_slot = value_slot(builder, &arr_ty, structs);
+            let owned = builder.ins().stack_addr(types::I64, out_slot, 0);
+            builtins.call_void(
+                module,
+                builder,
+                "aipl_arr_writable",
+                &[owned, arr_v, drop_fn, retain_fn, esz],
+            );
+            let base = writable_elems(builder, owned, &arr_ty);
+            if is_bit_packed(&elem) {
+                // A bit in a byte: clear it, then set it to the value.
+                let byte_off = builder.ins().ushr_imm_u(idx_v, 3);
+                let byte_addr = builder.ins().iadd(base, byte_off);
+                let byte = builder
+                    .ins()
+                    .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
+                let byte = builder.ins().uextend(types::I64, byte);
+                let bit = builder.ins().band_imm_u(idx_v, 7);
                 let one = builder.ins().iconst(types::I64, 1);
-                builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
-                store_array_elem(builder, val_at, owned, &arr_ty, structs);
-                builder.ins().jump(merge, &[]);
+                let mask = builder.ins().ishl(one, bit);
+                let keep = builder.ins().bnot(mask);
+                let cleared = builder.ins().band(byte, keep);
+                let set = builder.ins().ishl(val_v, bit);
+                let updated = builder.ins().bor(cleared, set);
+                builder
+                    .ins()
+                    .istore8(MemFlagsData::trusted(), updated, byte_addr, 0);
+            } else {
+                // Retain the new element, release the old, *then* write the
+                // slot — `__map_set`'s order, for the same reason: the old
+                // element may be read out of the slot by address.
+                let stride = array_elem_size(&elem, structs);
+                let off = builder.ins().imul_imm_s(idx_v, stride);
+                let addr = builder.ins().iadd(base, off);
+                let old = load_elem_at(builder, base, idx_v, &elem, stride, None, structs);
+                emit_retain(builder, module, builtins, structs, val_v, &val_ty);
+                emit_drop(builder, module, builtins, structs, old, &elem);
+                store_elem(builder, addr, val_v, &val_ty, stride, structs);
             }
+            let one = builder.ins().iconst(types::I64, 1);
+            builder.ins().store(MemFlagsData::trusted(), one, ptr, 0);
+            store_array_elem(builder, val_at, owned, &arr_ty, structs);
+            builder.ins().jump(merge, &[]);
 
             builder.switch_to_block(miss_b);
             builder.seal_block(miss_b);
@@ -18260,9 +18109,6 @@ fn compile_call_expr_direct<M: Module>(
                         SORT_KIND_UNSIGNED
                     }
                 }
-                // An untyped empty literal (`[].sort()`) never has an element to
-                // compare, so any kind does; it stays empty either way.
-                _ if is_none_inner(&elem) => SORT_KIND_SIGNED,
                 other => {
                     return Err(Error::at(
                         format!(
@@ -18314,15 +18160,6 @@ fn compile_call_expr_direct<M: Module>(
             for a in [sep, final_sep, only_sep] {
                 seps.push(compile_expr(module, builder, cx, scopes, a)?);
             }
-            // The separator that gets to name `T` for an empty receiver, below.
-            // Normally all three are the same expression; when they differ, the
-            // first that isn't itself empty is the one with something to say.
-            let st = seps
-                .iter()
-                .map(|(_, t)| t)
-                .find(|t| !matches!(t, ConcreteType::Array(e) if is_none_inner(e)))
-                .unwrap_or(&seps[0].1)
-                .clone();
             // Both runtime entry points borrow their arguments.
             let inner = match &pt {
                 // A set of parts joins exactly as an array of them: `join` only
@@ -18342,40 +18179,6 @@ fn compile_call_expr_direct<M: Module>(
                         receiver.span.clone(),
                     ));
                 }
-            };
-            // `join([], sep=", ")`: an empty parts array carries only the
-            // `__none__` placeholder element, so it pins no `T`. The separator
-            // is the one other place `T` appears, so it is what decides — the
-            // result is empty either way, and what is really being chosen is
-            // which representation that empty result has.
-            let inner = if is_none_inner(&inner) {
-                match &st {
-                    t if is_str_repr(t) || is_char_array(t) => {
-                        ConcreteType::Primitive(Primitive::Str)
-                    }
-                    ConcreteType::Primitive(Primitive::Char) => {
-                        ConcreteType::Primitive(Primitive::Str)
-                    }
-                    // Both sides empty: nothing anywhere names `T`, so there is no
-                    // representation to choose between — and none is needed, since
-                    // the result is empty too. It is the same untyped empty array
-                    // `[]` is, which coerces to whatever the caller wants.
-                    ConcreteType::Array(e) if is_none_inner(e) => {
-                        let block = emit_const_empty(module, builder, cx)?;
-                        let zero = builder.ins().iconst(types::I64, 0);
-                        let empty = arr_val_of_len(builder, block, zero);
-                        return Ok((
-                            empty,
-                            ConcreteType::Array(Box::new(ConcreteType::NoneInner)),
-                        ));
-                    }
-                    // A `T[]` separator is already the parts' element type; a
-                    // bare `T` is one level down.
-                    ConcreteType::Array(_) => st.clone(),
-                    other => ConcreteType::Array(Box::new(other.clone())),
-                }
-            } else {
-                inner
             };
             if is_str_repr(&inner) || is_char_array(&inner) {
                 // `str[]` (i.e. `char[][]`): the string join, whose separator is
@@ -19016,15 +18819,7 @@ fn compile_call_expr_direct<M: Module>(
                 };
                 // The comparison element type: the receiver's, or — for an empty
                 // `[]` receiver (untyped element) — the pattern's.
-                let elem = if !is_none_inner(&self_elem) {
-                    self_elem
-                } else {
-                    match (shape, &pat_ty) {
-                        (SeShape::Elem, t) => t.clone(),
-                        (_, ConcreteType::Array(e) | ConcreteType::Optional(e)) => (**e).clone(),
-                        (_, t) => t.clone(),
-                    }
-                };
+                let elem = self_elem;
                 // The helpers below read arrays through their views — either side
                 // may be a window. An element or an optional element is not an
                 // array and is passed as it is.
@@ -19146,15 +18941,7 @@ fn compile_call_expr_direct<M: Module>(
                 };
                 // The comparison element type: the receiver's, or — for an empty
                 // `[]` receiver (untyped element) — the needle's.
-                let elem = if !is_none_inner(&self_elem) {
-                    self_elem
-                } else {
-                    match (shape, &ndl_ty) {
-                        (SeShape::Elem, t) => t.clone(),
-                        (_, ConcreteType::Array(e) | ConcreteType::Optional(e)) => (**e).clone(),
-                        (_, t) => t.clone(),
-                    }
-                };
+                let elem = self_elem;
                 // The helpers below read arrays through their views — either side
                 // may be a window. An element or an optional element is not an
                 // array and is passed as it is.
@@ -19166,11 +18953,6 @@ fn compile_call_expr_direct<M: Module>(
                     }
                     SeShape::Elem => {
                         emit_arr_contains_elem(module, builder, cx, recv, ndl_v, &elem)?
-                    }
-                    SeShape::Opt if is_none_inner(&elem) => {
-                        // `[].contains(none)`: an untyped `none` needle in an
-                        // untyped empty array — nothing to find.
-                        builder.ins().iconst(types::I64, 0)
                     }
                     SeShape::Opt => {
                         // `none` → false; `some(v)` → single-element scan.
@@ -19229,49 +19011,42 @@ fn compile_call_expr_direct<M: Module>(
             let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, needle)?;
             // An empty set (`__none__` element) holds nothing — always false —
             // and has no element type to check the argument against.
-            if is_none_inner(&elem) {
-                (
-                    builder.ins().iconst(types::I64, 0),
+            // A bare literal queried against a narrow-element set flexes,
+            // so `#{u8(1)}.has(1)` needs no conversion on the `1`.
+            let x_ty = flex_int_ty(needle, &x_ty, &elem);
+            expect_type(&x_ty, &elem, "has element", needle.span.clone())?;
+            // A char set answers from its bitfield: one shift and one mask,
+            // with no spill, no call and no bounds test — 256 bits cover
+            // `char` totally, so every value indexes a real bit.
+            if is_char_set(&set_ty) {
+                return Ok((
+                    emit_charset_contains(builder, set_ptr, x_v),
                     ConcreteType::Primitive(Primitive::Bool),
-                )
-            } else {
-                // A bare literal queried against a narrow-element set flexes,
-                // so `#{u8(1)}.has(1)` needs no conversion on the `1`.
-                let x_ty = flex_int_ty(needle, &x_ty, &elem);
-                expect_type(&x_ty, &elem, "has element", needle.span.clone())?;
-                // A char set answers from its bitfield: one shift and one mask,
-                // with no spill, no call and no bounds test — 256 bits cover
-                // `char` totally, so every value indexes a real bit.
-                if is_char_set(&set_ty) {
-                    return Ok((
-                        emit_charset_contains(builder, set_ptr, x_v),
-                        ConcreteType::Primitive(Primitive::Bool),
-                    ));
-                }
-                // The runtime reads the queried value through a pointer; spill
-                // it and pass its address. Sized and written by element type
-                // (`value_slot`/`store_array_elem`) rather than as a bare word:
-                // a scalar is one store, but a composite element — a wide `str`
-                // among them — is a whole 24-byte value to copy, and storing its
-                // *address* into an 8-byte slot is what the runtime would then
-                // read back as the value.
-                let s = value_slot(builder, &elem, structs);
-                let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
-                store_array_elem(builder, x_ptr, x_v, &elem, structs);
-                let esz = builder
-                    .ins()
-                    .iconst(types::I64, runtime_elem_size(&elem, structs));
-                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
-                let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
-                let (name, args) = set_call(
-                    "aipl_set_contains",
-                    eq_fn,
-                    4,
-                    vec![set_ptr, x_ptr, esz, str_cmp],
-                );
-                let found = builtins.call(module, builder, name, &args);
-                (found, ConcreteType::Primitive(Primitive::Bool))
+                ));
             }
+            // The runtime reads the queried value through a pointer; spill
+            // it and pass its address. Sized and written by element type
+            // (`value_slot`/`store_array_elem`) rather than as a bare word:
+            // a scalar is one store, but a composite element — a wide `str`
+            // among them — is a whole 24-byte value to copy, and storing its
+            // *address* into an 8-byte slot is what the runtime would then
+            // read back as the value.
+            let s = value_slot(builder, &elem, structs);
+            let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
+            store_array_elem(builder, x_ptr, x_v, &elem, structs);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(&elem, structs));
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+            let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
+            let (name, args) = set_call(
+                "aipl_set_contains",
+                eq_fn,
+                4,
+                vec![set_ptr, x_ptr, esz, str_cmp],
+            );
+            let found = builtins.call(module, builder, name, &args);
+            (found, ConcreteType::Primitive(Primitive::Bool))
         }
         Callee::Union => {
             // `union(a: T{}, b: T{}) -> T{}` — a fresh set of all distinct
@@ -19326,7 +19101,7 @@ fn compile_call_expr_direct<M: Module>(
             emit_retain(builder, module, builtins, structs, b_ptr, &b_ty);
             let out_slot = value_slot(builder, &result_ty, structs);
             let res = builder.ins().stack_addr(types::I64, out_slot, 0);
-            let (a_v, in_place) = if a_owned && !is_none_inner(elem) {
+            let (a_v, in_place) = if a_owned {
                 // A receiver this scope owns outright grows in place: its
                 // reference (its tracking entry, popped here) goes to the union,
                 // which reuses the block. Owning the reference is not owning the
@@ -19398,63 +19173,57 @@ fn compile_call_expr_direct<M: Module>(
             ));
             let sbase = builder.ins().stack_addr(types::I64, slot, 0);
             // An empty dict (`__none__` key/value) holds nothing — always `none`.
-            if is_none_inner(&key_ty) {
-                let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(types::I64, zero, slot, 0);
-                (sbase, result_ty)
-            } else {
-                let key_t = flex_int_ty(key, &key_t, &key_ty);
-                expect_type(&key_t, &key_ty, "get key", key.span.clone())?;
-                // Spill the key and pass its address (a `bool` reads back as i64,
-                // a `str` as its pointer).
-                // Spilled by key type, not as a bare word — see `has` for why
-                // storing a composite key's *address* into an 8-byte slot is the
-                // bug that reads back as a value.
-                let ks = value_slot(builder, &key_ty, structs);
-                let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
-                store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
-                let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
-                let psz = builder.ins().iconst(types::I64, pair_size);
-                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
-                // The value's address, or 0 when the key is absent.
-                let vslot = builtins.call(
-                    module,
-                    builder,
-                    "aipl_dict_get",
-                    &[dict_v, key_ptr, psz, str_cmp],
-                );
-                let found = builder.ins().icmp_imm_s(IntCC::NotEqual, vslot, 0);
-                let some_b = builder.create_block();
-                let none_b = builder.create_block();
-                let merge_b = builder.create_block();
-                builder.ins().brif(found, some_b, &[], none_b, &[]);
+            let key_t = flex_int_ty(key, &key_t, &key_ty);
+            expect_type(&key_t, &key_ty, "get key", key.span.clone())?;
+            // Spill the key and pass its address (a `bool` reads back as i64,
+            // a `str` as its pointer).
+            // Spilled by key type, not as a bare word — see `has` for why
+            // storing a composite key's *address* into an 8-byte slot is the
+            // bug that reads back as a value.
+            let ks = value_slot(builder, &key_ty, structs);
+            let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
+            store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
+            let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
+            let psz = builder.ins().iconst(types::I64, pair_size);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
+            // The value's address, or 0 when the key is absent.
+            let vslot = builtins.call(
+                module,
+                builder,
+                "aipl_dict_get",
+                &[dict_v, key_ptr, psz, str_cmp],
+            );
+            let found = builder.ins().icmp_imm_s(IntCC::NotEqual, vslot, 0);
+            let some_b = builder.create_block();
+            let none_b = builder.create_block();
+            let merge_b = builder.create_block();
+            builder.ins().brif(found, some_b, &[], none_b, &[]);
 
-                builder.switch_to_block(some_b);
-                builder.seal_block(some_b);
-                // Read the value at the slot (a composite is addressed, a
-                // scalar/str/array loaded), build `some(value)` and retain its
-                // heap so it outlives the borrowed dict.
-                let val = component(builder, vslot, 0, &val_ty, structs);
-                emit_build_some(builder, sbase, val, &val_ty, structs);
-                emit_retain(builder, module, builtins, structs, sbase, &result_ty);
-                builder.ins().jump(merge_b, &[]);
+            builder.switch_to_block(some_b);
+            builder.seal_block(some_b);
+            // Read the value at the slot (a composite is addressed, a
+            // scalar/str/array loaded), build `some(value)` and retain its
+            // heap so it outlives the borrowed dict.
+            let val = component(builder, vslot, 0, &val_ty, structs);
+            emit_build_some(builder, sbase, val, &val_ty, structs);
+            emit_retain(builder, module, builtins, structs, sbase, &result_ty);
+            builder.ins().jump(merge_b, &[]);
 
-                builder.switch_to_block(none_b);
-                builder.seal_block(none_b);
-                let zero = builder.ins().iconst(types::I64, 0);
-                builder.ins().stack_store(types::I64, zero, slot, 0);
-                builder.ins().jump(merge_b, &[]);
+            builder.switch_to_block(none_b);
+            builder.seal_block(none_b);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(types::I64, zero, slot, 0);
+            builder.ins().jump(merge_b, &[]);
 
-                builder.switch_to_block(merge_b);
-                builder.seal_block(merge_b);
-                if needs_drop(&result_ty, structs) {
-                    scopes
-                        .last_mut()
-                        .expect("scope")
-                        .push(Tracked::new(sbase, &result_ty));
-                }
-                (sbase, result_ty)
+            builder.switch_to_block(merge_b);
+            builder.seal_block(merge_b);
+            if needs_drop(&result_ty, structs) {
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(sbase, &result_ty));
             }
+            (sbase, result_ty)
         }
         Callee::RemoveKey => {
             // `set d.remove_key(k);` — the in-place writeback form, the same one
@@ -19477,9 +19246,7 @@ fn compile_call_expr_direct<M: Module>(
             let dict_ty = ConcreteType::Dict(Box::new(key_ty.clone()), Box::new(val_ty.clone()));
             // An empty dict (`__none__` key) holds nothing, so there is nothing
             // to find and no key type to compare against.
-            if is_none_inner(&key_ty) {
-                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
-            }
+
             let key_t = flex_int_ty(key, &key_t, &key_ty);
             expect_type(&key_t, &key_ty, "remove_key key", key.span.clone())?;
             // Spilled by key type, not as a bare word — see `get` for why storing
@@ -19523,11 +19290,7 @@ fn compile_call_expr_direct<M: Module>(
                 mut_dict_receiver(env, receiver, "insert_key")?;
             let (key_v, key_t) = compile_expr(module, builder, cx, scopes, key)?;
             let (val_v, val_t) = compile_expr(module, builder, cx, scopes, value)?;
-            let (key_ty, val_ty) = if is_none_inner(&held_key_ty) {
-                (key_t.clone(), val_t.clone())
-            } else {
-                (held_key_ty, held_val_ty)
-            };
+            let (key_ty, val_ty) = (held_key_ty, held_val_ty);
             if !is_dict_key(&key_ty) {
                 return Err(Error::at(
                     format!(
@@ -19651,31 +19414,24 @@ fn compile_call_expr_direct<M: Module>(
                 }
             };
             let (key_v, key_t) = compile_expr(module, builder, cx, scopes, key)?;
-            if is_none_inner(&key_ty) {
-                (
-                    builder.ins().iconst(types::I64, 0),
-                    ConcreteType::Primitive(Primitive::Bool),
-                )
-            } else {
-                let key_t = flex_int_ty(key, &key_t, &key_ty);
-                expect_type(&key_t, &key_ty, "contains_key key", key.span.clone())?;
-                // Spilled by key type, not as a bare word — see `has` for why
-                // storing a composite key's *address* into an 8-byte slot is the
-                // bug that reads back as a value.
-                let ks = value_slot(builder, &key_ty, structs);
-                let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
-                store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
-                let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
-                let psz = builder.ins().iconst(types::I64, pair_size);
-                let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
-                let found = builtins.call(
-                    module,
-                    builder,
-                    "aipl_dict_contains_key",
-                    &[dict_v, key_ptr, psz, str_cmp],
-                );
-                (found, ConcreteType::Primitive(Primitive::Bool))
-            }
+            let key_t = flex_int_ty(key, &key_t, &key_ty);
+            expect_type(&key_t, &key_ty, "contains_key key", key.span.clone())?;
+            // Spilled by key type, not as a bare word — see `has` for why
+            // storing a composite key's *address* into an 8-byte slot is the
+            // bug that reads back as a value.
+            let ks = value_slot(builder, &key_ty, structs);
+            let key_ptr = builder.ins().stack_addr(types::I64, ks, 0);
+            store_array_elem(builder, key_ptr, key_v, &key_ty, structs);
+            let pair_size = dict_pair_size(&key_ty, &val_ty, structs);
+            let psz = builder.ins().iconst(types::I64, pair_size);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&key_ty));
+            let found = builtins.call(
+                module,
+                builder,
+                "aipl_dict_contains_key",
+                &[dict_v, key_ptr, psz, str_cmp],
+            );
+            (found, ConcreteType::Primitive(Primitive::Bool))
         }
         Callee::FilterKeep => {
             // Internal (in-place `filter`): `__filter_keep(arr, w, e)` stores
@@ -20126,7 +19882,10 @@ fn compile_call_expr_direct<M: Module>(
             builder.ins().jump(merge, &[]);
             builder.switch_to_block(merge);
             builder.seal_block(merge);
-            let arr_ty = ConcreteType::Array(Box::new(ConcreteType::NoneInner));
+            let arr_ty = match &locked {
+                Some(t @ ConcreteType::Array(_)) => t.clone(),
+                _ => ConcreteType::Array(Box::new(ConcreteType::Primitive(Primitive::I64))),
+            };
             scopes
                 .last_mut()
                 .expect("scope")
@@ -20154,7 +19913,7 @@ fn compile_call_expr_direct<M: Module>(
             let arr_owned = owned_temp_since(scopes, before, arr_ptr);
             let elem = match &arr_ty {
                 ConcreteType::Array(inner) => (**inner).clone(),
-                _ => ConcreteType::NoneInner,
+                _ => ConcreteType::Primitive(Primitive::I64),
             };
             // Representations with their own append lowering opt out: hand the
             // array back untouched and let the plain `push` path handle them.
@@ -20319,26 +20078,10 @@ fn compile_call_expr_direct<M: Module>(
             // element evaluates can write the slot — an expression cannot assign
             // a binding declared outside it.
             let (x_v, x_ty) = compile_expr(module, builder, cx, scopes, value)?;
-            let elem_was_none = is_none_inner(&elem_ty);
-            // An empty array (`__none__` element) takes its element type from
-            // the first pushed value; otherwise the value must match.
-            let result_elem = if elem_was_none {
-                if !is_storable_elem(&x_ty, structs) {
-                    return Err(Error::at(
-                        format!(
-                            "\"push\" element must be an integer (i8..i64, u8..u64), bool, char, str, or an array, got {}",
-                            type_name(&x_ty)
-                        ),
-                        value.span.clone(),
-                    ));
-                }
-                x_ty
-            } else {
-                // A bare literal pushed onto a narrow-element array flexes.
-                let x_ty = flex_int_ty(value, &x_ty, &elem_ty);
-                expect_type(&x_ty, &elem_ty, "push element", value.span.clone())?;
-                elem_ty
-            };
+            // A bare literal pushed onto a narrow-element array flexes.
+            let x_ty = flex_int_ty(value, &x_ty, &elem_ty);
+            expect_type(&x_ty, &elem_ty, "push element", value.span.clone())?;
+            let result_elem = elem_ty;
             let drop_fn = array_drop_fn_addr(builder, module, cx, &result_elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, &result_elem);
             let esz = builder
@@ -20367,31 +20110,6 @@ fn compile_call_expr_direct<M: Module>(
                 // place — but the *ownership bookkeeping* still follows the
                 // same `exclusive`-vs-shared split as a real array push below,
                 // just swapping in `str` construction for `array_ops::push[_mut]`.
-                //
-                // `mut cs = []` starts as the generic (array-shaped) empty
-                // placeholder — see `coerce_empty_to_char_array` — since an
-                // untyped `[]` has no way to know its first push will be a
-                // `char`. Converting *that* specific value requires knowing
-                // this is genuinely the *first* ever push to it — a fact
-                // `elem_was_none` only captures at compile time, for *this*
-                // call site. A push inside a loop compiles once but runs
-                // every iteration, so on the second iteration the "first
-                // push" code would wrongly re-run against a value that's
-                // already been converted to a real `str` on the iteration
-                // before. There's no cheap runtime way to tell those apart
-                // (both are ordinary heap pointers), so this specific
-                // transition is rejected rather than risking silent
-                // corruption — initialize with a real `char` first instead.
-                if elem_was_none {
-                    return Err(Error::at(
-                        "cannot push a char onto an array that started as an untyped empty \
-                         literal (`mut cs = []`) — initialize it with a char first, e.g. \
-                         \"mut cs = ['a']\", since the first push can't be proven to run \
-                         only once"
-                            .to_string(),
-                        receiver.span.clone(),
-                    ));
-                }
                 // The receiver's handle has to be re-derived here: the generic
                 // load above reads one word from the slot, which is not the
                 // whole 24-byte value.
@@ -20570,36 +20288,19 @@ fn compile_call_expr_direct<M: Module>(
             let mark = scope_depth(scopes);
             let (src_ptr, src_ty) = compile_expr(module, builder, cx, scopes, source)?;
             let src_owned = owned_temp_since(scopes, mark, src_ptr);
-            let src_elem = match &src_ty {
-                ConcreteType::Array(inner) => (**inner).clone(),
-                // A `str` *is* the `char` sequence (see `is_char_array`), so it
-                // is a valid source for a `char[]` receiver — and the only shape
-                // a `char*` variadic ever arrives as.
-                _ if is_str_repr(&src_ty) => ConcreteType::Primitive(Primitive::Char),
-                other => {
-                    return Err(Error::at(
-                        format!("\"extend\" requires an array, got {}", type_name(other)),
-                        source.span.clone(),
-                    ));
-                }
-            };
-            // The receiver takes its element type from the source when it is
-            // still the untyped empty literal, and otherwise the two must agree.
-            // An empty source pins nothing either way.
-            let elem_was_none = is_none_inner(&elem_ty);
-            let result_elem = if elem_was_none {
-                src_elem
-            } else {
-                if !is_none_inner(&src_elem) {
-                    expect_type(
-                        &src_ty,
-                        &ConcreteType::Array(Box::new(elem_ty.clone())),
-                        "extend source",
-                        source.span.clone(),
-                    )?;
-                }
-                elem_ty
-            };
+            if !matches!(&src_ty, ConcreteType::Array(_)) && !is_str_repr(&src_ty) {
+                return Err(Error::at(
+                    format!("\"extend\" requires an array, got {}", type_name(&src_ty)),
+                    source.span.clone(),
+                ));
+            }
+            expect_type(
+                &src_ty,
+                &ConcreteType::Array(Box::new(elem_ty.clone())),
+                "extend source",
+                source.span.clone(),
+            )?;
+            let result_elem = elem_ty;
             let new_arr_ty = ConcreteType::Array(Box::new(result_elem.clone()));
             // What the binding is typed after the append: a `str` stays one.
             let binding_ty = if str_receiver {
@@ -20610,20 +20311,7 @@ fn compile_call_expr_direct<M: Module>(
             if is_char_array(&new_arr_ty) {
                 // `char[]` is str-shaped, and `str` has no in-place growable
                 // form: build a fresh buffer of the combined length and copy
-                // both sides in, mirroring the `push` char path (and, for the
-                // same reason it does, refusing the untyped-empty transition —
-                // a loop body compiles once but runs many times, so "this is
-                // the first push" cannot be decided here).
-                if elem_was_none {
-                    return Err(Error::at(
-                        "cannot extend a char array that started as an untyped empty literal \
-                         (`mut cs = []`) — initialize it with a char first, e.g. \
-                         \"mut cs = ['a']\", since the first append can't be proven to run \
-                         only once"
-                            .to_string(),
-                        receiver.span.clone(),
-                    ));
-                }
+                // both sides in, mirroring the `push` char path.
                 // See `push`: the generic slot load is a word, the wide value
                 // is the slot itself.
                 let arr_ptr = load_binding_str(builder, slot);
@@ -20720,10 +20408,11 @@ fn compile_call_expr_direct<M: Module>(
             // `ok()` with no argument is the void success of a `!E` result: tag 1
             // with an unused (zeroed) value region, Ok side `unit`.
             if is_ok && args.is_empty() {
-                let res_ty = ConcreteType::Result(
-                    Box::new(ConcreteType::Unit),
-                    Box::new(ConcreteType::NoneInner),
-                );
+                let err_ty = match &locked {
+                    Some(ConcreteType::Result(_, e)) => (**e).clone(),
+                    _ => ConcreteType::Primitive(Primitive::I64),
+                };
+                let res_ty = ConcreteType::Result(Box::new(ConcreteType::Unit), Box::new(err_ty));
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     elem_size_of(&res_ty, structs) as u32,
@@ -20770,10 +20459,21 @@ fn compile_call_expr_direct<M: Module>(
                 }
                 _ => {}
             }
-            let res_ty = if is_ok {
-                ConcreteType::Result(Box::new(t.clone()), Box::new(ConcreteType::NoneInner))
-            } else {
-                ConcreteType::Result(Box::new(ConcreteType::NoneInner), Box::new(t.clone()))
+            let res_ty = match (&locked, is_ok) {
+                (Some(ConcreteType::Result(_, e)), true) => {
+                    ConcreteType::Result(Box::new(t.clone()), e.clone())
+                }
+                (Some(ConcreteType::Result(o, _)), false) => {
+                    ConcreteType::Result(o.clone(), Box::new(t.clone()))
+                }
+                (_, true) => ConcreteType::Result(
+                    Box::new(t.clone()),
+                    Box::new(ConcreteType::Primitive(Primitive::I64)),
+                ),
+                (_, false) => ConcreteType::Result(
+                    Box::new(ConcreteType::Primitive(Primitive::I64)),
+                    Box::new(t.clone()),
+                ),
             };
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -21579,32 +21279,18 @@ fn compile_expr<M: Module>(
 ) -> Result<(Value, ConcreteType), Error> {
     let (v, derived) = compile_expr_inner(module, builder, cx, scopes, expr)?;
     let locked = expr.ty.as_ref().and_then(|t| t.to_concrete());
-    let was_placeholder_set =
-        matches!(&derived, ConcreteType::Set(inner, _) if is_none_inner(inner));
     let ty = match &locked {
         Some(locked) if has_placeholder_ty(&derived) && !has_placeholder_ty(locked) => {
             locked.clone()
         }
         _ => derived,
     };
-    // Deciding the type here can decide the *representation* with it. An empty
-    // `#{}` derives the shared empty array block, which is what every other set
-    // is; locked at `#{char}` it is the 256-bit bitfield instead, and reading
-    // one as the other reads a block header as members. The empty set is what
-    // zeroed memory already reads as, so the substitute allocates nothing — and
-    // the block it replaces was static and untracked, so nothing is released.
-    if was_placeholder_set && is_char_set(&ty) {
-        return Ok((charset_slot(builder), ty));
-    }
     Ok((v, ty))
 }
 
 /// Whether `t` still contains a "decided by context" placeholder.
 fn has_placeholder_ty(t: &ConcreteType) -> bool {
     match t {
-        ConcreteType::NoneInner | ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
-            true
-        }
         // A set order context has yet to decide (a `to_set` call's).
         ConcreteType::Set(_, aipl_syntax::ast::SetOrder::Context) => true,
         ConcreteType::Optional(i) | ConcreteType::Array(i) | ConcreteType::Set(i, _) => {
@@ -21866,10 +21552,11 @@ fn compile_expr_inner<M: Module>(
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().stack_store(types::I64, zero, slot, 0);
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            (
-                ptr,
-                ConcreteType::Optional(Box::new(ConcreteType::NoneInner)),
-            )
+            let none_ty = match stamped_ty(expr) {
+                Some(t @ ConcreteType::Optional(_)) => t,
+                _ => ConcreteType::Optional(Box::new(ConcreteType::Primitive(Primitive::I64))),
+            };
+            (ptr, none_ty)
         }
         // The only expression that can *become* a tail call: `tail` rides down
         // to `compile_call`, which decides whether this particular callee
@@ -22334,7 +22021,6 @@ fn compile_expr_inner<M: Module>(
             // `aipl_str_len` then read as a string — a silent miscompile that
             // aborted on the first `push`. Call sites already coerced this way
             // (see `coerce_empty_to_char_array`); bindings did not.
-            let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
             // A composite the binding *owns* must own its storage, not only
             // the references in it. A call result or a constructor lands in a
@@ -22424,7 +22110,6 @@ fn compile_expr_inner<M: Module>(
             // `aipl_str_len` then read as a string — a silent miscompile that
             // aborted on the first `push`. Call sites already coerced this way
             // (see `coerce_empty_to_char_array`); bindings did not.
-            let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
             if is_register_scalar(&t) {
                 let var = declare_scalar(builder, v);
@@ -22837,8 +22522,7 @@ fn compile_expr_inner<M: Module>(
                     // A char set has no allocation to extend: `union` on it is
                     // four `or`s into a fresh slot, already as cheap as the
                     // in-place path is trying to be.
-                    let reusable =
-                        !is_none_inner(elem) && **elem != ConcreteType::Primitive(Primitive::Char);
+                    let reusable = **elem != ConcreteType::Primitive(Primitive::Char);
                     if let (Some(other), true) = (other, reusable) {
                         let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, other)?;
                         expect_type(&b_ty, &expected_ty, "union operand", other.span.clone())?;
@@ -23811,10 +23495,16 @@ fn compile_expr_inner<M: Module>(
             // `lock_flexed`).
             let fitted_elem = match expr.ty.as_ref().and_then(|t| t.to_concrete()) {
                 Some(ConcreteType::Array(inner)) if !has_placeholder_ty(&inner) => Some(*inner),
+                // The empty `char` sequence, written `[]` where a `str` is wanted.
+                Some(ConcreteType::Primitive(Primitive::Str)) if elems.is_empty() => {
+                    Some(ConcreteType::Primitive(Primitive::Char))
+                }
                 _ => None,
             };
             if let Some((words, elem)) = const_array_words(elems) {
                 let elem = match &fitted_elem {
+                    // An empty literal has no element to derive a type from: the stamp is it.
+                    Some(f) if elems.is_empty() => f.clone(),
                     Some(f @ ConcreteType::Primitive(p))
                         if p.is_int()
                             && matches!(&elem, ConcreteType::Primitive(q) if q.is_int()) =>
@@ -23875,7 +23565,10 @@ fn compile_expr_inner<M: Module>(
                 let owned_temp = owned_temp_since(scopes, before, v);
                 vals.push((v, t, owned_temp));
             }
-            let elem = elem_ty.unwrap_or(ConcreteType::NoneInner);
+            let elem = elem_ty.unwrap_or_else(|| match stamped_ty(expr) {
+                Some(ConcreteType::Array(e)) => *e,
+                _ => ConcreteType::Primitive(Primitive::I64),
+            });
             let arr_ty = ConcreteType::Array(Box::new(elem.clone()));
             if is_char_array(&arr_ty) {
                 // `char[]` is str-shaped (see `is_char_array`): build a heap
@@ -23987,8 +23680,24 @@ fn compile_expr_inner<M: Module>(
             // is the same static block an empty `[]` is (`emit_const_empty`),
             // so it allocates nothing.
             if elems.is_empty() {
+                // `#{}` is the empty literal of a set and of a dict: the type it is stamped
+                // with says which.
+                let set_ty = match stamped_ty(expr) {
+                    Some(ConcreteType::Set(e, o)) => ConcreteType::Set(e, o),
+                    Some(dict @ ConcreteType::Dict(..)) => {
+                        let value = emit_const_empty(module, builder, cx)?;
+                        let no_elems = builder.ins().iconst(types::I64, 0);
+                        let value = arr_val_of_len(builder, value, no_elems);
+                        return Ok((value, dict));
+                    }
+                    _ => {
+                        ConcreteType::Set(Box::new(ConcreteType::Primitive(Primitive::I64)), *order)
+                    }
+                };
+                if is_char_set(&set_ty) {
+                    return Ok((charset_slot(builder), set_ty));
+                }
                 let value = emit_const_empty(module, builder, cx)?;
-                let set_ty = ConcreteType::Set(Box::new(ConcreteType::NoneInner), *order);
                 let no_elems = builder.ins().iconst(types::I64, 0);
                 let value = arr_val_of_len(builder, value, no_elems);
                 return Ok((value, set_ty));
@@ -24056,7 +23765,7 @@ fn compile_expr_inner<M: Module>(
                 }
                 vals.push(v);
             }
-            let elem = elem_ty.unwrap_or(ConcreteType::NoneInner);
+            let elem = elem_ty.unwrap_or(ConcreteType::Primitive(Primitive::I64));
             // A `#{char}` is the bitfield: a zeroed slot with one bit per
             // member. No heap block, no per-element insert call, no
             // de-duplication scan (setting a bit twice is setting it once), and
@@ -24117,10 +23826,13 @@ fn compile_expr_inner<M: Module>(
             // (`emit_const_empty`), so it allocates nothing.
             if pairs.is_empty() {
                 let value = emit_const_empty(module, builder, cx)?;
-                let dict_ty = ConcreteType::Dict(
-                    Box::new(ConcreteType::NoneInner),
-                    Box::new(ConcreteType::NoneInner),
-                );
+                let dict_ty = match stamped_ty(expr) {
+                    Some(t @ ConcreteType::Dict(..)) => t,
+                    _ => ConcreteType::Dict(
+                        Box::new(ConcreteType::Primitive(Primitive::I64)),
+                        Box::new(ConcreteType::Primitive(Primitive::I64)),
+                    ),
+                };
                 let no_elems = builder.ins().iconst(types::I64, 0);
                 let value = arr_val_of_len(builder, value, no_elems);
                 return Ok((value, dict_ty));
@@ -24152,8 +23864,8 @@ fn compile_expr_inner<M: Module>(
                 }
                 vals.push((kv, vv));
             }
-            let key = key_ty.unwrap_or(ConcreteType::NoneInner);
-            let val = val_ty.unwrap_or(ConcreteType::NoneInner);
+            let key = key_ty.unwrap_or(ConcreteType::Primitive(Primitive::I64));
+            let val = val_ty.unwrap_or(ConcreteType::Primitive(Primitive::I64));
             let pair_size = dict_pair_size(&key, &val, structs);
             let psz = builder.ins().iconst(types::I64, pair_size);
             let (drop_fn, retain_fn) = pair_rc_fn_addrs(builder, module, cx, &key, &val);

@@ -63,17 +63,17 @@ test({
     assert(`{"x;y".split_map(";", tagged) == "x;y".split(";")$tagged()}` == "true");
 })
 --- report ---
-allocations       35
-deallocations     35
-reallocations     1
-bytes allocated   2501
-peak live bytes   2074
-instructions      2875
-binary size       14224 bytes (code 9276, data 710, metadata 4238)
+allocations       34
+deallocations     34
+reallocations     0
+bytes allocated   2480
+peak live bytes   2026
+instructions      2835
+binary size       14200 bytes (code 9268, data 710, metadata 4222)
 
 function                   calls  code bytes
 __eq_str$arr                   1         320
-__test$__test_block_1          1        7716
+__test$__test_block_1          1        7708
 __to_str_bool                  1         224
 __to_str_u64                   1         204
 __to_str_u64$arr               2         704

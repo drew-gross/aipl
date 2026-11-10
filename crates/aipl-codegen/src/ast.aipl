@@ -17,11 +17,10 @@
 #     `Type::Optional` is `Optional`, `ExprKind::Call` is `Call`. The mapping
 #     the FFI bridge (`ffi_ast.rs`) applies is the identity, so a case it does
 #     not know about is a case the two declarations disagree about.
-#   - **Only what the parser can produce is declared.** `Type` carries four
-#     sentinels no source text spells — `NoneInner`, `EmptyArrayArg`,
-#     `NoneLiteralArg`, `ConcatStr` — invented by the checker for literals whose
-#     type is still open. They are deliberately absent; a lowering that produced
-#     one would be a bug.
+#   - **Only what the parser can produce is declared.** `Type` carries a
+#     sentinel no source text spells — `ConcatStr`, a representation mono picks
+#     for a joined `str`. It is deliberately absent; a lowering that produced
+#     it would be a bug.
 #
 # `Ast` below is the single type `Build<A>` pins for the whole grammar, so every
 # production lowers to it whatever it is about, with a case per node kind the

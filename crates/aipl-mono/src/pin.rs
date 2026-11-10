@@ -1,7 +1,7 @@
 //! The type pinner: types a lowered program by unification and hands back a [`TProgram`], a tree
 //! in which every node carries a final type and no placeholder can be written down.
 //!
-//! This is the type checker of the typed-IR project (`TYPED_IR.md`): what it rejects is what does
+//! This is the type checker: what it rejects is what does
 //! not compile, and what it pins is what every later pass reads. It also records what each written
 //! name refers to ([`Pinned::resolutions`]), which the language server and the index read.
 //!
@@ -1598,11 +1598,7 @@ impl Pinner<'_> {
                 Box::new(go(self, r)?),
             ),
             Type::Without(t, x) => It::Without(Box::new(go(self, t)?), x.clone()),
-            Type::Tuple(_)
-            | Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
-            | Type::Unknown => {
+            Type::Tuple(_) | Type::Unknown => {
                 return gap(format!("a placeholder type in a declaration: {t:?}"), span)
             }
         })

@@ -2,7 +2,7 @@
 //! no type is provisional.
 //!
 //! [`ast::Expr`](crate::ast::Expr) is what the parser, loader, formatter and tools share, and it
-//! cannot say "this is fully typed": its [`Type`] has placeholders (`NoneInner`, `Unknown`, ...), an
+//! cannot say "this is fully typed": its [`Type`] has placeholders (`Unknown`, `Any`, ...), an
 //! integer literal is a bare `Num` until a context fits it, and only a few expressions record a
 //! type at all. A pass over it has to guess what an expression is, and guesses are where
 //! optimizations stop.
@@ -11,8 +11,8 @@
 //!
 //! - **Every node has a type** ([`TExpr::ty`]), not an `Option` of one.
 //! - **The type language cannot say "unknown".** [`Ty`] and [`ConcreteTy`] have no `Unknown`,
-//!   `Any`, `NoneInner`, `EmptyArrayArg`, `NoneLiteralArg`, `ConcatStr`, `Without`, `Tuple` or
-//!   `Generic`: the first five are placeholders, the rest are already lowered or erased by the time a
+//!   `Any`, `ConcatStr`, `Without`, `Tuple` or
+//!   `Generic`: the first three are placeholders, the rest are already lowered or erased by the time a
 //!   program is pinned. A set's order is a [`PinnedOrder`], which cannot be the checker's `Context`
 //!   placeholder.
 //! - **A literal has its width.** [`TExprKind::Int`] and [`TExprKind::Float`] are literals whose
@@ -149,14 +149,9 @@ impl Ty {
                     .collect::<Option<Vec<_>>>()?,
                 boxed(ret)?,
             ),
-            Type::Tuple(_)
-            | Type::Any
-            | Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
-            | Type::Unknown
-            | Type::ConcatStr
-            | Type::Without(..) => return None,
+            Type::Tuple(_) | Type::Any | Type::Unknown | Type::ConcatStr | Type::Without(..) => {
+                return None
+            }
         })
     }
 
@@ -1059,13 +1054,9 @@ mod tests {
         for placeholder in [
             Type::Unknown,
             Type::Any,
-            Type::NoneInner,
-            Type::EmptyArrayArg,
-            Type::NoneLiteralArg,
             Type::ConcatStr,
             Type::Tuple(vec![]),
             Type::Generic("Box".into(), vec![Type::Unknown]),
-            Type::Array(Box::new(Type::NoneInner)),
             Type::Set(Box::new(Type::Primitive(Primitive::I64)), SetOrder::Context),
         ] {
             assert_eq!(Ty::from_type(&placeholder), None, "{placeholder:?}");

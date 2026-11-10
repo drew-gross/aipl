@@ -94,17 +94,17 @@ test({
     """);
 })
 --- report ---
-allocations       18
-deallocations     18
+allocations       17
+deallocations     17
 reallocations     0
-bytes allocated   1118
-peak live bytes   1083
-instructions      3174
-binary size       11208 bytes (code 7720, data 287, metadata 3201)
+bytes allocated   1097
+peak live bytes   1062
+instructions      3090
+binary size       11184 bytes (code 7708, data 287, metadata 3189)
 
 function                                 calls  code bytes
 __aipl_const_teardown                        1          92
-__test$__test_block_1                        1        4548
+__test$__test_block_1                        1        4536
 __test$__test_block_1$shim_closure0          0        1384
 __test$__test_block_1$shim_closure1          6        1384
 __to_str_i64                                 5         204

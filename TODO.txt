@@ -120,6 +120,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  porting various optimizations/monomorphization passes to TExpr
   cell_text looks like it should be a fold. Also have a lint for this
   so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)

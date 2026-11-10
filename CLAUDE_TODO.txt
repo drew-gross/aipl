@@ -5,6 +5,10 @@ lints:
   destructure_binding/destructure_slot advise "(<Type> { n }, rest)" with a placeholder; name the real type, and say to import it when the file lacks the import (as the builtin lints do), so `let r = f()?;` on an ExecResult tells you which import the destructure needs
 
 type checker:
+  Expr::ty is still Option: the passes run on ast::Expr with optional stamps, not on typed::TExpr (typed.rs, erase/concretize are only exercised by tests). Porting every pre-/post-mono pass to TExpr would make a lost type unrepresentable
+  fold_extends' receiver rule is still syntactic (annotated, or seeded by []/a reservation); a receiver that merely holds another function's array measured worse when pushed into (optimizations/fold_extends_value_or) — retry on exact types
+  codegen still re-derives types bottom-up (compile_expr_inner) and reconciles with Expr::ty through has_placeholder_ty/coercible; with every node stamped it could read the stamp instead
+  stale comments still say `__none__`/"untyped empty" (grep `__none__` in crates/aipl-codegen/src/lib.rs, aipl-mono/src/{lib,typing,fold}.rs, aipl-loader/src/kwargs.rs, builtin_sort_by.aipl); the placeholder no longer exists
   generic fns are only checked when reachable from a root (main/test); check them at the definition (Drew's own project)
   `set self[(0, 0)] = ..` types the tuple literal as i64, then rejects it as the index (needs a (u64, u64) annotation)
   a `Span` cannot become an array: `[..names.range()]` fails with "__aipl_arr_reserve expects an array, got Span", so `names.zip(positions)` has no positions array; card_stats.aipl still builds (name, i) pairs by hand

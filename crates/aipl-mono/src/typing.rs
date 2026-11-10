@@ -11,37 +11,8 @@ use aipl_syntax::ast::{
     Type, VariantDecl,
 };
 use aipl_syntax::{
-    binop_spelling, is_dict_key, is_error, is_none_inner, is_set_elem, type_name, Error, Span,
-    SPAN_TYPE,
+    binop_spelling, is_dict_key, is_error, is_set_elem, type_name, Error, Span, SPAN_TYPE,
 };
-
-/// A lambda body's type with its error side filled in from a `?` the body
-/// propagated.
-///
-/// `ok(v)` names no error, so it types as `v!__none__` — which is right for a
-/// value but wrong for a *lambda*, whose failures leave through the `?` in its
-/// body rather than through an `err(..)` the literal mentions. Without this,
-/// `xs.try_map(|p| ok(T { .. f(p)? .. }))` leaves `try_map`'s `E` unpinned and
-/// unpinnable: `E` appears nowhere but the callback's own type, and the only
-/// thing naming it is the `?`.
-///
-/// `tries` is what the `?`s in the body propagated, in order; the first one that
-/// names a real error type wins. A body whose error side is already concrete
-/// keeps it, so an explicit `err(..)` always outranks this inference — and a
-/// body with conflicting `?` error types still fails where it did before, in the
-/// enclosing-return check.
-pub(crate) fn err_side_from_tries(body_ty: Type, tries: &[Type]) -> Type {
-    let Type::Result(ok, e) = &body_ty else {
-        return body_ty;
-    };
-    if !is_none_inner(e) {
-        return body_ty;
-    }
-    match tries.iter().find(|t| !is_none_inner(t)) {
-        Some(named) => Type::Result(ok.clone(), Box::new(named.clone())),
-        None => body_ty,
-    }
-}
 
 /// Mangle a type into a fragment usable inside a synthetic struct/variant name
 /// (all `$`/`!`/nesting flattened to `_`). Shared by [`tuple_struct_name`] and
@@ -53,11 +24,7 @@ pub(crate) fn mangle_type(ty: &Type) -> String {
         Type::Unit => panic!("Synthetic-type members cannot be unit"),
         // Tuple/generic members are parsed straight from source syntax; these
         // are compiler-internal pseudo-types that never appear there.
-        Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => {
+        Type::Any | Type::ConcatStr => {
             panic!("Synthetic-type members cannot be a compiler pseudo-type")
         }
         // Reachable, unlike the pseudo-types above: a generic tuple instantiated
@@ -457,7 +424,7 @@ pub(crate) fn has_return_only_var(sig: &Signature) -> bool {
 /// type parameter. They're permitted wherever a concrete scalar primitive is
 /// (set elements, dict keys, etc.).
 fn is_abstract_scalar_ty(t: &Type, type_params: &[String]) -> bool {
-    matches!(t, Type::Any | Type::NoneInner)
+    matches!(t, Type::Any)
         // A variable of *this* signature. The anonymous one an `any` normalized
         // to carries an empty name and belongs to whatever signature holds it.
         || matches!(t, Type::TypeVar(n) if n.is_empty() || type_params.iter().any(|tp| tp == n))
@@ -494,11 +461,7 @@ impl TypeValidator<'_> {
             // declared signature a user wrote — but `check_ty` also runs on
             // synthesized types (e.g. a struct field's inferred default), so
             // handle them permissively rather than asserting they can't occur.
-            Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
-            | Type::Unknown
-            | Type::ConcatStr => Ok(()),
+            Type::Unknown | Type::ConcatStr => Ok(()),
             Type::Named(n) => {
                 let ok = n == "Error"
                     || self.has_struct(n)
@@ -687,11 +650,7 @@ impl TypeValidator<'_> {
             // bare-`none`/empty-container marker are abstract scalars — always a
             // valid element.
             Type::TypeVar(_) => Ok(()),
-            Type::Any
-            | Type::NoneInner
-            | Type::EmptyArrayArg
-            | Type::NoneLiteralArg
-            | Type::Unknown => Ok(()),
+            Type::Any | Type::Unknown => Ok(()),
             // A concat-str has the `str` runtime representation.
             Type::ConcatStr => Ok(()),
             // A refined element is its base laid out in the slot — `check_ty`
@@ -1012,9 +971,6 @@ pub(crate) fn mentions_typevar(t: &Type) -> bool {
         | Type::Primitive(_)
         | Type::Named(_)
         | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
         | Type::Unknown
         | Type::ConcatStr => false,
     }
@@ -1036,11 +992,6 @@ pub(crate) fn tyname(t: &Type) -> String {
         // generic instance (`Token$AiplTok`) carries internal mangling — render
         // it back to source-like form for diagnostics.
         Type::Named(n) => aipl_syntax::demangle_named(n),
-        // The type of a bare `none` / `[]` is the literal: naming the placeholder
-        // element (`__none__[]`) would send the reader looking for a type they
-        // never wrote.
-        Type::Optional(inner) if is_none_inner(inner) => "none".to_string(),
-        Type::Array(inner) if is_none_inner(inner) => "[]".to_string(),
         Type::Optional(inner) => format!("{}?", tyname(inner)),
         Type::Array(inner) => format!("{}[]", tyname(inner)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), tyname(inner)),
@@ -1097,13 +1048,6 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     {
         return Ok(());
     }
-    // A bare `none` / empty `[]` carries the placeholder element `__none__`,
-    // which fits any element type in either direction — and at any depth: peel
-    // matching optional/array layers and apply the same rule to the cores, so
-    // e.g. `some(some(none))` (`__none__???`) fits `i64???`.
-    if is_none_inner(actual) || is_none_inner(expected) {
-        return Ok(());
-    }
     // A refinement (`T[] without []`) is its base at runtime, so a refined value
     // goes wherever the base does. The other direction is where the refinement
     // *means* something, and there is no coercion into it: the value has to be
@@ -1154,19 +1098,6 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     {
         return Ok(());
     }
-    // `#{}` is the empty literal for *both* a set and a dict, and which one it
-    // is comes from the use site — the same way `[]`, `none` and a bare integer
-    // take their type from context. The checker types it as `#{__none__}`
-    // because the parser has no way to tell the two apart from an empty brace
-    // pair, so a dict-shaped expectation accepts it here.
-    //
-    // Only the *empty* set: `#{__none__}` cannot arise any other way, since a
-    // non-empty set literal takes its element type from its first element.
-    if let (Type::Set(a, _), Type::Dict(_, _)) = (actual, expected) {
-        if is_none_inner(a) {
-            return Ok(());
-        }
-    }
     match (actual, expected) {
         (Type::Optional(a), Type::Optional(b)) => coerce(a, b),
         (Type::Array(a), Type::Array(b)) => coerce(a, b),
@@ -1175,9 +1106,7 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
         // order context is deciding right here; anything else has to agree on
         // the order, since the two are different types over one runtime.
         (Type::Set(a, oa), Type::Set(b, ob))
-            if is_none_inner(a)
-                || is_none_inner(b)
-                || *oa == aipl_syntax::ast::SetOrder::Context
+            if *oa == aipl_syntax::ast::SetOrder::Context
                 || *ob == aipl_syntax::ast::SetOrder::Context =>
         {
             coerce(a, b)
@@ -1328,9 +1257,7 @@ pub(crate) fn collect_var_bindings(
         (Type::Case(p), Type::Case(a)) => collect_var_bindings(p, a, vars, map),
         // A bare `none`/empty `[]` argument carries no element type (`__none__`),
         // so it can't pin the variable — leave it for another argument to fix.
-        (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
-            collect_var_bindings(p, a, vars, map)
-        }
+        (Type::Array(p), Type::Array(a)) => collect_var_bindings(p, a, vars, map),
         // `str` is usable as `char[]` — pin the element variable to `char`.
         (Type::Array(p), Type::Primitive(Primitive::Str)) => {
             collect_var_bindings(p, &Type::Primitive(Primitive::Char), vars, map)
@@ -1339,34 +1266,20 @@ pub(crate) fn collect_var_bindings(
         // walk, so a generic that only reads its sequence (`all`, `find_if`,
         // `map_join`) takes one, keeping the set's own type in the instance
         // (mono's `set_kept`). The element pins `T` exactly as an array's would.
-        (Type::Array(p), Type::Set(a, _)) if !is_none_inner(a) => {
-            collect_var_bindings(p, a, vars, map)
-        }
-        (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
-            collect_var_bindings(p, a, vars, map)
-        }
+        (Type::Array(p), Type::Set(a, _)) => collect_var_bindings(p, a, vars, map),
+        (Type::Set(p, _), Type::Set(a, _)) => collect_var_bindings(p, a, vars, map),
         (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
             // Bind from whichever side carries concrete structure; an empty
             // An empty dict literal has `__none__` key/value and pins nothing.
-            if !is_none_inner(ak) {
-                collect_var_bindings(pk, ak, vars, map);
-            }
-            if !is_none_inner(av) {
-                collect_var_bindings(pv, av, vars, map);
-            }
+            collect_var_bindings(pk, ak, vars, map);
+            collect_var_bindings(pv, av, vars, map);
         }
-        (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
-            collect_var_bindings(p, a, vars, map)
-        }
+        (Type::Optional(p), Type::Optional(a)) => collect_var_bindings(p, a, vars, map),
         (Type::Result(po, pe), Type::Result(ao, ae)) => {
             // Bind from whichever side carries concrete structure; an `ok`/`err`
             // pins one side and leaves the other `__none__`.
-            if !is_none_inner(ao) {
-                collect_var_bindings(po, ao, vars, map);
-            }
-            if !is_none_inner(ae) {
-                collect_var_bindings(pe, ae, vars, map);
-            }
+            collect_var_bindings(po, ao, vars, map);
+            collect_var_bindings(pe, ae, vars, map);
         }
         (Type::Fn(ps, pr), Type::Fn(as_, ar)) => {
             for (p, a) in ps.iter().zip(as_) {

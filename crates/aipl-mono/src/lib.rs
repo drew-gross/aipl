@@ -92,8 +92,8 @@ use aipl_syntax::{
         FieldInit, Function, Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program,
         SeqShape, Signature, StructDecl, Type, TypeParam, VariantCase, VariantDecl,
     },
-    concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
-    is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES, SPAN_TYPE,
+    concat_str_ty, is_concat_str, is_error, is_str_repr, type_name, DebugOptions, Error, Span,
+    BUILTIN_SIGNATURES, SPAN_TYPE,
 };
 use aipl_syntax::{Children, ChildrenMut};
 
@@ -728,9 +728,6 @@ fn ty_has_var(t: &Type) -> bool {
         | Type::Named(_)
         | Type::Unit
         | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
         | Type::Unknown
         | Type::ConcatStr => false,
     }
@@ -806,14 +803,7 @@ fn lt_ty(
             params.iter().map(|p| lt_ty(p, fields_map, order)).collect(),
             Box::new(lt_ty(ret, fields_map, order)),
         ),
-        Type::Named(_)
-        | Type::Primitive(_)
-        | Type::Unit
-        | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => t.clone(),
+        Type::Named(_) | Type::Primitive(_) | Type::Unit | Type::Any | Type::ConcatStr => t.clone(),
         // `lower_generics` resolves every *concrete* generic application to a
         // `Named` type; an abstract one (`Box<T>` over a generic function's own
         // type variable) is left for monomorphization — pass it through,
@@ -1753,7 +1743,6 @@ pub fn monomorphize_probed(
         skip_mut_desugar: false,
         cur_ret: Type::Unit,
         cur_expected: None,
-        try_errs: Vec::new(),
         probe,
         cur_template: String::new(),
         cur_subst: None,
@@ -2083,14 +2072,6 @@ type VShape = SeqShape;
 fn variadic_shape(arg_ty: &Type, seq_ty: &Type) -> VShape {
     if matches!(arg_ty, Type::Optional(_)) {
         VShape::Opt
-    } else if matches!(arg_ty, Type::EmptyArrayArg)
-        || matches!(arg_ty, Type::Array(e) if is_none_inner(e))
-    {
-        // An empty `[]` is the empty *sequence*, whatever the element type —
-        // it carries no element that could make it the single-element shape.
-        // Checked before the str-shaped branch, which would otherwise read it
-        // as one element of a `char` sequence.
-        VShape::Seq
     } else if is_str_repr(seq_ty) || typing::is_char_array(seq_ty) {
         // A `char` sequence is str-shaped however it is spelled. A *declared*
         // `char*` parameter has sequence type `str`, but a generic `T*` keeps
@@ -2163,6 +2144,7 @@ fn opt_variadic_seq(scrut: Expr, binder: String, elem: &Type, span: Span) -> Exp
         Expr::new(ExprKind::Str(String::new()), span.clone())
     } else {
         Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+            .with_ty(Type::Array(Box::new(elem.clone())))
     };
     Expr::new(
         ExprKind::Match(
@@ -2589,12 +2571,6 @@ struct Mono<'a> {
     /// checker's `current_expected`, and must, or mono rejects a program the
     /// checker accepted.
     cur_expected: Option<Type>,
-    /// Error types propagated by a `?` while inferring the expression currently
-    /// in progress, read back by [`Mono::fn_arg_return`] so a lambda whose only
-    /// mention of its error type is a `?` still pins a higher-order function's
-    /// error variable. Mirrors the checker's own `try_errs` — see
-    /// [`typing::err_side_from_tries`].
-    try_errs: Vec<Type>,
     /// Compares each inferred type with the pinner's; see [`probe`].
     probe: Option<&'a probe::Probe>,
     /// The source function the instance being processed came from.
@@ -2943,10 +2919,7 @@ impl Mono<'_> {
                 for (p, t) in params.iter().zip(arg_tys) {
                     benv.insert(p.name.clone(), t.clone());
                 }
-                let mark = self.try_errs.len();
                 let (_, ty) = self.infer(body, &benv)?;
-                let ty = typing::err_side_from_tries(ty, &self.try_errs[mark..]);
-                self.try_errs.truncate(mark);
                 Ok(Some(ty))
             }
             // A function-typed parameter of the function being processed, which is
@@ -3742,6 +3715,7 @@ impl Mono<'_> {
                 || matches!(&u, Type::Primitive(Primitive::Bool))
             {
                 Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+                    .with_ty(Type::Array(Box::new(decay_concat(u.clone()))))
             } else {
                 Expr::new(
                     ExprKind::Call(
@@ -3754,6 +3728,7 @@ impl Mono<'_> {
                     ),
                     span.clone(),
                 )
+                .with_ty(Type::Array(Box::new(decay_concat(u.clone()))))
             };
             Expr::new(
                 ExprKind::LetMut(
@@ -3984,7 +3959,8 @@ impl Mono<'_> {
                     bindings: Vec::new(),
                     ignore_payload: false,
                 },
-                body: Expr::new(ExprKind::None, span.clone()),
+                body: Expr::new(ExprKind::None, span.clone())
+                    .with_ty(Type::Optional(Box::new(decay_concat(u.clone())))),
                 span: span.clone(),
             };
             Expr::new(
@@ -4085,6 +4061,7 @@ impl Mono<'_> {
                 || matches!(&u, Type::Primitive(Primitive::Bool))
             {
                 Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+                    .with_ty(Type::Array(Box::new(decay_concat(u.clone()))))
             } else {
                 // How many elements are coming: a sequence's `len`, or — for a
                 // `Span`, which has none — the width of the range it is. The
@@ -4112,6 +4089,7 @@ impl Mono<'_> {
                     ExprKind::Call(Callee::WithCapacity, vec![count], false),
                     span.clone(),
                 )
+                .with_ty(Type::Array(Box::new(decay_concat(u.clone()))))
             };
             Expr::new(
                 ExprKind::LetMut(
@@ -4607,7 +4585,10 @@ impl Mono<'_> {
                 ExprKind::LetMut(
                     "$out".to_string(),
                     None,
-                    Box::new(Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())),
+                    Box::new(
+                        Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+                            .with_ty(Type::Array(Box::new(r.clone()))),
+                    ),
                     Box::new(with_i),
                 ),
                 span.clone(),
@@ -4865,6 +4846,7 @@ impl Mono<'_> {
                 || matches!(&elem, Type::Primitive(Primitive::Bool))
             {
                 Expr::new(ExprKind::ArrayLit(Vec::new()), span.clone())
+                    .with_ty(Type::Array(Box::new(decay_concat(elem.clone()))))
             } else {
                 Expr::new(
                     ExprKind::Call(
@@ -4877,6 +4859,7 @@ impl Mono<'_> {
                     ),
                     span.clone(),
                 )
+                .with_ty(Type::Array(Box::new(decay_concat(elem.clone()))))
             };
             Expr::new(
                 ExprKind::LetMut(
@@ -5036,13 +5019,6 @@ impl Mono<'_> {
             if variadic[i] {
                 continue;
             }
-            // A bare `none` or an empty `[]` carries only a placeholder element
-            // type and pins nothing — the same bow-out the variadic pass below
-            // and `collect_var_bindings` both make. Binding it would claim
-            // `T = __none__` and conflict with whatever really pinned `T`.
-            if is_none_inner(aty) || matches!(aty, Type::Array(e) if is_none_inner(e)) {
-                continue;
-            }
             self.bind_generic_or(pty, aty, &var_set, &mut map, gname, span.clone())?;
         }
         for (i, (pty, aty)) in param_tys.iter().zip(arg_tys).enumerate() {
@@ -5063,32 +5039,7 @@ impl Mono<'_> {
                 (VShape::Opt, Type::Optional(inner)) => (**inner).clone(),
                 _ => aty.clone(),
             };
-            // A bare `none` (or an empty `[]`) carries only a placeholder
-            // element type and pins nothing — the same bow-out
-            // `collect_var_bindings` makes for every other parameter. Binding it
-            // would claim `T = __none__` and conflict with the real argument.
-            if is_none_inner(&aty) || matches!(&aty, Type::Array(e) if is_none_inner(e)) {
-                continue;
-            }
             self.bind_generic_or(&target, &aty, &var_set, &mut map, gname, span.clone())?;
-        }
-        // Fallback pass: any type variable that no concrete arg pinned can
-        // still be inferred from an empty-array or bare-`none` argument — the
-        // resulting instance accepts the corresponding pseudo-type
-        // (`EmptyArray` / `NoneLiteral`), substituted to `Array(__none__)` /
-        // `Optional(__none__)` for codegen.
-        for v in &type_vars {
-            // A variable with a default takes it below, once the call's result has had
-            // its say, rather than standing for the empty array or `none` it was given.
-            if map.contains_key(v) || defaults.contains_key(v) {
-                continue;
-            }
-            for (pty, aty) in param_tys.iter().zip(arg_tys) {
-                if let Some(marker) = pseudo_marker(pty, aty, v) {
-                    map.insert(v.clone(), marker);
-                    break;
-                }
-            }
         }
         // A variable only the return type mentions is the recorded result type's
         // to give. It binds only what no argument did, so a variable an argument
@@ -5289,16 +5240,6 @@ impl Mono<'_> {
             // Not a sequence receiver at all: the normal path reports that.
             return None;
         };
-        // An untyped-empty destination (`mut buf = []`) takes its element type
-        // *from* the source, so there is no element type for a shape to fit
-        // against — and whether `buf.extend("ab")` appends two chars or one
-        // `str` is exactly what the receiver has not said. Such a receiver
-        // keeps the sequence shape, the only one `extend` has ever had there;
-        // `push` is the spelling for the first element, and pinning the element
-        // type is what it is for.
-        if is_none_inner(&elem) {
-            return None;
-        }
         let src = &atys[1];
         // The sequence reading wins any tie, so nothing that compiles today
         // changes meaning.
@@ -5800,13 +5741,11 @@ impl Mono<'_> {
             // `TokenRule<K>[]` argument). A `none`/empty-`[]` element carries no
             // type (`__none__`) and must not pin anything — fall through to
             // `collect_bindings`, which skips it (as it did before).
-            (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
+            (Type::Array(p), Type::Array(a)) => self.bind_generic_or(p, a, vars, map, gname, span),
+            (Type::Optional(p), Type::Optional(a)) => {
                 self.bind_generic_or(p, a, vars, map, gname, span)
             }
-            (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
-                self.bind_generic_or(p, a, vars, map, gname, span)
-            }
-            (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
+            (Type::Set(p, _), Type::Set(a, _)) => {
                 self.bind_generic_or(p, a, vars, map, gname, span)
             }
             _ => collect_bindings(pty, aty, vars, map, gname, span),
@@ -5837,15 +5776,9 @@ impl Mono<'_> {
                     self.bind_field(p, a, vars, map);
                 }
             }
-            (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
-                self.bind_field(p, a, vars, map)
-            }
-            (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
-                self.bind_field(p, a, vars, map)
-            }
-            (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
-                self.bind_field(p, a, vars, map)
-            }
+            (Type::Array(p), Type::Array(a)) => self.bind_field(p, a, vars, map),
+            (Type::Optional(p), Type::Optional(a)) => self.bind_field(p, a, vars, map),
+            (Type::Set(p, _), Type::Set(a, _)) => self.bind_field(p, a, vars, map),
             (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
                 self.bind_field(pk, ak, vars, map);
                 self.bind_field(pv, av, vars, map);
@@ -6360,10 +6293,7 @@ impl Mono<'_> {
         let mut result = self.infer_node(expr, env)?;
         // Every node leaves inference saying what it is, so the passes that run on the
         // monomorphized program read a type instead of re-deriving one.
-        if result.0.ty.is_none()
-            && !matches!(result.1, Type::Unit)
-            && !mentions_pseudo_type(&result.1)
-        {
+        if !matches!(result.1, Type::Unit) && !mentions_pseudo_type(&result.1) {
             result.0.ty = Some(Box::new(result.1.clone()));
         }
         if let (Some(probe), Some(subst)) = (self.probe, &self.cur_subst) {
@@ -6473,7 +6403,10 @@ impl Mono<'_> {
             ExprKind::Bool(_) => (expr.clone(), Type::Primitive(Primitive::Bool)),
             ExprKind::Str(_) => (expr.clone(), Type::Primitive(Primitive::Str)),
             ExprKind::Char(_) => (expr.clone(), Type::Primitive(Primitive::Char)),
-            ExprKind::None => (expr.clone(), Type::Optional(Box::new(Type::NoneInner))),
+            ExprKind::None => (
+                expr.clone(),
+                Type::Optional(Box::new(Type::Primitive(Primitive::I64))),
+            ),
             ExprKind::Ident(name) => {
                 // A nullary constructor of a generic variant (`Nothing@Opt`):
                 // resolve its instance (from the sole existing one) and rewrite to
@@ -6513,7 +6446,7 @@ impl Mono<'_> {
             }
             ExprKind::ArrayLit(elems) => {
                 let mut relems = Vec::with_capacity(elems.len());
-                let mut elem_ty = Type::NoneInner;
+                let mut elem_ty = Type::Primitive(Primitive::I64);
                 for (i, e) in elems.iter().enumerate() {
                     let (re, t) = self.infer(e, env)?;
                     if i == 0 {
@@ -6581,7 +6514,7 @@ impl Mono<'_> {
             }
             ExprKind::SetLit(elems, order) => {
                 let mut relems = Vec::with_capacity(elems.len());
-                let mut elem_ty = Type::NoneInner;
+                let mut elem_ty = Type::Primitive(Primitive::I64);
                 for (i, e) in elems.iter().enumerate() {
                     let (re, t) = self.infer(e, env)?;
                     if i == 0 {
@@ -6596,8 +6529,8 @@ impl Mono<'_> {
             }
             ExprKind::DictLit(pairs) => {
                 let mut rpairs = Vec::with_capacity(pairs.len());
-                let mut key_ty = Type::NoneInner;
-                let mut val_ty = Type::NoneInner;
+                let mut key_ty = Type::Primitive(Primitive::I64);
+                let mut val_ty = Type::Primitive(Primitive::I64);
                 for (i, (k, v)) in pairs.iter().enumerate() {
                     let (rk, kt) = self.infer(k, env)?;
                     let (rv, vt) = self.infer(v, env)?;
@@ -6638,7 +6571,7 @@ impl Mono<'_> {
                     Type::Array(inner) => *inner,
                     // `s[i]` on a `str` is the byte at `i` as a `char?`.
                     Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
-                    _ => Type::NoneInner,
+                    _ => Type::Primitive(Primitive::I64),
                 };
                 // Indexing yields `elem?` — for a `T?[]` that's a genuine `T??`.
                 (
@@ -6669,14 +6602,9 @@ impl Mono<'_> {
                 // optional; codegen emits the unwrap / early-return of `err`/`none`.
                 let (rin, it) = self.infer(inner, env)?;
                 let ok = match it {
-                    Type::Result(ok, e) => {
-                        // What this `?` propagates; `fn_arg_return` reads these
-                        // back to type a lambda that fails only through a `?`.
-                        self.try_errs.push(*e);
-                        *ok
-                    }
+                    Type::Result(ok, _) => *ok,
                     Type::Optional(inner) => *inner,
-                    _ => Type::NoneInner,
+                    _ => Type::Primitive(Primitive::I64),
                 };
                 (node(ExprKind::Try(Box::new(rin))), ok)
             }
@@ -7334,11 +7262,17 @@ impl Mono<'_> {
                     .cloned()
                     .unwrap_or_default();
                 let mut rfields = Vec::with_capacity(field_defs.len());
-                for (fname, _, fdefault) in &field_defs {
+                for (fname, fty, fdefault) in &field_defs {
                     let src = if let Some(fi) = inits.iter().find(|i| &i.name == fname) {
                         fi.value.clone()
                     } else if let Some(def) = fdefault {
-                        def.clone()
+                        // A default is written beside the field, with no initializer's context
+                        // around it, so the field's declared type is the type it has.
+                        let mut def = def.clone();
+                        if def.ty.is_none() {
+                            def.ty = Some(Box::new(fty.clone()));
+                        }
+                        def
                     } else {
                         // Checker already caught this; surface a clean error just in case.
                         return Err(Error::at(
@@ -7906,15 +7840,11 @@ fn collect_bindings(
     match param_ty {
         Type::TypeVar(v) if vars.contains(v.as_str()) => bind(v, arg_ty, map, gname, span.clone()),
         Type::Optional(inner) if ty_contains_var(inner, vars) => match arg_ty {
-            Type::Optional(a) if !is_none_inner(a) => {
-                collect_bindings(inner, a, vars, map, gname, span.clone())
-            }
+            Type::Optional(a) => collect_bindings(inner, a, vars, map, gname, span.clone()),
             _ => Ok(()),
         },
         Type::Array(inner) if ty_contains_var(inner, vars) => match arg_ty {
-            Type::Array(a) if !is_none_inner(a) => {
-                collect_bindings(inner, a, vars, map, gname, span.clone())
-            }
+            Type::Array(a) => collect_bindings(inner, a, vars, map, gname, span.clone()),
             // `str` is usable as `char[]` — pin the element variable to `char`.
             Type::Primitive(Primitive::Str) => collect_bindings(
                 inner,
@@ -7926,26 +7856,18 @@ fn collect_bindings(
             ),
             // A set is usable as a `T[]` (see `ParamSpec::set_kept`): its
             // element pins the variable as an array's would.
-            Type::Set(a, _) if !is_none_inner(a) => {
-                collect_bindings(inner, a, vars, map, gname, span.clone())
-            }
+            Type::Set(a, _) => collect_bindings(inner, a, vars, map, gname, span.clone()),
             _ => Ok(()),
         },
         Type::Set(inner, _) if ty_contains_var(inner, vars) => match arg_ty {
-            Type::Set(a, _) if !is_none_inner(a) => {
-                collect_bindings(inner, a, vars, map, gname, span.clone())
-            }
+            Type::Set(a, _) => collect_bindings(inner, a, vars, map, gname, span.clone()),
             _ => Ok(()),
         },
         Type::Dict(pk, pv) if ty_contains_var(pk, vars) || ty_contains_var(pv, vars) => {
             match arg_ty {
                 Type::Dict(ak, av) => {
-                    if !is_none_inner(ak) {
-                        collect_bindings(pk, ak, vars, map, gname, span.clone())?;
-                    }
-                    if !is_none_inner(av) {
-                        collect_bindings(pv, av, vars, map, gname, span.clone())?;
-                    }
+                    collect_bindings(pk, ak, vars, map, gname, span.clone())?;
+                    collect_bindings(pv, av, vars, map, gname, span.clone())?;
                     Ok(())
                 }
                 _ => Ok(()),
@@ -7954,12 +7876,8 @@ fn collect_bindings(
         Type::Result(po, pe) if ty_contains_var(po, vars) || ty_contains_var(pe, vars) => {
             match arg_ty {
                 Type::Result(ao, ae) => {
-                    if !is_none_inner(ao) {
-                        collect_bindings(po, ao, vars, map, gname, span.clone())?;
-                    }
-                    if !is_none_inner(ae) {
-                        collect_bindings(pe, ae, vars, map, gname, span.clone())?;
-                    }
+                    collect_bindings(po, ao, vars, map, gname, span.clone())?;
+                    collect_bindings(pe, ae, vars, map, gname, span.clone())?;
                     Ok(())
                 }
                 _ => Ok(()),
@@ -8018,25 +7936,6 @@ fn bind(
             ),
             span.clone(),
         )),
-    }
-}
-
-/// If `param_ty` mentions `v` exactly inside `T[]` (with `arg_ty` the empty
-/// array literal) or inside `T?` (with `arg_ty` bare `none`), return the
-/// pseudo marker to bind `v` to. Returns `None` when no such pairing applies.
-fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
-    match (param_ty, arg_ty) {
-        (Type::Array(inner), Type::Array(a))
-            if matches!(inner.as_ref(), Type::TypeVar(n) if n == v) && is_none_inner(a) =>
-        {
-            Some(Type::EmptyArrayArg)
-        }
-        (Type::Optional(inner), Type::Optional(a))
-            if matches!(inner.as_ref(), Type::TypeVar(n) if n == v) && is_none_inner(a) =>
-        {
-            Some(Type::NoneLiteralArg)
-        }
-        _ => None,
     }
 }
 
@@ -8232,25 +8131,15 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     }
     let mut map: HashMap<String, Type> = HashMap::new();
     for tp in &sig.type_vars {
-        // Prefer the first parameter whose argument concretely pins `v`;
-        // a `__none__` binding (an empty-array/bare-`none` argument, e.g.
-        // `value_or`'s uninformative `self` side) only wins if nothing else
-        // does, so a later, more informative parameter still takes over.
-        let mut none_ish: Option<Type> = None;
+        // The first parameter whose argument pins the variable decides it.
         for (p, aty) in sig.params.iter().zip(arg_tys) {
-            match bind_builtin_var(&p.ty, aty, &tp.name) {
-                Some(t) if !is_none_inner(&t) => {
-                    map.insert(tp.name.clone(), t);
-                    break;
-                }
-                Some(t) => {
-                    none_ish.get_or_insert(t);
-                }
-                None => {}
+            if let Some(t) = bind_builtin_var(&p.ty, aty, &tp.name) {
+                map.insert(tp.name.clone(), t);
+                break;
             }
         }
         map.entry(tp.name.clone())
-            .or_insert_with(|| none_ish.unwrap_or(Type::Primitive(Primitive::I64)));
+            .or_insert(Type::Primitive(Primitive::I64));
     }
     let ptys: Vec<Type> = sig.params.iter().map(|p| p.ty.clone()).collect();
     // See [`returns_its_receiver`].
@@ -8275,7 +8164,9 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
     match callee {
         // Internal: an empty array reserved to a given capacity (`map`'s output).
         // Untyped element (`__none__`) like `[]`; refined by the first `push`.
-        Callee::WithCapacity => return Some(Type::Array(Box::new(Type::NoneInner))),
+        Callee::WithCapacity => {
+            return Some(Type::Array(Box::new(Type::Primitive(Primitive::I64))))
+        }
         // Declared void (it's a statement); mono needs an `i64` value for the
         // expression it emits (see the `expr`-position uses of `print`).
         Callee::Print | Callee::Put => return Some(Type::Primitive(Primitive::I64)),
@@ -8315,12 +8206,12 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
         Callee::Ok => {
             return Some(Type::Result(
                 Box::new(decay_concat(arg_tys.first().cloned().unwrap_or(Type::Unit))),
-                Box::new(Type::NoneInner),
+                Box::new(Type::Primitive(Primitive::I64)),
             ))
         }
         Callee::Err => {
             return Some(Type::Result(
-                Box::new(Type::NoneInner),
+                Box::new(Type::Primitive(Primitive::I64)),
                 Box::new(decay_concat(
                     arg_tys
                         .first()
@@ -8332,7 +8223,7 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
         // `n.narrow()`: an optional of whichever integer the use site asked for,
         // which the checker recorded on the call. A placeholder here, so the
         // record is what the call types as (see the end of `Mono::infer`).
-        Callee::Narrow => return Some(Type::Optional(Box::new(Type::NoneInner))),
+        Callee::Narrow => return Some(Type::Optional(Box::new(Type::Primitive(Primitive::I64)))),
         // `n.to_float()`: `IEEE754Float64`, unless the checker recorded another float on
         // the call (the end of `Mono::infer` reads the record).
         Callee::ToFloat => return Some(Type::Primitive(Primitive::F64)),
@@ -8346,7 +8237,7 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                     Type::Set(inner.clone(), aipl_syntax::ast::SetOrder::Context)
                 }
                 _ => Type::Set(
-                    Box::new(Type::NoneInner),
+                    Box::new(Type::Primitive(Primitive::I64)),
                     aipl_syntax::ast::SetOrder::Context,
                 ),
             })
@@ -8358,7 +8249,7 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                 arg_tys
                     .first()
                     .cloned()
-                    .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
+                    .unwrap_or(Type::Array(Box::new(Type::Primitive(Primitive::I64)))),
             )
         }
         // `for (let part : s.split(sep))`'s iterable after fusion: the source
@@ -8376,7 +8267,7 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                 arg_tys
                     .first()
                     .cloned()
-                    .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
+                    .unwrap_or(Type::Array(Box::new(Type::Primitive(Primitive::I64)))),
             )
         }
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
@@ -8419,11 +8310,8 @@ fn decay_concat(t: Type) -> Type {
 }
 
 fn merge(a: Type, b: Type) -> Type {
-    if a == b || is_none_inner(&a) {
+    if a == b {
         return b;
-    }
-    if is_none_inner(&b) {
-        return a;
     }
     // A concat-str merged with another str-repr (plain `str`/`Error`) degrades to
     // that general representation: a mixed-provenance value isn't guaranteed to be
@@ -8448,7 +8336,7 @@ fn merge(a: Type, b: Type) -> Type {
             Box::new(merge((**x).clone(), (**y).clone())),
             // An empty literal or a `to_set` still awaiting context has no
             // order of its own; the other side's wins.
-            if is_none_inner(x) || *ox == aipl_syntax::ast::SetOrder::Context {
+            if *ox == aipl_syntax::ast::SetOrder::Context {
                 *oy
             } else {
                 *ox
@@ -8596,9 +8484,6 @@ fn normalize_param_ty(
         | Type::Named(_)
         | Type::TypeVar(_)
         | Type::Unit
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
         | Type::Unknown
         | Type::ConcatStr => Ok(t.clone()),
         Type::Optional(inner) => Ok(Type::Optional(Box::new(normalize_inner(
@@ -8665,9 +8550,6 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
         | Type::Named(_)
         | Type::TypeVar(_)
         | Type::Unit
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
         | Type::Unknown
         | Type::ConcatStr => t.clone(),
         // The surface grammar can't nest deeper, but recurse defensively.
@@ -8841,10 +8723,6 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
 }
 
 /// Substitute each type variable in `t` with its concrete type from `map`.
-/// `T[]` with `T` bound to the empty-array pseudo marker collapses to
-/// `Array(__none__)`; `T?` with the none-literal marker collapses to
-/// `Optional(__none__)`. Codegen treats these like the empty array literal
-/// and bare `none` it already knows about.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
     match t {
         Type::Case(v) => Type::Case(Box::new(subst_vars(v, map))),
@@ -8852,14 +8730,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
         // never contains `Any` (converted to a synthetic `Named` type var) or
         // the mono-only pseudo-types (only ever produced as *substituted
         // values*, via `map`, never as signature structure to recurse into).
-        Type::Primitive(_)
-        | Type::Unit
-        | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::Unknown
-        | Type::ConcatStr => t.clone(),
+        Type::Primitive(_) | Type::Unit | Type::Any | Type::Unknown | Type::ConcatStr => t.clone(),
         // A variable is what a substitution map is keyed by; an ordinary name
         // stands for itself however the map is populated.
         Type::TypeVar(v) => map
@@ -8867,40 +8738,15 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
             .cloned()
             .unwrap_or_else(|| Type::TypeVar(v.clone())),
         Type::Named(n) => Type::Named(n.clone()),
-        Type::Optional(inner) => {
-            let i = subst_vars(inner, map);
-            if is_none_literal_arg(&i) {
-                Type::Optional(Box::new(Type::NoneInner))
-            } else {
-                Type::Optional(Box::new(i))
-            }
-        }
-        Type::Array(inner) => {
-            let i = subst_vars(inner, map);
-            if is_empty_array_arg(&i) {
-                Type::Array(Box::new(Type::NoneInner))
-            } else {
-                Type::Array(Box::new(i))
-            }
-        }
+        Type::Optional(inner) => Type::Optional(Box::new(subst_vars(inner, map))),
+        Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map))),
         Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map)), x.clone()),
         Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map)), *o),
         Type::Dict(k, v) => Type::Dict(Box::new(subst_vars(k, map)), Box::new(subst_vars(v, map))),
-        Type::Result(ok, err) => {
-            // Each side independently collapses its none-literal marker, like the
-            // `Optional` arm above (so `ok(5)`'s `__none__` err stays `__none__`).
-            let collapse = |t: Type| {
-                if is_none_literal_arg(&t) {
-                    Type::NoneInner
-                } else {
-                    t
-                }
-            };
-            Type::Result(
-                Box::new(collapse(subst_vars(ok, map))),
-                Box::new(collapse(subst_vars(err, map))),
-            )
-        }
+        Type::Result(ok, err) => Type::Result(
+            Box::new(subst_vars(ok, map)),
+            Box::new(subst_vars(err, map)),
+        ),
         Type::Fn(params, ret) => Type::Fn(
             params.iter().map(|p| subst_vars(p, map)).collect(),
             Box::new(subst_vars(ret, map)),
@@ -8919,12 +8765,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
 fn ty_mentions(t: &Type, name: &str) -> bool {
     match t {
         Type::Case(v) => ty_mentions(v, name),
-        Type::Primitive(_)
-        | Type::Unit
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => false,
+        Type::Primitive(_) | Type::Unit | Type::ConcatStr => false,
         Type::Any => name == "any",
         // Only a variable can *be* the name asked about; a struct called `T` is
         // not the type parameter `T`.
@@ -8948,13 +8789,7 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
 fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
     match t {
         Type::Case(v) => ty_contains_var(v, vars),
-        Type::Unit
-        | Type::Primitive(_)
-        | Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => false,
+        Type::Unit | Type::Primitive(_) | Type::Any | Type::ConcatStr => false,
         Type::TypeVar(v) => vars.contains(v.as_str()),
         Type::Named(_) | Type::Unknown => false,
         Type::Optional(inner)
@@ -9513,11 +9348,7 @@ pub const DEFAULT_INLINE_MAX_EXPRS: usize = 4;
 fn mentions_abstract_type(ty: &Type) -> bool {
     match ty {
         Type::Case(v) => mentions_abstract_type(v),
-        Type::Any
-        | Type::NoneInner
-        | Type::EmptyArrayArg
-        | Type::NoneLiteralArg
-        | Type::ConcatStr => true,
+        Type::Any | Type::ConcatStr => true,
         Type::Optional(t) | Type::Array(t) | Type::Set(t, _) | Type::Without(t, _) => {
             mentions_abstract_type(t)
         }
@@ -10128,7 +9959,7 @@ fn mentions_pseudo_type(t: &Type) -> bool {
 /// bare `none` / empty literal carries until something pins them.
 fn has_placeholder(t: &Type) -> bool {
     match t {
-        Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
+        Type::Any => true,
         Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => has_placeholder(i),
         Type::Dict(k, v) => has_placeholder(k) || has_placeholder(v),
         Type::Result(a, b) => has_placeholder(a) || has_placeholder(b),
@@ -10882,21 +10713,12 @@ pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> 
                     elidable
                         && !p.owned
                         && is_heap_concrete(&p.ty)
-                        && !is_empty_array_placeholder(&p.ty)
                         && param_is_inspect_only(&p.name, &f.body)
                 })
                 .collect();
             (f.name.clone(), flags)
         })
         .collect()
-}
-
-/// A parameter typed as the untyped empty array (`[]`'s `__none__` element).
-/// `coerce_empty_to_char_array` *releases* such a value when it flows into a
-/// `char[]` position, which only balances if the callee holds a reference —
-/// so these never elide.
-fn is_empty_array_placeholder(ty: &ConcreteType) -> bool {
-    matches!(ty, ConcreteType::Array(inner) if aipl_syntax::concrete::is_none_inner(inner))
 }
 
 /// Whether `body` re-owns the binding `name` through a `mut` binding's slot

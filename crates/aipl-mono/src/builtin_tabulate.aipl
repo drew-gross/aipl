@@ -123,8 +123,8 @@ pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> st
 
     // Allocations are exact: the widths, the three rules and the header line are the fixed part, and
     // each row adds one line, so a temporary array optimized away shows up here.
-    assert(two.allocations == 56);
-    assert(eight.allocations == 134);
+    assert(two.allocations == 32);
+    assert(eight.allocations == 86);
 
     // Four times the rows costs under three times the instructions: the fixed part is shared and
     // nothing in a row's line depends on the number of rows.

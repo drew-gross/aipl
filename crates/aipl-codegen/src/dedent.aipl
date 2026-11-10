@@ -5,6 +5,7 @@ import {
     filter,
     is_all_whitespace,
     join,
+    less_than_or_equal as <=,
     logical_not as !,
     map,
     measure,
@@ -66,16 +67,17 @@ pub fn dedent(self: str) -> str {
     // Input built here, outside the call, so what is counted is `dedent`.
     let hundred = "        line of text\n".repeat(100);
 
-    // The number of allocations does not grow with the number of lines, so this
-    // is a comparison, which survives whatever the stages are built from. The
-    // exact count is the part a fusion changes.
+    // The number of allocations does not grow with the number of lines (a short
+    // result is inline and needs one fewer buffer), so this is a comparison,
+    // which survives whatever the stages are built from. The exact count is the
+    // part a fusion changes.
     let few = measure("three lines", "    a\n    b\n    c", dedent).allocations;
     let Measurement { allocations, bytes_allocated, peak_live_bytes } = measure(
         "a hundred lines",
         hundred,
         dedent,
     );
-    assert(few == allocations);
+    assert(few <= allocations);
     assert(allocations == 2);
 
     // What does grow with the input is the bytes allocated and the bytes live at
