@@ -257,6 +257,8 @@ let STYLE = """
     .label.hot { font-weight: bold; }
     #panel { pointer-events: none; }
     #panel .button { pointer-events: all; cursor: pointer; text-anchor: end; font-weight: bold; fill: #1a6fb5; }
+    #panel .fold { pointer-events: all; cursor: pointer; }
+    #panel .fold:hover { fill: #1a6fb5; }
     #panel .button:hover { text-decoration: underline; }
     #panel .heading { font-size: 14px; font-weight: bold; }
     #panel .summary { fill: #444; }
@@ -274,7 +276,7 @@ let STYLE = """
 # other archetype's overall record would be without its matches against the removed ones. The
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
-    var root, panel, locked = null, removed = [], names = [];
+    var root, panel, locked = null, removed = [], names = [], folded = [];
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
@@ -335,6 +337,12 @@ let SCRIPT = """
         node.setAttribute("y1", y);
         node.setAttribute("y2", y);
         panel.appendChild(node);
+    }
+    // A heading that folds the section under it: true when the section is open.
+    function fold(text, key, y, classes) {
+        var shut = folded.indexOf(key) >= 0;
+        put((shut ? "\u25b8 " : "\u25be ") + text, 0, y, (classes || "head") + " fold").setAttribute("data-fold", key);
+        return !shut;
     }
     function button(text, action, y) {
         put(text, NUMBERS[3], y, "button").setAttribute("data-action", action);
@@ -440,9 +448,10 @@ let SCRIPT = """
         var y = put_wrapped("Hover a cell for how the pairing did in each round, or click one to lock it. Click an archetype's name to remove it from the metagame and see everyone else's projected win rate.", 14, "head");
         if (removed.length) {
             y += 30;
-            put("Removed from the metagame", 0, y, "heading");
+            var open = fold("Removed from the metagame", "removed", y, "heading");
             button("Restore all", "restore", y);
             for (var index of removed) {
+                if (!open) break;
                 y += ROW + 2;
                 put(names[index], 0, y);
             }
@@ -467,7 +476,8 @@ let SCRIPT = """
             return;
         }
         y += 30;
-        put("Matches lost to the removed", 0, y, "head");
+        var open = fold("Matches lost to the removed", "lost", y);
+        if (!open) return;
         [[0, "Seen"], [2, "Record"], [3, "Win rate"]].forEach(function(column) { put(column[1], NUMBERS[column[0]], y, "head number"); });
         y += 6;
         rule(y);
@@ -493,11 +503,10 @@ let SCRIPT = """
         if (rounds !== "") {
             var labels = panel.getAttribute("data-slots").split("|");
             y += 30;
-            ["Seen", "Share", "Record", "Win rate"].forEach(function(name, i) { put(name, NUMBERS[i], y, "head number"); });
-            put("Round", 0, y, "head");
-            y += 6;
-            rule(y);
-            rounds.split(";").forEach(function(entry, i) {
+            var open = fold("Round", "rounds", y);
+            if (open) ["Seen", "Share", "Record", "Win rate"].forEach(function(name, i) { put(name, NUMBERS[i], y, "head number"); });
+            if (open) { y += 6; rule(y); }
+            if (open) rounds.split(";").forEach(function(entry, i) {
                 var fields = entry.split(",");
                 var classes = fields[0] === "0" ? "zero" : "";
                 y += ROW;
@@ -509,11 +518,10 @@ let SCRIPT = """
         if (brackets !== "") {
             var bracket_names = panel.getAttribute("data-brackets").split("|");
             y += 30;
-            put("Row's record going in", 0, y, "head");
-            [[0, "Seen"], [2, "Record"], [3, "Win rate"]].forEach(function(column) { put(column[1], NUMBERS[column[0]], y, "head number"); });
-            y += 6;
-            rule(y);
-            brackets.split(";").forEach(function(entry, i) {
+            var open = fold("Row's record going in", "brackets", y);
+            if (open) [[0, "Seen"], [2, "Record"], [3, "Win rate"]].forEach(function(column) { put(column[1], NUMBERS[column[0]], y, "head number"); });
+            if (open) { y += 6; rule(y); }
+            if (open) brackets.split(";").forEach(function(entry, i) {
                 var fields = entry.split(",");
                 var classes = fields[0] === "0" ? "zero" : "";
                 y += ROW;
@@ -551,6 +559,13 @@ let SCRIPT = """
         clear();
     });
     window.addEventListener("click", function(e) {
+        var key = e.target.getAttribute && e.target.getAttribute("data-fold");
+        if (key) {
+            var at = folded.indexOf(key);
+            if (at >= 0) folded.splice(at, 1); else folded.push(key);
+            if (locked) show(locked); else clear();
+            return;
+        }
         var action = e.target.classList && e.target.classList.contains("button") && e.target.getAttribute("data-action");
         if (action === "restore") { removed = []; refresh(); return; }
         if (action === "unlock") { unlock(); return; }
