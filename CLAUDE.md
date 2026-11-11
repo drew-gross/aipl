@@ -529,6 +529,22 @@ has: paragraphs, `` `code spans` `` (a run of backticks, so a span can hold one)
 `- ` lists, and `**bold**`/`*emphasis*`. Headings, links and tables render as the
 characters they are written with.
 
+## Literals over variables
+Write the literal where it is used. `let nothing = [];` is the worst case: the literal is shorter
+than the name, and the name says nothing the literal did not. `[].f()`, `f(none)` and `Record {}`
+at the use read better than a variable standing for them, and a typed empty (`let nothing: i64[] =
+[]`) is rarely needed: the context types it.
+
+A variable is right in three cases only:
+- its name tells the reader something useful (`let landfall = Identifier { .. }`, `let offset = 100`);
+- it substantially improves the formatting, e.g. a value used several times that would otherwise be
+  restated at length;
+- the test needs the variable to exercise something a literal cannot (a compiler feature that treats a
+  bound value differently from the same literal). This case **always** carries a comment saying what
+  is being tested and why the variable is necessary.
+
+Unused variables are a lint (`unused_binding`).
+
 ## Say why at the use, what at the definition
 A comment about **what a function is being used for** goes at the site that uses
 it; a comment about **what a function does** goes at its definition. They age

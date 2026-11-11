@@ -3,11 +3,11 @@
 import { to_set } from builtins;
 
 fn subject() {
-    let s = (1, "one").to_set();
+    let _ = (1, "one").to_set();
 }
 --- check --compile ---
 error: a tuple's elements must share a type (str is not an integer type)
  --> ./tests/cases/sets/err_to_set_tuple_mixed.aipl:6:13
   |
-6 |     let s = (1, "one").to_set();
+6 |     let _ = (1, "one").to_set();
   |             ^^^^^^^^^^

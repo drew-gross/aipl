@@ -3,11 +3,11 @@
 import { to_array } from builtins;
 
 fn subject() {
-    let a = (1, "one").to_array();
+    let _ = (1, "one").to_array();
 }
 --- check --compile ---
 error: a tuple's elements must share a type (str is not an integer type)
  --> ./tests/cases/tuples/err_to_array_mixed.aipl:6:13
   |
-6 |     let a = (1, "one").to_array();
+6 |     let _ = (1, "one").to_array();
   |             ^^^^^^^^^^

@@ -58,13 +58,13 @@ fn print_wrong_arg_type() !prints -> i64 {
 // Slicing something that isn't sliceable, and a bound that isn't an integer.
 fn slice_non_str() -> i64 {
     let n = 5;
-    let s = n[..2];
+    let _ = n[..2];
     0
 }
 
 fn slice_bound_not_int() {
     let s = "hello";
-    let x = s[..'z'];
+    let _ = s[..'z'];
 }
 
 // Slicing by a `Span` value has the same requirement on its receiver.
@@ -119,13 +119,13 @@ error: fn "print" arg 0: expected str, got i64
 error: cannot slice a value of type i64
   --> ./tests/cases/strings/err_strings.aipl:61:13
    |
-61 |     let s = n[..2];
+61 |     let _ = n[..2];
    |             ^
 
 error: an index must be an integer, got char
   --> ./tests/cases/strings/err_strings.aipl:67:17
    |
-67 |     let x = s[..'z'];
+67 |     let _ = s[..'z'];
    |                 ^^^
 
 error: fn "len" arg 0: expected i64[], got i64

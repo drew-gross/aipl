@@ -23,8 +23,7 @@ fn simplify(e: Expr) -> Expr {
 }.benchmark({
     let leaf = Num(7);
     assert(measure("leaf", leaf, simplify).allocations == 0);
-    let nothing = Zero;
-    assert(measure("nullary case", nothing, simplify).allocations == 0);
+    assert(measure("nullary case", Zero, simplify).allocations == 0);
     // A node that is rebuilt still allocates; its leaves do not.
     let sum = Add(Num(1), Num(2));
     assert(measure("sum", sum, simplify).allocations == 1);

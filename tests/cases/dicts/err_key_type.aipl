@@ -1,12 +1,12 @@
 # A dict key must be a scalar/str, not a container.
 
 fn subject() -> i64 {
-    let d = #{[1]: "a"};
+    let _ = #{[1]: "a"};
     0
 }
 --- check --compile ---
 error: fn "subject": a dict key must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
  --> ./tests/cases/dicts/err_key_type.aipl:4:13
   |
-4 |     let d = #{[1]: "a"};
+4 |     let _ = #{[1]: "a"};
   |             ^^^^^^^^^^^

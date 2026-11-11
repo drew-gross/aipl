@@ -2,11 +2,11 @@
 
 fn subject() {
     let xs = [1, 2];
-    let s = #{..xs, 3};
+    let _ = #{..xs, 3};
 }
 --- check --compile ---
 error: fn "union" arg 1: expected #{i64}, got i64[]
  --> ./tests/cases/sets/spread/err_spread_array.aipl:5:17
   |
-5 |     let s = #{..xs, 3};
+5 |     let _ = #{..xs, 3};
   |                 ^^

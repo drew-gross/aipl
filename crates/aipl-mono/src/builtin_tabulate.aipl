@@ -102,8 +102,7 @@ pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> st
         "+------+----+",
     ]);
     // No rows: just the header.
-    let nothing: str[][] = [];
-    assert(nothing.tabulate(["X"]) == ["+---+", "| X |", "+===+", "+---+"]);
+    assert([].tabulate(["X"]) == ["+---+", "| X |", "+===+", "+---+"]);
     // Alignment is optional, and the free-call form is the same.
     assert(tabulate([["7"]], ["Count"]) == [
         "+-------+",

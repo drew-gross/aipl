@@ -128,7 +128,6 @@ fn describe(row: str, column: str, cell: Cell?) -> str {
         none => `{row} against itself is not counted`,
     }
 }.test({
-    let nothing = Record {};
     assert(
         describe(
             "A",
@@ -140,7 +139,7 @@ fn describe(row: str, column: str, cell: Cell?) -> str {
         describe(
             "A",
             "B",
-            some(Cell { record: Record { draw: 1 }, rounds: [nothing], brackets: [] }),
+            some(Cell { record: Record { draw: 1 }, rounds: [Record {}], brackets: [] }),
         ) == "A vs B: 50.0% (0-0-1)",
     );
     assert(describe("A", "A", none) == "A against itself is not counted");
@@ -177,11 +176,10 @@ fn panel_attributes(
     });
     `data-title="{title.xml_escape()}" data-summary="{summary.xml_escape()}" data-rounds="{entries.join(sep=";")}" data-brackets="{at_record.join(sep=";")}" data-record="{record.win},{record.loss},{record.draw}"`
 }.test({
-    let nothing = Record {};
     let cell = Cell {
         record: Record { win: 3, draw: 1 },
-        rounds: [Record { win: 1 }, nothing, Record { win: 2, draw: 1 }],
-        brackets: [Record { win: 3 }, nothing, Record { draw: 1 }],
+        rounds: [Record { win: 1 }, Record {}, Record { win: 2, draw: 1 }],
+        brackets: [Record { win: 3 }, Record {}, Record { draw: 1 }],
     };
     assert(
         panel_attributes(
@@ -736,9 +734,6 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 </svg>
 `
 }.test({
-    let nothing = Record {};
-    let won = Record { win: 1 };
-    let lost = Record { loss: 1 };
     let matrix = Matrix {
         names: ["A", "B & C"],
         counts: [3, 1],
@@ -748,12 +743,34 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         matches: 2,
         brackets: [Bracket { win: 0, loss: 0 }],
         rows: [
-            [none, some(Cell { record: won, rounds: [won, nothing], brackets: [won] })],
-            [some(Cell { record: lost, rounds: [lost, nothing], brackets: [nothing] }), none],
+            [
+                none,
+                some(Cell {
+                    record: Record { win: 1 },
+                    rounds: [Record { win: 1 }, Record {}],
+                    brackets: [Record { win: 1 }],
+                }),
+            ],
+            [
+                some(Cell {
+                    record: Record { loss: 1 },
+                    rounds: [Record { loss: 1 }, Record {}],
+                    brackets: [Record {}],
+                }),
+                none,
+            ],
         ],
         overall: [
-            Cell { record: won, rounds: [won, nothing], brackets: [won] },
-            Cell { record: lost, rounds: [lost, nothing], brackets: [nothing] },
+            Cell {
+                record: Record { win: 1 },
+                rounds: [Record { win: 1 }, Record {}],
+                brackets: [Record { win: 1 }],
+            },
+            Cell {
+                record: Record { loss: 1 },
+                rounds: [Record { loss: 1 }, Record {}],
+                brackets: [Record {}],
+            },
         ],
     };
     let page = winrate_svg(matrix, "m");

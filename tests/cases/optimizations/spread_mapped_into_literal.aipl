@@ -88,11 +88,10 @@ test({
     assert(spread_map(xs) == ["a", "b", "<x>", "<yy>", "<zzz>", "<w>", "c"]);
     assert(spread_filter(xs) == ["a", "yy", "zzz", "c"]);
     assert(extended_map(xs) == ["a", "<x>", "<yy>", "<zzz>", "<w>"]);
-    let nothing: str[] = [];
     assert(built_map(xs) == spread_map(xs));
     assert(built_filter(xs) == spread_filter(xs));
-    assert(spread_map(nothing) == ["a", "b", "c"]);
-    assert(spread_filter(nothing) == ["a", "c"]);
+    assert(spread_map([]) == ["a", "b", "c"]);
+    assert(spread_filter([]) == ["a", "c"]);
 })
 
 // The temporary array a spread used to build is gone: no more allocations than the loop, fewer

@@ -21,10 +21,8 @@ pub fn collect_ok<T: any>(self: T?[]) -> T[] {
 }.test({
     assert([some(1), none, some(3)].collect_ok() == [1, 3]);
     // Every slot declines, or there are none to ask: nothing is kept.
-    let nothing: i64?[] = [none, none];
-    assert(nothing.collect_ok() == []);
-    let empty: i64?[] = [];
-    assert(empty.collect_ok() == []);
+    assert([none, none].collect_ok() == []);
+    assert([].collect_ok() == []);
     // Free-call form, and a heap element.
     assert(collect_ok([some("a"), none, some("b")]) == ["a", "b"]);
     // The usual partner: a map whose function may decline.

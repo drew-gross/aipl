@@ -31,8 +31,7 @@ fn long() -> str { "a string long past the inline limit, so it lives on the heap
 fn is_long(x: str?) -> bool { x == some(long()) }.benchmark({
     // `long()` is still called — it is the comparison's operand — but nothing is
     // built to hold its result, whether the comparison hits or misses.
-    let nothing: str? = none;
-    assert(measure("miss", nothing, is_long).allocations == 0);
+    assert(measure("miss", none, is_long).allocations == 0);
     assert(measure("hit", some(long()), is_long).allocations == 0);
 })
 

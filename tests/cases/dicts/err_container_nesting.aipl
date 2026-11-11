@@ -11,12 +11,12 @@
 import { wrapping_add as + } from builtins;
 
 fn opt_core() -> i64 {
-    let d: #{i64: i64}? = none;
+    let _: #{i64: i64}? = none;
     0
 }
 
 fn dict_value() -> i64 {
-    let d: #{str: #{i64}} = #{};
+    let _: #{str: #{i64}} = #{};
     0
 }
 
@@ -25,11 +25,11 @@ fn subject() -> i64 { opt_core() + dict_value() }
 error: fn "opt_core": a dict can be an array element but not an optional or dict element
   --> ./tests/cases/dicts/err_container_nesting.aipl:14:27
    |
-14 |     let d: #{i64: i64}? = none;
+14 |     let _: #{i64: i64}? = none;
    |                           ^^^^
 
 error: fn "dict_value": a set can be an array or optional element but not a dict value
   --> ./tests/cases/dicts/err_container_nesting.aipl:19:29
    |
-19 |     let d: #{str: #{i64}} = #{};
+19 |     let _: #{str: #{i64}} = #{};
    |                             ^^^

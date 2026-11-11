@@ -4,12 +4,12 @@
 struct Phantom<T> { tag: str }
 
 fn subject() -> i64 {
-    let p = Phantom { tag: "x" };
+    let _ = Phantom { tag: "x" };
     0
 }
 --- check --compile ---
 error: cannot infer type parameter "T" of generic struct "Phantom" — provide a field whose value determines it
  --> ./tests/cases/structs/errors/err_generic_cannot_infer.aipl:7:13
   |
-7 |     let p = Phantom { tag: "x" };
+7 |     let _ = Phantom { tag: "x" };
   |             ^^^^^^^^^^^^^^^^^^^^

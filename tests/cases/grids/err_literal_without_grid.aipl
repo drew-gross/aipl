@@ -3,11 +3,11 @@
 
 fn subject() {
     let rows = [[1, 2], [3, 4]];
-    let cell = rows[0, 1];
+    let _ = rows[0, 1];
 }
 --- check --compile ---
 error: fn "grid_get" arg 0: expected i64[,], got i64[][]
- --> ./tests/cases/grids/err_literal_without_grid.aipl:6:16
+ --> ./tests/cases/grids/err_literal_without_grid.aipl:6:13
   |
-6 |     let cell = rows[0, 1];
-  |                ^^^^
+6 |     let _ = rows[0, 1];
+  |             ^^^^

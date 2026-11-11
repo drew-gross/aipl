@@ -1,11 +1,11 @@
 # Every row of a grid literal has the same length.
 
 fn subject() {
-    let grid: i64[,] = [[1, 2, 3], [4, 5]];
+    let _: i64[,] = [[1, 2, 3], [4, 5]];
 }
 --- check --compile ---
 error: every row of a grid must have the same length: this row has 2, the first has 3
- --> ./tests/cases/grids/err_ragged_literal.aipl:4:36
+ --> ./tests/cases/grids/err_ragged_literal.aipl:4:33
   |
-4 |     let grid: i64[,] = [[1, 2, 3], [4, 5]];
-  |                                    ^^^^^^
+4 |     let _: i64[,] = [[1, 2, 3], [4, 5]];
+  |                                 ^^^^^^

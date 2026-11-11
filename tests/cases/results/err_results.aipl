@@ -15,7 +15,7 @@ fn ignored_result() {
 }
 
 fn unused_result_binding() {
-    let r = might_fail(5);
+    let _ = might_fail(5);
 }
 
 // A `match` on a result that omits the `err` case.
@@ -37,10 +37,10 @@ error: this result is discarded, ignoring its possible error; handle it with `ma
 14 |     might_fail(5);
    |     ^^^^^^^^^^^^^
 
-error: the result bound to "r" is never used, ignoring its possible error; inspect it with `match` or `?`
+error: the result bound to "_" is never used, ignoring its possible error; inspect it with `match` or `?`
   --> ./tests/cases/results/err_results.aipl:18:13
    |
-18 |     let r = might_fail(5);
+18 |     let _ = might_fail(5);
    |             ^^^^^^^^^^^^^
 
 error: non-exhaustive match: missing err

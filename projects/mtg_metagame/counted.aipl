@@ -31,7 +31,6 @@ pub fn ranked(self: Counted[]) -> Counted[] {
     ]);
 
     // Nothing ranks to nothing, and one thing to itself.
-    let nothing: Counted[] = [];
-    assert(nothing.ranked() == []);
+    assert([].ranked() == []);
     assert([Counted { name: "x", count: 1 }].ranked() == [Counted { name: "x", count: 1 }]);
 })

@@ -7,7 +7,7 @@ import { equal as ==, extend } from builtins;
 fn grown() -> str {
     mut s = "ab";
     set s.extend("c");
-    let t = s; // snapshot "abc"
+    let _ = s; // snapshot "abc"
     set s.extend("d");
     set s.extend("e");
     s // abcde

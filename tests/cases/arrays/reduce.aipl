@@ -40,8 +40,7 @@ test({
         print(`{xs.reduce(|acc, x| acc + x)}`);
 
         // Nothing to reduce, and one element.
-        let nothing: i64[] = [];
-        print(`{nothing.minimum()} {[7].maximum()}`);
+        print(`{[].minimum()} {[7].maximum()}`);
 
         // Strings and chars order as `<` does.
         print(`{["pear", "apple", "fig"].minimum()} {["pear", "apple", "fig"].maximum()}`);

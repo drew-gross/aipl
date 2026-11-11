@@ -4,11 +4,11 @@
 fn take(x: u8) -> u8 { x }
 
 fn subject() {
-    let y = take(300);
+    let _ = take(300);
 }
 --- check --compile ---
 error: integer literal 300 does not fit in u8
  --> ./tests/cases/integers/err_literal_out_of_range.aipl:7:18
   |
-7 |     let y = take(300);
+7 |     let _ = take(300);
   |                  ^^^

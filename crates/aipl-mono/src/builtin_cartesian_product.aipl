@@ -38,9 +38,8 @@ pub fn cartesian_product<T: any, U: any>(self: T[], other: U[]) -> (T, U)[] {
         (2, "c"),
     ]);
     assert([1, 2].cartesian_product([7]) == [(1, 7), (2, 7)]);
-    let nothing: i64[] = [];
-    assert(nothing.cartesian_product([1, 2]).is_empty()); // an empty side
-    assert([1, 2].cartesian_product(nothing).is_empty());
+    assert([].cartesian_product([1, 2]).is_empty()); // an empty side
+    assert([1, 2].cartesian_product([]).is_empty());
     assert(cartesian_product([1], [2]) == [(1, 2)]); // free-call form
     // A range stands for the array of its positions.
     let positions: (u64, u64)[] = [(0, 0), (0, 1), (1, 0), (1, 1)];

@@ -48,8 +48,7 @@ pub fn operator_named_forms(self: str) -> str[] {
     assert("%".operator_named_forms() == ["saturating_remainder"]);
     assert("/=".operator_named_forms() == ["saturating_divide_assign"]);
     // Not an operator: nothing.
-    let nothing: str[] = [];
-    assert("wrapping_add".operator_named_forms() == nothing);
-    assert("=".operator_named_forms() == nothing);
-    assert("".operator_named_forms() == nothing);
+    assert("wrapping_add".operator_named_forms() == []);
+    assert("=".operator_named_forms() == []);
+    assert("".operator_named_forms() == []);
 })

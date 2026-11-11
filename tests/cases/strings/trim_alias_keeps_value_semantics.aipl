@@ -6,7 +6,7 @@ import { equal as ==, trim } from builtins;
 
 fn trimmed() -> str {
     mut s = "  hi  ";
-    let t = s; // snapshot "  hi  "
+    let _ = s; // snapshot "  hi  "
     set s = trim(s); // copy (s is aliased) -> s = "hi"
     s
 }.test({

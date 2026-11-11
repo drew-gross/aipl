@@ -18,9 +18,8 @@ pub fn grid_of<T: any>(width: u64, height: u64, value: T) -> Grid<T> {
     assert(grid.grid_get(2, 0) == none);
     assert(grid.grid_get(0, 3) == none);
     // Without cells, whatever the other side is.
-    let nothing: i64[] = [];
-    assert(grid_of(0, 5, 1) == grid_from(0, nothing));
-    assert(grid_of(4, 0, 1) == grid_from(4, nothing));
+    assert(grid_of(0, 5, 1) == grid_from(0, []));
+    assert(grid_of(4, 0, 1) == grid_from(4, []));
     // Free-call form and a non-scalar value.
     assert(grid_of(2, 1, [1, 2]) == grid_from(2, [[1, 2], [1, 2]]));
 })

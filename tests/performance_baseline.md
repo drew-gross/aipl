@@ -76,7 +76,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/is_empty_longhand | 30473 | 3853143 | 744094 | 20546065 | 6406140 |
 | crates/aipl-codegen/src/lint/len_gt_zero | 38342 | 4811883 | 725784 | 29177207 | 6414572 |
 | crates/aipl-codegen/src/lint/let_else_as_case | 40655 | 4970646 | 734875 | 31072043 | 6416740 |
-| crates/aipl-codegen/src/lint/lint | 99 | 6128 | 4944 | 29952 | 1276264 |
+| crates/aipl-codegen/src/lint/lint | 101 | 6232 | 5048 | 30429 | 1284224 |
 | crates/aipl-codegen/src/lint/lint_hit | 21952 | 3156111 | 710800 | 10593982 | 6491340 |
 | crates/aipl-codegen/src/lint/loop_shape | 68689 | 15331968 | 550120 | 32762245 | 6605936 |
 | crates/aipl-codegen/src/lint/map_constant_repeat | 37648 | 4524643 | 728539 | 29268471 | 6412508 |
@@ -110,14 +110,15 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/squelch | 51 | 4080 | 1704 | 6932 | 11080 |
 | crates/aipl-codegen/src/lint/step_by_one | 40666 | 5009095 | 738218 | 31634336 | 6423036 |
 | crates/aipl-codegen/src/lint/union_loop_union_all | 127114 | 12925254 | 756076 | 134943199 | 6516336 |
+| crates/aipl-codegen/src/lint/unused_binding | 40234 | 6886064 | 703120 | 19924441 | 6328324 |
 | crates/aipl-codegen/src/lint/unused_imports | 26720 | 3457135 | 738624 | 15982385 | 6399004 |
 | crates/aipl-codegen/src/lint/value_or_compare | 32557 | 4146031 | 765831 | 22860895 | 6402020 |
 | crates/aipl-codegen/src/lint/with_value_or_self | 46189 | 5488296 | 806235 | 38734234 | 6419192 |
 | crates/aipl-codegen/src/lint/zip_with_pair_zip | 39755 | 4606763 | 737648 | 31502152 | 6400560 |
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2538 | 2520 |
-| crates/aipl-codegen/src/operator_named_forms | 16 | 1232 | 1232 | 3829 | 11792 |
+| crates/aipl-codegen/src/operator_named_forms | 16 | 1232 | 1232 | 3853 | 11860 |
 | crates/aipl-codegen/src/parse | 8731 | 927722 | 141927 | 5249311 | 768680 |
-| crates/aipl-codegen/src/parse_and_partial_load | 32894 | 3978911 | 765068 | 17097471 | 7907972 |
+| crates/aipl-codegen/src/parse_and_partial_load | 33188 | 3996423 | 765068 | 17164616 | 7917232 |
 | crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 169315 | 152588 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1784 | 5244 |
 | crates/aipl-codegen/src/parsed | 38 | 3441 | 2977 | 3267 | 70464 |
@@ -143,7 +144,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1145 | 2584 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 947 | 2484 |
 | crates/aipl-mono/src/builtin_as_case | 0 | 0 | 0 | 272 | 1200 |
-| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3588 | 7516 |
+| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3600 | 7548 |
 | crates/aipl-mono/src/builtin_collect_arms | 9 | 480 | 480 | 1820 | 3344 |
 | crates/aipl-mono/src/builtin_collect_ok | 7 | 512 | 584 | 2727 | 6760 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1463 | 2528 |
@@ -179,7 +180,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_grid_from | 0 | 0 | 0 | 634 | 1568 |
 | crates/aipl-mono/src/builtin_grid_get | 1 | 80 | 80 | 676 | 2156 |
 | crates/aipl-mono/src/builtin_grid_is_in_bounds_of | 0 | 0 | 0 | 548 | 1008 |
-| crates/aipl-mono/src/builtin_grid_of | 5 | 456 | 560 | 2182 | 6128 |
+| crates/aipl-mono/src/builtin_grid_of | 5 | 456 | 560 | 2194 | 6128 |
 | crates/aipl-mono/src/builtin_grid_try_set | 3 | 192 | 192 | 1296 | 2344 |
 | crates/aipl-mono/src/builtin_height | 0 | 0 | 0 | 485 | 1332 |
 | crates/aipl-mono/src/builtin_inline_str | 4 | 254 | 254 | 792 | 3768 |
@@ -258,7 +259,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/arrays/extend/extend_char | 8 | 634 | 634 | 1745 | 5664 |
 | tests/cases/arrays/extend/extend_char_in_place | 5 | 160 | 110 | 1117 | 2240 |
 | tests/cases/arrays/extend/extend_reserves_once | 2 | 50 | 290 | 427 | 1760 |
-| tests/cases/arrays/extend/extend_variadic_source | 33 | 2110 | 2174 | 6971 | 16960 |
+| tests/cases/arrays/extend/extend_variadic_source | 32 | 2046 | 2110 | 6933 | 16736 |
 | tests/cases/arrays/extend/push_loop_reallocates | 2 | 50 | 290 | 608 | 996 |
 | tests/cases/arrays/index_optional | 0 | 0 | 0 | 301 | 1272 |
 | tests/cases/arrays/index_set | 28 | 1695 | 1655 | 7603 | 17952 |
@@ -621,7 +622,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/optimizations/loop_tuple_windows_fusion | 11 | 329 | 6297 | 24887 | 7188 |
 | tests/cases/optimizations/map_find_if_fusion | 8 | 1926 | 3958 | 12238 | 3940 |
 | tests/cases/optimizations/map_map_fusion | 42 | 2539 | 2587 | 7406 | 13904 |
-| tests/cases/optimizations/map_reduce_fusion | 31 | 1898 | 1845 | 5279 | 13048 |
+| tests/cases/optimizations/map_reduce_fusion | 31 | 1898 | 1845 | 5291 | 13056 |
 | tests/cases/optimizations/map_to_dict_fusion | 14 | 732 | 852 | 1477 | 4324 |
 | tests/cases/optimizations/map_value_or_unwraps | 5 | 440 | 440 | 1543 | 5000 |
 | tests/cases/optimizations/move_last_use | 78 | 5027 | 5019 | 16238 | 23132 |
@@ -642,7 +643,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/optimizations/split_len_fusion_effects | 5 | 385 | 385 | 1004 | 5052 |
 | tests/cases/optimizations/split_map_fusion | 34 | 2480 | 2026 | 2835 | 9268 |
 | tests/cases/optimizations/spread_joined_into_literal | 22 | 1356 | 1548 | 3965 | 9096 |
-| tests/cases/optimizations/spread_mapped_into_literal | 49 | 4320 | 5304 | 6705 | 12488 |
+| tests/cases/optimizations/spread_mapped_into_literal | 49 | 4320 | 5304 | 6717 | 12516 |
 | tests/cases/optimizations/spread_walked_effects | 52 | 4640 | 4976 | 9387 | 11204 |
 | tests/cases/optimizations/struct_move_in | 44 | 2802 | 2842 | 9837 | 18880 |
 | tests/cases/optimizations/subst_single_use_binding | 17 | 1097 | 1062 | 3090 | 7708 |

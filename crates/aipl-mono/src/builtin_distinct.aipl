@@ -31,8 +31,7 @@ pub fn distinct<T: any>(self: T[]) -> T[] {
     assert(["b", "a", "b", "c", "a"].distinct() == ["b", "a", "c"]);
 
     // Nothing, one thing, and nothing to remove.
-    let nothing: i64[] = [];
-    assert(nothing.distinct() == []);
+    assert([].distinct() == []);
     assert([7].distinct() == [7]);
     assert([1, 2, 3].distinct() == [1, 2, 3]);
     assert([5, 5, 5].distinct() == [5]);

@@ -16,8 +16,7 @@ fn fallback(n: u64) -> str { `fallback {n} padded out well past the inline limit
 fn text(o: str?, n: u64) -> u64 { o.value_or(fallback(n)).len() }.benchmark({
     assert(measure("present", some("found"), |o| text(o, 1)).allocations == 0);
     // The default is built when it is needed: three allocations to render it.
-    let nothing: str? = none;
-    assert(measure("absent", nothing, |o| text(o, 2)).allocations == 3);
+    assert(measure("absent", none, |o| text(o, 2)).allocations == 3);
 })
 
 test({

@@ -42,7 +42,7 @@ fn filter_not_bool() !prints {
 
 // A function reference whose effects the caller doesn't declare.
 fn fn_ref_effect() -> i64 {
-    let ys = [1, 2, 3].map(shout);
+    let _ = [1, 2, 3].map(shout);
     3
 }
 
@@ -92,10 +92,10 @@ error: lambda body returns i64, but bool was expected
    |                                       ^^^^^
 
 error: fn "shout" has effect "!prints" but the calling function does not declare it
-  --> ./tests/cases/lambdas/err_lambdas.aipl:45:28
+  --> ./tests/cases/lambdas/err_lambdas.aipl:45:27
    |
-45 |     let ys = [1, 2, 3].map(shout);
-   |                            ^^^^^
+45 |     let _ = [1, 2, 3].map(shout);
+   |                           ^^^^^
 
 error: fn "map" arg 1: expected (i64) -> i64, got (str) -> str
   --> ./tests/cases/lambdas/err_lambdas.aipl:52:32

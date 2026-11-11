@@ -64,8 +64,7 @@ test({
         print(`{shortest(xs)} {longest(xs)} {smallest_square(xs)} {largest_text(xs)}`);
 
         // Nothing to reduce: `none`, whichever reduction it is.
-        let nothing: i64[] = [];
-        print(`{shortest(nothing)} {smallest_square(nothing)}`);
+        print(`{shortest([])} {smallest_square([])}`);
 
         // One element is itself.
         print(`{smallest_square([5])} {longest([123])}`);

@@ -1000,6 +1000,7 @@ case_tests! {
     crates_aipl_codegen_src_lint_squelch = "crates/aipl-codegen/src/lint/squelch",
     crates_aipl_codegen_src_lint_step_by_one = "crates/aipl-codegen/src/lint/step_by_one",
     crates_aipl_codegen_src_lint_union_loop_union_all = "crates/aipl-codegen/src/lint/union_loop_union_all",
+    crates_aipl_codegen_src_lint_unused_binding = "crates/aipl-codegen/src/lint/unused_binding",
     crates_aipl_codegen_src_lint_unused_imports = "crates/aipl-codegen/src/lint/unused_imports",
     crates_aipl_codegen_src_lint_value_or_compare = "crates/aipl-codegen/src/lint/value_or_compare",
     crates_aipl_codegen_src_lint_with_value_or_self = "crates/aipl-codegen/src/lint/with_value_or_self",

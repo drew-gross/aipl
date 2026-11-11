@@ -36,7 +36,6 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
     let others = found.count_if(|each| each.is_case(Other));
     if (0 < others) { [..named, Counted { name: "Other", count: others }] } else { named }
 }.test({
-    let nothing: str[] = [];
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
     let mono = Identifier { ..landfall, name: "Mono-G", not_cards: ["Island"] };
     let decks = [
@@ -118,7 +117,6 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[
         ..rows.tabulate(["Deck Name", "Metagame %", "Count"], right_aligned=[false, true, true]),
     ]
 }.test({
-    let nothing: str[] = [];
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
     let decks = [
         Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },

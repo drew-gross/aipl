@@ -1,0 +1,112 @@
+# The `unused_binding` lint: `let x = value;` (or `mut x = value;`) where nothing after it
+# mentions `x`. The binding names a value nobody reads, which misleads the reader into
+# looking for where it is used; the better spelling is to drop it, or the whole statement
+# when the value is all it was for.
+#
+# "Mentioned" is deliberately syntactic and *generous*, as it is for `unused_imports`: any
+# mention of the name in the rest of the block counts, a `set` of it and a rebinding of it
+# included. A missed dead binding costs one stale line, while a false hit costs a build that
+# cannot be made to pass except by `#[allow]`.
+#
+# `_` is the name for a value taken only for its effect or its failure (`let _ = f()?;`),
+# and a name the parser made (`__idx$3`) was never written by the author. Neither is flagged.
+# Bindings a pattern makes (`let P { a } = v;`, `for (let x : xs)`, parameters) are not
+# `let`s here and are left alone.
+
+import {
+    Span,
+    any,
+    collect_ok,
+    contains,
+    equal as ==,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+} from builtins;
+import { Call, Expr, Let, LetMut, Shim, collect_expr_cases } from "../expr.aipl";
+import { ParseError } from "../grammar.aipl";
+import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
+import { Function } from "../item.aipl";
+import { uses_of } from "./field_uses.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+
+# What the lint says of the binding `name`.
+fn message(name: str) -> str {
+    `\`{name}\` is never used — drop the binding, or the whole statement if only its effect matters`
+}
+
+# Whether `self` mentions `name`: as a value, as the function a call names (`f(x)` mentions `f`
+# without an `Ident`), or as the function a `shim` binds an operation to.
+fn is_mentioned(self: Expr, name: str) -> bool {
+    self.uses_of(name).mentions != 0 || self
+        .collect_expr_cases(Call)
+        .any(|Call(callee, _, _)| callee == name) || self
+        .collect_expr_cases(Shim)
+        .any(|Shim(_, bindings, _)| bindings.any(|(_, bound)| bound == name))
+}.test({
+    fn mentioned(src: str, name: str) -> bool!ParseError {
+        ok(lower_aipl_block_surface(src)?.is_mentioned(name))
+    }
+    assert(mentioned("{ f(p) }", "p")?);
+    assert(mentioned("{ p(1) }", "p")?);
+    assert(mentioned("{ shim prints { print = p } { g(); } }", "p")?);
+    assert(!mentioned("{ f(q) }", "p")?);
+})
+
+# A hit if nothing in `inner`, the rest of the block, mentions `name`, which was bound to the value at `at`.
+fn unused_in(name: str, at: Span, inner: Expr) -> LintHit? {
+    if (name == "_" || name.contains("$")) { return none; };
+    if (inner.is_mentioned(name)) { return none; };
+    some(hit(message(name), at))
+}
+
+# A hit for each `let` and `mut` binding in the function whose name is never mentioned after it.
+pub fn unused_binding(Function { body }) -> LintHit[] {
+    [
+        ..body
+            .collect_expr_cases(Let)
+            .map(|Let(name, _, value, inner)| unused_in(name, value.span, inner))
+            .collect_ok(),
+        ..body
+            .collect_expr_cases(LetMut)
+            .map(|LetMut(name, _, value, inner)| unused_in(name, value.span, inner))
+            .collect_ok(),
+    ]
+}.test({
+    // Never mentioned: flagged, `mut` too.
+    assert(lint_function_messages("fn f() -> i64 { let x = g(); 1 }", unused_binding)? == [
+        message("x"),
+    ]);
+    assert(lint_function_messages("fn f() -> i64 { mut x = g(); 1 }", unused_binding)? == [
+        message("x"),
+    ]);
+    // The `.test` block is held to it too.
+    assert(lint_function_messages(
+        "fn f() { }.test({ let nothing = []; assert(f() == 1); })",
+        unused_binding,
+    )? == [message("nothing")]);
+
+    // Read, interpolated, passed on, assigned or shadowed: a mention, whatever it is.
+    assert(lint_function_messages("fn f() -> i64 { let x = g(); x + 1 }", unused_binding)? == []);
+    assert(lint_function_messages("fn f() -> str { let x = g(); `{x}` }", unused_binding)? == []);
+    assert(
+        lint_function_messages("fn f() -> i64 { mut x = 0; set x = 2; 1 }", unused_binding)? == [],
+    );
+    assert(
+        lint_function_messages("fn f() -> i64 { let x = 1; h(|x| x); 1 }", unused_binding)? == [],
+    );
+
+    // A value taken for its effect or failure has no name, and the parser's names are not the
+    // author's.
+    assert(lint_function_messages("fn f() -> i64 { let _ = g()?; 1 }", unused_binding)? == []);
+    // A pattern's names, a loop's and a parameter's are other lints' business.
+    assert(lint_function_messages("fn f() -> i64 { let P { a } = g(); 1 }", unused_binding)? == []);
+    assert(lint_function_messages("fn f(x: i64) -> i64 { 1 }", unused_binding)? == []);
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { for (let x : xs) { g(); } 1 }",
+            unused_binding,
+        )? == [],
+    );
+})

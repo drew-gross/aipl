@@ -21,7 +21,7 @@ fn ret_u8() -> u8 { 200 }
 
 // A literal in *tail* position, behind a binding, flexes like a bare one.
 fn tail_after_let() -> u8 {
-    let ignored = 1;
+    let _ = 1;
     200
 }
 

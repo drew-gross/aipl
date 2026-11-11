@@ -32,9 +32,8 @@ test({
         set xs.extend(5);
         // An optional: `some` appends its element, `none` appends nothing.
         let sixth: i64? = some(6);
-        let nothing: i64? = none;
         set xs.extend(sixth);
-        set xs.extend(nothing);
+        set xs.extend(none);
         print(xs.to_str());
         print(xs.len().to_str());
 

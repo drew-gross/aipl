@@ -49,6 +49,7 @@ import { slice_to_len } from "./slice_to_len.aipl";
 import { slice_whole } from "./slice_whole.aipl";
 import { step_by_one } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
+import { unused_binding } from "./unused_binding.aipl";
 import { unused_imports } from "./unused_imports.aipl";
 import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
@@ -65,6 +66,7 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(destructure_binding),
         ..program.on_functions(destructure_param),
         ..program.on_functions(destructure_slot),
+        ..program.on_functions(unused_binding),
         ..program.on_functions_once(fn_body_type_stutter),
         ..program.on_functions_filled(match_bool_is_case),
         ..program.on_functions_filled(case_of_equal_is_case),

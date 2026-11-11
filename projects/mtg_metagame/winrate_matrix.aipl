@@ -226,8 +226,7 @@ fn record_of(self: Observation[]) -> Record {
     }
     total
 }.test({
-    let nothing: Observation[] = [];
-    assert(nothing.record_of() == Record {});
+    assert([].record_of() == Record {});
     let draw = Observation { player: "a", opponent: "b", result: Draw, slot: none, bracket: none };
     let win = Observation { ..draw, result: Win };
     let loss = Observation { ..draw, result: Loss };
@@ -257,12 +256,11 @@ fn cell_of(self: Observation[], slot_count: u64, brackets: Bracket[]) -> Cell {
     let loss = Observation { ..win, result: Loss, slot: some(0), bracket: some(upper) };
     let again = Observation { ..win, result: Win, bracket: some(upper) };
     let unplaced = Observation { ..win, slot: none, bracket: none };
-    let nothing = Record {};
     let middle = Bracket { win: 3, loss: 3 };
     assert([win, loss, unplaced, again].cell_of(3, [upper, middle, lower]) == Cell {
         record: Record { win: 3, loss: 1 },
-        rounds: [Record { loss: 1 }, Record { win: 2 }, nothing],
-        brackets: [Record { win: 1, loss: 1 }, nothing, Record { win: 1 }],
+        rounds: [Record { loss: 1 }, Record { win: 2 }, Record {}],
+        brackets: [Record { win: 1, loss: 1 }, Record {}, Record { win: 1 }],
     });
 })
 
@@ -345,9 +343,6 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         Match { ..played, round: "Round 2" },
         Match { ..played, round: "Finals" },
     ];
-    let nothing = Record {};
-    let won = Record { win: 1 };
-    let lost = Record { loss: 1 };
     assert(winrate_matrix(decks, matches, [forest]) == ok(Matrix {
         names: ["Forest", "Other"],
         counts: [2, 1],
@@ -362,15 +357,21 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
                 none,
                 some(Cell {
                     record: Record { win: 2 },
-                    rounds: [won, nothing, nothing, won, nothing],
-                    brackets: [won],
+                    rounds: [Record { win: 1 }, Record {}, Record {}, Record { win: 1 }, Record {}],
+                    brackets: [Record { win: 1 }],
                 }),
             ],
             [
                 some(Cell {
                     record: Record { loss: 2 },
-                    rounds: [lost, nothing, nothing, lost, nothing],
-                    brackets: [nothing],
+                    rounds: [
+                        Record { loss: 1 },
+                        Record {},
+                        Record {},
+                        Record { loss: 1 },
+                        Record {},
+                    ],
+                    brackets: [Record {}],
                 }),
                 none,
             ],
@@ -378,13 +379,19 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         overall: [
             Cell {
                 record: Record { win: 3, loss: 1 },
-                rounds: [won, nothing, nothing, won, Record { win: 1, loss: 1 }],
+                rounds: [
+                    Record { win: 1 },
+                    Record {},
+                    Record {},
+                    Record { win: 1 },
+                    Record { win: 1, loss: 1 },
+                ],
                 brackets: [Record { win: 2 }],
             },
             Cell {
                 record: Record { loss: 2 },
-                rounds: [lost, nothing, nothing, lost, nothing],
-                brackets: [nothing],
+                rounds: [Record { loss: 1 }, Record {}, Record {}, Record { loss: 1 }, Record {}],
+                brackets: [Record {}],
             },
         ],
     }));
