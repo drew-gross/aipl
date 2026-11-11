@@ -31,7 +31,7 @@ fn wrong_result() {
 // `read_line` returns a line, or `none`.
 fn wrong_line_type() {
     shim read_stdin { read_line = || 5 } {
-        let _ = read_line();
+        let line = read_line(); #[allow]
     };
 }
 

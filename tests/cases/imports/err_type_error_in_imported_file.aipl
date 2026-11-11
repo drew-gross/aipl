@@ -5,7 +5,7 @@
 import { check_len } from "./util.aipl";
 
 fn main() {
-    let _ = check_len();
+    let n = check_len(); #[allow]
 }
 --- file: util.aipl ---
 fn one_char_len(self: str, chars: #{char}) -> u64 { 1 }

@@ -42,7 +42,7 @@ fn nested_restores_the_outer() -> bool {
     let plain = shim random seeded_with_int(42) { [random_u64(), random_u64()] };
     let interrupted = shim random seeded_with_int(42) {
         let first = random_u64();
-        let _ = shim random seeded_with_int(1) { random_u64() };
+        shim random seeded_with_int(1) { random_u64() };
         [first, random_u64()]
     };
     plain == interrupted

@@ -4,7 +4,7 @@
 import { area } from "./shapes.aipl";
 
 fn main() {
-    let _ = area(1);
+    let a = area(1); #[allow]
 }
 --- file: shapes.aipl ---
 pub fn area(side: i64) -> Measure { 0 }
@@ -12,7 +12,7 @@ pub fn area(side: i64) -> Measure { 0 }
 error: unknown type "Measure"
  --> ./tests/cases/imports/err_unknown_type_in_imported_signature.aipl:7:13
   |
-7 |     let _ = area(1);
+7 |     let a = area(1); #[allow]
   |             ^^^^^^^
 
 error: unknown type "Measure"

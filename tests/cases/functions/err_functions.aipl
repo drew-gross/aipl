@@ -25,7 +25,7 @@ fn call_undefined() -> i64 { missing(1) }
 
 // A variadic parameter given a value of the wrong element type.
 fn variadic_wrong_type() {
-    let _ = 1.sum(true);
+    1.sum(true);
 }
 
 // An early `return` of the wrong type for the declared return.
@@ -62,7 +62,7 @@ fn value_lambda_untyped() -> i64 {
 
 // A call that returns nothing can't be bound, nor used as an operand.
 fn bind_void_result() !prints -> i64 {
-    let _ = print("hi");
+    print("hi");
     0
 }
 
@@ -90,10 +90,10 @@ error: call to undefined fn "missing"
    |                              ^^^^^^^^^^
 
 error: fn "sum" arg 1: variadic parameter expects i64[], i64, or i64?, got bool
-  --> ./tests/cases/functions/err_functions.aipl:28:19
+  --> ./tests/cases/functions/err_functions.aipl:28:11
    |
-28 |     let _ = 1.sum(true);
-   |                   ^^^^
+28 |     1.sum(true);
+   |           ^^^^
 
 error: return value is str, but the function returns i64
   --> ./tests/cases/functions/err_functions.aipl:33:21
@@ -142,12 +142,6 @@ error: lambda parameter "x" used as a value must be typed, e.g. `|x: i64| ...`
    |
 59 |     let f = |x| { x + 1 };
    |              ^
-
-error: cannot bind "_" to a value of type ()
-  --> ./tests/cases/functions/err_functions.aipl:65:13
-   |
-65 |     let _ = print("hi");
-   |             ^^^^^^^^^^^
 
 error: arithmetic operand: expected (), got i64
   --> ./tests/cases/functions/err_functions.aipl:69:42

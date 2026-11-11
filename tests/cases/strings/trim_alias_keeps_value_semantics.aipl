@@ -6,11 +6,11 @@ import { equal as ==, trim } from builtins;
 
 fn trimmed() -> str {
     mut s = "  hi  ";
-    let _ = s; // snapshot "  hi  "
+    let t = s; // snapshot "  hi  "
     set s = trim(s); // copy (s is aliased) -> s = "hi"
-    s
+    `{s}/{t}` // the snapshot is read afterwards, so it must be a live alias
 }.test({
-    assert(trimmed() == "hi");
+    assert(trimmed() == "hi/  hi  ");
 })
 
 fn snapshot() -> str {

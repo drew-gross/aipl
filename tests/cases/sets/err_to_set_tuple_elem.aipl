@@ -4,11 +4,11 @@ import { to_set } from builtins;
 
 fn subject() {
     let xs = [1, 2];
-    let _ = (xs, xs).to_set();
+    let s = (xs, xs).to_set(); #[allow]
 }
 --- check --compile ---
 error: fn "subject": a set element must be an integer (i8..i64, u8..u64), bool, char, str, struct or variant, got i64[]
  --> ./tests/cases/sets/err_to_set_tuple_elem.aipl:7:13
   |
-7 |     let _ = (xs, xs).to_set();
+7 |     let s = (xs, xs).to_set(); #[allow]
   |             ^^^^^^^^^^^^^^^^^

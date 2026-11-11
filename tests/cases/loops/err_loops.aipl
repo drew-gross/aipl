@@ -8,7 +8,7 @@ import { equal as ==, wrapping_add as +, wrapping_increment as ++ } from builtin
 // A `for` body that compares the loop variable to the wrong type.
 fn for_body_type_mismatch() -> i64 {
     for (let c : "x") {
-        let _ = c == 5;
+        c == 5;
     }
     0
 }
@@ -34,10 +34,10 @@ fn while_non_bool_condition() {
 }
 --- check --compile ---
 error: "==" between char and i64: both sides must be the same type
-  --> ./tests/cases/loops/err_loops.aipl:11:17
+  --> ./tests/cases/loops/err_loops.aipl:11:9
    |
-11 |         let _ = c == 5;
-   |                 ^^^^^^
+11 |         c == 5;
+   |         ^^^^^^
 
 error: for-loop iterable must be a str, array, set, dict, or range, got i64
   --> ./tests/cases/loops/err_loops.aipl:18:18

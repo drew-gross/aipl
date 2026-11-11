@@ -3,11 +3,11 @@ import { map } from builtins;
 fn pair<A: any, B: any>(a: A, b: B) -> (A, B) { (a, b) }
 
 fn subject() {
-    let _ = [1].map(pair);
+    let ps = [1].map(pair); #[allow]
 }
 --- check --compile ---
 error: fn "map" arg 1: expected (i64) -> i64, got (i64, i64) -> (i64, i64)
- --> ./tests/cases/lambdas/err_generic_fn_value_arity.aipl:6:21
+ --> ./tests/cases/lambdas/err_generic_fn_value_arity.aipl:6:22
   |
-6 |     let _ = [1].map(pair);
-  |                     ^^^^
+6 |     let ps = [1].map(pair); #[allow]
+  |                      ^^^^

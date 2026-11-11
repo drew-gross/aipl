@@ -543,7 +543,12 @@ A variable is right in three cases only:
   bound value differently from the same literal). This case **always** carries a comment saying what
   is being tested and why the variable is necessary.
 
-Unused variables are a lint (`unused_binding`).
+Unused variables are a lint (`unused_binding`), and `_` is not exempt from it: `#[allow]` is the one
+way to squelch a lint, so there is no second spelling. A value kept only for its effect is a statement
+(`checked(3)?;`, not `let _ = checked(3)?;`). A binding that has to exist for the test to mean anything
+gets a real use rather than `#[allow]` when the test runs code, since a dead-store elimination pass
+could drop a binding nothing reads, and then the compiler path the test is for never runs; the
+`#[allow]` is for a binding whose only job is to be checked (an `err_*` fixture's `let n: u8 = "hi";`).
 
 ## Say why at the use, what at the definition
 A comment about **what a function is being used for** goes at the site that uses

@@ -51,20 +51,20 @@ fn match_wildcard_not_last(s: str) -> str {
 
 // `print` takes a str.
 fn print_wrong_arg_type() !prints -> i64 {
-    let _ = print(42);
+    print(42);
     0
 }
 
 // Slicing something that isn't sliceable, and a bound that isn't an integer.
 fn slice_non_str() -> i64 {
     let n = 5;
-    let _ = n[..2];
+    let s = n[..2]; #[allow]
     0
 }
 
 fn slice_bound_not_int() {
     let s = "hello";
-    let _ = s[..'z'];
+    let x = s[..'z']; #[allow]
 }
 
 // Slicing by a `Span` value has the same requirement on its receiver.
@@ -111,21 +111,21 @@ error: the `_` arm must be last (arms after it are unreachable)
    |         ^
 
 error: fn "print" arg 0: expected str, got i64
-  --> ./tests/cases/strings/err_strings.aipl:54:19
+  --> ./tests/cases/strings/err_strings.aipl:54:11
    |
-54 |     let _ = print(42);
-   |                   ^^
+54 |     print(42);
+   |           ^^
 
 error: cannot slice a value of type i64
   --> ./tests/cases/strings/err_strings.aipl:61:13
    |
-61 |     let _ = n[..2];
+61 |     let s = n[..2]; #[allow]
    |             ^
 
 error: an index must be an integer, got char
   --> ./tests/cases/strings/err_strings.aipl:67:17
    |
-67 |     let _ = s[..'z'];
+67 |     let x = s[..'z']; #[allow]
    |                 ^^^
 
 error: fn "len" arg 0: expected i64[], got i64

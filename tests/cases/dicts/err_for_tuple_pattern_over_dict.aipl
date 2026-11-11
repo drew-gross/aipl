@@ -5,7 +5,7 @@
 fn subject() {
     let d = #{1: 2, 3: 4};
     for (let (k, v) : d) {
-        let _ = [k, v];
+        let pair = [k, v]; #[allow]
     }
 }
 --- check --compile ---

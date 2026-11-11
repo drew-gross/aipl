@@ -24,8 +24,8 @@ fn all_ok() -> i64 { 0 }.test({
 // The second `?` hits an `err`: the test fails with the error message and stops,
 // so the `assert(false)` after it never runs.
 fn hits_err() -> i64 { 0 }.test({
-    let _ = checked(3)?;
-    let _ = checked(0)?;
+    checked(3)?;
+    checked(0)?;
     assert(false);
 })
 
@@ -40,8 +40,8 @@ fn all_some() -> i64 { 0 }.test({
 // The second `?` hits a `none`: the test fails and stops, so the `assert(false)`
 // after it never runs. No payload, so the report has no message to render.
 fn hits_none() -> i64 { 0 }.test({
-    let _ = first("ok")?;
-    let _ = first("")?;
+    first("ok")?;
+    first("")?;
     assert(false);
 })
 --- check --tests ---

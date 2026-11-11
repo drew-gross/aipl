@@ -8,7 +8,7 @@ fn declares_unknown_effect() !mystery -> i64 { 0 }
 
 // Calling an effectful builtin without declaring its effect.
 fn print_without_prints_effect() -> i64 {
-    let _ = print("forbidden");
+    print("forbidden");
     0
 }
 
@@ -26,10 +26,10 @@ error: fn "declares_unknown_effect" declares unknown effect "!mystery"
   |    ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: fn "print" has effect "!prints" but the calling function does not declare it
-  --> ./tests/cases/effects/err_effects.aipl:11:13
+  --> ./tests/cases/effects/err_effects.aipl:11:5
    |
-11 |     let _ = print("forbidden");
-   |             ^^^^^^^^^^^^^^^^^^
+11 |     print("forbidden");
+   |     ^^^^^^^^^^^^^^^^^^
 
 error: fn "now_nanos" has effect "!clock" but the calling function does not declare it
   --> ./tests/cases/effects/err_effects.aipl:15:34

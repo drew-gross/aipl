@@ -7,12 +7,12 @@ import { equal as ==, extend } from builtins;
 fn grown() -> str {
     mut s = "ab";
     set s.extend("c");
-    let _ = s; // snapshot "abc"
+    let t = s; // snapshot "abc"
     set s.extend("d");
     set s.extend("e");
-    s // abcde
+    `{s}/{t}` // abcde/abc: the snapshot is read afterwards, so it must be a live alias
 }.test({
-    assert(grown() == "abcde");
+    assert(grown() == "abcde/abc");
 })
 
 fn snapshot() -> str {

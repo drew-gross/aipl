@@ -2,12 +2,12 @@
 # argument only means something in a call.
 
 fn subject() -> i64 {
-    let _ = [a=1];
+    let xs = [a=1]; #[allow]
     0
 }
 --- check --compile ---
 error: a keyword argument is only valid in a function call's arguments
- --> ./tests/cases/kwargs/err_kw_in_array_literal.aipl:5:14
+ --> ./tests/cases/kwargs/err_kw_in_array_literal.aipl:5:15
   |
-5 |     let _ = [a=1];
-  |              ^^^
+5 |     let xs = [a=1]; #[allow]
+  |               ^^^

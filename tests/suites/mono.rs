@@ -264,7 +264,7 @@ fn generic_owned_param_requires_substituted_heap_type() {
     let names = mono_names(
         "fn f<T: any>(x: T) -> T { mut y = x; y }
          fn make_str() -> str { \"abc\" }
-         fn main() -> i64 { let _ = f(make_str()); 0 }",
+         fn main() -> i64 { f(make_str()); 0 }",
     );
     assert!(names.contains(&"f$str$own0".to_string()), "{names:?}");
 }
@@ -353,7 +353,7 @@ fn named_type_param_unifies_across_uses() {
 fn named_type_param_distinct_instances_per_type() {
     let names = mono_names(
         "fn value_or<T: any>(s: T?, d: T) -> T { d }
-         fn main() -> i64 { let _ = value_or(some('a'), 'b'); value_or(some(1), 2) }",
+         fn main() -> i64 { value_or(some('a'), 'b'); value_or(some(1), 2) }",
     );
     assert_eq!(names, vec!["main", "value_or$char", "value_or$i64"]);
 }
@@ -377,10 +377,10 @@ fn int_literal_args_of_one_type_share_an_instance() {
         "fn wrap<T: any>(x: T) -> T[] { [x] }
          fn pair<T: any>(a: T, b: T) -> T[] { [a, b] }
          fn main() {
-             let _ = wrap(5);
-             let _ = wrap(7);
-             let _ = pair(0, 5);
-             let _ = pair(0, 7);
+             wrap(5);
+             wrap(7);
+             pair(0, 5);
+             pair(0, 7);
          }",
     );
     assert_eq!(names, vec!["main", "pair$i64", "wrap$i64"]);
@@ -411,7 +411,7 @@ fn concrete_arg_gives_the_literal_its_width() {
     // concrete int parameter still works" requirement, made executable.
     let names = mono_names(
         "fn value_or<T: any>(s: T?, d: T) -> T { d }
-         fn main() -> i64 { let n: u8? = none; let _: u8 = value_or(n, 0); 0 }",
+         fn main() -> i64 { let n: u8? = none; value_or(n, 0); 0 }",
     );
     assert_eq!(names, vec!["main", "value_or$u8"]);
 }
@@ -498,10 +498,10 @@ fn loading_a_program_twice_names_everything_alike() {
         "import { is_err_and, map_err, map_ok, sort_by, value_or, value_or_err } from builtins;
                fn main() -> i64 {
                    let r = ok(1);
-                   let _ = r.map_err(|e| e).map_ok(|v| v);
-                   let _ = r.is_err_and(|e| e);
-                   let _ = value_or_err(none, \"x\");
-                   let _ = sort_by([1], |x| x);
+                   r.map_err(|e| e).map_ok(|v| v);
+                   r.is_err_and(|e| e);
+                   value_or_err(none, \"x\");
+                   sort_by([1], |x| x);
                    value_or(none, 0)
                }";
     let load = || {

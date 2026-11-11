@@ -19,7 +19,7 @@ fn takes(v: VMinus) -> i64 { 1 }
 fn plain(v: V) -> i64 { takes(v) }
 
 fn excluded_literal() -> i64 {
-    let _: VMinus = C;
+    let w: VMinus = C; #[allow]
     1
 }
 
@@ -53,10 +53,10 @@ error: fn "takes" arg 0: expected V without C, got V: nothing shows it is not C
 19 | fn plain(v: V) -> i64 { takes(v) }
    |                               ^
 
-error: binding "_" is declared V without C, but its value is V: nothing shows it is not C
+error: binding "w" is declared V without C, but its value is V: nothing shows it is not C
   --> ./tests/cases/variants/err_without_case.aipl:22:21
    |
-22 |     let _: VMinus = C;
+22 |     let w: VMinus = C; #[allow]
    |                     ^
 
 error: non-exhaustive match: missing B

@@ -554,6 +554,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  lint against unused expressions
   lint against reimplementations of to_set()/distinct()
   turn trace rejection into a lint, but make some lints non-squelchable
   turn refuse_sectioned_import into a lint
@@ -670,6 +671,8 @@ design:
   apis should express intent
 
 optimizations:
+  dead store elimination
+  unused expression elimination
   retain elision:
     the arg contract being different for builtins caused problems for retain elision
     - Make retain elision more generic, maybe it should be applied at a lower layer?

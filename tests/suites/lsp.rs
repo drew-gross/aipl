@@ -486,7 +486,7 @@ fn a_type_name_goes_to_its_declaration() {
                   fn make(pair: Pair, shapes: Shape[]) -> Pair? { none }\n\
                   \n\
                   fn local() -> Shape? {\n\
-                  \u{20}   let _: Pair? = none;\n\
+                  \u{20}   let held: Pair? = none; #[allow]\n\
                   \u{20}   none\n\
                   }\n";
     let workspace = Workspace::new("type-names", &[("main.aipl", source)]);
@@ -1255,10 +1255,10 @@ fn a_function_passed_as_a_value_goes_to_its_declaration() {
                 fn run(f: (i64) -> i64, v: i64) -> i64 { f(v) }\n\
                 fn on(self: P, f: (P) -> i64) -> i64 { f(self) }\n\
                 fn main() {\n\
-                \u{20}   let _ = [1].map(inc);\n\
-                \u{20}   let _ = run(inc, 1);\n\
-                \u{20}   let _ = P { x: 1 }.on(first);\n\
-                \u{20}   let _ = [1].map(double);\n\
+                \u{20}   [1].map(inc);\n\
+                \u{20}   run(inc, 1);\n\
+                \u{20}   P { x: 1 }.on(first);\n\
+                \u{20}   [1].map(double);\n\
                 }\n";
     let util = "pub fn double(n: i64) -> i64 { n }\n";
     let workspace = Workspace::new(
@@ -1279,7 +1279,7 @@ fn a_function_passed_as_a_value_goes_to_its_declaration() {
     };
     goes(
         &mut server,
-        "inc);\n\u{20}   let _ = run",
+        "inc);\n\u{20}   run",
         "inc(n: i64) -> i64 { n }\nfn first",
     );
     goes(&mut server, "inc, 1", "inc(n: i64) -> i64 { n }\nfn first");

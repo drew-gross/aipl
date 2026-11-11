@@ -8,8 +8,9 @@
 # included. A missed dead binding costs one stale line, while a false hit costs a build that
 # cannot be made to pass except by `#[allow]`.
 #
-# `_` is the name for a value taken only for its effect or its failure (`let _ = f()?;`),
-# and a name the parser made (`__idx$3`) was never written by the author. Neither is flagged.
+# A name the parser made (`__idx$3`) was never written by the author, so it is not flagged. Every
+# name an author wrote is, `_` included: a value kept only for its effect is a statement, and a
+# binding that must stay unused carries `#[allow]` like any other lint hit.
 # Bindings a pattern makes (`let P { a } = v;`, `for (let x : xs)`, parameters) are not
 # `let`s here and are left alone.
 
@@ -56,7 +57,7 @@ fn is_mentioned(self: Expr, name: str) -> bool {
 
 # A hit if nothing in `inner`, the rest of the block, mentions `name`, which was bound to the value at `at`.
 fn unused_in(name: str, at: Span, inner: Expr) -> LintHit? {
-    if (name == "_" || name.contains("$")) { return none; };
+    if (name.contains("$")) { return none; };
     if (inner.is_mentioned(name)) { return none; };
     some(hit(message(name), at))
 }
@@ -97,9 +98,10 @@ pub fn unused_binding(Function { body }) -> LintHit[] {
         lint_function_messages("fn f() -> i64 { let x = 1; h(|x| x); 1 }", unused_binding)? == [],
     );
 
-    // A value taken for its effect or failure has no name, and the parser's names are not the
-    // author's.
-    assert(lint_function_messages("fn f() -> i64 { let _ = g()?; 1 }", unused_binding)? == []);
+    // `_` is a name like any other.
+    assert(lint_function_messages("fn f() -> i64 { let _ = g()?; 1 }", unused_binding)? == [
+        message("_"),
+    ]);
     // A pattern's names, a loop's and a parameter's are other lints' business.
     assert(lint_function_messages("fn f() -> i64 { let P { a } = g(); 1 }", unused_binding)? == []);
     assert(lint_function_messages("fn f(x: i64) -> i64 { 1 }", unused_binding)? == []);

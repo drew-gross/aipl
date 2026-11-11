@@ -76,7 +76,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/is_empty_longhand | 30473 | 3853143 | 744094 | 20546065 | 6406140 |
 | crates/aipl-codegen/src/lint/len_gt_zero | 38342 | 4811883 | 725784 | 29177207 | 6414572 |
 | crates/aipl-codegen/src/lint/let_else_as_case | 40655 | 4970646 | 734875 | 31072043 | 6416740 |
-| crates/aipl-codegen/src/lint/lint | 101 | 6232 | 5048 | 30429 | 1284224 |
+| crates/aipl-codegen/src/lint/lint | 101 | 6232 | 5048 | 30429 | 1284168 |
 | crates/aipl-codegen/src/lint/lint_hit | 21952 | 3156111 | 710800 | 10593982 | 6491340 |
 | crates/aipl-codegen/src/lint/loop_shape | 68689 | 15331968 | 550120 | 32762245 | 6605936 |
 | crates/aipl-codegen/src/lint/map_constant_repeat | 37648 | 4524643 | 728539 | 29268471 | 6412508 |
@@ -110,7 +110,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/squelch | 51 | 4080 | 1704 | 6932 | 11080 |
 | crates/aipl-codegen/src/lint/step_by_one | 40666 | 5009095 | 738218 | 31634336 | 6423036 |
 | crates/aipl-codegen/src/lint/union_loop_union_all | 127114 | 12925254 | 756076 | 134943199 | 6516336 |
-| crates/aipl-codegen/src/lint/unused_binding | 40234 | 6886064 | 703120 | 19924441 | 6328324 |
+| crates/aipl-codegen/src/lint/unused_binding | 40252 | 6887184 | 703536 | 19927589 | 6328972 |
 | crates/aipl-codegen/src/lint/unused_imports | 26720 | 3457135 | 738624 | 15982385 | 6399004 |
 | crates/aipl-codegen/src/lint/value_or_compare | 32557 | 4146031 | 765831 | 22860895 | 6402020 |
 | crates/aipl-codegen/src/lint/with_value_or_self | 46189 | 5488296 | 806235 | 38734234 | 6419192 |
@@ -118,7 +118,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2538 | 2520 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1232 | 1232 | 3853 | 11860 |
 | crates/aipl-codegen/src/parse | 8731 | 927722 | 141927 | 5249311 | 768680 |
-| crates/aipl-codegen/src/parse_and_partial_load | 33188 | 3996423 | 765068 | 17164616 | 7917232 |
+| crates/aipl-codegen/src/parse_and_partial_load | 33188 | 3996423 | 765068 | 17164616 | 7917176 |
 | crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 169315 | 152588 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1784 | 5244 |
 | crates/aipl-codegen/src/parsed | 38 | 3441 | 2977 | 3267 | 70464 |
@@ -714,7 +714,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/strings/concat/rope_query_ops | 19 | 1214 | 1214 | 2823 | 6300 |
 | tests/cases/strings/concat/string_concat | 1 | 88 | 88 | 67 | 420 |
 | tests/cases/strings/concat/string_concat_with_empty | 4 | 156 | 78 | 391 | 1980 |
-| tests/cases/strings/concat_alias_keeps_value_semantics | 6 | 120 | 60 | 806 | 3772 |
+| tests/cases/strings/concat_alias_keeps_value_semantics | 8 | 296 | 236 | 921 | 4268 |
 | tests/cases/strings/concat_in_place | 0 | 0 | 0 | 178 | 1276 |
 | tests/cases/strings/concat_in_place_grows | 2 | 112 | 152 | 1895 | 1700 |
 | tests/cases/strings/concat_repr | 33 | 2515 | 2515 | 4842 | 8292 |
@@ -765,7 +765,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/strings/template_triple_lit | 21 | 1638 | 1638 | 2500 | 6880 |
 | tests/cases/strings/to_str_scalars | 29 | 2002 | 2002 | 4751 | 8212 |
 | tests/cases/strings/trim | 0 | 0 | 0 | 149 | 1052 |
-| tests/cases/strings/trim_alias_keeps_value_semantics | 0 | 0 | 0 | 218 | 1412 |
+| tests/cases/strings/trim_alias_keeps_value_semantics | 2 | 176 | 176 | 314 | 1932 |
 | tests/cases/strings/trim_in_place | 0 | 0 | 0 | 189 | 1208 |
 | tests/cases/structs/array_of_boxed_field_structs | 16 | 975 | 975 | 2292 | 6848 |
 | tests/cases/structs/boxed_field_with_array | 199 | 8505 | 4219 | 23978 | 27380 |

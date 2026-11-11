@@ -1,11 +1,11 @@
 # An unknown type in a `let` annotation is reported at the value being bound.
 
 fn subject() {
-    let _: Count = 1;
+    let n: Count = 1; #[allow]
 }
 --- check --compile ---
 error: fn "subject": unknown type "Count"
  --> ./tests/cases/bindings/err_unknown_type_in_annotation.aipl:4:20
   |
-4 |     let _: Count = 1;
+4 |     let n: Count = 1; #[allow]
   |                    ^

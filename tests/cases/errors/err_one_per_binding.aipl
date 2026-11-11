@@ -15,7 +15,7 @@ import { len } from builtins;
 
 fn first_bad_let_only(v: str[]) -> u64 {
     let a = len(1);
-    let _ = len(true);
+    let b = len(true); #[allow]
     len(v);
     a
 }

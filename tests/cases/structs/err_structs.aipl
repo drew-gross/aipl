@@ -68,11 +68,11 @@ fn set_type_mismatch() {
 // `Span` bounds are `i64`: a `str` bound, and a chained range (whose left side
 // is itself a `Span`).
 fn range_bound_type() {
-    let _ = "a"..2;
+    let r = "a"..2; #[allow]
 }
 
 fn range_chained() {
-    let _ = 1..2..3;
+    let r = 1..2..3; #[allow]
 }
 --- check --compile ---
 error: unknown type "Widget"
@@ -138,11 +138,11 @@ error: set: expected i64, got bool
 error: an index must be an integer, got str
   --> ./tests/cases/structs/err_structs.aipl:71:13
    |
-71 |     let _ = "a"..2;
+71 |     let r = "a"..2; #[allow]
    |             ^^^
 
 error: an index must be an integer, got Span
   --> ./tests/cases/structs/err_structs.aipl:75:13
    |
-75 |     let _ = 1..2..3;
+75 |     let r = 1..2..3; #[allow]
    |             ^^^^
