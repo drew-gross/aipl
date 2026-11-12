@@ -161,6 +161,8 @@ monomorphization and the post-mono passes:
   `move_last_use` around a value), `If` 49k, `Ident` 34k, `Match` 16k, and a tail of `Call
   __builtin_equal` 706, `Num` 461, `__filter_*` 1.2k, `Str` 245, `Field` 50, the `extend_map`
   instances of `subexprs`, shim cell calls and the terminal builtins.
+- `Call __move` is done: `move_last_use` builds its wrappers with `moved(inner)`, which keeps the
+  operand's type. Next: `If`, `Ident`, `Match`, then the tail.
 - So step 2 starts by making the passes that build those nodes stamp them (`move_last_use` first:
   it is 8% of all nodes), then adding the adapter with the structural forms derived.
 

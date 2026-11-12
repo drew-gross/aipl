@@ -180,13 +180,21 @@ pub(crate) fn move_field_reads(
     out
 }
 
+/// `inner` handed over: `__move(inner)`, which is the value `inner` is and so has its type.
+fn moved(inner: Expr) -> Expr {
+    let (span, ty) = (inner.span.clone(), inner.ty.clone());
+    let mut node = Expr::new(ExprKind::Call(Callee::Move, vec![inner], false), span);
+    node.ty = ty;
+    node
+}
+
 fn mark_fields(name: &str, e: &mut Expr, heap_fields: &HashSet<String>) {
     let take =
         matches!(&e.kind, ExprKind::Field(obj, f) if is_name(obj, name) && heap_fields.contains(f));
     if take {
         let span = e.span.clone();
         let inner = std::mem::replace(e, Expr::new(ExprKind::Unit, span.clone()));
-        *e = Expr::new(ExprKind::Call(Callee::Move, vec![inner], false), span);
+        *e = moved(inner);
         return;
     }
     for child in children_mut(e) {
@@ -308,7 +316,7 @@ fn move_owned_receivers(e: &Expr, owns_receiver: &HashSet<String>) -> Expr {
                     let span = receiver.span.clone();
                     let inner =
                         std::mem::replace(receiver, Expr::new(ExprKind::Unit, span.clone()));
-                    *receiver = Expr::new(ExprKind::Call(Callee::Move, vec![inner], false), span);
+                    *receiver = moved(inner);
                 }
             }
         }
@@ -653,10 +661,7 @@ fn mark(
                 let span = value.span.clone();
                 let inner =
                     std::mem::replace(value.as_mut(), Expr::new(ExprKind::Unit, span.clone()));
-                *value = Box::new(Expr::new(
-                    ExprKind::Call(Callee::Move, vec![inner], false),
-                    span,
-                ));
+                *value = Box::new(moved(inner));
             } else if !scalar_valued(body) {
                 // The alias can be read through after a later move only if it
                 // escapes the `let`, and the value of a `let` is the value of its
@@ -692,7 +697,7 @@ fn mark(
                 if (user || (takes_array && position == 0)) && t && is_name(arg, name) {
                     let span = arg.span.clone();
                     let inner = std::mem::replace(arg, Expr::new(ExprKind::Unit, span.clone()));
-                    *arg = Expr::new(ExprKind::Call(Callee::Move, vec![inner], false), span);
+                    *arg = moved(inner);
                 } else {
                     mark(name, arg, t, mutating, alias_outlives);
                 }
