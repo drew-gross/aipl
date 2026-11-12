@@ -32,6 +32,8 @@ pub struct Report {
     pub unmatched: usize,
     /// Nodes whose pinned type mentions a type variable the instance's parameters do not bind.
     pub unbound: usize,
+    /// The unbound nodes by form and the pinned type's text: count and one example.
+    pub unbound_forms: BTreeMap<String, (usize, String)>,
     /// Disagreements at a span several nodes share; see [`Probe::finish`].
     pub collisions: usize,
     /// Nodes where mono's type still holds a placeholder (`none`'s inner type, an empty array).
@@ -128,6 +130,13 @@ impl Probe {
             &instance,
         ) else {
             report.unbound += 1;
+            let key = format!(
+                "{}: {}",
+                form(&expr.kind),
+                aipl_syntax::type_name(&want.to_type())
+            );
+            let example = format!("{template} @ {}..{}", expr.span.start, expr.span.end);
+            report.unbound_forms.entry(key).or_insert((0, example)).0 += 1;
             return;
         };
         let Some(got) = Ty::from_type(&norm(inferred)).and_then(|t| t.concretize(&|_| None)) else {

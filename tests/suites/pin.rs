@@ -82,7 +82,7 @@ fn scaled(n: i64, by: i64 = 2) -> i64 {
 }
 
 /// Author helper: how often monomorphization's inferred types differ from the pinned ones, by the
-/// form of the expression, over `tests/cases` (`AIPL_CASE=a,b` narrows it).
+/// form of the expression, over `tests/cases` and `crates` (`AIPL_CASE=a,b` narrows it).
 #[test]
 #[ignore = "author helper: prints where mono's inference and the pinner disagree"]
 fn mono_agreement_report() {
@@ -91,6 +91,7 @@ fn mono_agreement_report() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut files = Vec::new();
     aipl_files(&root.join("tests/cases"), &mut files);
+    aipl_files(&root.join("crates"), &mut files);
     if let Ok(only) = std::env::var("AIPL_CASE") {
         files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
     }
@@ -123,6 +124,13 @@ fn mono_agreement_report() {
         total.agreed += report.agreed;
         total.unmatched += report.unmatched;
         total.unbound += report.unbound;
+        for (form, (n, example)) in report.unbound_forms {
+            total
+                .unbound_forms
+                .entry(form)
+                .or_insert((0, format!("{} -- {example}", file.display())))
+                .0 += n;
+        }
         total.collisions += report.collisions;
         total.placeholder += report.placeholder;
         total.instances += report.instances;
@@ -140,6 +148,11 @@ fn mono_agreement_report() {
         total.instances, total.compared, total.agreed, total.placeholder, total.unbound,
         total.unmatched, total.collisions
     );
+    let mut unbound: Vec<_> = total.unbound_forms.iter().collect();
+    unbound.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    for (form, (n, example)) in unbound.into_iter().take(25) {
+        println!("unbound {n:6}  {form}\n         e.g. {example}");
+    }
     let mut rows: Vec<_> = total.disagreements.iter().collect();
     rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
     for (form, (n, example)) in rows.into_iter().take(40) {

@@ -1,6 +1,7 @@
 # Plan: make the type on every expression mandatory (`TExpr` end to end)
 
-Status: not started. Written after the pseudo-types were deleted (`Remove pseudo-types`).
+Status: step 1's probe is run (below); the port has not started. Written after the pseudo-types were
+deleted (`Remove pseudo-types`).
 Delete this file when the work is done.
 
 ## Where things stand
@@ -103,7 +104,37 @@ Steps 1 and 2 are independent of step 3; stopping after either leaves a coherent
 - Estimate to trust least: step 1, because it depends on how many disagreements exist, which only the
   probe reveals. Rough total: 2 to 4 days.
 
-## First action when this is picked up
+## Probe results (the first action, done)
+
+`cargo test --test compiler -- --ignored pin::mono_agreement_report --nocapture` (about 20s) runs the
+pinner and mono's `infer` side by side over `tests/cases` and `crates`, unoptimized, comparing each
+node by function, span and form. Over 756 programs (214 are the `err_*` cases, which do not
+monomorphize), 5,426 instances:
+
+- 75,201 nodes compared, 74,979 agree (99.7%). 222 disagree, in four groups:
+  - About 190 are statement-position nodes (`print`, `put`, `Assign`, `Match`, a shim, a call to a
+    void function): `infer` gives them `i64` or a slot array where the pinner says `()`. Not a type
+    disagreement; `infer` has no unit for "no value" and the stamp-first rule hid it.
+  - 20 `Let` nodes: `infer` says `()`, the pinner says the body's type.
+  - 17 `extend_map` / `extend_filter` calls: `infer` says `()`, the pinner says the array being
+    extended (the value of a mutating call).
+  - 2 `int_parse` calls (`i8?`, `i32?` pinned, `i64?` from `infer`): the pinner is right, `infer`
+    defaults the width and a stamp covered it. This is the only kind of disagreement where `infer` is
+    simply wrong.
+- 787 nodes are not compared (`unbound`): the probe derives an instance's type arguments from its
+  parameter types, and cannot when a type variable is not in any parameter. They are the generic builtin
+  bodies (`drop_first`, `tuple_windows`, `repeat`, `grid_get`) and the `unsettled` `Rule<K>` /
+  `StepResult<K>` / `Token<K>` family in `format.aipl` and `lex_aipl.aipl` (hard part 4). The port
+  does not need the probe's guess there: it reads `type_args` off the call. But the probe cannot
+  vouch for these until it does too.
+- 3,804 nodes are `unmatched`: synthesized by a pass or by mono itself, so they have no pinned
+  counterpart. That is the hand-typed set (hard part 2) that the port must type itself.
+
+Reading: the two derivations agree wherever both are defined, so step 1 is a day or two of porting,
+not three. The cost is the 608 match sites, the 3,804 synthesized nodes, and a settle-from-instances
+step for `Rule<K>`; the disagreement tail is small.
+
+## First action when this is picked up (done; kept for the record)
 
 Write the side-by-side probe (pinner type vs `infer` type per node, over `tests/cases` and `crates/**/*.aipl`)
 and read the disagreement list. Its size decides whether step 1 is a day or three.
