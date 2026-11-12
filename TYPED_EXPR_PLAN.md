@@ -134,6 +134,36 @@ Reading: the two derivations agree wherever both are defined, so step 1 is a day
 not three. The cost is the 608 match sites, the 3,804 synthesized nodes, and a settle-from-instances
 step for `Rule<K>`; the disagreement tail is small.
 
+## Order revised: step 2 first, behind an adapter at mono's output
+
+Reading mono: `infer_node` is a ~1,500-line fusion of typing and rewriting, and the pinner's types
+already feed it as the expected type (`Expr::ty`, stamp-first). A faithful `Expr` -> `TExpr` port of
+mono has no green state in between. The claim above that an adapter "would need the types that were
+lost" is false at mono's output, where `infer` stamps every non-unit node it returns. So:
+
+1. An adapter at the end of `lower_program` turns the stamped `Expr` bodies into
+   `TExpr<ConcreteTy>`, failing on any node that is neither typed nor structurally unit.
+2. The post-mono passes and codegen move to `TExpr<ConcreteTy>` (about 350 sites), and codegen
+   reads `expr.ty`: `has_placeholder_ty`, `stamped_ty` and the `i64` fallback go.
+3. Mono's inside and the pre-mono passes port afterwards, deleting the adapter as they go.
+
+### Coverage of the stamps (measured)
+
+`cargo test --test compiler -- --ignored pin::typed_coverage_report --nocapture` (about 10 minutes: it
+runs the full optimizer on every program). Over 829 programs, 5,689,355 nodes after
+monomorphization and the post-mono passes:
+
+- 4,745,762 (83%) carry a type, and none carries a type a `ConcreteTy` cannot say (no concat string
+  or placeholder leaks through the stamps).
+- 943,593 carry none. By form: `Unit` 331k, `Let` 217k, `Assign` 111k, `Seq` 76k, `Return` 31k and
+  `LetMut` 1.5k are structural (a unit, or the type of the body or last statement) and can be
+  computed from their children. The ones that are lost types: `Call __move` 73k (built by
+  `move_last_use` around a value), `If` 49k, `Ident` 34k, `Match` 16k, and a tail of `Call
+  __builtin_equal` 706, `Num` 461, `__filter_*` 1.2k, `Str` 245, `Field` 50, the `extend_map`
+  instances of `subexprs`, shim cell calls and the terminal builtins.
+- So step 2 starts by making the passes that build those nodes stamp them (`move_last_use` first:
+  it is 8% of all nodes), then adding the adapter with the structural forms derived.
+
 ## First action when this is picked up (done; kept for the record)
 
 Write the side-by-side probe (pinner type vs `infer` type per node, over `tests/cases` and `crates/**/*.aipl`)

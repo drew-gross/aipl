@@ -514,3 +514,40 @@ impl Stamper<'_> {
         }
     }
 }
+
+/// How many nodes of a monomorphized program carry a type a [`ConcreteTy`] can say.
+///
+/// Every non-unit node `infer` returns is stamped, and the passes after it build nodes of their
+/// own. This is the measurement of whether a typed tree could be read off the stamps: which forms
+/// are left without one, and which carry a type that is a representation choice rather than a type.
+#[derive(Default, Debug)]
+pub struct Coverage {
+    pub nodes: usize,
+    pub typed: usize,
+    /// Nodes with no stamp, by form: count and one example (`function @ span`).
+    pub untyped: BTreeMap<String, (usize, String)>,
+    /// Nodes whose stamp a pinned type cannot say, by form and the stamp's text.
+    pub unsayable: BTreeMap<String, (usize, String)>,
+}
+
+/// The stamps on the bodies of `program`; see [`Coverage`].
+pub fn coverage(program: &crate::MonoProgram) -> Coverage {
+    let mut out = Coverage::default();
+    for f in &program.fns {
+        let mut stack = vec![&f.body];
+        while let Some(e) = stack.pop() {
+            out.nodes += 1;
+            let at = format!("{} @ {}..{}", f.name, e.span.start, e.span.end);
+            match e.ty.as_deref() {
+                None => out.untyped.entry(form(&e.kind)).or_insert((0, at)).0 += 1,
+                Some(t) if Ty::from_type(t).is_none() => {
+                    let key = format!("{}: {}", form(&e.kind), aipl_syntax::type_name(t));
+                    out.unsayable.entry(key).or_insert((0, at)).0 += 1;
+                }
+                Some(_) => out.typed += 1,
+            }
+            stack.extend(crate::children(e));
+        }
+    }
+    out
+}

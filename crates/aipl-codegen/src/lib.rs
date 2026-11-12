@@ -3061,6 +3061,12 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     Ok(probe.finish())
 }
 
+/// The stamps on the monomorphized, optimized `program`, counted; see `aipl_mono::probe::Coverage`.
+pub fn typed_coverage(program: &Program) -> Result<aipl_mono::probe::Coverage, Vec<Error>> {
+    let mono = lowered(program, DebugOptions::OFF)?;
+    Ok(aipl_mono::probe::coverage(&mono))
+}
+
 /// `program` with every expression's stamp (`Expr::ty`) replaced by what the pinner makes of the
 /// program as it now stands. `builtins` are the declarations put ahead of the program. A function that no longer pins keeps the stamps it had.
 fn repin(builtins: &[Item], mut program: Program) -> Program {
