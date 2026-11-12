@@ -3,12 +3,12 @@
 # The mines are placed at random (`place_mines`) by the first reveal, seeded in `main`.
 
 import {
-    Down,
+    DownArrow,
     Key,
-    Left,
+    LeftArrow,
     Other,
-    Right,
-    Up,
+    RightArrow,
+    UpArrow,
     all,
     any,
     cartesian_product,
@@ -35,6 +35,7 @@ import {
     min,
     move_to,
     not_equal as !=,
+    pad,
     print,
     push,
     put,
@@ -367,13 +368,8 @@ fn render(self: Mark[,], show_mines: bool, cursor: (u64, u64)?) -> str {
 
     // The info line is padded to the box's width, so that drawing over a longer one
     // ("Mines: 10") leaves nothing of it.
-    let info = `Mines: {self.mines_remaining()}`;
-    let padding = if (info.len() < border.len()) {
-        (info.len()..border.len()).map(|_| " ").join(sep="")
-    } else {
-        ""
-    };
-    [`{info}{padding}`, border, ..rows, border].join(sep="\n")
+    let info = `Mines: {self.mines_remaining()}`.pad(border.len());
+    [info, border, ..rows, border].join(sep="\n")
 }.test({
     let game = new_game(3, 2).add_mines([(1, 2)]).reveal((0, 0));
     assert(game.render(false, none) == """
@@ -433,10 +429,10 @@ fn press(self: Session { game, cursor, mined }, key: Key) -> Turn {
     let row = cursor.0;
     let column = cursor.1;
     match (key) {
-        Up => Continue(Session { ..self, cursor: (row.before(), column) }),
-        Down => Continue(Session { ..self, cursor: (row.after(game.height()), column) }),
-        Left => Continue(Session { ..self, cursor: (row, column.before()) }),
-        Right => Continue(Session { ..self, cursor: (row, column.after(game.width())) }),
+        UpArrow => Continue(Session { ..self, cursor: (row.before(), column) }),
+        DownArrow => Continue(Session { ..self, cursor: (row.after(game.height()), column) }),
+        LeftArrow => Continue(Session { ..self, cursor: (row, column.before()) }),
+        RightArrow => Continue(Session { ..self, cursor: (row, column.after(game.width())) }),
         Other(byte) => if (byte == REVEAL_KEY) {
             if (!mined) {
                 // A flagged cell is not revealed, so it is not a first reveal either.
@@ -461,16 +457,16 @@ fn press(self: Session { game, cursor, mined }, key: Key) -> Turn {
     let start = Session { game: new_game(2, 2).add_mines([(1, 1)]), cursor: origin, mined: true };
     let corner: (u64, u64) = (1, 1);
     // Arrows move the cursor and stop at the edges.
-    assert(start.press(Up) == Continue(start));
-    assert(start.press(Left) == Continue(start));
+    assert(start.press(UpArrow) == Continue(start));
+    assert(start.press(LeftArrow) == Continue(start));
     let down: (u64, u64) = (1, 0);
-    assert(start.press(Down) == Continue(Session { ..start, cursor: down }));
+    assert(start.press(DownArrow) == Continue(Session { ..start, cursor: down }));
     assert(
         start
-            .press(Down)
-            .press_continuing(Right)
-            .press_continuing(Down)
-            .press_continuing(Right) == Continue(Session { ..start, cursor: corner }),
+            .press(DownArrow)
+            .press_continuing(RightArrow)
+            .press_continuing(DownArrow)
+            .press_continuing(RightArrow) == Continue(Session { ..start, cursor: corner }),
     );
     // `r` reveals under the cursor, `f` flags, `q` quits, other keys are ignored.
     assert(start.press(Other(114)) == Continue(Session {
@@ -501,7 +497,7 @@ fn press_continuing(self: Turn, key: Key) -> Turn {
 }.test({
     let origin: (u64, u64) = (0, 0);
     let session = Session { game: new_game(2, 2), cursor: origin, mined: true };
-    assert(Quit.press_continuing(Right) == Quit);
+    assert(Quit.press_continuing(RightArrow) == Quit);
     assert(Continue(session).press_continuing(Other(113)) == Quit);
 })
 

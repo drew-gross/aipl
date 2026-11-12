@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">220 files, 1889 items.</p>
+      <p class="summary">221 files, 1892 items.</p>
 
       <ul class="files">
 
@@ -5394,6 +5394,29 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_pad.html">crates/aipl-mono/src/builtin_pad.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>pad</code> builtin. The loader names this function by the canonical name <code>__builtin_pad</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>text.pad(10)</code> resolves through the ordinary machinery — the in-file name is only for this file's own tests, which read exactly like user code. The file also defines <code>Direction</code> and its cases, which a program imports from builtins beside <code>pad</code>.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_pad.html#item-Direction"><code>Direction</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_pad.html#item-pad"><code>pad</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-mono-src-builtin_parse_json.html">crates/aipl-mono/src/builtin_parse_json.aipl</a>
 
           <p class="file-summary">The AIPL implementation of the <code>parse</code> builtin of the <code>json</code> library. The loader names this function by the canonical name <code>__builtin_parse_json</code> (see <code>aipl_syntax::aipl_builtins</code>). The file also defines <code>Json</code> and <code>Member</code>, and <code>Json</code>'s cases, which a program imports from <code>json</code> beside <code>parse</code>.</p>
@@ -5672,7 +5695,7 @@
           <p class="file-summary">The AIPL implementation of the <code>tabulate</code> builtin. The loader names this function by the canonical name <code>__builtin_tabulate</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>rows.tabulate(headers)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-mono-src-builtin_tabulate.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-mono-src-builtin_tabulate.html#private">3 private</a></span>
 
 
           <ul class="items">

@@ -6,7 +6,7 @@
 import { drop_first, equal as ==, first, not_equal as !=, push, read_byte } from builtins;
 
 # One key press: an arrow key, or the byte of any other key.
-variant Key = Up | Down | Left | Right | Other(u8)
+variant Key = UpArrow | DownArrow | LeftArrow | RightArrow | Other(u8)
 
 # The first two bytes of an arrow key's three, `ESC [ A` for up.
 let ESCAPE: u8 = 27;
@@ -16,27 +16,27 @@ let BRACKET: u8 = 91;
 # The arrow key whose escape sequence ends in `last`, or `Other(last)`.
 fn arrow_ending(last: u8) -> Key {
     if (last == 65) {
-        Up
+        UpArrow
     } else if (last == 66) {
-        Down
+        DownArrow
     } else if (last == 67) {
-        Right
+        RightArrow
     } else if (last == 68) {
-        Left
+        LeftArrow
     } else {
         Other(last)
     }
 }.test({
-    assert(arrow_ending(65) == Up);
-    assert(arrow_ending(66) == Down);
-    assert(arrow_ending(67) == Right);
-    assert(arrow_ending(68) == Left);
+    assert(arrow_ending(65) == UpArrow);
+    assert(arrow_ending(66) == DownArrow);
+    assert(arrow_ending(67) == RightArrow);
+    assert(arrow_ending(68) == LeftArrow);
     assert(arrow_ending(69) == Other(69));
 })
 
 # The next key press, without waiting for Enter: `some(key)`, or `none` once input
 # is exhausted. An arrow key is the three bytes `ESC [ A`..`D` that `read_byte`
-# returns, and arrives as `Up`, `Down`, `Right` or `Left`; any other key is `Other`
+# returns, and arrives as `UpArrow`, `DownArrow`, `RightArrow` or `LeftArrow`; any other key is `Other`
 # with its first byte, and an escape sequence that is not an arrow ends at the
 # byte that breaks it. Carries `!read_stdin_raw`, like `read_byte`.
 pub fn read_key() !read_stdin_raw -> Key? {
@@ -59,15 +59,15 @@ pub fn read_key() !read_stdin_raw -> Key? {
 }.test({
     // A key that is one byte arrives as that byte, and an arrow key as its three.
     assert(keys_from([97], 1) == [some(Other(97))]);
-    assert(keys_from([27, 91, 65], 1) == [some(Up)]);
-    assert(keys_from([27, 91, 66], 1) == [some(Down)]);
-    assert(keys_from([27, 91, 67], 1) == [some(Right)]);
-    assert(keys_from([27, 91, 68], 1) == [some(Left)]);
+    assert(keys_from([27, 91, 65], 1) == [some(UpArrow)]);
+    assert(keys_from([27, 91, 66], 1) == [some(DownArrow)]);
+    assert(keys_from([27, 91, 67], 1) == [some(RightArrow)]);
+    assert(keys_from([27, 91, 68], 1) == [some(LeftArrow)]);
     // Keys come one at a time, in order, and `none` once the bytes run out.
     assert(keys_from([27, 91, 65, 97, 27, 91, 68], 4) == [
-        some(Up),
+        some(UpArrow),
         some(Other(97)),
-        some(Left),
+        some(LeftArrow),
         none,
     ]);
 

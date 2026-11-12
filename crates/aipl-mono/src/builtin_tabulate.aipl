@@ -8,6 +8,9 @@
 # lint is worse than ntwo.
 
 import {
+    Direction,
+    Left,
+    Right,
     equal as ==,
     join,
     left_fold,
@@ -16,24 +19,13 @@ import {
     map,
     max,
     measure,
+    pad,
     repeat,
     saturating_sub as -,
     wrapping_add as +,
     wrapping_mul as *,
     zip_with,
 } from builtins;
-
-# `text` padded with spaces to `width`: on the left when `right`, else on the right. Text
-# already wider than `width` is left as it is.
-fn padded(text: str, width: u64, right: bool) -> str {
-    let gap = " ".repeat(width - text.len());
-    if (right) { `{gap}{text}` } else { `{text}{gap}` }
-}.test({
-    assert(padded("ab", 5, false) == "ab   ");
-    assert(padded("ab", 5, true) == "   ab");
-    assert(padded("abcdef", 3, false) == "abcdef");
-    assert(padded("", 2, true) == "  ");
-})
 
 # The line of `fill` characters over each column of `widths`, joined by `+`.
 fn rule(widths: u64[], fill: str) -> str {
@@ -45,15 +37,15 @@ fn rule(widths: u64[], fill: str) -> str {
 })
 
 # What a table needs to know of a column to draw a cell of it.
-struct Column { width: u64, right: bool }
+struct Column { width: u64, side: Direction }
 
 # One row's line: each cell padded to its column, between `|`s. A row with more cells than there
 # are columns is cut off at the last column.
 fn cells_line(self: str[], columns: Column[]) -> str {
-    let parts = self.zip_with(columns, |text, column| padded(text, column.width, column.right));
+    let parts = self.zip_with(columns, |text, column| text.pad(column.width, dir=column.side));
     `| {parts.join(sep=" | ")} |`
 }.test({
-    let columns = [Column { width: 3, right: false }, Column { width: 2, right: true }];
+    let columns = [Column { width: 3, side: Right }, Column { width: 2, side: Left }];
     assert(["a", "b"].cells_line(columns) == "| a   |  b |");
     assert(["a", "b", "c"].cells_line(columns) == "| a   |  b |");
 })
@@ -83,7 +75,7 @@ pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -> st
     );
     let columns = widths.zip_with(
         right_aligned.fitted(count, false),
-        |width, right| { Column { width, right } },
+        |width, right| { Column { width, side: if (right) { Left } else { Right } } },
     );
     [
         rule(widths, "-"),

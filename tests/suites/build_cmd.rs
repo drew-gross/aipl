@@ -256,13 +256,13 @@ fn read_byte_reads_piped_bytes_in_a_built_binary() {
 
 /// Prints the name of each key press until input ends.
 const READ_KEYS: &str =
-    "import { Down, Key, Left, Other, Right, Up, print, read_key } from builtins;\n\n\
+    "import { DownArrow, Key, LeftArrow, Other, RightArrow, UpArrow, print, read_key } from builtins;\n\n\
      fn name(self: Key) -> str {\n\
      \x20   match (self) {\n\
-     \x20       Up => \"up\",\n\
-     \x20       Down => \"down\",\n\
-     \x20       Left => \"left\",\n\
-     \x20       Right => \"right\",\n\
+     \x20       UpArrow => \"up\",\n\
+     \x20       DownArrow => \"down\",\n\
+     \x20       LeftArrow => \"left\",\n\
+     \x20       RightArrow => \"right\",\n\
      \x20       Other(byte) => `other {byte}`,\n\
      \x20   }\n\
      }\n\n\

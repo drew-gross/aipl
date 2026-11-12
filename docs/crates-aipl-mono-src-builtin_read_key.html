@@ -34,22 +34,22 @@
 
           <ul class="cases">
 
-            <li id="item-Up"><code>Up</code>
+            <li id="item-UpArrow"><code>UpArrow</code>
 
 
             </li>
 
-            <li id="item-Down"><code>Down</code>
+            <li id="item-DownArrow"><code>DownArrow</code>
 
 
             </li>
 
-            <li id="item-Left"><code>Left</code>
+            <li id="item-LeftArrow"><code>LeftArrow</code>
 
 
             </li>
 
-            <li id="item-Right"><code>Right</code>
+            <li id="item-RightArrow"><code>RightArrow</code>
 
 
             </li>
@@ -72,7 +72,7 @@
           </h3>
           <pre class="signature"><code>pub fn read_key() !read_stdin_raw -&#62; Key?</code></pre>
 
-          <div class="doc"><p>The next key press, without waiting for Enter: <code>some(key)</code>, or <code>none</code> once input is exhausted. An arrow key is the three bytes <code>ESC [ A</code>..<code>D</code> that <code>read_byte</code> returns, and arrives as <code>Up</code>, <code>Down</code>, <code>Right</code> or <code>Left</code>; any other key is <code>Other</code> with its first byte, and an escape sequence that is not an arrow ends at the byte that breaks it. Carries <code>!read_stdin_raw</code>, like <code>read_byte</code>.</p></div>
+          <div class="doc"><p>The next key press, without waiting for Enter: <code>some(key)</code>, or <code>none</code> once input is exhausted. An arrow key is the three bytes <code>ESC [ A</code>..<code>D</code> that <code>read_byte</code> returns, and arrives as <code>UpArrow</code>, <code>DownArrow</code>, <code>RightArrow</code> or <code>LeftArrow</code>; any other key is <code>Other</code> with its first byte, and an escape sequence that is not an arrow ends at the byte that breaks it. Carries <code>!read_stdin_raw</code>, like <code>read_byte</code>.</p></div>
 
 
         </section>

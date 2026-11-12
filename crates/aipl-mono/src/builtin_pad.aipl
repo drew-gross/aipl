@@ -1,0 +1,44 @@
+# The AIPL implementation of the `pad` builtin. The loader names this function by the
+# canonical name `__builtin_pad` (see `aipl_syntax::aipl_builtins`), so a user's
+# `text.pad(10)` resolves through the ordinary machinery — the in-file name is only for this
+# file's own tests, which read exactly like user code. The file also defines `Direction` and
+# its cases, which a program imports from builtins beside `pad`.
+#
+# No lint steers the longhand here: the padding by hand is `" ".repeat(width - text.len())`
+# joined to the text in one of two orders, and which of the many ways of writing it a caller
+# used (a loop, a `map`, an `if` on the length) is not a shape that can be advised precisely.
+
+import { equal as ==, len, repeat, saturating_sub as -, to_str } from builtins;
+
+# The side of the text that `pad` adds its padding to.
+variant Direction = Left | Right
+
+# `self` made `width` long by adding `with` to the `dir` side of it: `"ab".pad(5)` is
+# `"ab   "`, `"ab".pad(5, dir=Left)` is `"   ab"`, and `"7".pad(3, with='0', dir=Left)` is
+# `"007"`. Text already `width` long or longer is left as it is. The length is `len`'s, so
+# a character wider than a byte counts as the bytes it takes. Callable as a method.
+pub fn pad(self: str, width: u64, with: char = ' ', dir: Direction = Right) -> str {
+    // The annotation is needed: unannotated, the gap read inside a `match` arm renders as the
+    // array `['x', 'x']` rather than its text.
+    let gap: str = to_str(with).repeat(width - self.len());
+    match (dir) {
+        Left => `{gap}{self}`,
+        Right => `{self}{gap}`,
+    }
+}.test({
+    // The padding goes after the text unless asked otherwise.
+    assert("ab".pad(5) == "ab   ");
+    assert("ab".pad(5, dir=Right) == "ab   ");
+    assert("ab".pad(5, dir=Left) == "   ab");
+    // Any character can fill.
+    assert("7".pad(3, with='0', dir=Left) == "007");
+    assert("ab".pad(4, with='.') == "ab..");
+    // Text as long as the width, or longer, is not cut.
+    assert("abc".pad(3) == "abc");
+    assert("abcdef".pad(3, dir=Left) == "abcdef");
+    // Nothing to pad, and nothing to pad with.
+    assert("".pad(2, dir=Left) == "  ");
+    assert("".pad(0) == "");
+    // The free-call form is the same call.
+    assert(pad("ab", 3) == "ab ");
+})

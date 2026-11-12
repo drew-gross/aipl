@@ -408,7 +408,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl_exporting(
         Callee::ReadKey,
         "builtin_read_key.aipl",
-        &["Key", "Up", "Down", "Left", "Right", "Other"],
+        &["Key", "UpArrow", "DownArrow", "LeftArrow", "RightArrow", "Other"],
     ),
     Builtin::aipl_in_library(
         Callee::ParseJson,
@@ -504,6 +504,7 @@ const BUILTINS: &[Builtin] = &[
     ),
     Builtin::aipl(Callee::Render, "builtin_render.aipl"),
     Builtin::aipl(Callee::Distinct, "builtin_distinct.aipl"),
+    Builtin::aipl_exporting(Callee::Pad, "builtin_pad.aipl", &["Direction", "Left", "Right"]),
     Builtin::aipl_in_library(Callee::Tabulate, "builtin_tabulate.aipl", "tabulate", None, &[]),
     Builtin::described(
         Callee::ToFixed,

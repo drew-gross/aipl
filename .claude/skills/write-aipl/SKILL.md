@@ -62,7 +62,7 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!` `logical_not`. Strings and arrays are joined with templates, spread literals (`[..a, ..b]`), `push` and `extend`; there is no concat operator.
 
 ## Builtins (import by name from `builtins`)
-- **text/chars**: print put to_str split words trim trim_while starts_with ends_with contains is_digit to_digit is_space is_whitespace is_all_whitespace int_parse int_parse_unsigned inline_str heap_str rope_str
+- **text/chars**: print put to_str split words trim pad trim_while starts_with ends_with contains is_digit to_digit is_space is_whitespace is_all_whitespace int_parse int_parse_unsigned inline_str heap_str rope_str
 - **arrays**: distinct (first-appearance order; `==`, so not floats) len is_empty is_nonempty first last push extend reserve reverse sort sort_by drop_first drop_last drop_n drop_last_n zip zip_with intersperse repeat range tuple_windows cartesian_product to_array
 - **query/fold**: map filter filter_map map_join map_reduce reduce left_fold right_fold find_if find_index find_map any all count count_if count_while join union_all collect_ok try_map split_map
 - **optional/result**: value_or value_or_err is_some is_some_and is_err_and map_ok map_err
