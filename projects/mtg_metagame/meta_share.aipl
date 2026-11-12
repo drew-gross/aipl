@@ -106,21 +106,18 @@ pub fn percent(count: u64, total: u64) -> str {
     assert(percent(3, 2000) == "0.1%");
 })
 
-# The report on `decks`, loaded from the metagame `name`, as lines.
-pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[] {
+# The report on `decks`, loaded from the metagame `name`, as text of one line each.
+pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str {
     let total = decks.len();
     let rows = shares(decks, identifiers).map(|share| {
         [share.name, percent(share.count, total), `{share.count}`]
     });
-    [
-        `Metagame Breakdown from {name}`,
-        "Order by Metagame %",
-        ..rows.tabulate([
-            Column { header: "Deck Name" },
-            Column { header: "Metagame %", side: Left },
-            Column { header: "Count", side: Left },
-        ]),
-    ]
+    let table = rows.tabulate([
+        Column { header: "Deck Name" },
+        Column { header: "Metagame %", side: Left },
+        Column { header: "Count", side: Left },
+    ]);
+    `Metagame Breakdown from {name}\nOrder by Metagame %\n{table}`
 }.test({
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
     let decks = [
@@ -129,14 +126,14 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[
         Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
     ];
     // Shares are of all the decks, and the `Other` decks are one row at the end.
-    assert(share_report("a_meta", decks, [landfall]) == [
-        "Metagame Breakdown from a_meta",
-        "Order by Metagame %",
-        "+-----------+------------+-------+",
-        "| Deck Name | Metagame % | Count |",
-        "+===========+============+=======+",
-        "| Landfall  |      66.7% |     2 |",
-        "| Other     |      33.3% |     1 |",
-        "+-----------+------------+-------+",
-    ]);
+    assert(share_report("a_meta", decks, [landfall]) == """
+        Metagame Breakdown from a_meta
+        Order by Metagame %
+        +-----------+------------+-------+
+        | Deck Name | Metagame % | Count |
+        +===========+============+=======+
+        | Landfall  |      66.7% |     2 |
+        | Other     |      33.3% |     1 |
+        +-----------+------------+-------+
+    """);
 })

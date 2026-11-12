@@ -19,6 +19,12 @@ fn count_of(self: str) -> str {
     assert(count_of("nope") == "bad");
 })
 
-fn boxed(rows: str[][]) -> str[] { rows.tabulate([Column { header: "N" }]) }.test({
-    assert(boxed([["1"]]) == ["+---+", "| N |", "+===+", "| 1 |", "+---+"]);
+fn boxed(rows: str[][]) -> str { rows.tabulate([Column { header: "N" }]) }.test({
+    assert(boxed([["1"]]) == """
+        +---+
+        | N |
+        +===+
+        | 1 |
+        +---+
+    """);
 })

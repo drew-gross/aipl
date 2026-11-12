@@ -6,6 +6,7 @@ import {
     drop_first,
     equal as ==,
     first,
+    join,
     len,
     less_than as <,
     logical_and as &&,
@@ -60,10 +61,10 @@ fn load_named(name: str) !read_files !execute_program -> Metagame!str {
 }
 
 # One line per card played in the metagame named by `args`, most played first.
-fn cards_listing(args: str[]) !read_files !execute_program -> str[]!str {
+fn cards_listing(args: str[]) !read_files !execute_program -> str!str {
     let [name] = args else { return err(USAGE); };
     let Metagame { decks } = load_named(name)?;
-    ok(card_counts(decks)$card_line())
+    ok(card_counts(decks)$card_line().join(sep="\n"))
 }
 
 # What `share` or `winrate` was asked: the metagame, the archetype list to classify its decks with,
@@ -124,7 +125,7 @@ fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
 })
 
 # The share report for the metagame named by `args`, one line each.
-fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
+fn share_listing(args: str[]) !read_files !execute_program -> str!str {
     let DeckOptions { metagame, archetypes } = parse_deck_options("share", args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks } = load_named(metagame)?;
@@ -133,18 +134,18 @@ fn share_listing(args: str[]) !read_files !execute_program -> str[]!str {
 
 # Write the winrate matrix for the metagame named by `args` as an SVG page, to the file `--output`
 # names or `winrate_<metagame>.svg`, and say where it went.
-fn winrate_listing(args: str[]) !read_files !execute_program !write_files -> str[]!str {
+fn winrate_listing(args: str[]) !read_files !execute_program !write_files -> str!str {
     let DeckOptions { metagame, archetypes, output } = parse_deck_options("winrate", args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks, matches } = load_named(metagame)?;
     let path = output.value_or(`winrate_{metagame}.svg`);
     let matrix = winrate_matrix(decks, matches, identifiers)?;
     write_string_to_file(path, matrix.winrate_svg(metagame))?;
-    ok([`wrote {path}`])
+    ok(`wrote {path}`)
 }
 
-# The lines a command line asks for, or why it asks for none.
-fn run(args: str[]) !read_files !execute_program !write_files -> str[]!str {
+# The text a command line asks for, or why it asks for none.
+fn run(args: str[]) !read_files !execute_program !write_files -> str!str {
     let some(command) = args.first() else { return err(USAGE); };
     let rest = args.drop_first();
     match (command) {
@@ -160,10 +161,8 @@ fn run(args: str[]) !read_files !execute_program !write_files -> str[]!str {
 # one of the names in `data/index.json`.
 fn main(args: str[]) !prints !read_files !execute_program !write_files -> i64 {
     match (run(args)) {
-        ok(lines) => {
-            for (let line : lines) {
-                print(line);
-            }
+        ok(text) => {
+            print(text);
             0
         },
         err(message) => {

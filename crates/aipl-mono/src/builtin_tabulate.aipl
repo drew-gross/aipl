@@ -61,11 +61,12 @@ fn fitted<T: any>(self: T[], n: u64, filler: T) -> T[] {
     assert(empty.fitted(2, 7) == [7, 7]);
 })
 
-# `rows` drawn as a table, as lines: a rule above, the headers of `columns` and a heavier rule
+# `rows` drawn as a table, as text of one line each: a rule above, the headers of `columns` and a heavier rule
 # under them, the rows, and a rule below. Each column is as wide as its widest cell, its header
 # included, and its cells are on the side its `Column` says. A row with fewer cells than there are
-# columns has blanks for the rest, and one with more is cut off. Callable as a method.
-pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
+# columns has blanks for the rest, and one with more is cut off. The lines are joined by newlines,
+# with none after the last. Callable as a method.
+pub fn tabulate(self: str[][], columns: Column[]) -> str {
     let headers = columns$header;
     let cells = self$fitted(columns.len(), "");
     // A column is as wide as its widest cell, its header included.
@@ -80,37 +81,42 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
         rule(widths, "="),
         ..cells$cells_line(layout),
         rule(widths, "-"),
-    ]
+    ].join(sep="\n")
 }.test({
     assert([["ab", "1"], ["c", "10"]].tabulate([
         Column { header: "Name" },
         Column { header: "N", side: Left },
-    ]) == [
-        "+------+----+",
-        "| Name |  N |",
-        "+======+====+",
-        "| ab   |  1 |",
-        "| c    | 10 |",
-        "+------+----+",
-    ]);
+    ]) == """
+        +------+----+
+        | Name |  N |
+        +======+====+
+        | ab   |  1 |
+        | c    | 10 |
+        +------+----+
+    """);
     // No rows: just the header.
-    assert([].tabulate([Column { header: "X" }]) == ["+---+", "| X |", "+===+", "+---+"]);
+    assert([].tabulate([Column { header: "X" }]) == """
+        +---+
+        | X |
+        +===+
+        +---+
+    """);
     // A column's side is optional, and the free-call form is the same.
-    assert(tabulate([["7"]], [Column { header: "Count" }]) == [
-        "+-------+",
-        "| Count |",
-        "+=======+",
-        "| 7     |",
-        "+-------+",
-    ]);
+    assert(tabulate([["7"]], [Column { header: "Count" }]) == """
+        +-------+
+        | Count |
+        +=======+
+        | 7     |
+        +-------+
+    """);
     // A cell wider than its header widens the column.
-    assert([["long"]].tabulate([Column { header: "h" }]) == [
-        "+------+",
-        "| h    |",
-        "+======+",
-        "| long |",
-        "+------+",
-    ]);
+    assert([["long"]].tabulate([Column { header: "h" }]) == """
+        +------+
+        | h    |
+        +======+
+        | long |
+        +------+
+    """);
 }).benchmark({
     let columns = [
         Column { header: "Name" },
@@ -131,10 +137,10 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
     let two = measure("two rows", few, |rows| { rows.tabulate(columns) });
     let eight = measure("eight rows", many, |rows| { rows.tabulate(columns) });
 
-    // Allocations are exact: the headers, widths, layout, the three rules and the header line are the fixed
+    // Allocations are exact: the headers, widths, layout, the three rules, the header line and the joined text are the fixed
     // part, and each row adds its padded copy and its line, so a temporary array optimized away shows up here.
-    assert(two.allocations == 38);
-    assert(eight.allocations == 105);
+    assert(two.allocations == 39);
+    assert(eight.allocations == 106);
 
     // Four times the rows costs under three times the instructions: the fixed part is shared and
     // nothing in a row's line depends on the number of rows.

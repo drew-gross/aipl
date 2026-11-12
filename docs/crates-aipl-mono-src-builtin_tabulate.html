@@ -41,9 +41,9 @@
             <a class="anchor" href="#item-tabulate">tabulate</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tabulate(self: str[][], columns: Column[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn tabulate(self: str[][], columns: Column[]) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>rows</code> drawn as a table, as lines: a rule above, the headers of <code>columns</code> and a heavier rule under them, the rows, and a rule below. Each column is as wide as its widest cell, its header included, and its cells are on the side its <code>Column</code> says. A row with fewer cells than there are columns has blanks for the rest, and one with more is cut off. Callable as a method.</p></div>
+          <div class="doc"><p><code>rows</code> drawn as a table, as text of one line each: a rule above, the headers of <code>columns</code> and a heavier rule under them, the rows, and a rule below. Each column is as wide as its widest cell, its header included, and its cells are on the side its <code>Column</code> says. A row with fewer cells than there are columns has blanks for the rest, and one with more is cut off. The lines are joined by newlines, with none after the last. Callable as a method.</p></div>
 
 
         </section>
