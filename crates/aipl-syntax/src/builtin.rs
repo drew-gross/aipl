@@ -505,7 +505,7 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::Render, "builtin_render.aipl"),
     Builtin::aipl(Callee::Distinct, "builtin_distinct.aipl"),
     Builtin::aipl_exporting(Callee::Pad, "builtin_pad.aipl", &["Direction", "Left", "Right"]),
-    Builtin::aipl_in_library(Callee::Tabulate, "builtin_tabulate.aipl", "tabulate", None, &[]),
+    Builtin::aipl_in_library(Callee::Tabulate, "builtin_tabulate.aipl", "tabulate", None, &["Column"]),
     Builtin::described(
         Callee::ToFixed,
         "fn to_fixed<F>(self: F, digits: u64) -> str",

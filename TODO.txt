@@ -519,6 +519,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  tabulate (and through to card_listing and co) should return strings, not str[]
   pad_left and pad_right functions
   better way to iterate over all pairs than 2 for loops (tuple_combinations()? product()?)
   better function for making an "index" (list of T to dict of T's ID to T)

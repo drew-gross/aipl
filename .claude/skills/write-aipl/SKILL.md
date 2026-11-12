@@ -72,5 +72,5 @@ less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!`
 - **io/terminal**: read_file_to_string write_string_to_file list_files read_line read_byte read_key execute_program clear_terminal move_to
 - **`from json`**: parse (`Json!str`; `Json` cases Null Bool Number String Array Object(Member[]), `Member { key, value }`; numbers stay text)
 - **floats**: render (`x.render(digits=1)`: `to_str` with keyword options; digits after the point, halves to even), to_float (int to float, typed by its position, default F64) float_add float_sub float_mul float_div float_equal float_not_equal float_less_than float_greater_than float_less_than_or_equal float_greater_than_or_equal (import `name as op`; a file has one `==`, so use `equal(a, b)` for non-floats beside `float_equal as ==`; unary `-` needs `float_sub as -`; floats are not `ord`, not set/dict keys, and a struct holding one has no `==`)
-- **`from tabulate`**: tabulate (`rows.tabulate(headers, right_aligned=[..])` → grid lines)
+- **`from tabulate`**: tabulate, `Column { header, side }` (`rows.tabulate(columns)` → grid lines; `side=Left` right-aligns, `Left`/`Right` come from `pad`'s exports)
 - **misc**: min max hash now_nanos measure Measurement Span

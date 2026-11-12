@@ -145,3 +145,4 @@ structs:
 
 codegen/types:
   `let gap = to_str(c).repeat(n);` then `match (d) { A => `{gap}{s}`, B => `{s}{gap}` }` renders gap as `['x', 'x']` (a char array) instead of its text; `let gap: str = ..` avoids it (builtin_pad.aipl carries the annotation). Likely the sunk/inlined `repeat` loses its str-ness in the interpolation
+  a struct field default that is a variant case (`side: Direction = Right`) fails with `unknown identifier "Right"` even with the case imported or declared in the same file; tabulate's `Column` has to make `side` required

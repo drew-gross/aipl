@@ -2,6 +2,8 @@
 # counts toward every archetype it matches, so the shares can add up to more than all.
 
 import {
+    Left,
+    Right,
     count_if,
     distinct,
     equal as ==,
@@ -19,7 +21,7 @@ import {
 import { Identifier, Meta, Other, archetypes_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
 import { Card, Deck } from "./metagame.aipl";
-import { tabulate } from tabulate;
+import { Column, tabulate } from tabulate;
 
 # The decks of each archetype, most decks first, then the decks that are none of `identifiers`
 # as one `Other` row at the end, whatever its count (and not at all when there are none).
@@ -114,7 +116,11 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[
     [
         `Metagame Breakdown from {name}`,
         "Order by Metagame %",
-        ..rows.tabulate(["Deck Name", "Metagame %", "Count"], right_aligned=[false, true, true]),
+        ..rows.tabulate([
+            Column { header: "Deck Name", side: Right },
+            Column { header: "Metagame %", side: Left },
+            Column { header: "Count", side: Left },
+        ]),
     ]
 }.test({
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };

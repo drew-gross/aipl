@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_tabulate.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>tabulate</code> builtin. The loader names this function by the canonical name <code>__builtin_tabulate</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>rows.tabulate(headers)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>No lint steers the longhand here: a hand-drawn table is built from so many different pieces (separators, padding, borders) that no shape could be advised precisely, and a mis-advised lint is worse than ntwo.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>tabulate</code> builtin. The loader names this function by the canonical name <code>__builtin_tabulate</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>rows.tabulate(columns)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>No lint steers the longhand here: a hand-drawn table is built from so many different pieces (separators, padding, borders) that no shape could be advised precisely, and a mis-advised lint is worse than ntwo.</p></div>
 
 
 
@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>struct Column</code></pre>
 
-          <div class="doc"><p>What a table needs to know of a column to draw a cell of it.</p></div>
+          <div class="doc"><p>A column of a table: what its header says, and the side its cells are padded on: <code>Right</code> leaves the text on the left, and <code>Left</code> puts it on the right, as for numbers.</p></div>
 
 
         </section>
@@ -41,9 +41,9 @@
             <a class="anchor" href="#item-tabulate">tabulate</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tabulate(self: str[][], headers: str[], right_aligned: bool[] = []) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn tabulate(self: str[][], columns: Column[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p><code>rows</code> drawn as a table, as lines: a rule above, <code>headers</code> and a heavier rule under them, the rows, and a rule below. Each column is as wide as its widest cell, padded on the right, or on the left for a column <code>right_aligned</code> marks (a column it does not reach is on the left). A row with fewer cells than <code>headers</code> has blanks for the rest, and one with more is cut off. Callable as a method.</p></div>
+          <div class="doc"><p><code>rows</code> drawn as a table, as lines: a rule above, the headers of <code>columns</code> and a heavier rule under them, the rows, and a rule below. Each column is as wide as its widest cell, its header included, and its cells are on the side its <code>Column</code> says. A row with fewer cells than there are columns has blanks for the rest, and one with more is cut off. Callable as a method.</p></div>
 
 
         </section>
@@ -76,9 +76,9 @@
             <a class="anchor" href="#item-cells_line">cells_line</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn cells_line(self: str[], columns: Column[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn cells_line(self: str[], layout: (u64, Direction)[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>One row's line: each cell padded to its column, between <code>|</code>s. A row with more cells than there are columns is cut off at the last column.</p></div>
+          <div class="doc"><p>One row's line: each cell padded to a width, on a side, between <code>|</code>s. A row with more cells than there are <code>(width, side)</code> pairs is cut off at the last pair.</p></div>
 
 
         </section>
