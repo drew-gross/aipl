@@ -776,6 +776,7 @@ case_tests! {
     cases_structs_errors_err_body_shorthand_non_struct = "cases/structs/errors/err_body_shorthand_non_struct",
     cases_structs_errors_err_generic_arity = "cases/structs/errors/err_generic_arity",
     cases_structs_errors_err_generic_cannot_infer = "cases/structs/errors/err_generic_cannot_infer",
+    cases_structs_field_default_global_names = "cases/structs/field_default_global_names",
     cases_structs_fields_field_init_shorthand = "cases/structs/fields/field_init_shorthand",
     cases_structs_fields_field_order_independent = "cases/structs/fields/field_order_independent",
     cases_structs_fields_fn_field = "cases/structs/fields/fn_field",

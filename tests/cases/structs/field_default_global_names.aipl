@@ -1,0 +1,27 @@
+# A field default is spliced into each construction site, so the names it uses resolve in the file
+# that declares the struct, not the one that builds it: a case of a variant (`side: Edge = Back`)
+# and a struct (`start: Point = Point { x: 0 }`) both work in a file that imports neither.
+
+import { equal as ==, not_equal as != } from builtins;
+import { Box, Front, make } from "./field_default_global_names_lib.aipl";
+
+test({
+    // The case and the struct come from the declaring file's defaults.
+    assert(make() == Box { name: "b" });
+    // A default can still be given explicitly.
+    assert(Box { name: "b", side: Front }.side == Front);
+    assert(make() != Box { name: "b", side: Front });
+})
+--- file: field_default_global_names_lib.aipl ---
+import { equal as == } from builtins;
+
+variant Edge = Front | Back
+
+struct Point { x: i64 }
+
+struct Box { name: str, side: Edge = Back, start: Point = Point { x: 0 } }
+
+pub fn make() -> Box { name: "b" }.test({
+    assert(make().side == Back);
+    assert(make().start == Point { x: 0 });
+})

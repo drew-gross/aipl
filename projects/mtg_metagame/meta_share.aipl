@@ -3,7 +3,6 @@
 
 import {
     Left,
-    Right,
     count_if,
     distinct,
     equal as ==,
@@ -117,7 +116,7 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str[
         `Metagame Breakdown from {name}`,
         "Order by Metagame %",
         ..rows.tabulate([
-            Column { header: "Deck Name", side: Right },
+            Column { header: "Deck Name" },
             Column { header: "Metagame %", side: Left },
             Column { header: "Count", side: Left },
         ]),

@@ -36,9 +36,9 @@ fn rule(widths: u64[], fill: str) -> str {
     assert(rule([2], "=") == "+====+");
 })
 
-# A column of a table: what its header says, and the side its cells are padded on: `Right` leaves
-# the text on the left, and `Left` puts it on the right, as for numbers.
-struct Column { header: str, side: Direction }
+# A column of a table: what its header says, and the side its cells are padded on: `Right` (the
+# default) leaves the text on the left, and `Left` puts it on the right, as for numbers.
+struct Column { header: str, side: Direction = Right }
 
 # One row's line: each cell padded to a width, on a side, between `|`s. A row with more cells than
 # there are `(width, side)` pairs is cut off at the last pair.
@@ -83,7 +83,7 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
     ]
 }.test({
     assert([["ab", "1"], ["c", "10"]].tabulate([
-        Column { header: "Name", side: Right },
+        Column { header: "Name" },
         Column { header: "N", side: Left },
     ]) == [
         "+------+----+",
@@ -94,14 +94,9 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
         "+------+----+",
     ]);
     // No rows: just the header.
-    assert([].tabulate([Column { header: "X", side: Right }]) == [
-        "+---+",
-        "| X |",
-        "+===+",
-        "+---+",
-    ]);
+    assert([].tabulate([Column { header: "X" }]) == ["+---+", "| X |", "+===+", "+---+"]);
     // A column's side is optional, and the free-call form is the same.
-    assert(tabulate([["7"]], [Column { header: "Count", side: Right }]) == [
+    assert(tabulate([["7"]], [Column { header: "Count" }]) == [
         "+-------+",
         "| Count |",
         "+=======+",
@@ -109,7 +104,7 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
         "+-------+",
     ]);
     // A cell wider than its header widens the column.
-    assert([["long"]].tabulate([Column { header: "h", side: Right }]) == [
+    assert([["long"]].tabulate([Column { header: "h" }]) == [
         "+------+",
         "| h    |",
         "+======+",
@@ -118,7 +113,7 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str[] {
     ]);
 }).benchmark({
     let columns = [
-        Column { header: "Name", side: Right },
+        Column { header: "Name" },
         Column { header: "Count", side: Left },
         Column { header: "Share", side: Left },
     ];

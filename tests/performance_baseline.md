@@ -775,6 +775,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/structs/destructure_imported | 8 | 491 | 491 | 1216 | 5560 |
 | tests/cases/structs/destructure_mut | 17 | 1107 | 1107 | 2259 | 6908 |
 | tests/cases/structs/destructure_rename | 22 | 1444 | 1444 | 2403 | 7308 |
+| tests/cases/structs/field_default_global_names | 0 | 0 | 0 | 374 | 1468 |
 | tests/cases/structs/fields/field_init_shorthand | 0 | 0 | 0 | 87 | 404 |
 | tests/cases/structs/fields/field_order_independent | 0 | 0 | 0 | 40 | 212 |
 | tests/cases/structs/fields/fn_field | 1 | 32 | 32 | 154 | 632 |

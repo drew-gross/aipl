@@ -2,7 +2,7 @@
 # (with the `Json` type and its cases), `tabulate` from `tabulate`. A library is a bare word,
 # where a path is quoted, and the same library may be imported on more than one line.
 
-import { Right, equal as ==, len } from builtins;
+import { equal as ==, len } from builtins;
 import { Number, Object, parse } from json;
 import { Column, tabulate } from tabulate;
 
@@ -19,6 +19,6 @@ fn count_of(self: str) -> str {
     assert(count_of("nope") == "bad");
 })
 
-fn boxed(rows: str[][]) -> str[] { rows.tabulate([Column { header: "N", side: Right }]) }.test({
+fn boxed(rows: str[][]) -> str[] { rows.tabulate([Column { header: "N" }]) }.test({
     assert(boxed([["1"]]) == ["+---+", "| N |", "+===+", "| 1 |", "+---+"]);
 })

@@ -1589,7 +1589,14 @@ fn rewrite_item(
                 .map(|fd| aipl_syntax::ast::FieldDecl {
                     name: fd.name.clone(),
                     ty: rewrite_type(&fd.ty, view, &s.type_vars),
-                    default: fd.default.clone(),
+                    // A field default is spliced into every construction site, possibly in
+                    // another file, so its global references resolve through this file's
+                    // view now, as a keyword parameter's default does. No field is a local
+                    // to it: a default reads no other field.
+                    default: fd
+                        .default
+                        .as_ref()
+                        .map(|d| rewrite_expr(d, view, sc, &HashSet::new())),
                 })
                 .collect(),
         }),
