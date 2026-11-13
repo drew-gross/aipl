@@ -69,7 +69,9 @@ pub use reuse_matched_values::reuse_matched_values;
 
 mod move_last_use;
 pub use move_last_use::move_last_uses_post_mono;
+mod stamp_idents;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
+pub use stamp_idents::stamp_idents;
 
 mod subst;
 pub use subst::inline_single_use_bindings;

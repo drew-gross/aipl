@@ -3325,6 +3325,8 @@ fn lower_program(
     // after every pass that reorders pure reads, so a mark reflects the order
     // codegen will actually evaluate in. See `aipl_mono::move_last_use`.
     let program = aipl_mono::move_last_uses_post_mono(program);
+    // A name a pass built has no type of its own; its binder has one.
+    let program = aipl_mono::stamp_idents(&program);
     if let Ok(want) = std::env::var("AIPL_DUMP_FN") {
         for f in &program.fns {
             if f.name == want {

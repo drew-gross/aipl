@@ -174,8 +174,8 @@ fn typed_coverage_report() {
     if let Ok(only) = std::env::var("AIPL_CASE") {
         files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
     }
-    let (mut programs, mut nodes, mut typed) = (0usize, 0usize, 0usize);
-    let mut untyped: BTreeMap<String, (usize, String)> = BTreeMap::new();
+    let (mut programs, mut nodes, mut typed, mut derivable) = (0usize, 0usize, 0usize, 0usize);
+    let mut lost: BTreeMap<String, (usize, String)> = BTreeMap::new();
     let mut unsayable: BTreeMap<String, (usize, String)> = BTreeMap::new();
     for file in &files {
         let Ok(program) = aipl::loader::load_program(file, DebugOptions::OFF) else {
@@ -186,10 +186,8 @@ fn typed_coverage_report() {
         programs += 1;
         nodes += report.nodes;
         typed += report.typed;
-        for (into, from) in [
-            (&mut untyped, report.untyped),
-            (&mut unsayable, report.unsayable),
-        ] {
+        derivable += report.derivable;
+        for (into, from) in [(&mut lost, report.lost), (&mut unsayable, report.unsayable)] {
             for (key, (n, example)) in from {
                 into.entry(key)
                     .or_insert((0, format!("{} -- {example}", file.display())))
@@ -197,8 +195,8 @@ fn typed_coverage_report() {
             }
         }
     }
-    println!("programs {programs}; nodes {nodes}; typed {typed}");
-    for (title, rows) in [("untyped", untyped), ("unsayable", unsayable)] {
+    println!("programs {programs}; nodes {nodes}; typed {typed}; derivable {derivable}");
+    for (title, rows) in [("lost", lost), ("unsayable", unsayable)] {
         let mut rows: Vec<_> = rows.into_iter().collect();
         rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
         for (form, (n, example)) in rows.into_iter().take(40) {

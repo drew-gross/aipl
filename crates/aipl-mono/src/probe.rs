@@ -515,17 +515,21 @@ impl Stamper<'_> {
     }
 }
 
-/// How many nodes of a monomorphized program carry a type a [`ConcreteTy`] can say.
+/// How many nodes of a monomorphized program have a type a [`ConcreteTy`] can say, one way or another.
 ///
 /// Every non-unit node `infer` returns is stamped, and the passes after it build nodes of their
-/// own. This is the measurement of whether a typed tree could be read off the stamps: which forms
-/// are left without one, and which carry a type that is a representation choice rather than a type.
+/// own. This is the measurement of whether a typed tree could be read off the stamps. A node
+/// with no stamp is *derivable* when its form says what it is from its children (a `let` is its
+/// body, an `if` is its branch, an assignment is unit); the rest are lost.
 #[derive(Default, Debug)]
 pub struct Coverage {
     pub nodes: usize,
     pub typed: usize,
-    /// Nodes with no stamp, by form: count and one example (`function @ span`).
-    pub untyped: BTreeMap<String, (usize, String)>,
+    /// Nodes with no stamp whose children say what they are.
+    pub derivable: usize,
+    /// Nodes with no stamp and no way to get one, by form: count and one example
+    /// (`function @ span`).
+    pub lost: BTreeMap<String, (usize, String)>,
     /// Nodes whose stamp a pinned type cannot say, by form and the stamp's text.
     pub unsayable: BTreeMap<String, (usize, String)>,
 }
@@ -534,20 +538,44 @@ pub struct Coverage {
 pub fn coverage(program: &crate::MonoProgram) -> Coverage {
     let mut out = Coverage::default();
     for f in &program.fns {
-        let mut stack = vec![&f.body];
-        while let Some(e) = stack.pop() {
-            out.nodes += 1;
-            let at = format!("{} @ {}..{}", f.name, e.span.start, e.span.end);
-            match e.ty.as_deref() {
-                None => out.untyped.entry(form(&e.kind)).or_insert((0, at)).0 += 1,
-                Some(t) if Ty::from_type(t).is_none() => {
-                    let key = format!("{}: {}", form(&e.kind), aipl_syntax::type_name(t));
-                    out.unsayable.entry(key).or_insert((0, at)).0 += 1;
-                }
-                Some(_) => out.typed += 1,
-            }
-            stack.extend(crate::children(e));
-        }
+        let _ = settle(&f.body, &f.name, &mut out);
     }
     out
+}
+
+/// Whether `e` has a type, stamped or derived from its children, counting every node under it.
+fn settle(e: &Expr, within: &str, out: &mut Coverage) -> bool {
+    out.nodes += 1;
+    // Every child is visited whatever this node comes to, so each is counted.
+    let kids: Vec<bool> = crate::children(e).map(|c| settle(c, within, out)).collect();
+    let at = || format!("{within} @ {}..{}", e.span.start, e.span.end);
+    if let Some(t) = e.ty.as_deref() {
+        if Ty::from_type(t).is_none() {
+            let key = format!("{}: {}", form(&e.kind), aipl_syntax::type_name(t));
+            out.unsayable.entry(key).or_insert((0, at())).0 += 1;
+            return false;
+        }
+        out.typed += 1;
+        return true;
+    }
+    // The children in `crate::children` order: a `let`'s value then its body, a `seq`'s two, an
+    // `if`'s condition and branches. A form is as settled as the child that gives it its type.
+    let (settled, derives) = match &e.kind {
+        ExprKind::Unit | ExprKind::Assign(..) | ExprKind::While(..) | ExprKind::For(..) => {
+            (true, true)
+        }
+        ExprKind::Return(..) => (true, true),
+        ExprKind::Let(..) | ExprKind::LetMut(..) | ExprKind::Seq(..) | ExprKind::Shim(..) => {
+            (kids.last().copied().unwrap_or(true), true)
+        }
+        ExprKind::If(..) => (kids.iter().skip(1).any(|k| *k), true),
+        ExprKind::Match(..) => (kids.iter().skip(1).any(|k| *k), true),
+        _ => (false, false),
+    };
+    if derives && settled {
+        out.derivable += 1;
+        return true;
+    }
+    out.lost.entry(form(&e.kind)).or_insert((0, at())).0 += 1;
+    false
 }

@@ -161,10 +161,19 @@ monomorphization and the post-mono passes:
   `move_last_use` around a value), `If` 49k, `Ident` 34k, `Match` 16k, and a tail of `Call
   __builtin_equal` 706, `Num` 461, `__filter_*` 1.2k, `Str` 245, `Field` 50, the `extend_map`
   instances of `subexprs`, shim cell calls and the terminal builtins.
-- `Call __move` is done: `move_last_use` builds its wrappers with `moved(inner)`, which keeps the
-  operand's type. Next: `If`, `Ident`, `Match`, then the tail.
-- So step 2 starts by making the passes that build those nodes stamp them (`move_last_use` first:
-  it is 8% of all nodes), then adding the adapter with the structural forms derived.
+- Done so far, with the coverage test now counting a node as *derivable* when its form says what it is
+  from its children (a `let` is its body, an `if` its branch, an assignment unit) and as *lost* only
+  when nothing does:
+  - `move_last_use` builds `__move` with `moved(inner)`, which keeps the operand's type.
+  - `stamp_idents` runs last in `lower_program`: it types each bare name from its binder (a parameter,
+    a `let`, a `for`, a match arm's pattern read against the scrutinee's type), a comparison as `bool`
+    (a literal operand takes the other side's type), a string literal as `str`, a `Field` from the
+    struct declaration, and a `__move` as its operand.
+  - On a spot run (209 programs, 13,343 nodes) the lost nodes went from 87 to 9, all calls to
+    unit-valued intrinsics (`__filter_drop`, `__filter_truncate`, `__map_set`, the mutating
+    `extend_*` instances). The adapter has to say those are unit by callee.
+  - `If` and `Match` were never lost: an untyped one is a statement whose branches are unit.
+- Next: the adapter itself, then the post-mono passes and codegen reading `expr.ty`.
 
 ## First action when this is picked up (done; kept for the record)
 
