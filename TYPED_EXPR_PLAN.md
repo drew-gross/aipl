@@ -173,7 +173,20 @@ monomorphization and the post-mono passes:
     unit-valued intrinsics (`__filter_drop`, `__filter_truncate`, `__map_set`, the mutating
     `extend_*` instances). The adapter has to say those are unit by callee.
   - `If` and `Match` were never lost: an untyped one is a statement whose branches are unit.
-- Next: the adapter itself, then the post-mono passes and codegen reading `expr.ty`.
+- The adapter (`aipl-mono/src/typed_adapter.rs`): `on_typed(program, pass)` types each body
+  (a bare name from its binder, a statement form as unit, a binding or sequence as its body, an
+  `if`/`match` as a branch, a call to a unit-answering builtin/instance as unit, an unfitted
+  literal as `i64`), hands it to `pass` as `TExpr<ConcreteTy>`, and converts back. Conversion adds
+  nothing: a node that was not stamped (`TExpr::derived`) comes back unstamped, and a binding that
+  was annotated (`TExpr::annotated`) keeps its annotation, which is its value's type. A concat
+  string, which `ConcreteTy` cannot say, travels as a named type of its own.
+- First pass on it: `fuse_try_with_post_mono` (its pre-mono twin still reads `Expr`, so the logic
+  is written twice until that side is typed).
+- Found on the way: mono's `node(..)` stamped the call's type on the `Field` of a call through a
+  function-valued field (fixed: the field is left unstamped), and `children_mut` skips an
+  assignment's target.
+- Next: the other post-mono passes the same way, each through `on_typed`; then codegen reading
+  `expr.ty`.
 
 ## First action when this is picked up (done; kept for the record)
 

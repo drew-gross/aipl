@@ -39,7 +39,7 @@ pub fn stamp_idents(program: &MonoProgram) -> MonoProgram {
 }
 
 /// What each element of a value of type `t` is, when a `for` can walk it.
-fn element_of(t: &Type) -> Option<Type> {
+pub(crate) fn element_of(t: &Type) -> Option<Type> {
     match t {
         Type::Array(inner) | Type::Set(inner, _) => Some((**inner).clone()),
         Type::Primitive(Primitive::Str) | Type::ConcatStr => Some(Type::Primitive(Primitive::Char)),
@@ -62,7 +62,7 @@ fn fill(e: &mut Expr, scope: &mut Vec<(String, Option<Type>)>, decls: &Decls<'_>
         ExprKind::Let(name, declared, value, body)
         | ExprKind::LetMut(name, declared, value, body) => {
             fill(value, scope, decls);
-            let ty = declared.clone().or_else(|| value.ty.as_deref().cloned());
+            let ty = declared.clone().or_else(|| derived(value));
             scope.push((name.clone(), ty));
             fill(body, scope, decls);
             scope.pop();
@@ -79,6 +79,20 @@ fn fill(e: &mut Expr, scope: &mut Vec<(String, Option<Type>)>, decls: &Decls<'_>
                 scope.pop();
             }
             scope.pop();
+        }
+        ExprKind::Lambda(params, body) => {
+            let depth = scope.len();
+            scope.extend(params.iter().map(|p| (p.name.clone(), p.ty.clone())));
+            fill(body, scope, decls);
+            scope.truncate(depth);
+        }
+        ExprKind::IfLet(arm, scrutinee, otherwise) => {
+            fill(scrutinee, scope, decls);
+            let depth = scope.len();
+            scope.extend(bindings_typed(&arm.pattern, scrutinee.ty.as_deref(), decls));
+            fill(&mut arm.body, scope, decls);
+            scope.truncate(depth);
+            fill(otherwise, scope, decls);
         }
         ExprKind::Match(scrutinee, arms) => {
             fill(scrutinee, scope, decls);
@@ -99,10 +113,28 @@ fn fill(e: &mut Expr, scope: &mut Vec<(String, Option<Type>)>, decls: &Decls<'_>
     }
 }
 
+/// The type `e` has: its stamp, or the one its form says from what it holds (a binding or a
+/// sequence is its body, an `if` or `match` a branch). `None` for a unit value.
+fn derived(e: &Expr) -> Option<Type> {
+    if let Some(t) = &e.ty {
+        return Some((**t).clone());
+    }
+    match &e.kind {
+        ExprKind::Let(_, _, _, body)
+        | ExprKind::LetMut(_, _, _, body)
+        | ExprKind::Seq(_, body)
+        | ExprKind::Shim(_, _, body) => derived(body),
+        ExprKind::If(_, then, otherwise) => derived(then).or_else(|| derived(otherwise)),
+        ExprKind::Match(_, arms) => arms.iter().find_map(|a| derived(&a.body)),
+        ExprKind::IfLet(arm, _, otherwise) => derived(&arm.body).or_else(|| derived(otherwise)),
+        _ => None,
+    }
+}
+
 /// The declarations a name's type can be read from.
-struct Decls<'a> {
-    variants: &'a [ConcreteVariantDecl],
-    structs: &'a [ConcreteStructDecl],
+pub(crate) struct Decls<'a> {
+    pub(crate) variants: &'a [ConcreteVariantDecl],
+    pub(crate) structs: &'a [ConcreteStructDecl],
 }
 
 /// A node a pass built without a type, once its children have theirs: what it is follows from what
@@ -160,7 +192,7 @@ fn settle_built(e: &mut Expr, decls: &Decls<'_>) {
 
 /// The names `pattern` binds, with the type each has when the scrutinee's type says: the payload of
 /// an optional, a result or a variant case, or the element of an array.
-fn bindings_typed(
+pub(crate) fn bindings_typed(
     pattern: &Pattern,
     scrutinee: Option<&Type>,
     decls: &Decls<'_>,

@@ -278,6 +278,13 @@ pub struct TExpr<T: TyRepr = Ty> {
     /// the function decided, so pinning fell back to a default. Such a type is not a finding: the
     /// argument is for monomorphization to settle from the instances the program has.
     pub unsettled: bool,
+    /// Whether `ty` was worked out from the node's form and its surroundings rather than recorded
+    /// on it: the tree this one came from carried no stamp here. Going back to an `Expr` such a
+    /// node is left unstamped, so a conversion round trip adds nothing a pass could trip over.
+    pub derived: bool,
+    /// For a `let` or `mut`: whether the binding was written with, or recorded as having, a type of
+    /// its own (`mut n: u64 = 0`), which is then its value's `ty`.
+    pub annotated: bool,
 }
 
 /// One arm of a typed `match`, or the arm of an `if let`.
@@ -387,6 +394,8 @@ impl<T: TyRepr> TExpr<T> {
             value_span: None,
             name_span: None,
             unsettled: false,
+            derived: false,
+            annotated: false,
         }
     }
 
@@ -400,6 +409,8 @@ impl<T: TyRepr> TExpr<T> {
             value_span: like.value_span.clone(),
             name_span: like.name_span.clone(),
             unsettled: false,
+            derived: false,
+            annotated: false,
         }
     }
 
@@ -738,6 +749,8 @@ impl<T: TyRepr> TExpr<T> {
             value_span: self.value_span.clone(),
             name_span: self.name_span.clone(),
             unsettled: self.unsettled,
+            derived: self.derived,
+            annotated: self.annotated,
         })
     }
 }
@@ -812,6 +825,11 @@ impl<T: TyRepr> TMatchArm<T> {
 }
 
 impl<T: TyRepr> TPattern<T> {
+    /// The names this pattern binds, as [`Pattern::bindings`] says them.
+    pub fn bindings(&self) -> Vec<String> {
+        self.erase().bindings().to_vec()
+    }
+
     fn erase(&self) -> Pattern {
         match self {
             TPattern::Ctor {

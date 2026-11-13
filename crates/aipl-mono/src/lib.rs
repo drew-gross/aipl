@@ -70,6 +70,7 @@ pub use reuse_matched_values::reuse_matched_values;
 mod move_last_use;
 pub use move_last_use::move_last_uses_post_mono;
 mod stamp_idents;
+mod typed_adapter;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
 pub use stamp_idents::stamp_idents;
 
@@ -7775,7 +7776,9 @@ impl Mono<'_> {
                     let mut it = rargs.into_iter();
                     let recv = it.next().expect("call through a field has a receiver");
                     let rest: Vec<Expr> = it.collect();
-                    let field = node(ExprKind::Field(Box::new(recv), name.to_string()));
+                    let mut field = node(ExprKind::Field(Box::new(recv), name.to_string()));
+                    // `node` stamps the call's type, which is not the field's.
+                    field.ty = None;
                     let call = node(ExprKind::Call(Callee::Local(tmp.clone()), rest, false));
                     (
                         node(ExprKind::Let(tmp, None, Box::new(field), Box::new(call))),

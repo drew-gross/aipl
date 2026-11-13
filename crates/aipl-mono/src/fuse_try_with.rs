@@ -31,6 +31,8 @@
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Pattern, Program};
 
+use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm, TPattern};
+
 use crate::{children, children_mut, MonoProgram};
 
 /// A binding, and the fields read off it in turn.
@@ -59,13 +61,9 @@ pub fn fuse_try_with(program: &Program) -> Program {
     }
 }
 
-/// [`fuse_try_with`] over monomorphized functions.
+/// [`fuse_try_with`] over monomorphized functions, on the typed tree.
 pub fn fuse_try_with_post_mono(program: &MonoProgram) -> MonoProgram {
-    let mut out = program.clone();
-    for f in &mut out.fns {
-        fuse(&mut f.body, &mut Vec::new());
-    }
-    out
+    crate::typed_adapter::on_typed(program, |body| fuse_typed(body, &mut Vec::new()))
 }
 
 /// Rewrite `e` in place, children first. `aliases` are the immutable `let a = place`
@@ -240,4 +238,147 @@ fn lower(e: &mut Expr) {
         *callee = Callee::WithOrSelf;
         *style = false;
     }
+}
+
+// The typed twin of `fuse` and what it calls, for the passes after monomorphization. The
+// pre-monomorphization pass above still reads `Expr`; it goes when that side is typed.
+
+type Typed = TExpr<ConcreteTy>;
+
+fn fuse_typed(e: &mut Typed, aliases: &mut Vec<(String, Place)>) {
+    if let TExprKind::Let(name, value, body) = &mut e.kind {
+        fuse_typed(value, aliases);
+        let alias = place_of_typed(value, aliases)
+            .filter(|(root, _)| !disturbs_typed(body, &[name.as_str(), root.as_str()]));
+        let aliased = alias.is_some();
+        if let Some(place) = alias {
+            aliases.push((name.clone(), place));
+        }
+        fuse_typed(body, aliases);
+        if aliased {
+            aliases.pop();
+        }
+    } else {
+        e.for_each_child_mut(&mut |child| fuse_typed(child, aliases));
+    }
+    rewrite_typed(e, aliases);
+}
+
+fn rewrite_typed(e: &mut Typed, aliases: &[(String, Place)]) {
+    let args = match &e.kind {
+        TExprKind::Call {
+            callee: Callee::ValueOr,
+            args,
+            ..
+        } => match args.as_slice() {
+            [w, default] => with_args_typed(w).filter(|a| same_typed(&a[0], default, aliases)),
+            _ => None,
+        },
+        TExprKind::Let(s, w, body) => match &body.kind {
+            TExprKind::Match(scrutinee, arms) if matches!(&scrutinee.kind, TExprKind::Ident(n) if n == s) => {
+                with_args_typed(w).filter(|a| falls_back_to_typed(arms, &a[0], aliases))
+            }
+            _ => None,
+        },
+        _ => None,
+    };
+    if let Some(args) = args {
+        e.kind = TExprKind::Call {
+            callee: Callee::WithOrSelf,
+            type_args: Vec::new(),
+            args,
+            method_style: false,
+        };
+    }
+}
+
+fn with_args_typed(e: &Typed) -> Option<Vec<Typed>> {
+    match &e.kind {
+        TExprKind::Call {
+            callee: Callee::With,
+            args,
+            ..
+        } if args.len() == 3 => Some(args.clone()),
+        _ => None,
+    }
+}
+
+fn falls_back_to_typed(
+    arms: &[TMatchArm<ConcreteTy>],
+    receiver: &Typed,
+    aliases: &[(String, Place)],
+) -> bool {
+    let [a, b] = arms else {
+        return false;
+    };
+    fn ctor(arm: &TMatchArm<ConcreteTy>) -> Option<(&str, &[String])> {
+        match &arm.pattern {
+            TPattern::Ctor { name, bindings, .. } => Some((name.as_str(), bindings.as_slice())),
+            _ => None,
+        }
+    }
+    let (some, none) = match (ctor(a), ctor(b)) {
+        (Some(("some", _)), Some(("none", []))) => (a, b),
+        (Some(("none", [])), Some(("some", _))) => (b, a),
+        _ => return false,
+    };
+    let Some(("some", [bound])) = ctor(some) else {
+        return false;
+    };
+    if !matches!(&some.body.kind, TExprKind::Ident(n) if n == bound) {
+        return false;
+    }
+    match &none.body.kind {
+        TExprKind::Let(d, value, rest) if matches!(&rest.kind, TExprKind::Ident(n) if n == d) => {
+            same_typed(receiver, value, aliases)
+        }
+        _ => same_typed(receiver, &none.body, aliases),
+    }
+}
+
+fn same_typed(a: &Typed, b: &Typed, aliases: &[(String, Place)]) -> bool {
+    match (place_of_typed(a, aliases), place_of_typed(b, aliases)) {
+        (Some(x), Some(y)) => x == y,
+        _ => false,
+    }
+}
+
+fn place_of_typed(e: &Typed, aliases: &[(String, Place)]) -> Option<Place> {
+    match &e.kind {
+        TExprKind::Ident(n) => Some(
+            aliases
+                .iter()
+                .rev()
+                .find(|(a, _)| a == n)
+                .map(|(_, p)| p.clone())
+                .unwrap_or_else(|| (n.clone(), Vec::new())),
+        ),
+        TExprKind::Field(inner, f) => {
+            let (root, mut path) = place_of_typed(inner, aliases)?;
+            path.push(f.clone());
+            Some((root, path))
+        }
+        TExprKind::Let(d, value, body) if matches!(&body.kind, TExprKind::Ident(n) if n == d) => {
+            place_of_typed(value, aliases)
+        }
+        _ => None,
+    }
+}
+
+fn disturbs_typed(e: &Typed, names: &[&str]) -> bool {
+    let named = |n: &String| names.contains(&n.as_str());
+    let here = match &e.kind {
+        TExprKind::Let(n, _, _) | TExprKind::LetMut(n, _, _) => named(n),
+        TExprKind::Assign(lhs, _, _) => matches!(&lhs.kind, TExprKind::Ident(n) if named(n)),
+        TExprKind::For(n, index, _, _) => names.iter().any(|x| aipl_syntax::for_binds(n, index, x)),
+        TExprKind::Lambda(params, _) => params.iter().any(|p| named(&p.name)),
+        TExprKind::Match(_, arms) => arms
+            .iter()
+            .any(|arm| arm.pattern.bindings().iter().any(named)),
+        TExprKind::IfLet(arm, _, _) => arm.pattern.bindings().iter().any(named),
+        _ => false,
+    };
+    let mut below = false;
+    e.for_each_child(&mut |c| below = below || disturbs_typed(c, names));
+    here || below
 }
