@@ -180,13 +180,22 @@ monomorphization and the post-mono passes:
   nothing: a node that was not stamped (`TExpr::derived`) comes back unstamped, and a binding that
   was annotated (`TExpr::annotated`) keeps its annotation, which is its value's type. A concat
   string, which `ConcreteTy` cannot say, travels as a named type of its own.
-- First pass on it: `fuse_try_with_post_mono` (its pre-mono twin still reads `Expr`, so the logic
-  is written twice until that side is typed).
+- Passes on it (each through `on_typed`/`on_typed_where`/`on_typed_named`): `fuse_try_with`,
+  `fold_matches`, `sink_bindings`, `eliminate_known_constructors`, `move_last_uses` (all
+  `*_post_mono`), and the expansion step of the two post-mono inliners (`inline_typed.rs`: the
+  decisions are still made on `Expr`, the bodies a call sits in and the body it expands to are
+  converted, spliced, and converted back). Helpers they share are in `typed_util.rs` (children,
+  `mentions_free`, `rename_scoped`, `uses_of`, ...), `early_exit.rs` has a typed twin.
+- A binding's `annotation` lives on the `let` node (`TExpr::annotation`) and can differ from its
+  value's `ty`: the inliner binds a `char[]` argument as the parameter's `str`.
+- Twins still written twice, until mono and the pre-mono passes are typed: `fuse_try_with`,
+  `fold_match`, `sink_here`, `early_exit`, the analysis half of `move_last_use` (mono's early run
+  still calls the `Expr` one).
 - Found on the way: mono's `node(..)` stamped the call's type on the `Field` of a call through a
   function-valued field (fixed: the field is left unstamped), and `children_mut` skips an
   assignment's target.
-- Next: the other post-mono passes the same way, each through `on_typed`; then codegen reading
-  `expr.ty`.
+- Next: convert once before the post-mono pipeline instead of per pass (each pass pays a round
+  trip now); then codegen reading `expr.ty`; then mono and the pre-mono passes, deleting the twins.
 
 ## First action when this is picked up (done; kept for the record)
 

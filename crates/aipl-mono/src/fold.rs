@@ -42,7 +42,8 @@
 //! piece folding first, it never has two literals to join.
 
 use crate::passes::Scope;
-use crate::{ConcreteFn, MonoProgram};
+use crate::MonoProgram;
+use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm, TPattern};
 use std::collections::HashMap;
 
 use aipl_syntax::ast::{
@@ -107,49 +108,35 @@ pub fn fold_constants(program: &Program, scope: &Scope) -> Program {
 /// nothing. Choosing an arm moves no literal into anything it was not already
 /// in.
 pub fn fold_matches_post_mono(program: &MonoProgram, scope: &Scope) -> MonoProgram {
-    MonoProgram {
-        fns: program
-            .fns
-            .iter()
-            .map(|f| match scope.covers(&f.name) {
-                true => ConcreteFn {
-                    body: fold_matches(&f.body),
-                    ..f.clone()
-                },
-                false => f.clone(),
-            })
-            .collect(),
-        ..program.clone()
-    }
+    crate::typed_adapter::on_typed_where(program, |name| scope.covers(name), fold_matches_typed)
 }
+
+type Typed = TExpr<ConcreteTy>;
 
 /// `e` with every `match` on a literal replaced by the arm that takes it,
 /// innermost first.
-fn fold_matches(e: &Expr) -> Expr {
-    let mut out = e.clone();
-    for child in crate::children_mut(&mut out) {
-        *child = fold_matches(child);
-    }
+fn fold_matches_typed(e: &mut Typed) {
+    crate::typed_util::each_child_mut(e, &mut fold_matches_typed);
     // A `let` of a `str` literal used only as the scrutinee of its body's `match`
     // is that `match` on the literal (see `is_match_only_use`).
-    if let ExprKind::Let(name, ty, value, body) = &out.kind {
-        if is_match_only_use(value, ty.as_ref(), body, name) {
-            if let ExprKind::Match(_, arms) = &body.kind {
-                let moved = Expr::rebuilt(ExprKind::Match(value.clone(), arms.clone()), body);
-                out = match fold_match(value, arms) {
-                    Some(taken) => Expr::rebuilt(taken, e),
-                    None => Expr::rebuilt(moved.kind, e),
-                };
-                return out;
+    let folded = match &e.kind {
+        TExprKind::Let(name, value, body)
+            if is_match_only_use_typed(value, e.annotation.as_ref(), body, name) =>
+        {
+            match &body.kind {
+                TExprKind::Match(_, arms) => Some(
+                    fold_match_typed(value, arms)
+                        .unwrap_or_else(|| TExprKind::Match(value.clone(), arms.clone())),
+                ),
+                _ => None,
             }
         }
+        TExprKind::Match(scrutinee, arms) => fold_match_typed(scrutinee, arms),
+        _ => None,
+    };
+    if let Some(kind) = folded {
+        *e = TExpr::rebuilt(kind, e.ty.clone(), e);
     }
-    if let ExprKind::Match(scrutinee, arms) = &out.kind {
-        if let Some(taken) = fold_match(scrutinee, arms) {
-            return Expr::rebuilt(taken, e);
-        }
-    }
-    out
 }
 
 /// Structurally rebuild `e` with children folded first, then fold this node
@@ -308,6 +295,27 @@ fn is_match_only_use(v: &Expr, ty: Option<&Type>, body: &Expr, name: &str) -> bo
             .any(|a| crate::sink::mentions_free(&a.body, name))
 }
 
+/// [`is_match_only_use`] over the typed tree, with the binding's `annotation`.
+fn is_match_only_use_typed(
+    v: &Typed,
+    annotation: Option<&ConcreteTy>,
+    body: &Typed,
+    name: &str,
+) -> bool {
+    if !matches!(v.kind, TExprKind::Str(_))
+        || annotation.is_some_and(|a| *a != ConcreteTy::Primitive(Primitive::Str))
+    {
+        return false;
+    }
+    let TExprKind::Match(scrutinee, arms) = &body.kind else {
+        return false;
+    };
+    matches!(&scrutinee.kind, TExprKind::Ident(n) if n == name)
+        && !arms
+            .iter()
+            .any(|a| crate::typed_util::mentions_free(&a.body, name))
+}
+
 /// Whether `e` rebinds `name` anywhere within it — a `let`/`mut`, a `for`
 /// variable, a lambda parameter, or a `match` arm's payload binding.
 ///
@@ -452,6 +460,37 @@ fn fold_match(scrutinee: &Expr, arms: &[MatchArm]) -> Option<ExprKind> {
     if arms
         .iter()
         .any(|a| crate::contains_context_literal(&a.body))
+    {
+        return None;
+    }
+    Some(taken.body.kind.clone())
+}
+
+/// [`fold_match`] over the typed tree.
+fn fold_match_typed(
+    scrutinee: &Typed,
+    arms: &[TMatchArm<ConcreteTy>],
+) -> Option<TExprKind<ConcreteTy>> {
+    let accepts = |pattern: &TPattern<ConcreteTy>| -> Option<bool> {
+        match (&scrutinee.kind, pattern) {
+            (_, TPattern::Wildcard) => Some(true),
+            (TExprKind::Str(s), TPattern::Str(p)) => Some(s == p),
+            (TExprKind::Char(c), TPattern::Char(p)) => Some(c == p),
+            (TExprKind::Int(n), TPattern::Int(p)) => Some(n == p),
+            _ => None,
+        }
+    };
+    let mut taken = None;
+    for arm in arms {
+        if accepts(&arm.pattern)? {
+            taken = Some(arm);
+            break;
+        }
+    }
+    let taken = taken?;
+    if arms
+        .iter()
+        .any(|a| crate::typed_util::contains_context_literal(&a.body))
     {
         return None;
     }

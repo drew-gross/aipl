@@ -56,9 +56,10 @@ use crate::passes::Scope;
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
+use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm};
 
 use crate::subst::read_names;
-use crate::{ConcreteFn, MonoProgram};
+use crate::MonoProgram;
 
 /// Builtins whose call can abort the program, so deferring one past a branch
 /// could turn a program that dies into one that doesn't. `__assert` is what
@@ -409,19 +410,170 @@ pub fn sink_bindings_post_mono(
     scope: &Scope,
 ) -> MonoProgram {
     let blocked = undeferrable_fns_post_mono(program, builtin_effects);
-    MonoProgram {
-        fns: program
-            .fns
-            .iter()
-            .map(|f| match scope.covers(&f.name) {
-                true => ConcreteFn {
-                    body: sink_expr(&f.body, &blocked),
-                    ..f.clone()
-                },
-                false => f.clone(),
-            })
-            .collect(),
-        ..program.clone()
+    crate::typed_adapter::on_typed_where(
+        program,
+        |name| scope.covers(name),
+        |body| {
+            let taken = std::mem::replace(body, placeholder());
+            *body = sink_typed(taken, &blocked);
+        },
+    )
+}
+
+type Typed = TExpr<ConcreteTy>;
+
+fn placeholder() -> Typed {
+    TExpr::new(TExprKind::Unit, ConcreteTy::Unit, 0..0)
+}
+
+/// [`reaches_blocked`] over the typed tree.
+fn reaches_blocked_typed(e: &Typed, blocked: &HashSet<String>) -> bool {
+    let here = match &e.kind {
+        TExprKind::Call { callee, .. } => blocked.contains(callee.name()),
+        TExprKind::Ident(name) => blocked.contains(name),
+        TExprKind::Shim(..) => true,
+        _ => false,
+    };
+    here || crate::typed_util::any_child(e, |c| reaches_blocked_typed(c, blocked))
+}
+
+/// [`can_defer`] over the typed tree.
+pub(crate) fn can_defer_typed(value: &Typed, blocked: &HashSet<String>) -> bool {
+    fn moves_control_or_writes(e: &Typed) -> bool {
+        matches!(
+            &e.kind,
+            TExprKind::Try(_)
+                | TExprKind::Return(_)
+                | TExprKind::Assign(..)
+                | TExprKind::For(..)
+                | TExprKind::While(..)
+        ) || crate::typed_util::any_child(e, moves_control_or_writes)
+    }
+    !reaches_blocked_typed(value, blocked) && !moves_control_or_writes(value)
+}
+
+/// [`sink_expr`] over the typed tree.
+fn sink_typed(mut e: Typed, blocked: &HashSet<String>) -> Typed {
+    crate::typed_util::each_child_mut(&mut e, &mut |child| {
+        let taken = std::mem::replace(child, placeholder());
+        *child = sink_typed(taken, blocked);
+    });
+    sink_here_typed(e, blocked)
+}
+
+/// [`sink_here`] over the typed tree. A binding re-formed around an arm has the arm's type.
+fn sink_here_typed(e: Typed, blocked: &HashSet<String>) -> Typed {
+    let TExprKind::Let(name, value, body) = &e.kind else {
+        return e;
+    };
+    if !can_defer_typed(value, blocked) {
+        return e;
+    }
+    let annotation = e.annotation.clone();
+    // The binding, re-formed around whichever arm turned out to use it.
+    let rebind = |arm: &Typed| {
+        let mut node = TExpr::rebuilt(
+            TExprKind::Let(name.clone(), value.clone(), Box::new(arm.clone())),
+            arm.ty.clone(),
+            &e,
+        );
+        node.annotation = annotation.clone();
+        node
+    };
+    use crate::typed_util::{mentions_free, read_names};
+    match &body.kind {
+        TExprKind::If(cond, then, els) => {
+            if mentions_free(cond, name) {
+                return e;
+            }
+            match (mentions_free(then, name), mentions_free(els, name)) {
+                (true, false) => TExpr::rebuilt(
+                    TExprKind::If(cond.clone(), Box::new(rebind(then)), els.clone()),
+                    body.ty.clone(),
+                    body,
+                ),
+                (false, true) => TExpr::rebuilt(
+                    TExprKind::If(cond.clone(), then.clone(), Box::new(rebind(els))),
+                    body.ty.clone(),
+                    body,
+                ),
+                _ => e,
+            }
+        }
+        TExprKind::Match(scrutinee, arms) => {
+            if mentions_free(scrutinee, name) {
+                return e;
+            }
+            if arms
+                .iter()
+                .any(|a| a.pattern.bindings().iter().any(|b| b == name))
+            {
+                return e;
+            }
+            let mut users = arms
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| mentions_free(&a.body, name))
+                .map(|(i, _)| i);
+            let (Some(only), None) = (users.next(), users.next()) else {
+                return e;
+            };
+            let mut read = HashSet::new();
+            read_names(value, &mut read);
+            if arms[only]
+                .pattern
+                .bindings()
+                .iter()
+                .any(|b| read.contains(b))
+            {
+                return e;
+            }
+            let arms = arms
+                .iter()
+                .enumerate()
+                .map(|(i, a)| TMatchArm {
+                    body: if i == only {
+                        rebind(&a.body)
+                    } else {
+                        a.body.clone()
+                    },
+                    ..a.clone()
+                })
+                .collect();
+            TExpr::rebuilt(
+                TExprKind::Match(scrutinee.clone(), arms),
+                body.ty.clone(),
+                body,
+            )
+        }
+        TExprKind::Seq(first, rest) if !mentions_free(rest, name) => {
+            let narrowed = sink_here_typed(rebind(first), blocked);
+            TExpr::rebuilt(
+                TExprKind::Seq(Box::new(narrowed), rest.clone()),
+                body.ty.clone(),
+                body,
+            )
+        }
+        TExprKind::Let(other, other_value, rest)
+            if other != name
+                && !mentions_free(other_value, name)
+                && !mentions_free(value, other)
+                && can_defer_typed(other_value, blocked) =>
+        {
+            let moved = rebind(rest);
+            let sunk = sink_here_typed(moved.clone(), blocked);
+            if sunk == moved {
+                return e;
+            }
+            let mut node = TExpr::rebuilt(
+                TExprKind::Let(other.clone(), other_value.clone(), Box::new(sunk)),
+                body.ty.clone(),
+                body,
+            );
+            node.annotation = body.annotation.clone();
+            node
+        }
+        _ => e,
     }
 }
 

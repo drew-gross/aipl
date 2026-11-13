@@ -1824,7 +1824,7 @@ impl Pinner<'_> {
             name_span: e.name_span.clone(),
             unsettled: false,
             derived: false,
-            annotated: false,
+            annotation: None,
         }
     }
 

@@ -69,11 +69,46 @@ impl Cx<'_> {
 
 /// `program` with `pass` applied to every function body as a typed tree.
 pub fn on_typed(program: &MonoProgram, pass: impl Fn(&mut TExpr<ConcreteTy>)) -> MonoProgram {
+    on_typed_where(program, |_| true, pass)
+}
+
+/// [`on_typed`] for a pass that needs to know which function it is in.
+pub fn on_typed_named(
+    program: &MonoProgram,
+    pass: impl Fn(&str, &mut TExpr<ConcreteTy>),
+) -> MonoProgram {
     MonoProgram {
         fns: program
             .fns
             .iter()
             .map(|f| {
+                let mut typed = to_typed(f, program)
+                    .unwrap_or_else(|why| panic!("{}: cannot type the body: {why}", f.name));
+                pass(&f.name, &mut typed);
+                ConcreteFn {
+                    body: from_typed(&typed),
+                    ..f.clone()
+                }
+            })
+            .collect(),
+        ..program.clone()
+    }
+}
+
+/// [`on_typed`] for the functions `covers` names; the others come back as they were.
+pub fn on_typed_where(
+    program: &MonoProgram,
+    covers: impl Fn(&str) -> bool,
+    pass: impl Fn(&mut TExpr<ConcreteTy>),
+) -> MonoProgram {
+    MonoProgram {
+        fns: program
+            .fns
+            .iter()
+            .map(|f| {
+                if !covers(&f.name) {
+                    return f.clone();
+                }
                 let mut typed = to_typed(f, program)
                     .unwrap_or_else(|why| panic!("{}: cannot type the body: {why}", f.name));
                 pass(&mut typed);
@@ -119,7 +154,7 @@ fn stamp_of(t: &ConcreteTy) -> Type {
     t.to_type()
 }
 
-fn concrete(t: &Type) -> Result<ConcreteTy, String> {
+pub(crate) fn concrete(t: &Type) -> Result<ConcreteTy, String> {
     Ok(Ty::from_type(t)
         .and_then(|t| t.concretize(&|_| None))
         .unwrap_or_else(|| opaque(t)))
@@ -162,7 +197,7 @@ pub fn to_typed(f: &ConcreteFn, program: &MonoProgram) -> Result<TExpr<ConcreteT
 
 fn typed(e: &Expr, cx: &Cx<'_>) -> Result<TExpr<ConcreteTy>, String> {
     let program = cx.program;
-    let mut annotated_flag = false;
+    let mut annotation: Option<ConcreteTy> = None;
     let sub = |x: &Expr| typed(x, cx);
     let boxed = |x: &Expr| typed(x, cx).map(Box::new);
     let (kind, derived) = match &e.kind {
@@ -273,15 +308,15 @@ fn typed(e: &Expr, cx: &Cx<'_>) -> Result<TExpr<ConcreteTy>, String> {
             (TExprKind::Field(x, f.clone()), declared)
         }
         ExprKind::Let(n, declared, v, b) => {
-            let (v, b, annotated) = binding(n, declared, v, b, cx)?;
+            let (v, b, declared_ty) = binding(n, declared, v, b, cx)?;
             let ty = b.ty.clone();
-            annotated_flag = annotated;
+            annotation = declared_ty;
             (TExprKind::Let(n.clone(), v, b), Some(ty))
         }
         ExprKind::LetMut(n, declared, v, b) => {
-            let (v, b, annotated) = binding(n, declared, v, b, cx)?;
+            let (v, b, declared_ty) = binding(n, declared, v, b, cx)?;
             let ty = b.ty.clone();
-            annotated_flag = annotated;
+            annotation = declared_ty;
             (TExprKind::LetMut(n.clone(), v, b), Some(ty))
         }
         ExprKind::Assign(l, v, r) => {
@@ -446,7 +481,7 @@ fn typed(e: &Expr, cx: &Cx<'_>) -> Result<TExpr<ConcreteTy>, String> {
     out.value_span = e.value_span.clone();
     out.name_span = e.name_span.clone();
     out.derived = e.ty.is_none();
-    out.annotated = annotated_flag;
+    out.annotation = annotation;
     Ok(out)
 }
 
@@ -459,10 +494,19 @@ fn binding(
     value: &Expr,
     body: &Expr,
     cx: &Cx<'_>,
-) -> Result<(Box<TExpr<ConcreteTy>>, Box<TExpr<ConcreteTy>>, bool), String> {
+) -> Result<
+    (
+        Box<TExpr<ConcreteTy>>,
+        Box<TExpr<ConcreteTy>>,
+        Option<ConcreteTy>,
+    ),
+    String,
+> {
     let mut value = typed(value, cx)?;
-    if let Some(t) = declared {
-        value.ty = concrete(t)?;
+    let declared = declared.as_ref().map(concrete).transpose()?;
+    // A literal nothing fitted takes the type the binding declares.
+    if let (Some(t), true) = (&declared, value.derived) {
+        value.ty = t.clone();
     }
     let depth = cx.bind([(
         name.to_string(),
@@ -471,7 +515,7 @@ fn binding(
     )]);
     let body = typed(body, cx);
     cx.unbind(depth);
-    Ok((Box::new(value), Box::new(body?), declared.is_some()))
+    Ok((Box::new(value), Box::new(body?), declared))
 }
 
 /// What a `for` over a value of type `t` binds per iteration, when it says.
@@ -608,8 +652,8 @@ pub fn from_typed(e: &TExpr<ConcreteTy>) -> Expr {
                 .collect(),
         ),
         K::Field(x, f) => ExprKind::Field(boxed(x), f.clone()),
-        K::Let(n, v, b) => ExprKind::Let(n.clone(), annotation(e, v), boxed(v), boxed(b)),
-        K::LetMut(n, v, b) => ExprKind::LetMut(n.clone(), annotation(e, v), boxed(v), boxed(b)),
+        K::Let(n, v, b) => ExprKind::Let(n.clone(), annotation(e), boxed(v), boxed(b)),
+        K::LetMut(n, v, b) => ExprKind::LetMut(n.clone(), annotation(e), boxed(v), boxed(b)),
         K::Assign(l, v, r) => ExprKind::Assign(boxed(l), boxed(v), boxed(r)),
         K::For(n, i, it, b) => ExprKind::For(n.clone(), i.clone(), boxed(it), boxed(b)),
         K::While(c, b) => ExprKind::While(boxed(c), boxed(b)),
@@ -655,8 +699,8 @@ pub fn from_typed(e: &TExpr<ConcreteTy>) -> Expr {
 }
 
 /// What a binding was annotated with: its value's type, when it had one of its own.
-fn annotation(binding: &TExpr<ConcreteTy>, value: &TExpr<ConcreteTy>) -> Option<Type> {
-    binding.annotated.then(|| stamp_of(&value.ty))
+fn annotation(binding: &TExpr<ConcreteTy>) -> Option<Type> {
+    binding.annotation.as_ref().map(stamp_of)
 }
 
 fn arm_from_typed(arm: &TMatchArm<ConcreteTy>) -> MatchArm {

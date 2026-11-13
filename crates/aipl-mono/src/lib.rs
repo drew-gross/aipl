@@ -68,9 +68,12 @@ pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
 pub use reuse_matched_values::reuse_matched_values;
 
 mod move_last_use;
-pub use move_last_use::move_last_uses_post_mono;
+pub use move_last_use_typed::move_last_uses_post_mono;
+mod inline_typed;
+mod move_last_use_typed;
 mod stamp_idents;
 mod typed_adapter;
+mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
 pub use stamp_idents::stamp_idents;
 
@@ -9278,18 +9281,13 @@ pub fn inline_single_use_post_mono(
                 mutable: p.mutable,
             })
             .collect();
-        let mut replaced = false;
-        for g in &mut program.fns {
-            let body = replace_call(
-                &g.body,
-                &f.name,
-                &fparam_names,
-                &f.body,
-                &mut replaced,
-                InlineSites::First,
-            );
-            g.body = body;
-        }
+        let replaced = inline_typed::expand_calls(
+            &mut program,
+            &f,
+            &fparam_names,
+            inline_typed::Sites::First,
+            false,
+        );
         if replaced {
             // Inlining and *eliding* are separate decisions. A function called
             // once from AIPL can be folded into that caller and still be
@@ -9720,22 +9718,10 @@ pub fn inline_small_post_mono(
                 mutable: p.mutable,
             })
             .collect();
-        let mut replaced = false;
-        for g in &mut program.fns {
-            // Not into itself: `is_directly_recursive` rejected a self-referencing
-            // body, but a candidate is still its own function.
-            if g.name == f.name {
-                continue;
-            }
-            g.body = replace_call(
-                &g.body,
-                &f.name,
-                &fparams,
-                &f.body,
-                &mut replaced,
-                InlineSites::All,
-            );
-        }
+        // Not into itself: `is_directly_recursive` rejected a self-referencing body, but a
+        // candidate is still its own function.
+        let replaced =
+            inline_typed::expand_calls(&mut program, &f, &fparams, inline_typed::Sites::All, true);
         // Unlike the pre-mono pass, nothing downstream will drop the orphan for
         // us — an unreferenced function still reaches codegen — so drop it here
         // once nothing names it and nothing outside can ask for it.

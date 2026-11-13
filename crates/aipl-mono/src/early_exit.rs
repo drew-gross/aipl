@@ -245,3 +245,181 @@ fn contains_return(e: &Expr) -> bool {
 fn contains_try(e: &Expr) -> bool {
     matches!(e.kind, ExprKind::Try(_)) || children(e).any(|c| contains_try(c))
 }
+
+// The same rewrite over the typed tree, for the inlining that happens after monomorphization.
+
+use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm};
+
+use crate::typed_util::any_child;
+
+type Typed = TExpr<ConcreteTy>;
+
+/// [`without_early_exits`] over the typed tree.
+pub(crate) fn without_early_exits_typed(body: &Typed) -> Option<Typed> {
+    if contains_try_typed(body) {
+        return None;
+    }
+    if !contains_return_typed(body) {
+        return Some(body.clone());
+    }
+    in_value_position_typed(body)
+}
+
+/// The type of the first of `branches` that produces a value (unit when none does).
+fn valued(branches: &[&Typed]) -> ConcreteTy {
+    branches
+        .iter()
+        .map(|b| b.ty.clone())
+        .find(|t| *t != ConcreteTy::Unit)
+        .unwrap_or(ConcreteTy::Unit)
+}
+
+fn in_value_position_typed(e: &Typed) -> Option<Typed> {
+    match &e.kind {
+        TExprKind::Return(value) => match contains_return_typed(value) {
+            true => None,
+            false => Some(value.as_ref().clone()),
+        },
+        TExprKind::Seq(first, rest) => {
+            if always_returns_typed(first) {
+                return in_value_position_typed(first);
+            }
+            if let Some(rewritten) = guard_typed(e, first, rest) {
+                return Some(rewritten);
+            }
+            if contains_return_typed(first) {
+                return None;
+            }
+            let rest = in_value_position_typed(rest)?;
+            let ty = rest.ty.clone();
+            Some(TExpr::rebuilt(
+                TExprKind::Seq(first.clone(), Box::new(rest)),
+                ty,
+                e,
+            ))
+        }
+        TExprKind::If(cond, then, els) if !contains_return_typed(cond) => {
+            let (then, els) = (
+                in_value_position_typed(then)?,
+                in_value_position_typed(els)?,
+            );
+            let ty = valued(&[&then, &els]);
+            Some(TExpr::rebuilt(
+                TExprKind::If(cond.clone(), Box::new(then), Box::new(els)),
+                ty,
+                e,
+            ))
+        }
+        TExprKind::Let(name, value, body) if !contains_return_typed(value) => {
+            let body = in_value_position_typed(body)?;
+            let ty = body.ty.clone();
+            let mut out = TExpr::rebuilt(
+                TExprKind::Let(name.clone(), value.clone(), Box::new(body)),
+                ty,
+                e,
+            );
+            out.annotation = e.annotation.clone();
+            Some(out)
+        }
+        TExprKind::LetMut(name, value, body) if !contains_return_typed(value) => {
+            let body = in_value_position_typed(body)?;
+            let ty = body.ty.clone();
+            let mut out = TExpr::rebuilt(
+                TExprKind::LetMut(name.clone(), value.clone(), Box::new(body)),
+                ty,
+                e,
+            );
+            out.annotation = e.annotation.clone();
+            Some(out)
+        }
+        TExprKind::Match(scrutinee, arms) if !contains_return_typed(scrutinee) => {
+            let arms: Option<Vec<TMatchArm<ConcreteTy>>> = arms
+                .iter()
+                .map(|arm| {
+                    Some(TMatchArm {
+                        body: in_value_position_typed(&arm.body)?,
+                        ..arm.clone()
+                    })
+                })
+                .collect();
+            let arms = arms?;
+            let ty = valued(&arms.iter().map(|a| &a.body).collect::<Vec<_>>());
+            Some(TExpr::rebuilt(
+                TExprKind::Match(scrutinee.clone(), arms),
+                ty,
+                e,
+            ))
+        }
+        _ => match contains_return_typed(e) {
+            true => None,
+            false => Some(e.clone()),
+        },
+    }
+}
+
+fn guard_typed(whole: &Typed, first: &Typed, rest: &Typed) -> Option<Typed> {
+    let TExprKind::If(cond, then, els) = &first.kind else {
+        return None;
+    };
+    if contains_return_typed(cond) {
+        return None;
+    }
+    let (exits, falls_through) = match (always_returns_typed(then), always_returns_typed(els)) {
+        (true, false) => (then, els),
+        (false, true) => (els, then),
+        _ => return None,
+    };
+    if contains_return_typed(falls_through) {
+        return None;
+    }
+    let continued = Box::new(then_also_typed(
+        falls_through,
+        in_value_position_typed(rest)?,
+    ));
+    let exited = Box::new(in_value_position_typed(exits)?);
+    let (then, els) = match always_returns_typed(then) {
+        true => (exited, continued),
+        false => (continued, exited),
+    };
+    let ty = valued(&[&then, &els]);
+    Some(TExpr::rebuilt(
+        TExprKind::If(cond.clone(), then, els),
+        ty,
+        whole,
+    ))
+}
+
+fn then_also_typed(before: &Typed, rest: Typed) -> Typed {
+    match before.kind {
+        TExprKind::Unit => rest,
+        _ => {
+            let ty = rest.ty.clone();
+            TExpr::rebuilt(
+                TExprKind::Seq(Box::new(before.clone()), Box::new(rest)),
+                ty,
+                before,
+            )
+        }
+    }
+}
+
+fn always_returns_typed(e: &Typed) -> bool {
+    match &e.kind {
+        TExprKind::Return(_) => true,
+        TExprKind::Seq(first, rest) => always_returns_typed(first) || always_returns_typed(rest),
+        TExprKind::If(_, then, els) => always_returns_typed(then) && always_returns_typed(els),
+        TExprKind::Let(_, _, body) | TExprKind::LetMut(_, _, body) => always_returns_typed(body),
+        TExprKind::Match(_, arms) => {
+            !arms.is_empty() && arms.iter().all(|a| always_returns_typed(&a.body))
+        }
+        _ => false,
+    }
+}
+
+fn contains_return_typed(e: &Typed) -> bool {
+    matches!(e.kind, TExprKind::Return(_)) || any_child(e, contains_return_typed)
+}
+
+fn contains_try_typed(e: &Typed) -> bool {
+    matches!(e.kind, TExprKind::Try(_)) || any_child(e, contains_try_typed)
+}

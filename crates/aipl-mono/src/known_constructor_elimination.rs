@@ -103,11 +103,18 @@
 use crate::passes::Scope;
 use std::collections::HashSet;
 
-use aipl_syntax::ast::{Callee, Expr, ExprKind, FieldInit, MatchArm, Pattern, Type};
+use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TFieldInit, TMatchArm, TPattern};
 
-use crate::sink::{can_defer, undeferrable_fns_post_mono};
-use crate::subst::{assigned_names, read_names, uses_of};
-use crate::{body_size, ConcreteFn, MonoProgram};
+use crate::sink::undeferrable_fns_post_mono;
+use crate::typed_util::{
+    any_child, assigned_names, body_size, contains_context_literal, distinct_binders,
+    each_child_mut, read_names, rename_scoped, uses_of,
+};
+use aipl_syntax::ast::Callee;
+
+type Typed = TExpr<ConcreteTy>;
+type Arm = TMatchArm<ConcreteTy>;
+type Pattern = TPattern<ConcreteTy>;
 
 /// Eliminate every known-constructor pair in `program`. `max_duplicated` bounds
 /// how much arm text a pushed `match` may copy; `builtin_effects` is the effect
@@ -120,29 +127,20 @@ use crate::{body_size, ConcreteFn, MonoProgram};
 /// [`crate::passes`]), and skipping it saves the walk rather than changing the
 /// answer.
 pub fn eliminate_known_constructors_post_mono(
-    program: &MonoProgram,
+    program: &crate::MonoProgram,
     max_duplicated: usize,
     builtin_effects: &HashSet<String>,
     scope: &Scope,
-) -> MonoProgram {
+) -> crate::MonoProgram {
     let limits = Limits {
         max_duplicated,
         blocked: undeferrable_fns_post_mono(program, builtin_effects),
     };
-    MonoProgram {
-        fns: program
-            .fns
-            .iter()
-            .map(|f| match scope.covers(&f.name) {
-                true => ConcreteFn {
-                    body: rewrite(&f.body, &limits),
-                    ..f.clone()
-                },
-                false => f.clone(),
-            })
-            .collect(),
-        ..program.clone()
-    }
+    crate::typed_adapter::on_typed_where(
+        program,
+        |name| scope.covers(name),
+        |body| *body = rewrite(body, &limits),
+    )
 }
 
 /// What holds a push back: the arm-copy budget, and the functions whose call
@@ -152,32 +150,52 @@ struct Limits {
     blocked: HashSet<String>,
 }
 
+/// Whether `value` may be moved into a branch — see [`crate::sink`].
+fn can_defer(value: &Typed, blocked: &HashSet<String>) -> bool {
+    crate::sink::can_defer_typed(value, blocked)
+}
+
+/// A node of `kind` and `ty` standing where `like` stood.
+fn node(kind: TExprKind<ConcreteTy>, ty: ConcreteTy, like: &Typed) -> Typed {
+    TExpr::rebuilt(kind, ty, like)
+}
+
+/// What the `let` node `e` declares its value as, when it declares anything.
+fn declared(e: &Typed) -> Option<&ConcreteTy> {
+    match &e.kind {
+        TExprKind::Let(..) | TExprKind::LetMut(..) => e.annotation.as_ref(),
+        _ => None,
+    }
+}
+
 /// Rebuild `e` with its children rewritten first, then rewrite `e` itself.
 /// Bottom-up, so an eliminator whose operand only took the shape by an inner
 /// rewrite (an `ok(..)?` inside an arm, a projection of a projection) is
 /// pushed too.
-fn rewrite(e: &Expr, limits: &Limits) -> Expr {
+fn rewrite(e: &Typed, limits: &Limits) -> Typed {
     let mut out = e.clone();
-    for child in crate::children_mut(&mut out) {
-        *child = rewrite(child, limits);
-    }
+    each_child_mut(&mut out, &mut |child| *child = rewrite(child, limits));
     match &out.kind {
-        ExprKind::Try(inner) if ends_in(inner, is_optional_or_result) => push_try(inner, &out),
-        ExprKind::Match(scrutinee, arms)
+        TExprKind::Try(inner) if ends_in(inner, is_optional_or_result) => push_try(inner, &out),
+        TExprKind::Match(scrutinee, arms)
             if ends_in(scrutinee, is_matchable)
                 && match_can_move(scrutinee, arms, limits, false) =>
         {
             push_match(scrutinee, arms, &out, &|_| None)
         }
-        ExprKind::Let(name, annotation, value, body) if ends_in(value, is_matchable) => {
-            match_through_binding(name, annotation.as_ref(), value, body, limits).unwrap_or(out)
+        TExprKind::Let(name, value, body) if ends_in(value, is_matchable) => {
+            match_through_binding(name, declared(&out), value, body, limits).unwrap_or(out)
         }
-        ExprKind::Field(base, field)
+        TExprKind::Field(base, field)
             if ends_in(base, is_struct) && field_can_move(base, field, limits) =>
         {
             push_field(base, field, &out, limits)
         }
-        ExprKind::Call(op @ (Callee::Equal | Callee::NotEqual), args, _) if args.len() == 2 => {
+        TExprKind::Call {
+            callee: op @ (Callee::Equal | Callee::NotEqual),
+            args,
+            ..
+        } if args.len() == 2 => {
             let sides = (
                 known(&args[0]).filter(is_matchable),
                 known(&args[1]).filter(is_matchable),
@@ -206,17 +224,19 @@ fn rewrite(e: &Expr, limits: &Limits) -> Expr {
 /// constructor, the comparison it lands in is unwrapped in turn.
 fn unwrap_equality(
     equal: bool,
-    other: &Expr,
+    other: &Typed,
     constructor: Known<'_>,
-    at: &Expr,
+    at: &Typed,
     limits: &Limits,
-) -> Expr {
+) -> Typed {
     let id = aipl_syntax::fresh_id();
-    let rebuilt = |kind: ExprKind| Expr::rebuilt(kind, at);
+    // Everything built here is a `bool` but the payload names.
+    let boolean = at.ty.clone();
+    let rebuilt = |kind: TExprKind<ConcreteTy>| node(kind, boolean.clone(), at);
     // Each payload as the arm reads it: itself when it may be deferred, else
     // the name it is bound to ahead of the match.
     let payloads = constructor.payloads();
-    let operands: Vec<(Expr, Option<Expr>)> = payloads
+    let operands: Vec<(Typed, Option<Typed>)> = payloads
         .iter()
         .enumerate()
         .map(|(i, p)| {
@@ -224,7 +244,10 @@ fn unwrap_equality(
                 ((*p).clone(), None)
             } else {
                 let name = format!("$ceq{id}_{i}");
-                (Expr::rebuilt(ExprKind::Ident(name), p), Some((*p).clone()))
+                (
+                    node(TExprKind::Ident(name), p.ty.clone(), p),
+                    Some((*p).clone()),
+                )
             }
         })
         .collect();
@@ -237,18 +260,28 @@ fn unwrap_equality(
     } else {
         (Callee::NotEqual, Callee::LogicalOr)
     };
+    let call = |callee: Callee, args: Vec<Typed>| {
+        rebuilt(TExprKind::Call {
+            callee,
+            type_args: Vec::new(),
+            args,
+            method_style: false,
+        })
+    };
     let hit = binders
         .iter()
         .zip(&operands)
         .map(|(binder, (operand, _))| {
-            rebuilt(ExprKind::Call(
+            call(
                 compare.clone(),
-                vec![rebuilt(ExprKind::Ident(binder.clone())), operand.clone()],
-                false,
-            ))
+                vec![
+                    node(TExprKind::Ident(binder.clone()), operand.ty.clone(), at),
+                    operand.clone(),
+                ],
+            )
         })
-        .reduce(|acc, next| rebuilt(ExprKind::Call(join.clone(), vec![acc, next], false)))
-        .unwrap_or_else(|| rebuilt(ExprKind::Bool(equal)));
+        .reduce(|acc, next| call(join.clone(), vec![acc, next]))
+        .unwrap_or_else(|| rebuilt(TExprKind::Bool(equal)));
     let (hit_name, miss_pattern) = match &constructor {
         Known::Some(_) => ("some".to_string(), constructor_pattern("none")),
         Known::None => ("none".to_string(), constructor_pattern("some")),
@@ -258,8 +291,7 @@ fn unwrap_equality(
         Known::Struct(_) => unreachable!("a struct is not matchable"),
     };
     let arms = vec![
-        MatchArm {
-            written: Default::default(),
+        Arm {
             pattern: Pattern::Ctor {
                 name: hit_name,
                 bindings: binders,
@@ -268,24 +300,23 @@ fn unwrap_equality(
             body: hit,
             span: at.span.clone(),
         },
-        MatchArm {
-            written: Default::default(),
+        Arm {
             pattern: miss_pattern,
-            body: rebuilt(ExprKind::Bool(!equal)),
+            body: rebuilt(TExprKind::Bool(!equal)),
             span: at.span.clone(),
         },
     ];
-    let matched = rebuilt(ExprKind::Match(Box::new(other.clone()), arms));
+    let matched = rebuilt(TExprKind::Match(Box::new(other.clone()), arms));
     // The bindings, outermost first, so the payloads run in their written order.
     operands
         .into_iter()
         .rev()
         .fold(matched, |body, (operand, bound)| match bound {
             Some(value) => {
-                let ExprKind::Ident(name) = operand.kind else {
+                let TExprKind::Ident(name) = operand.kind else {
                     unreachable!("a bound payload is read through its name")
                 };
-                rebuilt(ExprKind::Let(name, None, Box::new(value), Box::new(body)))
+                rebuilt(TExprKind::Let(name, Box::new(value), Box::new(body)))
             }
             None => body,
         })
@@ -305,21 +336,21 @@ fn constructor_pattern(case: &str) -> Pattern {
 /// The constructor a leaf is, if it is one this pass knows how to take apart.
 enum Known<'a> {
     /// `ok(v)` or `ok()`.
-    Ok(Option<&'a Expr>),
+    Ok(Option<&'a Typed>),
     /// `err(e)`.
-    Err(&'a Expr),
+    Err(&'a Typed),
     /// `some(v)`.
-    Some(&'a Expr),
+    Some(&'a Typed),
     /// The `none` literal.
     None,
     /// A variant case, `Case(a, b)` or the nullary `Case`, named as the loader
     /// qualifies it (`Case@Variant`).
     Variant {
         name: &'a str,
-        payloads: Vec<&'a Expr>,
+        payloads: Vec<&'a Typed>,
     },
     /// A struct construction, `S { a: x, b: y }`.
-    Struct(&'a [FieldInit]),
+    Struct(&'a [TFieldInit<ConcreteTy>]),
 }
 
 /// The constructor families each eliminator takes apart.
@@ -354,7 +385,7 @@ impl Known<'_> {
     }
 
     /// The payload expressions, in slot order.
-    fn payloads(&self) -> Vec<&Expr> {
+    fn payloads(&self) -> Vec<&Typed> {
         match self {
             Known::Ok(p) => p.iter().copied().collect(),
             Known::Err(p) | Known::Some(p) => vec![p],
@@ -371,33 +402,48 @@ fn is_variant_constructor(name: &str) -> bool {
     name.contains('@')
 }
 
-fn known(e: &Expr) -> Option<Known<'_>> {
+fn known(e: &Typed) -> Option<Known<'_>> {
     Some(match &e.kind {
-        ExprKind::Call(Callee::Ok, args, _) => match &args[..] {
+        TExprKind::Call {
+            callee: Callee::Ok,
+            args,
+            ..
+        } => match &args[..] {
             [] => Known::Ok(None),
             [v] => Known::Ok(Some(v)),
             _ => return None,
         },
-        ExprKind::Call(Callee::Err, args, _) => match &args[..] {
+        TExprKind::Call {
+            callee: Callee::Err,
+            args,
+            ..
+        } => match &args[..] {
             [v] => Known::Err(v),
             _ => return None,
         },
-        ExprKind::Call(Callee::Some, args, _) => match &args[..] {
+        TExprKind::Call {
+            callee: Callee::Some,
+            args,
+            ..
+        } => match &args[..] {
             [v] => Known::Some(v),
             _ => return None,
         },
-        ExprKind::None => Known::None,
-        ExprKind::Call(Callee::User(name), args, false) if is_variant_constructor(name) => {
-            Known::Variant {
-                name,
-                payloads: args.iter().collect(),
-            }
-        }
-        ExprKind::Ident(name) if is_variant_constructor(name) => Known::Variant {
+        TExprKind::None => Known::None,
+        TExprKind::Call {
+            callee: Callee::User(name),
+            args,
+            method_style: false,
+            ..
+        } if is_variant_constructor(name) => Known::Variant {
+            name,
+            payloads: args.iter().collect(),
+        },
+        TExprKind::Ident(name) if is_variant_constructor(name) => Known::Variant {
             name,
             payloads: Vec::new(),
         },
-        ExprKind::Construct(_, fields) => Known::Struct(fields),
+        TExprKind::Construct(_, fields) => Known::Struct(fields),
         _ => return None,
     })
 }
@@ -405,30 +451,30 @@ fn known(e: &Expr) -> Option<Known<'_>> {
 /// Whether every branch of `e` ends in a constructor `accepts` — the condition
 /// under which pushing an eliminator through it removes the constructed value
 /// rather than duplicating the test.
-fn ends_in(e: &Expr, accepts: fn(&Known<'_>) -> bool) -> bool {
+fn ends_in(e: &Typed, accepts: fn(&Known<'_>) -> bool) -> bool {
     match &e.kind {
-        ExprKind::Let(_, _, _, body)
-        | ExprKind::LetMut(_, _, _, body)
-        | ExprKind::Assign(_, _, body)
-        | ExprKind::Seq(_, body) => ends_in(body, accepts),
-        ExprKind::If(_, t, f) => ends_in(t, accepts) && ends_in(f, accepts),
-        ExprKind::Match(_, arms) => arms.iter().all(|a| ends_in(&a.body, accepts)),
+        TExprKind::Let(_, _, body)
+        | TExprKind::LetMut(_, _, body)
+        | TExprKind::Assign(_, _, body)
+        | TExprKind::Seq(_, body) => ends_in(body, accepts),
+        TExprKind::If(_, t, f) => ends_in(t, accepts) && ends_in(f, accepts),
+        TExprKind::Match(_, arms) => arms.iter().all(|a| ends_in(&a.body, accepts)),
         _ => known(e).is_some_and(|k| accepts(&k)),
     }
 }
 
 /// The leaves of `e` (which [`ends_in`] some constructor family), in order.
-fn leaves<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
+fn leaves<'a>(e: &'a Typed, out: &mut Vec<&'a Typed>) {
     match &e.kind {
-        ExprKind::Let(_, _, _, body)
-        | ExprKind::LetMut(_, _, _, body)
-        | ExprKind::Assign(_, _, body)
-        | ExprKind::Seq(_, body) => leaves(body, out),
-        ExprKind::If(_, t, f) => {
+        TExprKind::Let(_, _, body)
+        | TExprKind::LetMut(_, _, body)
+        | TExprKind::Assign(_, _, body)
+        | TExprKind::Seq(_, body) => leaves(body, out),
+        TExprKind::If(_, t, f) => {
             leaves(t, out);
             leaves(f, out);
         }
-        ExprKind::Match(_, arms) => {
+        TExprKind::Match(_, arms) => {
             for a in arms {
                 leaves(&a.body, out);
             }
@@ -439,37 +485,32 @@ fn leaves<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
 
 /// Rebuild the value-carrying structure of `e` — which [`ends_in`] the
 /// constructors `at_leaf` handles — with `at_leaf` applied to each. `like`
-/// lends its span (and type stamp) to every rebuilt node: it is the eliminator
-/// being pushed, whose position is what a diagnostic should still point at, and
-/// whose type — the payload's, not the constructed value's — is what the
-/// rebuilt nodes now have.
-fn push(e: &Expr, like: &Expr, at_leaf: &mut dyn FnMut(&Expr, Known<'_>) -> Expr) -> Expr {
+/// lends its span and type to every rebuilt node: it is the eliminator being
+/// pushed, whose position is what a diagnostic should still point at, and whose
+/// type — the payload's, not the constructed value's — is what the rebuilt
+/// nodes now have.
+fn push(e: &Typed, like: &Typed, at_leaf: &mut dyn FnMut(&Typed, Known<'_>) -> Typed) -> Typed {
+    let ty = like.ty.clone();
     let kind = match &e.kind {
-        ExprKind::Let(n, ty, v, body) => ExprKind::Let(
-            n.clone(),
-            ty.clone(),
-            v.clone(),
-            Box::new(push(body, like, at_leaf)),
-        ),
-        ExprKind::LetMut(n, ty, v, body) => ExprKind::LetMut(
-            n.clone(),
-            ty.clone(),
-            v.clone(),
-            Box::new(push(body, like, at_leaf)),
-        ),
-        ExprKind::Assign(lhs, v, body) => {
-            ExprKind::Assign(lhs.clone(), v.clone(), Box::new(push(body, like, at_leaf)))
+        TExprKind::Let(n, v, body) => {
+            TExprKind::Let(n.clone(), v.clone(), Box::new(push(body, like, at_leaf)))
         }
-        ExprKind::Seq(a, body) => ExprKind::Seq(a.clone(), Box::new(push(body, like, at_leaf))),
-        ExprKind::If(c, t, f) => ExprKind::If(
+        TExprKind::LetMut(n, v, body) => {
+            TExprKind::LetMut(n.clone(), v.clone(), Box::new(push(body, like, at_leaf)))
+        }
+        TExprKind::Assign(lhs, v, body) => {
+            TExprKind::Assign(lhs.clone(), v.clone(), Box::new(push(body, like, at_leaf)))
+        }
+        TExprKind::Seq(a, body) => TExprKind::Seq(a.clone(), Box::new(push(body, like, at_leaf))),
+        TExprKind::If(c, t, f) => TExprKind::If(
             c.clone(),
             Box::new(push(t, like, at_leaf)),
             Box::new(push(f, like, at_leaf)),
         ),
-        ExprKind::Match(scrutinee, arms) => ExprKind::Match(
+        TExprKind::Match(scrutinee, arms) => TExprKind::Match(
             scrutinee.clone(),
             arms.iter()
-                .map(|a| MatchArm {
+                .map(|a| Arm {
                     body: push(&a.body, like, at_leaf),
                     ..a.clone()
                 })
@@ -480,20 +521,27 @@ fn push(e: &Expr, like: &Expr, at_leaf: &mut dyn FnMut(&Expr, Known<'_>) -> Expr
             return at_leaf(e, leaf);
         }
     };
-    Expr::rebuilt(kind, like)
+    let mut out = node(kind, ty, like);
+    out.annotation = e.annotation.clone();
+    out
 }
 
 /// `body`, preceded by the evaluation of each of `payloads` that does
 /// something — one this pass cannot drop (see [`can_defer`]) — in their
 /// original order. A payload that only computes a value is left out: the
 /// constructor would have owned it, and nothing else ever looked at it.
-fn keep_effects(payloads: &[&Expr], body: Expr, like: &Expr, limits: &Limits) -> Expr {
+fn keep_effects(payloads: &[&Typed], body: Typed, like: &Typed, limits: &Limits) -> Typed {
     payloads
         .iter()
         .rev()
         .filter(|p| !can_defer(p, &limits.blocked))
         .fold(body, |rest, p| {
-            Expr::rebuilt(ExprKind::Seq(Box::new((*p).clone()), Box::new(rest)), like)
+            let ty = rest.ty.clone();
+            node(
+                TExprKind::Seq(Box::new((*p).clone()), Box::new(rest)),
+                ty,
+                like,
+            )
         })
 }
 
@@ -501,11 +549,15 @@ fn keep_effects(payloads: &[&Expr], body: Expr, like: &Expr, limits: &Limits) ->
 /// and `some(v)` become `v` (`ok()` becomes unit), `err(e)` and `none` keep
 /// the `?` — the early return, now taken from inside the branch. `try_at` is
 /// the original `?` expression.
-fn push_try(inner: &Expr, try_at: &Expr) -> Expr {
+fn push_try(inner: &Typed, try_at: &Typed) -> Typed {
     push(inner, try_at, &mut |leaf, kind| match kind {
         Known::Ok(Some(v)) | Known::Some(v) => v.clone(),
-        Known::Ok(None) => Expr::rebuilt(ExprKind::Unit, try_at),
-        Known::Err(_) | Known::None => Expr::rebuilt(ExprKind::Try(Box::new(leaf.clone())), try_at),
+        Known::Ok(None) => node(TExprKind::Unit, try_at.ty.clone(), try_at),
+        Known::Err(_) | Known::None => node(
+            TExprKind::Try(Box::new(leaf.clone())),
+            try_at.ty.clone(),
+            try_at,
+        ),
         Known::Variant { .. } | Known::Struct(_) => {
             unreachable!("`?` only ever meets optional and result constructors")
         }
@@ -515,7 +567,7 @@ fn push_try(inner: &Expr, try_at: &Expr) -> Expr {
 /// The arm of `arms` a leaf constructor named `case` selects: the first whose
 /// pattern names it, or the first catch-all. Post-mono every pattern is one of
 /// these three, and the `match` is exhaustive, so a leaf always finds one.
-fn arm_for<'a>(arms: &'a [MatchArm], case: &str) -> Option<&'a MatchArm> {
+fn arm_for<'a>(arms: &'a [Arm], case: &str) -> Option<&'a Arm> {
     arms.iter().find(|a| match &a.pattern {
         Pattern::Ctor { name, .. } => name.split('@').next() == Some(case),
         Pattern::Wildcard | Pattern::Bind(_) => true,
@@ -529,11 +581,11 @@ fn arm_for<'a>(arms: &'a [MatchArm], case: &str) -> Option<&'a MatchArm> {
 /// binding the scrutinee introduces captures a name an arm reads. A payload
 /// with no type of its own (`some(none)`, `ok([])`) is bound to a binder only
 /// when the push can annotate it (`annotated` — see [`match_through_binding`]).
-fn match_can_move(scrutinee: &Expr, arms: &[MatchArm], limits: &Limits, annotated: bool) -> bool {
+fn match_can_move(scrutinee: &Typed, arms: &[Arm], limits: &Limits, annotated: bool) -> bool {
     let mut ends = Vec::new();
     leaves(scrutinee, &mut ends);
     let mut copied = 0usize;
-    let mut used: Vec<&MatchArm> = Vec::new();
+    let mut used: Vec<&Arm> = Vec::new();
     for leaf in ends {
         let kind = known(leaf).expect("a leaf is a known constructor");
         let Some(arm) = arm_for(arms, kind.case_name()) else {
@@ -548,13 +600,13 @@ fn match_can_move(scrutinee: &Expr, arms: &[MatchArm], limits: &Limits, annotate
                 && bindings
                     .iter()
                     .zip(&payloads)
-                    .any(|(b, p)| b != "_" && crate::contains_context_literal(p))
+                    .any(|(b, p)| b != "_" && contains_context_literal(*p))
             {
                 return false;
             }
             let mut read = HashSet::new();
             for p in &payloads {
-                read_names(p, &mut read);
+                read_names(*p, &mut read);
             }
             if bindings.iter().any(|b| read.contains(b)) {
                 return false;
@@ -580,21 +632,19 @@ fn match_can_move(scrutinee: &Expr, arms: &[MatchArm], limits: &Limits, annotate
 
 /// Every name a binding or pattern anywhere in `e` introduces — the names an
 /// arm body pushed into `e` would find in scope.
-fn bound_names(e: &Expr, out: &mut HashSet<String>) {
+fn bound_names(e: &Typed, out: &mut HashSet<String>) {
     match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => {
+        TExprKind::Let(n, _, _) | TExprKind::LetMut(n, _, _) => {
             out.insert(n.clone());
         }
-        ExprKind::Match(_, arms) => {
+        TExprKind::Match(_, arms) => {
             for a in arms {
                 out.extend(a.pattern.bindings());
             }
         }
         _ => {}
     }
-    for c in crate::children(e) {
-        bound_names(c, out);
-    }
+    crate::typed_util::each_child(e, &mut |c| bound_names(c, out));
 }
 
 /// `let name = value; .. match (name) { arms } ..` with the `match` pushed into
@@ -604,11 +654,11 @@ fn bound_names(e: &Expr, out: &mut HashSet<String>) {
 /// movable past what sits between, or the push itself refused.
 fn match_through_binding(
     name: &str,
-    annotation: Option<&Type>,
-    value: &Expr,
-    body: &Expr,
+    annotation: Option<&ConcreteTy>,
+    value: &Typed,
+    body: &Typed,
     limits: &Limits,
-) -> Option<Expr> {
+) -> Option<Typed> {
     let uses = uses_of(body, name);
     if uses.count != 1 || uses.repeated || !can_defer(value, &limits.blocked) {
         return None;
@@ -633,15 +683,16 @@ fn match_through_binding(
 /// the read of `name` sits anywhere else.
 fn push_into_scrutinee(
     name: &str,
-    value: &Expr,
-    body: &Expr,
+    value: &Typed,
+    body: &Typed,
     limits: &Limits,
     annotated: bool,
-    annotate: &dyn Fn(&str) -> Option<Type>,
-) -> Option<Expr> {
-    let again = |inner: &Expr| push_into_scrutinee(name, value, inner, limits, annotated, annotate);
+    annotate: &dyn Fn(&str) -> Option<ConcreteTy>,
+) -> Option<Typed> {
+    let again =
+        |inner: &Typed| push_into_scrutinee(name, value, inner, limits, annotated, annotate);
     let kind = match &body.kind {
-        ExprKind::Match(scrutinee, arms) if matches!(&scrutinee.kind, ExprKind::Ident(n) if n == name) =>
+        TExprKind::Match(scrutinee, arms) if matches!(&scrutinee.kind, TExprKind::Ident(n) if n == name) =>
         {
             if !match_can_move(value, arms, limits, annotated) {
                 return None;
@@ -652,44 +703,47 @@ fn push_into_scrutinee(
         // as the scrutinee further down (the shape two inlined calls leave, the
         // inner one's argument binding the outer one's parameter). Follow it
         // and drop the alias; its annotation is the scrutinee's type too.
-        ExprKind::Let(alias, ty, v, rest) if matches!(&v.kind, ExprKind::Ident(n) if n == name) => {
+        TExprKind::Let(alias, v, rest) if matches!(&v.kind, TExprKind::Ident(n) if n == name) => {
             let uses = uses_of(rest, alias);
             if uses.count != 1 || uses.repeated || alias == name || reads(value, alias) {
                 return None;
             }
+            let alias_ty = declared(body).cloned();
             return push_into_scrutinee(
                 alias,
                 value,
                 rest,
                 limits,
-                annotated || ty.is_some(),
-                &|case| annotate(case).or_else(|| payload_annotation(ty.as_ref(), case)),
+                annotated || alias_ty.is_some(),
+                &|case| annotate(case).or_else(|| payload_annotation(alias_ty.as_ref(), case)),
             );
         }
         // A binding of the same name below would shadow it; the read this is
         // looking for cannot be under one. A value the pushed `value` reads
         // cannot be re-bound between either, or the move would capture it.
-        ExprKind::Let(n, ty, v, rest) | ExprKind::LetMut(n, ty, v, rest)
+        TExprKind::Let(n, v, rest) | TExprKind::LetMut(n, v, rest)
             if n != name && !reads(value, n) =>
         {
             let inner = Box::new(again(rest)?);
-            if matches!(&body.kind, ExprKind::Let(..)) {
-                ExprKind::Let(n.clone(), ty.clone(), v.clone(), inner)
+            if matches!(&body.kind, TExprKind::Let(..)) {
+                TExprKind::Let(n.clone(), v.clone(), inner)
             } else {
-                ExprKind::LetMut(n.clone(), ty.clone(), v.clone(), inner)
+                TExprKind::LetMut(n.clone(), v.clone(), inner)
             }
         }
-        ExprKind::Assign(lhs, v, rest) => {
-            ExprKind::Assign(lhs.clone(), v.clone(), Box::new(again(rest)?))
+        TExprKind::Assign(lhs, v, rest) => {
+            TExprKind::Assign(lhs.clone(), v.clone(), Box::new(again(rest)?))
         }
-        ExprKind::Seq(first, rest) => ExprKind::Seq(first.clone(), Box::new(again(rest)?)),
+        TExprKind::Seq(first, rest) => TExprKind::Seq(first.clone(), Box::new(again(rest)?)),
         _ => return None,
     };
-    Some(Expr::rebuilt(kind, body))
+    let mut out = node(kind, body.ty.clone(), body);
+    out.annotation = body.annotation.clone();
+    Some(out)
 }
 
 /// Whether `e` reads the name `n` anywhere.
-fn reads(e: &Expr, n: &str) -> bool {
+fn reads(e: &Typed, n: &str) -> bool {
     let mut names = HashSet::new();
     read_names(e, &mut names);
     names.contains(n)
@@ -698,11 +752,11 @@ fn reads(e: &Expr, n: &str) -> bool {
 /// The type a binder of `case`'s payload is declared with, read off the
 /// scrutinee's declared type `annotation`: the optional's inner type for
 /// `some`, a result's side for `ok`/`err`, nothing for a variant case.
-fn payload_annotation(annotation: Option<&Type>, case: &str) -> Option<Type> {
+fn payload_annotation(annotation: Option<&ConcreteTy>, case: &str) -> Option<ConcreteTy> {
     match (annotation, case) {
-        (Some(Type::Optional(inner)), "some") => Some((**inner).clone()),
-        (Some(Type::Result(ok, _)), "ok") => Some((**ok).clone()),
-        (Some(Type::Result(_, err)), "err") => Some((**err).clone()),
+        (Some(ConcreteTy::Optional(inner)), "some") => Some((**inner).clone()),
+        (Some(ConcreteTy::Result(ok, _)), "ok") => Some((**ok).clone()),
+        (Some(ConcreteTy::Result(_, err)), "err") => Some((**err).clone()),
         _ => None,
     }
 }
@@ -715,30 +769,43 @@ fn payload_annotation(annotation: Option<&Type>, case: &str) -> Option<Type> {
 /// declared with, when the scrutinee's type is known (see
 /// [`match_through_binding`]).
 fn push_match(
-    scrutinee: &Expr,
-    arms: &[MatchArm],
-    match_at: &Expr,
-    annotate: &dyn Fn(&str) -> Option<Type>,
-) -> Expr {
+    scrutinee: &Typed,
+    arms: &[Arm],
+    match_at: &Typed,
+    annotate: &dyn Fn(&str) -> Option<ConcreteTy>,
+) -> Typed {
     push(scrutinee, match_at, &mut |leaf, kind| {
         let arm = arm_for(arms, kind.case_name()).expect("checked by `match_can_move`");
         let payloads = kind.payloads();
         let annotation = annotate(kind.case_name());
-        let bind = |name: String, value: Expr, body: Expr| {
-            Expr::rebuilt(
-                ExprKind::Let(name, annotation.clone(), Box::new(value), Box::new(body)),
+        let bind = |name: String, mut value: Typed, body: Typed| {
+            // A declared type is the value's own.
+            if let Some(t) = &annotation {
+                value.ty = t.clone();
+            }
+            let ty = body.ty.clone();
+            let mut out = node(
+                TExprKind::Let(name, Box::new(value), Box::new(body)),
+                ty,
+                match_at,
+            );
+            out.annotation = annotation.clone();
+            out
+        };
+        let evaluate = |value: Typed, body: Typed| {
+            let ty = body.ty.clone();
+            node(
+                TExprKind::Seq(Box::new(value), Box::new(body)),
+                ty,
                 match_at,
             )
-        };
-        let evaluate = |value: Expr, body: Expr| {
-            Expr::rebuilt(ExprKind::Seq(Box::new(value), Box::new(body)), match_at)
         };
         match &arm.pattern {
             // `some(v) => v` — the arm hands its one payload straight back, so
             // the payload *is* the value; binding it first would only copy it.
             Pattern::Ctor { bindings, .. }
                 if matches!((&bindings[..], &payloads[..]), ([b], [_])
-                    if matches!(&arm.body.kind, ExprKind::Ident(v) if v == b)) =>
+                    if matches!(&arm.body.kind, TExprKind::Ident(v) if v == b)) =>
             {
                 payloads[0].clone()
             }
@@ -747,7 +814,7 @@ fn push_match(
             // is copied to every leaf, so each copy binds names of its own.
             Pattern::Ctor { bindings, .. } => {
                 let renames = fresh_binders(bindings);
-                let body = aipl_syntax::rename_scoped(&arm.body, &renames, true);
+                let body = rename_scoped(&arm.body, &renames, true);
                 bindings
                     .iter()
                     .zip(payloads)
@@ -761,13 +828,13 @@ fn push_match(
             // therefore still built.
             Pattern::Bind(name) => {
                 let renames = fresh_binders(std::slice::from_ref(name));
-                let body = aipl_syntax::rename_scoped(&arm.body, &renames, true);
+                let body = rename_scoped(&arm.body, &renames, true);
                 bind(renames[name].clone(), leaf.clone(), body)
             }
             _ => payloads
                 .iter()
                 .rev()
-                .fold(crate::distinct_binders(&arm.body), |body, payload| {
+                .fold(distinct_binders(&arm.body), |body, payload| {
                     evaluate((*payload).clone(), body)
                 }),
         }
@@ -788,7 +855,7 @@ fn fresh_binders(binders: &[String]) -> std::collections::HashMap<String, String
 /// [`can_defer`]) or kept as a statement. The only thing refused is a field
 /// that leaves the function from where it sits, which no statement placed
 /// ahead of the projected value could reproduce.
-fn field_can_move(base: &Expr, field: &str, limits: &Limits) -> bool {
+fn field_can_move(base: &Typed, field: &str, limits: &Limits) -> bool {
     let mut ends = Vec::new();
     leaves(base, &mut ends);
     ends.iter().all(|leaf| {
@@ -808,16 +875,16 @@ fn field_can_move(base: &Expr, field: &str, limits: &Limits) -> bool {
 /// binding, from where it sits. (`can_defer` refuses those too, plus anything
 /// effectful; here the effectful ones are exactly what a kept statement is
 /// for.)
-fn keepable(e: &Expr) -> bool {
+fn keepable(e: &Typed) -> bool {
     !matches!(
         &e.kind,
-        ExprKind::Try(_) | ExprKind::Return(_) | ExprKind::Assign(..)
-    ) && crate::children(e).all(|c| keepable(c))
+        TExprKind::Try(_) | TExprKind::Return(_) | TExprKind::Assign(..)
+    ) && !any_child(e, |c| !keepable(c))
 }
 
 /// `base.field` with the projection applied at each struct `base` ends in:
 /// the field's initializer, behind whichever other fields must still run.
-fn push_field(base: &Expr, field: &str, field_at: &Expr, limits: &Limits) -> Expr {
+fn push_field(base: &Typed, field: &str, field_at: &Typed, limits: &Limits) -> Typed {
     push(base, field_at, &mut |_, kind| {
         let Known::Struct(fields) = kind else {
             unreachable!("a field is only ever projected out of a struct")
@@ -826,7 +893,7 @@ fn push_field(base: &Expr, field: &str, field_at: &Expr, limits: &Limits) -> Exp
             .iter()
             .find(|f| f.name == field)
             .expect("checked by `field_can_move`");
-        let others: Vec<&Expr> = fields
+        let others: Vec<&Typed> = fields
             .iter()
             .filter(|f| f.name != field)
             .map(|f| &f.value)
@@ -846,25 +913,29 @@ mod tests {
         }
     }
 
-    fn e(kind: ExprKind) -> Expr {
-        Expr::new(kind, 0..0)
+    fn e(kind: TExprKind<ConcreteTy>) -> Typed {
+        TExpr::new(kind, ConcreteTy::Unit, 0..0)
     }
 
-    fn id(n: &str) -> Expr {
-        e(ExprKind::Ident(n.into()))
+    fn id(n: &str) -> Typed {
+        e(TExprKind::Ident(n.into()))
     }
 
-    fn call(c: Callee, args: Vec<Expr>) -> Expr {
-        e(ExprKind::Call(c, args, false))
+    fn call(c: Callee, args: Vec<Typed>) -> Typed {
+        e(TExprKind::Call {
+            callee: c,
+            type_args: Vec::new(),
+            args,
+            method_style: false,
+        })
     }
 
-    fn user(name: &str, args: Vec<Expr>) -> Expr {
+    fn user(name: &str, args: Vec<Typed>) -> Typed {
         call(Callee::User(name.into()), args)
     }
 
-    fn arm(name: &str, bindings: &[&str], body: Expr) -> MatchArm {
-        MatchArm {
-            written: Default::default(),
+    fn arm(name: &str, bindings: &[&str], body: Typed) -> Arm {
+        Arm {
             pattern: Pattern::Ctor {
                 name: name.into(),
                 bindings: bindings.iter().map(|b| (*b).to_string()).collect(),
@@ -875,20 +946,20 @@ mod tests {
         }
     }
 
-    fn branch(then: Expr, otherwise: Expr) -> Expr {
-        e(ExprKind::If(
+    fn branch(then: Typed, otherwise: Typed) -> Typed {
+        e(TExprKind::If(
             Box::new(id("c")),
             Box::new(then),
             Box::new(otherwise),
         ))
     }
 
-    fn construct(fields: &[(&str, Expr)]) -> Expr {
-        e(ExprKind::Construct(
+    fn construct(fields: &[(&str, Typed)]) -> Typed {
+        e(TExprKind::Construct(
             "S".into(),
             fields
                 .iter()
-                .map(|(n, v)| FieldInit {
+                .map(|(n, v)| TFieldInit {
                     name: aipl_syntax::SpanStr::synthetic((*n).to_string()),
                     value: v.clone(),
                 })
@@ -898,165 +969,170 @@ mod tests {
 
     #[test]
     fn try_on_result_arms_unwraps_ok_and_keeps_err() {
-        let inlined = e(ExprKind::Match(
+        let inlined = e(TExprKind::Match(
             Box::new(id("o")),
             vec![
                 arm("some", &["v"], call(Callee::Ok, vec![id("v")])),
                 arm("none", &[], call(Callee::Err, vec![id("e")])),
             ],
         ));
-        let out = rewrite(&e(ExprKind::Try(Box::new(inlined))), &limits(8));
-        let ExprKind::Match(_, arms) = &out.kind else {
+        let out = rewrite(&e(TExprKind::Try(Box::new(inlined))), &limits(8));
+        let TExprKind::Match(_, arms) = &out.kind else {
             panic!("the `?` should have been pushed into the match, got {out:?}");
         };
-        assert!(matches!(&arms[0].body.kind, ExprKind::Ident(v) if v == "v"));
+        assert!(matches!(&arms[0].body.kind, TExprKind::Ident(v) if v == "v"));
         assert!(matches!(
             &arms[1].body.kind,
-            ExprKind::Try(inner) if matches!(&inner.kind, ExprKind::Call(Callee::Err, _, _))
+            TExprKind::Try(inner) if matches!(&inner.kind, TExprKind::Call { callee: Callee::Err, args: _, .. })
         ));
     }
 
     #[test]
     fn try_on_optional_branches_unwraps_some_and_keeps_none() {
-        let optional = branch(call(Callee::Some, vec![id("x")]), e(ExprKind::None));
-        let out = rewrite(&e(ExprKind::Try(Box::new(optional))), &limits(8));
-        let ExprKind::If(_, t, f) = &out.kind else {
+        let optional = branch(call(Callee::Some, vec![id("x")]), e(TExprKind::None));
+        let out = rewrite(&e(TExprKind::Try(Box::new(optional))), &limits(8));
+        let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the `?` inside the `if`, got {out:?}");
         };
-        assert!(matches!(&t.kind, ExprKind::Ident(v) if v == "x"));
-        assert!(matches!(&f.kind, ExprKind::Try(inner) if matches!(inner.kind, ExprKind::None)));
+        assert!(matches!(&t.kind, TExprKind::Ident(v) if v == "x"));
+        assert!(matches!(&f.kind, TExprKind::Try(inner) if matches!(inner.kind, TExprKind::None)));
     }
 
     #[test]
     fn a_branch_that_is_not_a_constructor_keeps_the_eliminator_outside() {
-        let mixed = e(ExprKind::Match(
+        let mixed = e(TExprKind::Match(
             Box::new(id("o")),
             vec![
                 arm("some", &["v"], call(Callee::Ok, vec![id("v")])),
                 arm("none", &[], user("fallback", vec![])),
             ],
         ));
-        let out = rewrite(&e(ExprKind::Try(Box::new(mixed))), &limits(8));
-        assert!(matches!(out.kind, ExprKind::Try(_)));
+        let out = rewrite(&e(TExprKind::Try(Box::new(mixed))), &limits(8));
+        assert!(matches!(out.kind, TExprKind::Try(_)));
     }
 
     #[test]
     fn the_push_runs_through_bindings_ahead_of_the_tail() {
-        let inner = e(ExprKind::Let(
+        let inner = e(TExprKind::Let(
             "e".into(),
-            None,
             Box::new(id("msg")),
             Box::new(call(Callee::Ok, vec![])),
         ));
-        let out = rewrite(&e(ExprKind::Try(Box::new(inner))), &limits(8));
-        let ExprKind::Let(_, _, _, body) = &out.kind else {
+        let out = rewrite(&e(TExprKind::Try(Box::new(inner))), &limits(8));
+        let TExprKind::Let(_, _, body) = &out.kind else {
             panic!("expected the let to survive, got {out:?}");
         };
-        assert!(matches!(body.kind, ExprKind::Unit));
+        assert!(matches!(body.kind, TExprKind::Unit));
     }
 
     #[test]
     fn match_on_optional_branches_binds_the_payload_per_leaf() {
         // `value_or` inlined over `if (c) { some(x) } else { none }`.
-        let scrutinee = branch(call(Callee::Some, vec![id("x")]), e(ExprKind::None));
-        let matched = e(ExprKind::Match(
+        let scrutinee = branch(call(Callee::Some, vec![id("x")]), e(TExprKind::None));
+        let matched = e(TExprKind::Match(
             Box::new(scrutinee),
             vec![arm("some", &["v"], id("v")), arm("none", &[], id("d"))],
         ));
         let out = rewrite(&matched, &limits(8));
-        let ExprKind::If(_, t, f) = &out.kind else {
+        let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
         // `some(v) => v` hands the payload straight back: no binding at all.
-        assert!(matches!(&t.kind, ExprKind::Ident(x) if x == "x"));
-        assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
+        assert!(matches!(&t.kind, TExprKind::Ident(x) if x == "x"));
+        assert!(matches!(&f.kind, TExprKind::Ident(d) if d == "d"));
     }
 
     #[test]
     fn a_match_on_a_let_bound_name_is_pushed_into_the_binding() {
         // `let s: i64? = if c { some(x) } else { none }; let d = 0; match (s)
         // { some(v) => v + 1, none => d }` — inlining's shape.
-        let value = branch(call(Callee::Some, vec![id("x")]), e(ExprKind::None));
-        let matched = e(ExprKind::Match(
+        let value = branch(call(Callee::Some, vec![id("x")]), e(TExprKind::None));
+        let matched = e(TExprKind::Match(
             Box::new(id("s")),
             vec![
                 arm("some", &["v"], user("inc", vec![id("v")])),
                 arm("none", &[], id("d")),
             ],
         ));
-        let bound = e(ExprKind::Let(
+        // The binding says what its value is: an `i64?`.
+        let mut value = value;
+        value.ty = ConcreteTy::Optional(Box::new(ConcreteTy::Primitive(
+            aipl_syntax::ast::Primitive::I64,
+        )));
+        let mut bound = e(TExprKind::Let(
             "s".into(),
-            Some(Type::Optional(Box::new(Type::Primitive(
-                aipl_syntax::ast::Primitive::I64,
-            )))),
             Box::new(value),
-            Box::new(e(ExprKind::Let(
+            Box::new(e(TExprKind::Let(
                 "d".into(),
-                None,
-                Box::new(e(ExprKind::Num(0))),
+                Box::new(e(TExprKind::Int(0))),
                 Box::new(matched),
             ))),
         ));
+        bound.annotation = Some(ConcreteTy::Optional(Box::new(ConcreteTy::Primitive(
+            aipl_syntax::ast::Primitive::I64,
+        ))));
         let out = rewrite(&bound, &limits(8));
-        let ExprKind::Let(d, _, _, rest) = &out.kind else {
+        let TExprKind::Let(d, _, rest) = &out.kind else {
             panic!("expected the `d` binding to survive, got {out:?}");
         };
         assert_eq!(d, "d");
-        let ExprKind::If(_, t, f) = &rest.kind else {
+        let TExprKind::If(_, t, f) = &rest.kind else {
             panic!("expected the match pushed into the `if`, got {rest:?}");
         };
         // The binder takes the annotation's payload type.
-        assert!(
-            matches!(&t.kind, ExprKind::Let(v, Some(Type::Primitive(_)), p, _)
-            if v.ends_with("_v") && matches!(&p.kind, ExprKind::Ident(x) if x == "x"))
-        );
-        assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
+        assert!(matches!(&t.kind, TExprKind::Let(v, p, _)
+            if v.ends_with("_v") && matches!(&p.kind, TExprKind::Ident(x) if x == "x")
+                && p.ty == ConcreteTy::Primitive(aipl_syntax::ast::Primitive::I64)));
+        assert!(t.annotation.is_some());
+        assert!(matches!(&f.kind, TExprKind::Ident(d) if d == "d"));
     }
 
     #[test]
     fn a_match_whose_copies_would_be_too_large_stays() {
         let scrutinee = branch(
             call(Callee::Some, vec![id("x")]),
-            branch(call(Callee::Some, vec![id("y")]), e(ExprKind::None)),
+            branch(call(Callee::Some, vec![id("y")]), e(TExprKind::None)),
         );
         let big = user("f", vec![user("g", vec![id("v")])]);
-        let matched = e(ExprKind::Match(
+        let matched = e(TExprKind::Match(
             Box::new(scrutinee),
             vec![arm("some", &["v"], big), arm("none", &[], id("d"))],
         ));
         // Two `some` leaves select the same two-operation arm: one copy of it.
         assert!(matches!(
             rewrite(&matched, &limits(1)).kind,
-            ExprKind::Match(..)
+            TExprKind::Match(..)
         ));
         assert!(matches!(
             rewrite(&matched, &limits(2)).kind,
-            ExprKind::If(..)
+            TExprKind::If(..)
         ));
     }
 
     #[test]
     fn a_scrutinee_binding_an_arm_reads_blocks_the_move() {
-        let scrutinee = e(ExprKind::Let(
+        let scrutinee = e(TExprKind::Let(
             "d".into(),
-            None,
             Box::new(id("inner")),
-            Box::new(branch(call(Callee::Some, vec![id("d")]), e(ExprKind::None))),
+            Box::new(branch(
+                call(Callee::Some, vec![id("d")]),
+                e(TExprKind::None),
+            )),
         ));
-        let matched = e(ExprKind::Match(
+        let matched = e(TExprKind::Match(
             Box::new(scrutinee),
             vec![arm("some", &["v"], id("v")), arm("none", &[], id("d"))],
         ));
         assert!(matches!(
             rewrite(&matched, &limits(8)).kind,
-            ExprKind::Match(..)
+            TExprKind::Match(..)
         ));
     }
 
     #[test]
     fn match_on_variant_cases_binds_each_payload_slot() {
         let scrutinee = branch(user("Pair@V", vec![id("a"), id("b")]), id("Nil@V"));
-        let matched = e(ExprKind::Match(
+        let matched = e(TExprKind::Match(
             Box::new(scrutinee),
             vec![
                 arm("Pair@V", &["x", "_"], id("x")),
@@ -1064,20 +1140,20 @@ mod tests {
             ],
         ));
         let out = rewrite(&matched, &limits(8));
-        let ExprKind::If(_, t, f) = &out.kind else {
+        let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
         // `let x = a; b; x` — the ignored slot is still evaluated.
-        let ExprKind::Let(name, _, payload, body) = &t.kind else {
+        let TExprKind::Let(name, payload, body) = &t.kind else {
             panic!("expected `let x = a; ..`, got {t:?}");
         };
         // The arm's binder is renamed, since its body is copied to each leaf.
         assert!(name.ends_with("_x"));
-        assert!(matches!(&payload.kind, ExprKind::Ident(a) if a == "a"));
-        assert!(matches!(&body.kind, ExprKind::Seq(first, rest)
-            if matches!(&first.kind, ExprKind::Ident(b) if b == "b")
-                && matches!(&rest.kind, ExprKind::Ident(x) if x == name)));
-        assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
+        assert!(matches!(&payload.kind, TExprKind::Ident(a) if a == "a"));
+        assert!(matches!(&body.kind, TExprKind::Seq(first, rest)
+            if matches!(&first.kind, TExprKind::Ident(b) if b == "b")
+                && matches!(&rest.kind, TExprKind::Ident(x) if x == name)));
+        assert!(matches!(&f.kind, TExprKind::Ident(d) if d == "d"));
     }
 
     #[test]
@@ -1085,13 +1161,13 @@ mod tests {
         // `Pair(x, x)` against `Pair(x, y)`: binding `x` first would make the
         // second payload read the binder instead of the outer `x`.
         let scrutinee = user("Pair@V", vec![id("x"), id("x")]);
-        let matched = e(ExprKind::Match(
+        let matched = e(TExprKind::Match(
             Box::new(scrutinee),
             vec![arm("Pair@V", &["x", "y"], id("y"))],
         ));
         assert!(matches!(
             rewrite(&matched, &limits(8)).kind,
-            ExprKind::Match(..)
+            TExprKind::Match(..)
         ));
     }
 
@@ -1103,23 +1179,23 @@ mod tests {
             vec![id("x"), call(Callee::Some, vec![id("y")])],
         );
         let out = rewrite(&compared, &limits(8));
-        let ExprKind::Match(scrutinee, arms) = &out.kind else {
+        let TExprKind::Match(scrutinee, arms) = &out.kind else {
             panic!("expected a match on `x`, got {out:?}");
         };
-        assert!(matches!(&scrutinee.kind, ExprKind::Ident(x) if x == "x"));
+        assert!(matches!(&scrutinee.kind, TExprKind::Ident(x) if x == "x"));
         assert!(
             matches!(&arms[0].pattern, Pattern::Ctor { name, bindings, .. }
             if name == "some" && bindings.len() == 1)
         );
         assert!(
-            matches!(&arms[0].body.kind, ExprKind::Call(Callee::Equal, a, _)
-            if matches!(&a[1].kind, ExprKind::Ident(y) if y == "y"))
+            matches!(&arms[0].body.kind, TExprKind::Call { callee: Callee::Equal, args: a, .. }
+            if matches!(&a[1].kind, TExprKind::Ident(y) if y == "y"))
         );
         assert!(
             matches!(&arms[1].pattern, Pattern::Ctor { name, bindings, .. }
             if name == "none" && bindings.is_empty())
         );
-        assert!(matches!(arms[1].body.kind, ExprKind::Bool(false)));
+        assert!(matches!(arms[1].body.kind, TExprKind::Bool(false)));
     }
 
     #[test]
@@ -1131,19 +1207,21 @@ mod tests {
             vec![call(Callee::Err, vec![user("loud", vec![])]), id("r")],
         );
         let out = rewrite(&compared, &limits(8));
-        let ExprKind::Let(bound, _, value, body) = &out.kind else {
+        let TExprKind::Let(bound, value, body) = &out.kind else {
             panic!("expected the payload bound ahead of the match, got {out:?}");
         };
-        assert!(matches!(&value.kind, ExprKind::Call(Callee::User(f), _, _) if f == "loud"));
-        let ExprKind::Match(_, arms) = &body.kind else {
+        assert!(
+            matches!(&value.kind, TExprKind::Call { callee: Callee::User(f), args: _, .. } if f == "loud")
+        );
+        let TExprKind::Match(_, arms) = &body.kind else {
             panic!("expected a match under the binding, got {body:?}");
         };
         assert!(
-            matches!(&arms[0].body.kind, ExprKind::Call(Callee::NotEqual, a, _)
-            if matches!(&a[1].kind, ExprKind::Ident(t) if t == bound))
+            matches!(&arms[0].body.kind, TExprKind::Call { callee: Callee::NotEqual, args: a, .. }
+            if matches!(&a[1].kind, TExprKind::Ident(t) if t == bound))
         );
         assert!(matches!(&arms[1].pattern, Pattern::Ctor { name, .. } if name == "ok"));
-        assert!(matches!(arms[1].body.kind, ExprKind::Bool(true)));
+        assert!(matches!(arms[1].body.kind, TExprKind::Bool(true)));
     }
 
     #[test]
@@ -1153,20 +1231,24 @@ mod tests {
             vec![id("x"), user("Pair@V", vec![id("a"), id("b")])],
         );
         let out = rewrite(&compared, &limits(8));
-        let ExprKind::Match(_, arms) = &out.kind else {
+        let TExprKind::Match(_, arms) = &out.kind else {
             panic!("expected a match on `x`, got {out:?}");
         };
         assert!(matches!(
             &arms[0].body.kind,
-            ExprKind::Call(Callee::LogicalAnd, _, _)
+            TExprKind::Call {
+                callee: Callee::LogicalAnd,
+                args: _,
+                ..
+            }
         ));
         assert!(matches!(arms[1].pattern, Pattern::Wildcard));
         // A nullary case needs no payload comparison at all.
         let nullary = call(Callee::Equal, vec![id("Nil@V"), id("x")]);
-        let ExprKind::Match(_, arms) = &rewrite(&nullary, &limits(8)).kind else {
+        let TExprKind::Match(_, arms) = &rewrite(&nullary, &limits(8)).kind else {
             panic!("expected a match");
         };
-        assert!(matches!(arms[0].body.kind, ExprKind::Bool(true)));
+        assert!(matches!(arms[0].body.kind, TExprKind::Bool(true)));
     }
 
     #[test]
@@ -1179,13 +1261,18 @@ mod tests {
             vec![id("a"), user("Cons@L", vec![id("one"), inner])],
         );
         let out = rewrite(&compared, &limits(8));
-        let ExprKind::Match(_, arms) = &out.kind else {
+        let TExprKind::Match(_, arms) = &out.kind else {
             panic!("expected a match on `a` with no binding ahead, got {out:?}");
         };
-        let ExprKind::Call(Callee::LogicalAnd, parts, _) = &arms[0].body.kind else {
+        let TExprKind::Call {
+            callee: Callee::LogicalAnd,
+            args: parts,
+            ..
+        } = &arms[0].body.kind
+        else {
             panic!("expected `v0 == one && ..`, got {:?}", arms[0].body);
         };
-        assert!(matches!(parts[1].kind, ExprKind::Match(..)));
+        assert!(matches!(parts[1].kind, TExprKind::Match(..)));
     }
 
     #[test]
@@ -1199,7 +1286,10 @@ mod tests {
         );
         assert!(matches!(
             rewrite(&compared, &limits(8)).kind,
-            ExprKind::Call(Callee::Equal, ..)
+            TExprKind::Call {
+                callee: Callee::Equal,
+                ..
+            }
         ));
     }
 
@@ -1209,22 +1299,22 @@ mod tests {
         let compared = call(
             Callee::Equal,
             vec![
-                branch(call(Callee::Some, vec![id("a")]), e(ExprKind::None)),
+                branch(call(Callee::Some, vec![id("a")]), e(TExprKind::None)),
                 call(Callee::Some, vec![id("y")]),
             ],
         );
         let out = rewrite(&compared, &limits(8));
-        let ExprKind::If(_, t, f) = &out.kind else {
+        let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
-        assert!(matches!(&t.kind, ExprKind::Let(_, _, _, body)
-            if matches!(body.kind, ExprKind::Call(Callee::Equal, ..))));
-        assert!(matches!(f.kind, ExprKind::Bool(false)));
+        assert!(matches!(&t.kind, TExprKind::Let(_, _, body)
+            if matches!(body.kind, TExprKind::Call { callee: Callee::Equal, .. })));
+        assert!(matches!(f.kind, TExprKind::Bool(false)));
     }
 
     #[test]
     fn field_of_a_construction_is_its_initializer() {
-        let projected = e(ExprKind::Field(
+        let projected = e(TExprKind::Field(
             Box::new(branch(
                 construct(&[("a", id("x")), ("b", user("pure", vec![]))]),
                 construct(&[("a", id("y")), ("b", id("z"))]),
@@ -1232,37 +1322,37 @@ mod tests {
             "a".into(),
         ));
         let out = rewrite(&projected, &limits(8));
-        let ExprKind::If(_, t, f) = &out.kind else {
+        let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the projection pushed into the `if`, got {out:?}");
         };
-        assert!(matches!(&t.kind, ExprKind::Ident(x) if x == "x"));
-        assert!(matches!(&f.kind, ExprKind::Ident(y) if y == "y"));
+        assert!(matches!(&t.kind, TExprKind::Ident(x) if x == "x"));
+        assert!(matches!(&f.kind, TExprKind::Ident(y) if y == "y"));
     }
 
     #[test]
     fn a_dropped_field_that_does_something_is_kept_as_a_statement() {
-        let projected = e(ExprKind::Field(
+        let projected = e(TExprKind::Field(
             Box::new(construct(&[("a", id("x")), ("b", user("loud", vec![]))])),
             "a".into(),
         ));
         let out = rewrite(&projected, &limits(8));
-        assert!(matches!(&out.kind, ExprKind::Seq(first, rest)
-            if matches!(&first.kind, ExprKind::Call(Callee::User(n), _, _) if n == "loud")
-                && matches!(&rest.kind, ExprKind::Ident(x) if x == "x")));
+        assert!(matches!(&out.kind, TExprKind::Seq(first, rest)
+            if matches!(&first.kind, TExprKind::Call { callee: Callee::User(n), args: _, .. } if n == "loud")
+                && matches!(&rest.kind, TExprKind::Ident(x) if x == "x")));
     }
 
     #[test]
     fn a_field_that_leaves_the_function_blocks_the_move() {
-        let projected = e(ExprKind::Field(
+        let projected = e(TExprKind::Field(
             Box::new(construct(&[
                 ("a", id("x")),
-                ("b", e(ExprKind::Try(Box::new(id("r"))))),
+                ("b", e(TExprKind::Try(Box::new(id("r"))))),
             ])),
             "a".into(),
         ));
         assert!(matches!(
             rewrite(&projected, &limits(8)).kind,
-            ExprKind::Field(..)
+            TExprKind::Field(..)
         ));
     }
 }

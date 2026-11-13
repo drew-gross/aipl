@@ -259,7 +259,7 @@ fn fuse_typed(e: &mut Typed, aliases: &mut Vec<(String, Place)>) {
             aliases.pop();
         }
     } else {
-        e.for_each_child_mut(&mut |child| fuse_typed(child, aliases));
+        crate::typed_util::each_child_mut(e, &mut |child| fuse_typed(child, aliases));
     }
     rewrite_typed(e, aliases);
 }
@@ -378,7 +378,5 @@ fn disturbs_typed(e: &Typed, names: &[&str]) -> bool {
         TExprKind::IfLet(arm, _, _) => arm.pattern.bindings().iter().any(named),
         _ => false,
     };
-    let mut below = false;
-    e.for_each_child(&mut |c| below = below || disturbs_typed(c, names));
-    here || below
+    here || crate::typed_util::any_child(e, |c| disturbs_typed(c, names))
 }

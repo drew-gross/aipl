@@ -282,9 +282,10 @@ pub struct TExpr<T: TyRepr = Ty> {
     /// on it: the tree this one came from carried no stamp here. Going back to an `Expr` such a
     /// node is left unstamped, so a conversion round trip adds nothing a pass could trip over.
     pub derived: bool,
-    /// For a `let` or `mut`: whether the binding was written with, or recorded as having, a type of
-    /// its own (`mut n: u64 = 0`), which is then its value's `ty`.
-    pub annotated: bool,
+    /// For a `let` or `mut`: the type the binding was written with, or recorded as having
+    /// (`mut n: u64 = 0`), when it has one of its own. It can differ from the value's `ty`: the
+    /// binding is what a representation is chosen for (a `char[]` argument bound as a `str`).
+    pub annotation: Option<T>,
 }
 
 /// One arm of a typed `match`, or the arm of an `if let`.
@@ -395,11 +396,11 @@ impl<T: TyRepr> TExpr<T> {
             name_span: None,
             unsettled: false,
             derived: false,
-            annotated: false,
+            annotation: None,
         }
     }
 
-    /// A node of `kind` and `ty` standing where `like` stood: its spans, nothing else. The builder
+    /// A node of `kind` and `ty` standing where `like` stood: its spans and whether it carried a stamp. The builder
     /// for a pass that replaces one expression with another and has to say what the new one is.
     pub fn rebuilt(kind: TExprKind<T>, ty: T, like: &TExpr<T>) -> Self {
         TExpr {
@@ -409,8 +410,8 @@ impl<T: TyRepr> TExpr<T> {
             value_span: like.value_span.clone(),
             name_span: like.name_span.clone(),
             unsettled: false,
-            derived: false,
-            annotated: false,
+            derived: like.derived,
+            annotation: None,
         }
     }
 
@@ -750,7 +751,10 @@ impl<T: TyRepr> TExpr<T> {
             name_span: self.name_span.clone(),
             unsettled: self.unsettled,
             derived: self.derived,
-            annotated: self.annotated,
+            annotation: match &self.annotation {
+                Some(t) => Some(f(t)?),
+                None => None,
+            },
         })
     }
 }
@@ -825,6 +829,48 @@ impl<T: TyRepr> TMatchArm<T> {
 }
 
 impl<T: TyRepr> TPattern<T> {
+    /// This pattern with each name it binds replaced by what `rename` makes of it.
+    pub fn rename_bindings(&self, rename: &mut impl FnMut(&str) -> String) -> TPattern<T> {
+        let elems = |elems: &[TExpr<T>], rename: &mut dyn FnMut(&str) -> String| {
+            elems
+                .iter()
+                .map(|e| match &e.kind {
+                    TExprKind::Ident(name) => {
+                        TExpr::rebuilt(TExprKind::Ident(rename(name)), e.ty.clone(), e)
+                    }
+                    _ => e.clone(),
+                })
+                .collect::<Vec<_>>()
+        };
+        match self {
+            TPattern::Ctor {
+                name,
+                bindings,
+                ignore_payload,
+            } => TPattern::Ctor {
+                name: name.clone(),
+                bindings: bindings.iter().map(|b| rename(b)).collect(),
+                ignore_payload: *ignore_payload,
+            },
+            TPattern::Array(es) => TPattern::Array(elems(es, rename)),
+            TPattern::ArrayRest(es) => TPattern::ArrayRest(elems(es, rename)),
+            TPattern::Str(_) | TPattern::Char(_) | TPattern::Wildcard | TPattern::Int(_) => {
+                self.clone()
+            }
+            TPattern::Bind(name) => TPattern::Bind(rename(name)),
+            TPattern::Tuple(ps) => {
+                TPattern::Tuple(ps.iter().map(|p| p.rename_bindings(rename)).collect())
+            }
+            TPattern::ArrayNested(ps) => {
+                TPattern::ArrayNested(ps.iter().map(|p| p.rename_bindings(rename)).collect())
+            }
+            TPattern::Nested { name, args } => TPattern::Nested {
+                name: name.clone(),
+                args: args.iter().map(|p| p.rename_bindings(rename)).collect(),
+            },
+        }
+    }
+
     /// The names this pattern binds, as [`Pattern::bindings`] says them.
     pub fn bindings(&self) -> Vec<String> {
         self.erase().bindings().to_vec()
