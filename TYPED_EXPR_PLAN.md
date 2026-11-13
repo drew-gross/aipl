@@ -194,8 +194,17 @@ monomorphization and the post-mono passes:
 - Found on the way: mono's `node(..)` stamped the call's type on the `Field` of a call through a
   function-valued field (fixed: the field is left unstamped), and `children_mut` skips an
   assignment's target.
-- Next: convert once before the post-mono pipeline instead of per pass (each pass pays a round
-  trip now); then codegen reading `expr.ty`; then mono and the pre-mono passes, deleting the twins.
+- Done: the adapter runs once, at mono's output (`typed_adapter::to_typed`, panicking on a node
+  nothing types); `MonoProgram`'s bodies are `TExpr<ConcreteType>` (`ConcreteFn<Body>`), every
+  post-mono pass and codegen read that tree, and `has_placeholder_ty`'s only remaining job is a
+  `Context`-ordered set. `aipl_mono::typed::*` has the ownership questions codegen asks
+  (`ownership_typed.rs`); `passes.rs` is generic over the body; `stamp_idents` and the coverage
+  probe are gone. Codegen reads `expr.ty` for `none`, `[]`, `#{}`, dicts, floats and the type
+  locked onto a call. Still on `Expr`: mono's inside, the pre-mono passes, and their twins
+  (`fuse_try_with`, `fold_match`, `sink_here`, `early_exit`, `aliases_or_unsafe` and friends in
+  `lib.rs`, the analysis half of `move_last_use`).
+- Next: mono's inside and the pre-mono passes on `TExpr<Ty>`, deleting the twins and the stamp
+  conversion in `typed_adapter`.
 
 ## First action when this is picked up (done; kept for the record)
 

@@ -69,13 +69,21 @@ pub use reuse_matched_values::reuse_matched_values;
 
 mod move_last_use;
 pub use move_last_use_typed::move_last_uses_post_mono;
+mod binder_types;
 mod inline_typed;
 mod move_last_use_typed;
-mod stamp_idents;
+mod ownership_typed;
 mod typed_adapter;
 mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
-pub use stamp_idents::stamp_idents;
+/// The post-monomorphization tree and the questions codegen asks of it.
+pub mod typed {
+    pub use crate::ownership_typed::{
+        assigns_binding, binding_is_exclusive, inspect_only_params, is_receiver, moves_binding,
+        reowns_binding,
+    };
+    pub use crate::typed_util::{any_child, body_size, each_child, each_child_mut, Typed};
+}
 
 mod subst;
 pub use subst::inline_single_use_bindings;
@@ -1796,7 +1804,7 @@ pub fn monomorphize_probed(
         ),
     );
 
-    let mut out_fns: Vec<ConcreteFn> = Vec::new();
+    let mut out_fns: Vec<ConcreteFn<Expr>> = Vec::new();
     // Drain the work-list until nothing new is discovered. Processing a body
     // enqueues the instances (concrete callees, generic specializations, and
     // their owned forms) it calls, so the reachable set grows transitively from
@@ -2002,50 +2010,61 @@ pub fn monomorphize_probed(
     // a type variable that escaped instantiation is caught here — with a name to
     // report — rather than reaching codegen and being mangled into a nonsense
     // instance name.
+    let concrete_structs: Vec<ConcreteStructDecl> = structs
+        .into_iter()
+        .map(|s| ConcreteStructDecl {
+            fields: s
+                .fields
+                .iter()
+                .map(|f| ConcreteFieldDecl {
+                    name: f.name.text.clone(),
+                    ty: settled(&f.ty, &format!("struct {:?} field {:?}", s.name, f.name)),
+                })
+                .collect(),
+            // Settled here, where the tuple naming scheme lives: past this
+            // boundary a tuple is told apart by this flag, not by its name.
+            is_tuple: tuple_instance_arity(&s.name).is_some(),
+            name: s.name.text,
+        })
+        .collect();
+    let concrete_variants: Vec<ConcreteVariantDecl> = variants_out
+        .into_iter()
+        .map(|v| ConcreteVariantDecl {
+            cases: v
+                .cases
+                .iter()
+                .map(|c| ConcreteVariantCase {
+                    name: c.name.text.clone(),
+                    payload: c
+                        .payload
+                        .iter()
+                        .map(|p| settled(&p.ty, &format!("variant {:?} case {:?}", v.name, c.name)))
+                        .collect(),
+                })
+                .collect(),
+            name: v.name.text,
+        })
+        .collect();
+    let shim_cells: Vec<ConcreteType> = mono
+        .shim_cells
+        .iter()
+        .map(|ty| settled(ty, "a variable a shim closure captures"))
+        .collect();
+    // The boundary to the typed tree: every node of every body carries its type from here on. A
+    // node nothing types is a hole in the stamping, which is a compiler bug, not a user error.
+    let decls = typed_adapter::Decls::of(&concrete_structs, &concrete_variants, &out_fns);
+    let fns = out_fns
+        .iter()
+        .map(|f| {
+            typed_adapter::to_typed(f, &decls)
+                .unwrap_or_else(|why| panic!("{}: cannot type the body: {why}", f.name))
+        })
+        .collect();
     Ok(MonoProgram {
-        structs: structs
-            .into_iter()
-            .map(|s| ConcreteStructDecl {
-                fields: s
-                    .fields
-                    .iter()
-                    .map(|f| ConcreteFieldDecl {
-                        name: f.name.text.clone(),
-                        ty: settled(&f.ty, &format!("struct {:?} field {:?}", s.name, f.name)),
-                    })
-                    .collect(),
-                // Settled here, where the tuple naming scheme lives: past this
-                // boundary a tuple is told apart by this flag, not by its name.
-                is_tuple: tuple_instance_arity(&s.name).is_some(),
-                name: s.name.text,
-            })
-            .collect(),
-        variants: variants_out
-            .into_iter()
-            .map(|v| ConcreteVariantDecl {
-                cases: v
-                    .cases
-                    .iter()
-                    .map(|c| ConcreteVariantCase {
-                        name: c.name.text.clone(),
-                        payload: c
-                            .payload
-                            .iter()
-                            .map(|p| {
-                                settled(&p.ty, &format!("variant {:?} case {:?}", v.name, c.name))
-                            })
-                            .collect(),
-                    })
-                    .collect(),
-                name: v.name.text,
-            })
-            .collect(),
-        shim_cells: mono
-            .shim_cells
-            .iter()
-            .map(|ty| settled(ty, "a variable a shim closure captures"))
-            .collect(),
-        fns: out_fns,
+        structs: concrete_structs,
+        variants: concrete_variants,
+        shim_cells,
+        fns,
     })
 }
 
@@ -2278,12 +2297,32 @@ struct Generic {
 /// apart makes each representation self-explanatory and lets the compiler
 /// catch a stray reference to the wrong one.
 #[derive(Clone)]
-pub struct ConcreteFn {
+pub struct ConcreteFn<Body = typed_util::Typed> {
     pub name: String,
     pub params: Vec<ConcreteParam>,
     pub effects: Vec<String>,
     pub return_ty: Option<ConcreteType>,
-    pub body: Expr,
+    /// The typed tree, once the instance has left monomorphization; the stamped `Expr` it is
+    /// inferred as until then (`typed_adapter::to_typed` is the boundary).
+    pub body: Body,
+}
+
+/// Whether a body names a function, for [`ConcreteFn::is_directly_recursive`] on either side
+/// of the typed boundary.
+pub trait Recursion {
+    fn references(&self, name: &str) -> bool;
+}
+
+impl Recursion for Expr {
+    fn references(&self, name: &str) -> bool {
+        references_name(self, name)
+    }
+}
+
+impl Recursion for typed_util::Typed {
+    fn references(&self, name: &str) -> bool {
+        typed_util::references_name(self, name)
+    }
 }
 
 /// Classification every consumer of a [`ConcreteFn`] needs, answered from the
@@ -2295,7 +2334,7 @@ pub struct ConcreteFn {
 /// read alike. They live on the type rather than in codegen because every one of
 /// them is a property of the function itself: no target, no layout, no ABI
 /// lowering is consulted, only what was declared.
-impl ConcreteFn {
+impl<Body> ConcreteFn<Body> {
     /// The declared return type, with an absent one read as `Unit`.
     ///
     /// This is what the *body* is checked against. What a caller receives can
@@ -2314,8 +2353,11 @@ impl ConcreteFn {
     /// Direct only: two functions that name each other are not recursive by this
     /// test. Matches by name, so a local that rebinds the name would count too.
     /// Suitable as a guard before copying the body somewhere else.
-    pub fn is_directly_recursive(&self) -> bool {
-        references_name(&self.body, &self.name)
+    pub fn is_directly_recursive(&self) -> bool
+    where
+        Body: Recursion,
+    {
+        self.body.references(&self.name)
     }
 
     /// `main` declared with no return type: it returns nothing, and its exit
@@ -2620,7 +2662,7 @@ impl Mono<'_> {
         return_ty: &Option<Type>,
         body: &Expr,
         specs: &[ParamSpec],
-    ) -> Result<ConcreteFn, Error> {
+    ) -> Result<ConcreteFn<Expr>, Error> {
         let mut env: Env = HashMap::new();
         for p in params {
             env.insert(p.name.clone(), p.ty.clone());
@@ -8011,7 +8053,7 @@ pub fn builtin_is_mutating(name: &str) -> bool {
 /// anywhere. The in-place runtime (`array_ops::push_mut`) never checks for a
 /// second reference — this analysis is the only guard — so an argument is
 /// added here only once its runtime has been read.
-fn builtin_reads_arg(f: &Callee, i: usize) -> bool {
+pub(crate) fn builtin_reads_arg(f: &Callee, i: usize) -> bool {
     matches!((f, i), (Callee::Extend, 1) | (Callee::Union, 1))
 }
 
@@ -9673,7 +9715,7 @@ pub fn inline_small_post_mono(
         .fns
         .iter()
         .filter(|f| {
-            body_size(&f.body) <= max_exprs
+            typed_util::body_size(&f.body) <= max_exprs
                 && f.name != "main"
                 && f.name != "__test_main"
                 // A `.test` body's name changes what `?` means inside it — see
@@ -9687,7 +9729,7 @@ pub fn inline_small_post_mono(
                 // A higher-order function (one with a function-typed parameter)
                 // is not inlined. Variadic parameters need no check:
                 // `specialize_variadic` has already resolved them.
-                && is_inline_shape(
+                && is_inline_shape_typed(
                     f.params
                         .iter()
                         .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
@@ -9786,6 +9828,13 @@ fn is_inline_candidate(
 /// A mutating method passes: [`build_inlined`] binds its `mut self` receiver
 /// `mut` and yields it, which is what a call to such a method means in either
 /// position it can appear.
+fn is_inline_shape_typed(higher_order_or_variadic: bool, body: &typed_util::Typed) -> bool {
+    !higher_order_or_variadic
+        && early_exit::without_early_exits_typed(body).is_some()
+        && !typed_util::contains_inplace_hof_intrinsic(body)
+}
+
+/// [`is_inline_shape_typed`] for a body before monomorphization.
 fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr) -> bool {
     !higher_order_or_variadic
         // A guard clause becomes the `if` it already is, and a `return` in tail
@@ -9849,7 +9898,7 @@ fn is_inline_candidate_mono(
         // A higher-order function (one with a function-typed parameter) is not
         // inlined. Variadic parameters need no check: `specialize_variadic` has
         // already resolved them.
-        && is_inline_shape(
+        && is_inline_shape_typed(
             f.params
                 .iter()
                 .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
@@ -9868,7 +9917,7 @@ fn use_counts_mono(program: &MonoProgram) -> HashMap<&str, usize> {
         program.fns.iter().map(|f| (f.name.as_str(), 0)).collect();
     for f in &program.fns {
         let mut bound: HashSet<&str> = f.params.iter().map(|p| p.name.as_str()).collect();
-        count_uses(&f.body, &mut bound, &mut counts);
+        typed_util::count_uses(&f.body, &mut bound, &mut counts);
     }
     counts
 }
@@ -9880,7 +9929,7 @@ fn collect_binders_mono(program: &MonoProgram) -> HashSet<&str> {
         for p in &f.params {
             set.insert(p.name.as_str());
         }
-        collect_body_binders(&f.body, &mut set);
+        typed_util::collect_body_binders(&f.body, &mut set);
     }
     set
 }
@@ -10655,126 +10704,6 @@ fn fields_read_once_into(names: &[&str], e: &Expr, repeats: bool, seen: &mut Vec
 // indexing, slicing, passing it on (a nested call retains it itself, or is
 // itself elided and touches no refcount at all).
 
-/// Which parameters of each instance in `program` are *borrow-only*: the caller
-/// need not retain the argument and the callee must not release it. Keyed by
-/// instance name, one flag per parameter (positionally aligned with
-/// [`ConcreteFn::params`]). See the section comment above for the rules; both
-/// codegen call sites read this same map, so the two halves always agree.
-pub fn inspect_only_params(program: &MonoProgram) -> HashMap<String, Vec<bool>> {
-    // Instances used as function *values* (a bare identifier naming a function,
-    // rather than a call of it). Over-approximate — a local binding that
-    // happens to share a function's name counts too — which only costs elision.
-    let names: HashSet<&str> = program.fns.iter().map(|f| f.name.as_str()).collect();
-    let mut address_taken: HashSet<&str> = HashSet::new();
-    for f in &program.fns {
-        aipl_syntax::each_subexpr(&f.body, &mut |e| match &e.kind {
-            ExprKind::Ident(n) => {
-                if let Some(name) = names.get(n.as_str()) {
-                    address_taken.insert(name);
-                }
-            }
-            // A shim installs its functions by address, and the operation's
-            // call sites reach them through `call_indirect`, which retains every
-            // argument.
-            ExprKind::Shim(_, bindings, _) => {
-                for (_, shim) in bindings {
-                    if let Some(name) = names.get(shim.as_str()) {
-                        address_taken.insert(name);
-                    }
-                }
-            }
-            _ => {}
-        });
-    }
-
-    program
-        .fns
-        .iter()
-        .map(|f| {
-            // `main` is called by the runtime entry point, not by compiled code:
-            // it is handed a freshly built CLI-args array (rc 1) that nothing
-            // else owns, so its entry-scope release is what frees it.
-            let elidable = f.name != "main"
-                && !f.params.iter().any(|p| p.mutable)
-                && !address_taken.contains(f.name.as_str());
-            let flags = f
-                .params
-                .iter()
-                .map(|p| {
-                    elidable
-                        && !p.owned
-                        && is_heap_concrete(&p.ty)
-                        && param_is_inspect_only(&p.name, &f.body)
-                })
-                .collect();
-            (f.name.clone(), flags)
-        })
-        .collect()
-}
-
-/// Whether `body` re-owns the binding `name` through a `mut` binding's slot
-/// (`mut y = name` / `set y = name`) — the one shape where codegen may transfer a
-/// value's existing reference instead of retaining a fresh one, and so the one
-/// use that makes a borrowed binding (an inspect-only parameter, or a `match`
-/// payload that did not retain) unsafe to leave unretained.
-pub fn reowns_binding(name: &str, body: &Expr) -> bool {
-    !param_is_inspect_only(name, body)
-}
-
-/// Whether every use of the parameter `name` in `body` merely inspects it: no
-/// use re-owns the incoming reference. Only the `mut`-binding slot forms can —
-/// `own_value_into_slot` may transfer a value's existing reference into the
-/// slot instead of retaining a new one — so those disqualify and everything
-/// else (including a plain `let`, a field/element store, a `return`, and any
-/// nested call, each of which retains what it keeps) is fine.
-fn param_is_inspect_only(name: &str, body: &Expr) -> bool {
-    let is_n = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if n == name);
-    let mut inspect_only = true;
-    aipl_syntax::each_subexpr(body, &mut |e| match &e.kind {
-        // `mut y = p` and `set y = p`.
-        ExprKind::LetMut(_, _, val, _) | ExprKind::Assign(_, val, _) if is_n(val) => {
-            inspect_only = false;
-        }
-        _ => {}
-    });
-    inspect_only
-}
-
-/// Static "exclusivity" analysis for a mutable heap binding (array or `str`):
-/// true iff every use of `name` in `body` is provably non-aliasing, so `push` /
-/// `+` may mutate it in place. `allow_tail_move` permits a final move-out (a
-/// returned binding). Conservative: any unhandled use disqualifies it.
-/// Whether `body` ever assigns the binding `name` — a `set name = ..`, which
-/// is also what every in-place mutation (`set name.push(x)`) desugars to.
-/// A binding that is never assigned is only ever read, so nothing needs its
-/// block unique.
-pub fn assigns_binding(name: &str, body: &Expr) -> bool {
-    if let ExprKind::Assign(lhs, _, _) = &body.kind {
-        if matches!(&lhs.kind, ExprKind::Ident(n) if n == name) {
-            return true;
-        }
-    }
-    children(body).any(|c| assigns_binding(name, c))
-}
-
-/// Whether `body` moves the binding `name` — whole (`__move(name)`) or by a
-/// field (`__move(name.f)`), the marks `move_last_use` leaves. Only such a
-/// binding needs storage of its own; one that is merely read can keep
-/// borrowing the storage it was read out of.
-pub fn moves_binding(name: &str, body: &Expr) -> bool {
-    if let ExprKind::Call(Callee::Move, args, _) = &body.kind {
-        let moved = match args.first().map(|a| &a.kind) {
-            Some(ExprKind::Ident(n)) => n == name,
-            Some(ExprKind::Field(obj, _)) => matches!(&obj.kind, ExprKind::Ident(n) if n == name),
-            _ => false,
-        };
-        if moved {
-            return true;
-        }
-    }
-    children(body).any(|c| moves_binding(name, c))
-}
-
 /// Whether `name`'s slot can be treated as the sole owner of its block, so a
 /// `push`/`extend` into it may write in place instead of copying.
 ///
@@ -10785,7 +10714,7 @@ pub fn moves_binding(name: &str, body: &Expr) -> bool {
 /// `f`: reading only the *builtin* mutating names made a binding grown by a
 /// user `mut self` method non-exclusive for its whole scope, so every append
 /// copied the accumulator — and a recursive one paid that at every level.
-pub fn binding_is_exclusive(
+pub(crate) fn binding_is_exclusive(
     name: &str,
     body: &Expr,
     allow_tail_move: bool,
@@ -10801,7 +10730,7 @@ pub fn binding_is_exclusive(
 /// into the call and the result comes back into the slot — and which one a site
 /// carries depends only on whether the callee owns its receiver. Every place
 /// that recognises the shape asks this, so the two cannot drift apart.
-pub fn is_receiver(e: &Expr, name: &str) -> bool {
+pub(crate) fn is_receiver(e: &Expr, name: &str) -> bool {
     match &e.kind {
         ExprKind::Ident(n) => n == name,
         ExprKind::Call(Callee::Move, args, _) => {

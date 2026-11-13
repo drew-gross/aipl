@@ -103,7 +103,10 @@
 use crate::passes::Scope;
 use std::collections::HashSet;
 
-use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TFieldInit, TMatchArm, TPattern};
+use aipl_syntax::ast::ConcreteType;
+use aipl_syntax::typed::{TExpr, TExprKind, TFieldInit, TMatchArm, TPattern};
+
+use crate::typed_util::Typed;
 
 use crate::sink::undeferrable_fns_post_mono;
 use crate::typed_util::{
@@ -112,9 +115,8 @@ use crate::typed_util::{
 };
 use aipl_syntax::ast::Callee;
 
-type Typed = TExpr<ConcreteTy>;
-type Arm = TMatchArm<ConcreteTy>;
-type Pattern = TPattern<ConcreteTy>;
+type Arm = TMatchArm<ConcreteType>;
+type Pattern = TPattern<ConcreteType>;
 
 /// Eliminate every known-constructor pair in `program`. `max_duplicated` bounds
 /// how much arm text a pushed `match` may copy; `builtin_effects` is the effect
@@ -136,10 +138,10 @@ pub fn eliminate_known_constructors_post_mono(
         max_duplicated,
         blocked: undeferrable_fns_post_mono(program, builtin_effects),
     };
-    crate::typed_adapter::on_typed_where(
+    crate::typed_util::map_bodies(
         program,
         |name| scope.covers(name),
-        |body| *body = rewrite(body, &limits),
+        |_, body| *body = rewrite(body, &limits),
     )
 }
 
@@ -156,12 +158,12 @@ fn can_defer(value: &Typed, blocked: &HashSet<String>) -> bool {
 }
 
 /// A node of `kind` and `ty` standing where `like` stood.
-fn node(kind: TExprKind<ConcreteTy>, ty: ConcreteTy, like: &Typed) -> Typed {
+fn node(kind: TExprKind<ConcreteType>, ty: ConcreteType, like: &Typed) -> Typed {
     TExpr::rebuilt(kind, ty, like)
 }
 
 /// What the `let` node `e` declares its value as, when it declares anything.
-fn declared(e: &Typed) -> Option<&ConcreteTy> {
+fn declared(e: &Typed) -> Option<&ConcreteType> {
     match &e.kind {
         TExprKind::Let(..) | TExprKind::LetMut(..) => e.annotation.as_ref(),
         _ => None,
@@ -232,7 +234,7 @@ fn unwrap_equality(
     let id = aipl_syntax::fresh_id();
     // Everything built here is a `bool` but the payload names.
     let boolean = at.ty.clone();
-    let rebuilt = |kind: TExprKind<ConcreteTy>| node(kind, boolean.clone(), at);
+    let rebuilt = |kind: TExprKind<ConcreteType>| node(kind, boolean.clone(), at);
     // Each payload as the arm reads it: itself when it may be deferred, else
     // the name it is bound to ahead of the match.
     let payloads = constructor.payloads();
@@ -350,7 +352,7 @@ enum Known<'a> {
         payloads: Vec<&'a Typed>,
     },
     /// A struct construction, `S { a: x, b: y }`.
-    Struct(&'a [TFieldInit<ConcreteTy>]),
+    Struct(&'a [TFieldInit<ConcreteType>]),
 }
 
 /// The constructor families each eliminator takes apart.
@@ -654,7 +656,7 @@ fn bound_names(e: &Typed, out: &mut HashSet<String>) {
 /// movable past what sits between, or the push itself refused.
 fn match_through_binding(
     name: &str,
-    annotation: Option<&ConcreteTy>,
+    annotation: Option<&ConcreteType>,
     value: &Typed,
     body: &Typed,
     limits: &Limits,
@@ -687,7 +689,7 @@ fn push_into_scrutinee(
     body: &Typed,
     limits: &Limits,
     annotated: bool,
-    annotate: &dyn Fn(&str) -> Option<ConcreteTy>,
+    annotate: &dyn Fn(&str) -> Option<ConcreteType>,
 ) -> Option<Typed> {
     let again =
         |inner: &Typed| push_into_scrutinee(name, value, inner, limits, annotated, annotate);
@@ -752,11 +754,11 @@ fn reads(e: &Typed, n: &str) -> bool {
 /// The type a binder of `case`'s payload is declared with, read off the
 /// scrutinee's declared type `annotation`: the optional's inner type for
 /// `some`, a result's side for `ok`/`err`, nothing for a variant case.
-fn payload_annotation(annotation: Option<&ConcreteTy>, case: &str) -> Option<ConcreteTy> {
+fn payload_annotation(annotation: Option<&ConcreteType>, case: &str) -> Option<ConcreteType> {
     match (annotation, case) {
-        (Some(ConcreteTy::Optional(inner)), "some") => Some((**inner).clone()),
-        (Some(ConcreteTy::Result(ok, _)), "ok") => Some((**ok).clone()),
-        (Some(ConcreteTy::Result(_, err)), "err") => Some((**err).clone()),
+        (Some(ConcreteType::Optional(inner)), "some") => Some((**inner).clone()),
+        (Some(ConcreteType::Result(ok, _)), "ok") => Some((**ok).clone()),
+        (Some(ConcreteType::Result(_, err)), "err") => Some((**err).clone()),
         _ => None,
     }
 }
@@ -772,7 +774,7 @@ fn push_match(
     scrutinee: &Typed,
     arms: &[Arm],
     match_at: &Typed,
-    annotate: &dyn Fn(&str) -> Option<ConcreteTy>,
+    annotate: &dyn Fn(&str) -> Option<ConcreteType>,
 ) -> Typed {
     push(scrutinee, match_at, &mut |leaf, kind| {
         let arm = arm_for(arms, kind.case_name()).expect("checked by `match_can_move`");
@@ -913,8 +915,8 @@ mod tests {
         }
     }
 
-    fn e(kind: TExprKind<ConcreteTy>) -> Typed {
-        TExpr::new(kind, ConcreteTy::Unit, 0..0)
+    fn e(kind: TExprKind<ConcreteType>) -> Typed {
+        TExpr::new(kind, ConcreteType::Unit, 0..0)
     }
 
     fn id(n: &str) -> Typed {
@@ -1056,7 +1058,7 @@ mod tests {
         ));
         // The binding says what its value is: an `i64?`.
         let mut value = value;
-        value.ty = ConcreteTy::Optional(Box::new(ConcreteTy::Primitive(
+        value.ty = ConcreteType::Optional(Box::new(ConcreteType::Primitive(
             aipl_syntax::ast::Primitive::I64,
         )));
         let mut bound = e(TExprKind::Let(
@@ -1068,7 +1070,7 @@ mod tests {
                 Box::new(matched),
             ))),
         ));
-        bound.annotation = Some(ConcreteTy::Optional(Box::new(ConcreteTy::Primitive(
+        bound.annotation = Some(ConcreteType::Optional(Box::new(ConcreteType::Primitive(
             aipl_syntax::ast::Primitive::I64,
         ))));
         let out = rewrite(&bound, &limits(8));
@@ -1082,7 +1084,7 @@ mod tests {
         // The binder takes the annotation's payload type.
         assert!(matches!(&t.kind, TExprKind::Let(v, p, _)
             if v.ends_with("_v") && matches!(&p.kind, TExprKind::Ident(x) if x == "x")
-                && p.ty == ConcreteTy::Primitive(aipl_syntax::ast::Primitive::I64)));
+                && p.ty == ConcreteType::Primitive(aipl_syntax::ast::Primitive::I64)));
         assert!(t.annotation.is_some());
         assert!(matches!(&f.kind, TExprKind::Ident(d) if d == "d"));
     }

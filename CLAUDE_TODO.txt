@@ -142,3 +142,6 @@ naming:
 
 codegen/types:
   `let gap = to_str(c).repeat(n);` then `match (d) { A => `{gap}{s}`, B => `{s}{gap}` }` renders gap as `['x', 'x']` (a char array) instead of its text; `let gap: str = ..` avoids it (builtin_pad.aipl carries the annotation). Likely the sunk/inlined `repeat` loses its str-ness in the interpolation
+
+typed tree:
+  codegen `flex_int_ty` hands `aipl_syntax::flex_fit` a shallow `Expr` rebuilt from the typed tail/branches (codegen `flex_shape`); port `flex_fit` to `TExpr` when the pre-mono side is typed

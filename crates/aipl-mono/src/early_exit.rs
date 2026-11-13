@@ -248,11 +248,10 @@ fn contains_try(e: &Expr) -> bool {
 
 // The same rewrite over the typed tree, for the inlining that happens after monomorphization.
 
-use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm};
+use aipl_syntax::ast::ConcreteType;
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm};
 
-use crate::typed_util::any_child;
-
-type Typed = TExpr<ConcreteTy>;
+use crate::typed_util::{any_child, Typed};
 
 /// [`without_early_exits`] over the typed tree.
 pub(crate) fn without_early_exits_typed(body: &Typed) -> Option<Typed> {
@@ -266,12 +265,12 @@ pub(crate) fn without_early_exits_typed(body: &Typed) -> Option<Typed> {
 }
 
 /// The type of the first of `branches` that produces a value (unit when none does).
-fn valued(branches: &[&Typed]) -> ConcreteTy {
+fn valued(branches: &[&Typed]) -> ConcreteType {
     branches
         .iter()
         .map(|b| b.ty.clone())
-        .find(|t| *t != ConcreteTy::Unit)
-        .unwrap_or(ConcreteTy::Unit)
+        .find(|t| *t != ConcreteType::Unit)
+        .unwrap_or(ConcreteType::Unit)
 }
 
 fn in_value_position_typed(e: &Typed) -> Option<Typed> {
@@ -333,7 +332,7 @@ fn in_value_position_typed(e: &Typed) -> Option<Typed> {
             Some(out)
         }
         TExprKind::Match(scrutinee, arms) if !contains_return_typed(scrutinee) => {
-            let arms: Option<Vec<TMatchArm<ConcreteTy>>> = arms
+            let arms: Option<Vec<TMatchArm<ConcreteType>>> = arms
                 .iter()
                 .map(|arm| {
                     Some(TMatchArm {

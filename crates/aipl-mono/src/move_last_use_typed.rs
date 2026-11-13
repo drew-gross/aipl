@@ -1,20 +1,18 @@
 //! The final marking of last uses, on the typed tree: [`crate::move_last_use`]'s analysis for the
 //! program after monomorphization, which is the only place it runs on typed bodies. The module
 //! docs there say what a mark is and why the early marks are stripped and made again; this is
-//! the same walk over `TExpr<ConcreteTy>`.
+//! the same walk over `TExpr<ConcreteType>`.
 
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, ConcreteType};
-use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm};
 
-use crate::typed_util::{any_child, each_child, each_child_mut};
+use crate::typed_util::{any_child, each_child, each_child_mut, Typed};
 use crate::{is_heap_concrete, MonoProgram};
 
-type Typed = TExpr<ConcreteTy>;
-
 fn placeholder(like: &Typed) -> Typed {
-    TExpr::new(TExprKind::Unit, ConcreteTy::Unit, like.span.clone())
+    TExpr::new(TExprKind::Unit, ConcreteType::Unit, like.span.clone())
 }
 
 /// `inner` handed over: `__move(inner)`, which is the value `inner` is and so has its type.
@@ -62,7 +60,7 @@ fn is_name(e: &Typed, name: &str) -> bool {
     matches!(&e.kind, TExprKind::Ident(n) if n == name)
 }
 
-fn binds(arm: &TMatchArm<ConcreteTy>, name: &str) -> bool {
+fn binds(arm: &TMatchArm<ConcreteType>, name: &str) -> bool {
     arm.pattern.bindings().iter().any(|b| b == name)
 }
 
@@ -191,16 +189,20 @@ pub fn move_last_uses_post_mono(program: &MonoProgram) -> MonoProgram {
         .map(|f| f.name.clone())
         .collect();
     let by_name = |name: &str| program.fns.iter().find(|f| f.name == name);
-    crate::typed_adapter::on_typed_named(program, |name, body| {
-        let f = by_name(name).expect("a function of the program");
-        let marked = mark_owned_params(
-            f,
-            program,
-            &remark(&strip(body), program, &mutating),
-            &mutating,
-        );
-        *body = move_owned_receivers(&marked, &owns_receiver);
-    })
+    crate::typed_util::map_bodies(
+        program,
+        |_| true,
+        |name, body| {
+            let f = by_name(name).expect("a function of the program");
+            let marked = mark_owned_params(
+                f,
+                program,
+                &remark(&strip(body), program, &mutating),
+                &mutating,
+            );
+            *body = move_owned_receivers(&marked, &owns_receiver);
+        },
+    )
 }
 
 fn mark_owned_params(
@@ -246,10 +248,10 @@ fn heap_fields_named(program: &MonoProgram, name: &str) -> HashSet<String> {
 /// declarations — empty for anything but a struct.
 fn heap_fields_annotated(
     program: &MonoProgram,
-    annotation: Option<&ConcreteTy>,
+    annotation: Option<&ConcreteType>,
 ) -> HashSet<String> {
     match annotation {
-        Some(ConcreteTy::Named(name)) => heap_fields_named(program, name),
+        Some(ConcreteType::Named(name)) => heap_fields_named(program, name),
         _ => HashSet::new(),
     }
 }
@@ -637,8 +639,8 @@ fn mark(
 mod tests {
     use super::*;
 
-    fn e(kind: TExprKind<ConcreteTy>) -> Typed {
-        TExpr::new(kind, ConcreteTy::Unit, 0..0)
+    fn e(kind: TExprKind<ConcreteType>) -> Typed {
+        TExpr::new(kind, ConcreteType::Unit, 0..0)
     }
 
     fn id(n: &str) -> Typed {

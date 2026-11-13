@@ -100,6 +100,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern};
 use aipl_syntax::{
     ast::{
         Arity,
@@ -110,9 +111,7 @@ use aipl_syntax::{
         ExprKind,
         Function as AstFn,
         Item,
-        MatchArm,
         Param,
-        Pattern,
         Primitive,
         Program,
         SeqShape,
@@ -125,11 +124,16 @@ use aipl_syntax::{
     },
     binop_spelling,
     concrete::{
-        error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_set_elem,
-        is_str_repr, is_unit, type_name,
+        error_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_set_elem, is_str_repr,
+        is_unit, type_name,
     },
 };
 use aipl_syntax::{DebugOptions, Error, Span};
+
+/// The tree codegen compiles: monomorphization's output, every node carrying its type.
+type Typed = TExpr<ConcreteType>;
+type Arm = TMatchArm<ConcreteType>;
+type Pat = TPattern<ConcreteType>;
 
 // `HEADER_SIZE` is the refcount prefix shared by every refcounted heap block
 // (a `str` buffer and an array block alike — `buffer.rs`): the `i64` refcount
@@ -3061,12 +3065,6 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     Ok(probe.finish())
 }
 
-/// The stamps on the monomorphized, optimized `program`, counted; see `aipl_mono::probe::Coverage`.
-pub fn typed_coverage(program: &Program) -> Result<aipl_mono::probe::Coverage, Vec<Error>> {
-    let mono = lowered(program, DebugOptions::OFF)?;
-    Ok(aipl_mono::probe::coverage(&mono))
-}
-
 /// `program` with every expression's stamp (`Expr::ty`) replaced by what the pinner makes of the
 /// program as it now stands. `builtins` are the declarations put ahead of the program. A function that no longer pins keeps the stamps it had.
 fn repin(builtins: &[Item], mut program: Program) -> Program {
@@ -3325,8 +3323,6 @@ fn lower_program(
     // after every pass that reorders pure reads, so a mark reflects the order
     // codegen will actually evaluate in. See `aipl_mono::move_last_use`.
     let program = aipl_mono::move_last_uses_post_mono(program);
-    // A name a pass built has no type of its own; its binder has one.
-    let program = aipl_mono::stamp_idents(&program);
     if let Ok(want) = std::env::var("AIPL_DUMP_FN") {
         for f in &program.fns {
             if f.name == want {
@@ -3413,7 +3409,7 @@ fn compile_program<M: Module>(
     // Which heap parameters each instance only *inspects*, so its call sites can
     // skip the borrow retain and its body the matching entry-scope release. One
     // shared answer for both halves — see `aipl_mono::inspect_only_params`.
-    let mut inspect_only = aipl_mono::inspect_only_params(program);
+    let mut inspect_only = aipl_mono::typed::inspect_only_params(program);
     // Which functions carry `CallConv::Tail` (and so split into a `$tail` body
     // plus an exported trampoline) — see the "Tail calls" section.
     let tail_plan = tail_call_plan(program, &structs);
@@ -6320,10 +6316,12 @@ const TAIL_SUFFIX: &str = "$tail";
 /// Under-approximating is safe: a missed edge only costs an optimization, since
 /// codegen independently re-derives tail position and emits a `return_call` only
 /// when both ends carry the convention this plan gave them.
-fn tail_callees(body: &Expr) -> Vec<String> {
-    fn walk(e: &Expr, tail: bool, out: &mut Vec<String>) {
+fn tail_callees(body: &Typed) -> Vec<String> {
+    fn walk(e: &Typed, tail: bool, out: &mut Vec<String>) {
         match &e.kind {
-            ExprKind::Call(name, args, _) => {
+            TExprKind::Call {
+                callee: name, args, ..
+            } => {
                 if tail {
                     out.push(name.name().to_string());
                 }
@@ -6331,32 +6329,28 @@ fn tail_callees(body: &Expr) -> Vec<String> {
                     walk(a, false, out);
                 }
             }
-            ExprKind::Return(v) => walk(v, true, out),
-            ExprKind::Seq(a, b) => {
+            TExprKind::Return(v) => walk(v, true, out),
+            TExprKind::Seq(a, b) => {
                 walk(a, false, out);
                 walk(b, tail, out);
             }
-            ExprKind::Let(_, _, v, b)
-            | ExprKind::LetMut(_, _, v, b)
-            | ExprKind::Assign(_, v, b) => {
+            TExprKind::Let(_, v, b) | TExprKind::LetMut(_, v, b) | TExprKind::Assign(_, v, b) => {
                 walk(v, false, out);
                 walk(b, tail, out);
             }
-            ExprKind::If(c, t, f) => {
+            TExprKind::If(c, t, f) => {
                 walk(c, false, out);
                 walk(t, tail, out);
                 walk(f, tail, out);
             }
-            ExprKind::Match(s, arms) => {
+            TExprKind::Match(s, arms) => {
                 walk(s, false, out);
                 for a in arms {
                     walk(&a.body, tail, out);
                 }
             }
             _ => {
-                for c in aipl_mono::children(e) {
-                    walk(c, false, out);
-                }
+                aipl_mono::typed::each_child(e, &mut |c| walk(c, false, out));
             }
         }
     }
@@ -8184,7 +8178,7 @@ fn expect_len_operand(actual: &ConcreteType, context: &str, span: Span) -> Resul
 /// the annotation. The checker has verified all of this; this is the
 /// codegen-side mirror.
 fn binding_ty(
-    value: &Expr,
+    value: &Typed,
     actual: &ConcreteType,
     declared: Option<&ConcreteType>,
     name: &str,
@@ -9829,9 +9823,9 @@ fn writable_place<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    arg: &Expr,
+    arg: &Typed,
 ) -> Result<(Value, ConcreteType), Error> {
-    if let ExprKind::Ident(name) = &arg.kind {
+    if let TExprKind::Ident(name) = &arg.kind {
         if let Some(EnvBinding::Mut(slot, ty, _)) = cx.env.get(name) {
             let ty = ty.borrow().clone();
             if is_block_array(&ty) {
@@ -9852,11 +9846,16 @@ fn compile_binding_value<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    value: &Expr,
+    value: &Typed,
 ) -> Result<(Value, ConcreteType), Error> {
-    if let ExprKind::Call(Callee::Move, args, _) = &value.kind {
-        if let [Expr {
-            kind: ExprKind::Ident(param),
+    if let TExprKind::Call {
+        callee: Callee::Move,
+        args,
+        ..
+    } = &value.kind
+    {
+        if let [Typed {
+            kind: TExprKind::Ident(param),
             ..
         }] = args.as_slice()
         {
@@ -9983,10 +9982,10 @@ fn compile_inspected<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    e: &Expr,
+    e: &Typed,
 ) -> Result<(Value, ConcreteType), Error> {
-    if let ExprKind::Field(obj, field_name) = &e.kind {
-        if matches!(&obj.kind, ExprKind::Ident(_)) {
+    if let TExprKind::Field(obj, field_name) = &e.kind {
+        if matches!(&obj.kind, TExprKind::Ident(_)) {
             let (obj_ptr, obj_ty) = compile_expr(module, builder, cx, scopes, obj)?;
             let field = match &obj_ty {
                 ConcreteType::Named(n) => cx
@@ -10631,9 +10630,9 @@ fn arr_base(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
 /// element type of its own: the caller supplies `char`.
 fn mut_str_receiver(
     env: &Env,
-    receiver: &Expr,
+    receiver: &Typed,
 ) -> Option<(StackSlot, Rc<RefCell<ConcreteType>>, bool)> {
-    let ExprKind::Ident(var) = &receiver.kind else {
+    let TExprKind::Ident(var) = &receiver.kind else {
         return None;
     };
     let Some(EnvBinding::Mut(slot, cell, exclusive)) = env.get(var) else {
@@ -10649,11 +10648,11 @@ fn mut_str_receiver(
 /// binding earns live here once and the type's own live where it is known.
 fn mut_receiver_slot(
     env: &Env,
-    receiver: &Expr,
+    receiver: &Typed,
     what: &str,
     kind: &str,
 ) -> Result<(StackSlot, Rc<RefCell<ConcreteType>>, bool), Error> {
-    let ExprKind::Ident(var) = &receiver.kind else {
+    let TExprKind::Ident(var) = &receiver.kind else {
         return Err(Error::at(
             format!(
                 "\"{what}\" must be called on a mutable {kind} variable, e.g. \"xs.{what}(x)\""
@@ -10688,7 +10687,7 @@ fn mut_receiver_slot(
 /// position was already rewritten by mono into this one on a fresh local.
 fn mut_array_receiver(
     env: &Env,
-    receiver: &Expr,
+    receiver: &Typed,
     what: &str,
 ) -> Result<(StackSlot, Rc<RefCell<ConcreteType>>, bool, ConcreteType), Error> {
     let (slot, ty_cell, exclusive) = mut_receiver_slot(env, receiver, what, "array")?;
@@ -10708,7 +10707,7 @@ fn mut_array_receiver(
 /// the slot, the type cell, whether it is unaliased, and the key/value types.
 fn mut_dict_receiver(
     env: &Env,
-    receiver: &Expr,
+    receiver: &Typed,
     what: &str,
 ) -> Result<
     (
@@ -11609,8 +11608,83 @@ const CHARSET_WORDS: usize = charset::CHARSET_SIZE / 8;
 /// the representation is chosen so zeroed memory already reads as one.
 /// The concrete type the pinner gave `expr`, which is what a context-typed literal (`[]`, `#{}`,
 /// `none`, a bare `ok`/`err`) has no elements of its own to say.
-fn stamped_ty(expr: &Expr) -> Option<ConcreteType> {
-    expr.ty.as_ref().and_then(|t| t.to_concrete())
+/// A bare integer (or float, container or constructor reference) literal takes the width of the
+/// type it is being fitted against: [`aipl_syntax::concrete::flex_int_ty`] over the part of `e`
+/// that rule reads. That is the literal itself, or the tails and branches that carry its value —
+/// everything else cannot flex, and is left out of the tree the rule is shown.
+fn flex_int_ty(e: &Typed, ety: &ConcreteType, other: &ConcreteType) -> ConcreteType {
+    aipl_syntax::concrete::flex_int_ty(&flex_shape(e), ety, other)
+}
+
+fn flex_shape(e: &Typed) -> Expr {
+    let hole = || Expr::new(ExprKind::Unit, e.span.clone());
+    let kind = match &e.kind {
+        TExprKind::Int(n) => ExprKind::Num(*n),
+        TExprKind::Float(t) => ExprKind::Float(t.clone()),
+        TExprKind::Bool(b) => ExprKind::Bool(*b),
+        TExprKind::Char(c) => ExprKind::Char(*c),
+        TExprKind::Str(s) => ExprKind::Str(s.clone()),
+        TExprKind::Ident(n) => ExprKind::Ident(n.clone()),
+        TExprKind::None => ExprKind::None,
+        TExprKind::Neg(x) => ExprKind::Neg(Box::new(flex_shape(x))),
+        TExprKind::Seq(_, tail) => ExprKind::Seq(Box::new(hole()), Box::new(flex_shape(tail))),
+        TExprKind::Let(n, _, tail) => ExprKind::Let(
+            n.clone(),
+            None,
+            Box::new(hole()),
+            Box::new(flex_shape(tail)),
+        ),
+        TExprKind::LetMut(n, _, tail) => ExprKind::LetMut(
+            n.clone(),
+            None,
+            Box::new(hole()),
+            Box::new(flex_shape(tail)),
+        ),
+        TExprKind::Assign(l, _, tail) => ExprKind::Assign(
+            Box::new(flex_shape(l)),
+            Box::new(hole()),
+            Box::new(flex_shape(tail)),
+        ),
+        TExprKind::If(_, a, b) => ExprKind::If(
+            Box::new(hole()),
+            Box::new(flex_shape(a)),
+            Box::new(flex_shape(b)),
+        ),
+        TExprKind::ArrayLit(xs) => ExprKind::ArrayLit(xs.iter().map(flex_shape).collect()),
+        TExprKind::SetLit(xs, order) => {
+            ExprKind::SetLit(xs.iter().map(flex_shape).collect(), order.to_set_order())
+        }
+        TExprKind::DictLit(pairs) => ExprKind::DictLit(
+            pairs
+                .iter()
+                .map(|(k, v)| (flex_shape(k), flex_shape(v)))
+                .collect(),
+        ),
+        TExprKind::Call {
+            callee: callee @ (Callee::Some | Callee::Ok | Callee::Err),
+            args,
+            ..
+        } => ExprKind::Call(callee.clone(), args.iter().map(flex_shape).collect(), false),
+        // A constructor reference where a case is wanted is read back out of the lambda.
+        TExprKind::Lambda(..) => return e.erase(),
+        _ => ExprKind::Unit,
+    };
+    Expr::new(kind, e.span.clone())
+}
+
+/// Whether `e` never produces a value: it returns, or every branch does.
+fn diverges(e: &Typed) -> bool {
+    match &e.kind {
+        TExprKind::Return(_) => true,
+        TExprKind::Seq(first, rest) => diverges(first) || diverges(rest),
+        TExprKind::Let(_, _, rest)
+        | TExprKind::LetMut(_, _, rest)
+        | TExprKind::Assign(_, _, rest) => diverges(rest),
+        TExprKind::If(_, then, otherwise) => diverges(then) && diverges(otherwise),
+        TExprKind::IfLet(arm, _, otherwise) => diverges(&arm.body) && diverges(otherwise),
+        TExprKind::Match(_, arms) => !arms.is_empty() && arms.iter().all(|a| diverges(&a.body)),
+        _ => false,
+    }
 }
 
 fn charset_slot(builder: &mut FunctionBuilder) -> Value {
@@ -12689,13 +12763,13 @@ fn own_value_into_slot<M: Module>(
     scopes: &mut [Vec<Tracked>],
     v: Value,
     ty: &ConcreteType,
-    value: &Expr,
+    value: &Typed,
     owned_params: &HashSet<String>,
 ) {
     if !needs_drop(ty, structs) {
         return;
     }
-    if let ExprKind::Ident(n) = &value.kind {
+    if let TExprKind::Ident(n) = &value.kind {
         // An owned-parameter move transfers its existing reference with no inc.
         if owned_params.contains(n) {
             return;
@@ -13741,15 +13815,15 @@ fn emit_const_str<M: Module>(
 /// in the data section (see [`emit_const_array`]) instead of built by stores at
 /// runtime. Anything else (`some(1)`, a name, a call, a nested array) is `None`
 /// and takes the allocating path.
-fn const_scalar(e: &Expr) -> Option<(i64, Primitive)> {
+fn const_scalar(e: &Typed) -> Option<(i64, Primitive)> {
     match &e.kind {
-        ExprKind::Num(n) => Some((*n, Primitive::I64)),
-        ExprKind::Neg(inner) => match &inner.kind {
-            ExprKind::Num(n) => Some((n.wrapping_neg(), Primitive::I64)),
+        TExprKind::Int(n) => Some((*n, Primitive::I64)),
+        TExprKind::Neg(inner) => match &inner.kind {
+            TExprKind::Int(n) => Some((n.wrapping_neg(), Primitive::I64)),
             _ => None,
         },
-        ExprKind::Bool(b) => Some((i64::from(*b), Primitive::Bool)),
-        ExprKind::Char(c) => Some((i64::from(*c), Primitive::Char)),
+        TExprKind::Bool(b) => Some((i64::from(*b), Primitive::Bool)),
+        TExprKind::Char(c) => Some((i64::from(*c), Primitive::Char)),
         _ => None,
     }
 }
@@ -13760,7 +13834,7 @@ fn const_scalar(e: &Expr) -> Option<(i64, Primitive)> {
 /// `NoneInner` placeholder, exactly as the allocating path infers it. `None`
 /// when any element has to be computed, or when the kinds disagree (that is a
 /// type error, and the allocating path is what reports it).
-fn const_array_words(elems: &[Expr]) -> Option<(Vec<i64>, ConcreteType)> {
+fn const_array_words(elems: &[Typed]) -> Option<(Vec<i64>, ConcreteType)> {
     let mut words = Vec::with_capacity(elems.len());
     let mut kind: Option<Primitive> = None;
     for el in elems {
@@ -15514,7 +15588,7 @@ enum MatchPlan {
 /// a backstop, and codegen runs on monomorphized output the checker already saw).
 fn plan_match(
     scrut_ty: &ConcreteType,
-    arms: &[MatchArm],
+    arms: &[Arm],
     structs: &HashMap<String, TypeDef>,
     scrut_span: Span,
 ) -> Result<MatchPlan, Error> {
@@ -15593,7 +15667,7 @@ fn plan_match(
             // source `match` lists its cases); it is what
             // `aipl_mono::eliminate_known_constructors_post_mono` synthesizes
             // for `x == Case(..)`, whose answer for every other case is the same.
-            let catch_all = matches!(arms.last().map(|a| &a.pattern), Some(Pattern::Wildcard));
+            let catch_all = matches!(arms.last().map(|a| &a.pattern), Some(Pat::Wildcard));
             for (i, arm) in arms.iter().enumerate() {
                 if catch_all && i == arms.len() - 1 {
                     arm_tags.push(usize::MAX);
@@ -15664,18 +15738,18 @@ fn plan_match(
 ///
 /// What is left per binding — that the arm does not move or re-own *it* — the
 /// caller asks of each name.
-fn arm_borrows_payload(cx: &Cx, scrutinee: &Expr, arm_body: &Expr) -> bool {
+fn arm_borrows_payload(cx: &Cx, scrutinee: &Typed, arm_body: &Typed) -> bool {
     scrutinee_is_stable(cx, scrutinee, arm_body)
 }
 
 /// Whether `e` — a `match` scrutinee or a `for` iterable — is a name, or a field
 /// path off one, rooted at a stable value (see [`Cx::stable`]) that `body` cannot
 /// take away: not an `owned` parameter, and neither moved nor re-owned in `body`.
-fn scrutinee_is_stable(cx: &Cx, e: &Expr, body: &Expr) -> bool {
-    fn root(e: &Expr) -> Option<&str> {
+fn scrutinee_is_stable(cx: &Cx, e: &Typed, body: &Typed) -> bool {
+    fn root(e: &Typed) -> Option<&str> {
         match &e.kind {
-            ExprKind::Ident(n) => Some(n),
-            ExprKind::Field(obj, _) => root(obj),
+            TExprKind::Ident(n) => Some(n),
+            TExprKind::Field(obj, _) => root(obj),
             _ => None,
         }
     }
@@ -15687,8 +15761,8 @@ fn scrutinee_is_stable(cx: &Cx, e: &Expr, body: &Expr) -> bool {
     };
     cx.stable.contains(value)
         && !cx.owned_params.contains(root)
-        && !aipl_mono::moves_binding(root, body)
-        && !aipl_mono::reowns_binding(root, body)
+        && !aipl_mono::typed::moves_binding(root, body)
+        && !aipl_mono::typed::reowns_binding(root, body)
 }
 
 /// Read arm `i`'s payload bindings from the scrutinee at `ptr` (tag already in
@@ -15696,7 +15770,7 @@ fn scrutinee_is_stable(cx: &Cx, e: &Expr, body: &Expr) -> bool {
 fn bind_match_arm(
     builder: &mut FunctionBuilder,
     plan: &MatchPlan,
-    arm: &MatchArm,
+    arm: &Arm,
     i: usize,
     ptr: Value,
     tag: Value,
@@ -15780,7 +15854,7 @@ fn compile_variant<M: Module>(
     vname: &str,
     tag: usize,
     fields: &[(u32, ConcreteType)],
-    args: &[Expr],
+    args: &[Typed],
     span: Span,
 ) -> Result<(Value, ConcreteType), Error> {
     if args.len() != fields.len() {
@@ -16173,7 +16247,7 @@ fn compile_indirect_call<M: Module>(
     name: &str,
     ptys: &[ConcreteType],
     ret: &ConcreteType,
-    args: &[Expr],
+    args: &[Typed],
     span: Span,
 ) -> Result<(Value, ConcreteType), Error> {
     let Cx {
@@ -16261,7 +16335,7 @@ fn compile_call<M: Module>(
     scopes: &mut Vec<Vec<Tracked>>,
     name: &str,
     info: &FuncInfo,
-    args: &[Expr],
+    args: &[Typed],
     span: Span,
 ) -> Result<(Value, ConcreteType), Error> {
     let Cx {
@@ -16456,7 +16530,7 @@ fn compile_call<M: Module>(
         builder.ins().return_call(local_callee, &call_args);
         // Unreachable continuation: the enclosing `if`/`match` arm still emits
         // its merge jump (and the epilogue its return), which compile into here
-        // and are dropped as dead code — the same shape `ExprKind::Return` uses.
+        // and are dropped as dead code — the same shape `TExprKind::Return` uses.
         let dead = builder.create_block();
         builder.switch_to_block(dead);
         builder.seal_block(dead);
@@ -16523,7 +16597,7 @@ fn narrow_target_bug(locked: &Option<ConcreteType>, span: &Span) -> Error {
 }
 
 /// Compile a call expression, dispatched on the `callee` — the
-/// `ExprKind::Call` handling extracted from [`compile_expr`] so expression
+/// `TExprKind::Call` handling extracted from [`compile_expr`] so expression
 /// dispatch stays readable. `args`/`style` are the call's arguments and method-
 /// call flag; `span` is the call site. The builtin and intrinsic arms are
 /// matched first; the wildcard arm compiles an ordinary (monomorphized) user or
@@ -16552,7 +16626,7 @@ fn compile_call_expr<M: Module>(
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
     callee: &Callee,
-    args: &[Expr],
+    args: &[Typed],
     style: bool,
     span: Span,
     locked: Option<ConcreteType>,
@@ -16601,7 +16675,7 @@ fn compile_call_expr<M: Module>(
     // Evaluate each argument once. The real branch reads them back through
     // bindings, so nothing is evaluated on one path and skipped on the other.
     let mut shim_env = env.clone();
-    let mut bound: Vec<Expr> = Vec::with_capacity(args.len());
+    let mut bound: Vec<Typed> = Vec::with_capacity(args.len());
     let mut values: Vec<Value> = Vec::with_capacity(args.len());
     for (idx, (arg, expected)) in args.iter().zip(&ptys).enumerate() {
         let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
@@ -16613,8 +16687,12 @@ fn compile_call_expr<M: Module>(
             arg.span.clone(),
         )?;
         let binding = format!("__shim_arg{idx}");
-        shim_env.insert(binding.clone(), EnvBinding::Immut(v, actual));
-        bound.push(Expr::new(ExprKind::Ident(binding), arg.span.clone()));
+        bound.push(Typed::new(
+            TExprKind::Ident(binding.clone()),
+            actual.clone(),
+            arg.span.clone(),
+        ));
+        shim_env.insert(binding, EnvBinding::Immut(v, actual));
         values.push(v);
     }
 
@@ -16709,7 +16787,7 @@ fn compile_call_expr_direct<M: Module>(
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
     callee: &Callee,
-    args: &[Expr],
+    args: &[Typed],
     style: bool,
     span: Span,
     locked: Option<ConcreteType>,
@@ -18340,7 +18418,7 @@ fn compile_call_expr_direct<M: Module>(
             //
             // A string literal is str-shaped by construction, so its element
             // type is `char` without asking.
-            if let ExprKind::Str(lit) = &receiver.kind {
+            if let TExprKind::Str(lit) = &receiver.kind {
                 let elem = ConcreteType::Primitive(Primitive::Char);
                 let mut words = [0u64; CHARSET_WORDS];
                 for c in lit.as_bytes() {
@@ -19625,8 +19703,8 @@ fn compile_call_expr_direct<M: Module>(
             // parameter, an element read out of an array) does not own the
             // struct, and its fields are borrowed as before. An owned
             // parameter's fields are taken by the `Field` arm itself.
-            if let ExprKind::Field(obj, field_name) = &arg.kind {
-                if let ExprKind::Ident(owner) = &obj.kind {
+            if let TExprKind::Field(obj, field_name) = &arg.kind {
+                if let TExprKind::Ident(owner) = &obj.kind {
                     if let Some(EnvBinding::Immut(obj_ptr, obj_ty)) = env.get(owner) {
                         let obj_ptr = *obj_ptr;
                         let owned_here = cx.owned_params.contains(owner)
@@ -19664,7 +19742,7 @@ fn compile_call_expr_direct<M: Module>(
                 }
                 return compile_expr(module, builder, cx, scopes, arg);
             }
-            let ExprKind::Ident(name) = &arg.kind else {
+            let TExprKind::Ident(name) = &arg.kind else {
                 // Inlining may have put the binding's value here directly; a
                 // fresh value is already what a move wants.
                 return compile_expr(module, builder, cx, scopes, arg);
@@ -20565,10 +20643,14 @@ fn compile_call_expr_direct<M: Module>(
             // Either way the slot it names is where the mutated value goes back.
             let receiver = &args[0];
             let named = match &receiver.kind {
-                ExprKind::Call(Callee::Move, margs, _) => margs.first().unwrap_or(receiver),
+                TExprKind::Call {
+                    callee: Callee::Move,
+                    args: margs,
+                    ..
+                } => margs.first().unwrap_or(receiver),
                 _ => receiver,
             };
-            let ExprKind::Ident(var) = &named.kind else {
+            let TExprKind::Ident(var) = &named.kind else {
                 return Err(Error::at(
                     format!("mutating method {disp:?} must be called on a mutable variable"),
                     receiver.span.clone(),
@@ -20610,7 +20692,13 @@ fn compile_call_expr_direct<M: Module>(
             // block at a refcount of two, which the next call's entry reads as
             // sharing and copies: the appends went in place and every level
             // still allocated.
-            let moved_receiver = matches!(&receiver.kind, ExprKind::Call(Callee::Move, ..));
+            let moved_receiver = matches!(
+                &receiver.kind,
+                TExprKind::Call {
+                    callee: Callee::Move,
+                    ..
+                }
+            );
             let mark = scope_depth(scopes);
             // `args` is already the effective list `[receiver, method args..]`;
             // its result is the mutated self.
@@ -20776,13 +20864,13 @@ fn shim_cell<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     cx: Cx,
-    cell: &Expr,
+    cell: &Typed,
     span: Span,
 ) -> Result<ShimCell, Error> {
     let Cx {
         structs, builtins, ..
     } = cx;
-    let ExprKind::Num(number) = cell.kind else {
+    let TExprKind::Int(number) = cell.kind else {
         return Err(Error::at(
             "a shim cell is named by its number".to_string(),
             span,
@@ -20986,7 +21074,7 @@ fn define_constant_teardown_fn<M: Module>(
 }
 
 /// Emit `recv[a..b]` for any sliceable receiver — the shared tail of
-/// `ExprKind::Slice` and the Span-index sugar in `ExprKind::Index`:
+/// `TExprKind::Slice` and the Span-index sugar in `TExprKind::Index`:
 ///
 /// - `str` → `aipl_str_slice` (a buffer-sharing view for a large heap source,
 ///   else a copy); an open-ended `b` of `None` is filled with `aipl_str_len`.
@@ -21013,7 +21101,7 @@ fn emit_slice<M: Module>(
     let structs = cx.structs;
     let builtins = cx.builtins;
     // Exact `str` plus `char[]`, not the broader `is_str_shaped` — matching
-    // the char-at scope in `ExprKind::Index` (`Error`/concat-str receivers
+    // the char-at scope in `TExprKind::Index` (`Error`/concat-str receivers
     // aren't part of the slice surface).
     if *recv_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(recv_ty) {
         let b_v = match b_v {
@@ -21071,9 +21159,9 @@ fn compile_binop<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    l: &Expr,
+    l: &Typed,
     op: BinOp,
-    r: &Expr,
+    r: &Typed,
     span: &Span,
 ) -> Result<(Value, ConcreteType), Error> {
     let builtins = cx.builtins;
@@ -21272,7 +21360,7 @@ fn compile_binop<M: Module>(
 /// so a context-dependent expression — a bare `none`, an empty `[]` — derives a
 /// `__none__`-style placeholder once whatever pinned it is out of view. Inlining
 /// puts expressions in exactly that position, which is why the answer is
-/// recorded at check time (see `Expr::ty`) and read back here.
+/// recorded at check time (see `Typed::ty`) and read back here.
 ///
 /// Only a *placeholder* derivation is replaced: everywhere else what is derived
 /// here is at least as good, and a recorded type is not a licence to override a
@@ -21284,15 +21372,13 @@ fn compile_expr<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    expr: &Expr,
+    expr: &Typed,
 ) -> Result<(Value, ConcreteType), Error> {
     let (v, derived) = compile_expr_inner(module, builder, cx, scopes, expr)?;
-    let locked = expr.ty.as_ref().and_then(|t| t.to_concrete());
-    let ty = match &locked {
-        Some(locked) if has_placeholder_ty(&derived) && !has_placeholder_ty(locked) => {
-            locked.clone()
-        }
-        _ => derived,
+    let ty = if has_placeholder_ty(&derived) && !has_placeholder_ty(&expr.ty) {
+        expr.ty.clone()
+    } else {
+        derived
     };
     Ok((v, ty))
 }
@@ -21317,7 +21403,7 @@ fn compile_expr_inner<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    expr: &Expr,
+    expr: &Typed,
 ) -> Result<(Value, ConcreteType), Error> {
     // Destructure into the names the body already uses, so only the signature
     // and call sites change. `cx` itself stays in scope for `..cx` spreads.
@@ -21348,16 +21434,13 @@ fn compile_expr_inner<M: Module>(
     let cx = Cx { tail: false, ..cx };
     let span = expr.span.clone();
     Ok(match &expr.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(..) => unreachable!("type arguments are resolved by the checker"),
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        ExprKind::IfLet(..) => {
+        TExprKind::IfLet(..) => {
             unreachable!("`if let` is desugared to an exhaustive `Match` by mono's `infer`")
         }
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
-        ExprKind::Unit => (builder.ins().iconst(types::I64, 0), ConcreteType::Unit),
-        ExprKind::Shim(effect, bindings, body) => {
+        TExprKind::Unit => (builder.ins().iconst(types::I64, 0), ConcreteType::Unit),
+        TExprKind::Shim(effect, bindings, body) => {
             // Install each bound function's address into its operation's slot
             // for the dynamic extent of `body`, then put back whatever was
             // there. Saving the previous occupant (rather than clearing) is what
@@ -21419,7 +21502,7 @@ fn compile_expr_inner<M: Module>(
             }
             (v, t)
         }
-        ExprKind::Return(value) => {
+        TExprKind::Return(value) => {
             // Early return: evaluate the value, hand the caller a reference,
             // release *every* live scope (we're leaving the function), then return
             // per the ABI — mirroring the function epilogue. Whatever follows in
@@ -21470,15 +21553,15 @@ fn compile_expr_inner<M: Module>(
             builder.seal_block(dead);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        ExprKind::Num(n) => (
+        TExprKind::Int(n) => (
             builder.ins().iconst(types::I64, *n),
             ConcreteType::Primitive(Primitive::I64),
         ),
-        ExprKind::Float(text) => {
+        TExprKind::Float(text) => {
             // The checker recorded the width the literal landed at; one nothing pinned
             // is `IEEE754Float64`. It is rounded here, once, from its digits.
-            let p = match expr.ty.as_deref() {
-                Some(Type::Primitive(Primitive::F32)) => Primitive::F32,
+            let p = match &expr.ty {
+                ConcreteType::Primitive(Primitive::F32) => Primitive::F32,
                 _ => Primitive::F64,
             };
             let bits = float_literal_bits(text, p).ok_or_else(|| {
@@ -21492,15 +21575,15 @@ fn compile_expr_inner<M: Module>(
                 ConcreteType::Primitive(p),
             )
         }
-        ExprKind::Bool(b) => (
+        TExprKind::Bool(b) => (
             builder.ins().iconst(types::I64, if *b { 1 } else { 0 }),
             ConcreteType::Primitive(Primitive::Bool),
         ),
-        ExprKind::Char(c) => (
+        TExprKind::Char(c) => (
             builder.ins().iconst(types::I64, i64::from(*c)),
             ConcreteType::Primitive(Primitive::Char),
         ),
-        ExprKind::Str(s) => {
+        TExprKind::Str(s) => {
             let (v, tracked) = emit_const_str(module, builder, cx, s.as_bytes())?;
             if tracked {
                 scopes
@@ -21510,7 +21593,7 @@ fn compile_expr_inner<M: Module>(
             }
             (v, ConcreteType::Primitive(Primitive::Str))
         }
-        ExprKind::Ident(name) => {
+        TExprKind::Ident(name) => {
             // A local binding shadows everything; an unbound name may be a
             // nullary variant constructor (e.g. `Empty`), or a function used as
             // a value (`let f = inc;`) — its value is the function's code
@@ -21548,7 +21631,7 @@ fn compile_expr_inner<M: Module>(
                 env_load(builder, name, env, structs, span.clone())?
             }
         }
-        ExprKind::None => {
+        TExprKind::None => {
             // Allocate a 16-byte slot with tag = 0. Value field stays
             // undefined (callers must check is_some before touching it).
             // ConcreteType is Optional(__none__) — implicitly converts to any
@@ -21561,8 +21644,8 @@ fn compile_expr_inner<M: Module>(
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().stack_store(types::I64, zero, slot, 0);
             let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            let none_ty = match stamped_ty(expr) {
-                Some(t @ ConcreteType::Optional(_)) => t,
+            let none_ty = match expr.ty.clone() {
+                t @ ConcreteType::Optional(_) => t,
                 _ => ConcreteType::Optional(Box::new(ConcreteType::Primitive(Primitive::I64))),
             };
             (ptr, none_ty)
@@ -21570,7 +21653,12 @@ fn compile_expr_inner<M: Module>(
         // The only expression that can *become* a tail call: `tail` rides down
         // to `compile_call`, which decides whether this particular callee
         // qualifies.
-        ExprKind::Call(name, args, style) => compile_call_expr(
+        TExprKind::Call {
+            callee: name,
+            args,
+            method_style: style,
+            ..
+        } => compile_call_expr(
             module,
             builder,
             Cx { tail, ..cx },
@@ -21581,9 +21669,9 @@ fn compile_expr_inner<M: Module>(
             span.clone(),
             // The type the checker locked onto this call, for the one builtin
             // whose *construction* depends on its context: `to_set`.
-            expr.ty.as_ref().and_then(|t| t.to_concrete()),
+            Some(expr.ty.clone()),
         )?,
-        ExprKind::Construct(name, field_inits) => {
+        TExprKind::Construct(name, field_inits) => {
             let layout = structs
                 .get(name)
                 .and_then(TypeDef::as_struct)
@@ -21778,7 +21866,7 @@ fn compile_expr_inner<M: Module>(
             }
             (ptr, sty)
         }
-        ExprKind::Field(obj, field_name) => {
+        TExprKind::Field(obj, field_name) => {
             let (obj_ptr, obj_ty) = compile_expr(module, builder, cx, scopes, obj)?;
             let ConcreteType::Named(ref struct_name) = obj_ty else {
                 return Err(Error::at(
@@ -21822,7 +21910,7 @@ fn compile_expr_inner<M: Module>(
             // value — both released null-safely) and wide-`str` fields move;
             // an inline composite has no empty value to leave behind, so those
             // keep the borrow-and-retain below.
-            if matches!(&obj.kind, ExprKind::Ident(n) if cx.owned_params.contains(n))
+            if matches!(&obj.kind, TExprKind::Ident(n) if cx.owned_params.contains(n))
                 && needs_drop(&fty, structs)
                 && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
             {
@@ -21877,7 +21965,7 @@ fn compile_expr_inner<M: Module>(
             };
             (v, fty)
         }
-        ExprKind::Neg(inner) => {
+        TExprKind::Neg(inner) => {
             let (v, t) = compile_expr(module, builder, cx, scopes, inner)?;
             // A float negates by flipping its sign bit, which also negates zero and NaN.
             if let ConcreteType::Primitive(p) = &t {
@@ -21898,7 +21986,7 @@ fn compile_expr_inner<M: Module>(
                 ConcreteType::Primitive(Primitive::I64),
             )
         }
-        ExprKind::If(cond, then_e, else_e) => {
+        TExprKind::If(cond, then_e, else_e) => {
             let (cond_v, cond_ty) = compile_expr(module, builder, cx, scopes, cond)?;
             expect_type(
                 &cond_ty,
@@ -21956,9 +22044,9 @@ fn compile_expr_inner<M: Module>(
             let else_ty = flex_int_ty(else_e, &else_ty, &then_ty);
             // A branch that always returns has no value to agree with: the
             // `if` is the other branch's type.
-            let (then_ty, else_ty) = if aipl_syntax::diverges(then_e) {
+            let (then_ty, else_ty) = if diverges(then_e) {
                 (else_ty.clone(), else_ty)
-            } else if aipl_syntax::diverges(else_e) {
+            } else if diverges(else_e) {
                 (then_ty.clone(), then_ty)
             } else {
                 (then_ty, else_ty)
@@ -21998,7 +22086,7 @@ fn compile_expr_inner<M: Module>(
             }
             (result, merged_ty)
         }
-        ExprKind::Seq(first, rest) => {
+        TExprKind::Seq(first, rest) => {
             // Evaluate `first` purely for effect and discard its value. Any
             // heap refs it allocated stay tracked in the current scope and
             // are released at scope exit, just like a discarded binding's
@@ -22008,19 +22096,19 @@ fn compile_expr_inner<M: Module>(
         }
         // Monomorphization lifts lambdas into synthesized functions before
         // codegen; the checker rejects them otherwise. So none reach here.
-        ExprKind::Lambda(_, _) => unreachable!("lambda reached codegen"),
+        TExprKind::Lambda(_, _) => unreachable!("lambda reached codegen"),
         // Monomorphization lowers TupleLit to Construct before codegen.
-        ExprKind::TupleLit(_) => unreachable!("TupleLit must be lowered before codegen"),
-        ExprKind::Let(name, ty, value, body) => {
+        TExprKind::TupleLit(_) => unreachable!("TupleLit must be lowered before codegen"),
+        TExprKind::Let(name, value, body) => {
             // Evaluate the binding's value in the current scope (so any
             // string refcounts allocated by the value are already tracked
             // for dec at scope exit). Then extend the env with the new
             // name and compile the body.
             let (v, actual) = compile_binding_value(module, builder, cx, scopes, value)?;
-            // The `let`'s annotation rides on `Expr`, which both sides of
+            // The `let`'s annotation rides on `Typed`, which both sides of
             // monomorphization share, so it is abstract; by the time codegen
             // reads it every variable in it has been substituted.
-            let declared = ty.as_ref().and_then(|t| t.to_concrete());
+            let declared = expr.annotation.clone();
             let t = binding_ty(value, &actual, declared.as_ref(), name)?;
             // An annotated empty `[]` bound at `char[]` must become the
             // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
@@ -22049,11 +22137,13 @@ fn compile_expr_inner<M: Module>(
             // move falls through to the borrowing read, and the binding holds
             // an address into the parent again.
             let fresh_storage = match &value.kind {
-                ExprKind::Construct(..) => true,
-                ExprKind::Call(Callee::Move, args, _) => {
-                    !matches!(args.first().map(|a| &a.kind), Some(ExprKind::Field(..)))
-                }
-                ExprKind::Call(..) => true,
+                TExprKind::Construct(..) => true,
+                TExprKind::Call {
+                    callee: Callee::Move,
+                    args,
+                    ..
+                } => !matches!(args.first().map(|a| &a.kind), Some(TExprKind::Field(..))),
+                TExprKind::Call { .. } => true,
                 _ => false,
             };
             //
@@ -22064,7 +22154,7 @@ fn compile_expr_inner<M: Module>(
                 && !lives_in_slot(&t)
                 && !is_boxed(&t, structs)
                 && !fresh_storage
-                && aipl_mono::moves_binding(name, body)
+                && aipl_mono::typed::moves_binding(name, body)
                 && matches!(
                     scopes.last().and_then(|s| s.last()),
                     Some(Tracked { owned: Owned::Value(x), .. }) if *x == v
@@ -22099,17 +22189,17 @@ fn compile_expr_inner<M: Module>(
                 body,
             )?
         }
-        ExprKind::LetMut(name, ty, value, body) => {
+        TExprKind::LetMut(name, value, body) => {
             let before = scope_depth(scopes);
             let (v, actual) = compile_binding_value(module, builder, cx, scopes, value)?;
             // Whether the value, evaluated, is a fresh temporary this binding
             // owns outright — what a `__move` of a binding hands over when the
             // binding held a reference of its own (see `Callee::Move`).
             let value_is_owned_temp = owned_temp_since(scopes, before, v);
-            // The `let`'s annotation rides on `Expr`, which both sides of
+            // The `let`'s annotation rides on `Typed`, which both sides of
             // monomorphization share, so it is abstract; by the time codegen
             // reads it every variable in it has been substituted.
-            let declared = ty.as_ref().and_then(|t| t.to_concrete());
+            let declared = expr.annotation.clone();
             let t = binding_ty(value, &actual, declared.as_ref(), name)?;
             // An annotated empty `[]` bound at `char[]` must become the
             // *str-shaped* empty, not the array-shaped placeholder: a `char[]`
@@ -22165,8 +22255,13 @@ fn compile_expr_inner<M: Module>(
             // `push` grow it in place and move it, leaving the other owner
             // holding a stale pointer and the moved block with a reference too
             // many: the block leaks, and the old address is released.
-            let moved_binding =
-                matches!(&value.kind, ExprKind::Call(Callee::Move, _, _)) && value_is_owned_temp;
+            let moved_binding = matches!(
+                &value.kind,
+                TExprKind::Call {
+                    callee: Callee::Move,
+                    ..
+                }
+            ) && value_is_owned_temp;
             let fresh_literal = moved_binding
                 || match &t {
                     // A reserved-capacity array (`map`'s pre-sized output) is
@@ -22180,14 +22275,17 @@ fn compile_expr_inner<M: Module>(
                     // its `STATIC_REFCOUNT` and copies (`emit_const_array`), and
                     // every one after that grows the copy in place.
                     ConcreteType::Array(_) => {
-                        matches!(&value.kind, ExprKind::ArrayLit(_))
+                        matches!(&value.kind, TExprKind::ArrayLit(_))
                             || matches!(
                                 &value.kind,
-                                ExprKind::Call(Callee::WithCapacity | Callee::ArrWritable, _, _)
+                                TExprKind::Call {
+                                    callee: Callee::WithCapacity | Callee::ArrWritable,
+                                    ..
+                                }
                             )
                     }
                     ConcreteType::Primitive(Primitive::Str) => {
-                        matches!(&value.kind, ExprKind::Str(_))
+                        matches!(&value.kind, TExprKind::Str(_))
                     }
                     _ => false,
                 };
@@ -22207,7 +22305,7 @@ fn compile_expr_inner<M: Module>(
             // and the caller's own receiver may itself be owned. Falling
             // through to the non-exclusive arm below gives the new binding its
             // own reference, which is what a second owner needs.
-            let owned_move = matches!(&value.kind, ExprKind::Ident(n)
+            let owned_move = matches!(&value.kind, TExprKind::Ident(n)
             if cx.owned_params.contains(n)
                 && !matches!(
                     cx.env.get(n.as_str()),
@@ -22233,7 +22331,7 @@ fn compile_expr_inner<M: Module>(
             // ordinary call, which the writeback shape `set a = a.f(..)` turns
             // on (see `binding_is_exclusive`).
             let exclusive = (fresh_literal || owned_move)
-                && aipl_mono::binding_is_exclusive(name, body, true, &|f| {
+                && aipl_mono::typed::binding_is_exclusive(name, body, true, &|f| {
                     aipl_mono::builtin_is_mutating(f)
                         || cx.funcs.get(f).is_some_and(|info| info.is_mutating)
                 });
@@ -22245,7 +22343,7 @@ fn compile_expr_inner<M: Module>(
                 && !lives_in_slot(&t)
                 && !is_str_shaped(&t)
                 && !is_boxed(&t, structs)
-                && aipl_mono::moves_binding(name, body)
+                && aipl_mono::typed::moves_binding(name, body)
                 && takeable_fields(structs, &t).is_some_and(|f| !f.is_empty());
             // Only on the exclusive path, where the slot becomes the block's
             // sole owner: a non-exclusive binding retains its value and leaves
@@ -22256,7 +22354,7 @@ fn compile_expr_inner<M: Module>(
             let v = if exclusive
                 && (owned_move || moved_binding)
                 && mut_binding_owns_slot_ref(&t, structs)
-                && aipl_mono::assigns_binding(name, body)
+                && aipl_mono::typed::assigns_binding(name, body)
             {
                 // A moved binding's fresh entry names the old pointer; the
                 // unique block replaces it under the same entry, which the
@@ -22420,10 +22518,10 @@ fn compile_expr_inner<M: Module>(
                 body,
             )?
         }
-        ExprKind::Assign(lhs, value, body) => {
+        TExprKind::Assign(lhs, value, body) => {
             // Mono's `infer` desugars every field-path LHS to a bare-ident
             // store, so only idents reach codegen.
-            let ExprKind::Ident(name) = &lhs.kind else {
+            let TExprKind::Ident(name) = &lhs.kind else {
                 unreachable!("field assignment is desugared during monomorphization")
             };
             // `set recv.f(args)` (parsed as `set recv = recv.f(args)`): a mutating
@@ -22437,8 +22535,8 @@ fn compile_expr_inner<M: Module>(
             // compiles the call.
             let is_writeback_call = matches!(
                 &value.kind,
-                ExprKind::Call(f, cargs, true)
-                    if cargs.first().is_some_and(|a| aipl_mono::is_receiver(a, name))
+                TExprKind::Call { callee: f, args: cargs, method_style: true, .. }
+                    if cargs.first().is_some_and(|a| aipl_mono::typed::is_receiver(a, name))
                         && (aipl_mono::builtin_is_mutating(f.name())
                             || funcs.get(f.name()).is_some_and(|i| i.is_mutating))
             );
@@ -22476,9 +22574,9 @@ fn compile_expr_inner<M: Module>(
                 // Both forms fold to the call `trim(s)` with args `[s]`.
                 let trims_self = matches!(
                     &value.kind,
-                    ExprKind::Call(Callee::Trim, cargs, _)
+                    TExprKind::Call { callee: Callee::Trim, args: cargs, .. }
                         if cargs.len() == 1
-                            && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name)
+                            && matches!(&cargs[0].kind, TExprKind::Ident(n) if n == name)
                 );
                 if trims_self {
                     // A wide `str` binding *is* its slot's 24
@@ -22520,9 +22618,12 @@ fn compile_expr_inner<M: Module>(
                     // `set a = a.union(b)` / `set a = union(a, b)` both fold to
                     // the call `union(a, b)` with args `[a, b]`.
                     let other = match &value.kind {
-                        ExprKind::Call(Callee::Union, cargs, _)
-                            if cargs.len() == 2
-                                && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
+                        TExprKind::Call {
+                            callee: Callee::Union,
+                            args: cargs,
+                            ..
+                        } if cargs.len() == 2
+                            && matches!(&cargs[0].kind, TExprKind::Ident(n) if n == name) =>
                         {
                             Some(&cargs[1])
                         }
@@ -22709,7 +22810,7 @@ fn compile_expr_inner<M: Module>(
             // so subsequent Ident lookups will load the new value.
             compile_expr(module, builder, Cx { tail, ..cx }, scopes, body)?
         }
-        ExprKind::For(var, index, iterable, body) => {
+        TExprKind::For(var, index, iterable, body) => {
             // An index binder never reaches codegen: what an index *is* depends
             // on what is being iterated, so mono lowers the two-binder form away
             // once it knows (`lower_for`), exactly as it lowers a range loop into
@@ -22740,14 +22841,18 @@ fn compile_expr_inner<M: Module>(
                 // The iterable of a `for` that walks its array backwards: what
                 // the fusion pass wraps `xs.reverse()` in when it is only ever
                 // iterated. Only this arm ever sees it.
-                ExprKind::Call(Callee::ReverseIter, args, _) if args.len() == 1 => {
-                    (&args[0], true, None)
-                }
+                TExprKind::Call {
+                    callee: Callee::ReverseIter,
+                    args,
+                    ..
+                } if args.len() == 1 => (&args[0], true, None),
                 // The iterable of a `for` over a split: the source, and the
                 // separator the cursor cuts on. Only this arm ever sees it.
-                ExprKind::Call(Callee::SplitIter, args, _) if args.len() == 2 => {
-                    (&args[0], false, Some(&args[1]))
-                }
+                TExprKind::Call {
+                    callee: Callee::SplitIter,
+                    args,
+                    ..
+                } if args.len() == 2 => (&args[0], false, Some(&args[1])),
                 _ => (&**iterable, false, None),
             };
             let iterable_mark = scope_depth(scopes);
@@ -23002,8 +23107,8 @@ fn compile_expr_inner<M: Module>(
             let mut body_stable: HashSet<Value> = cx.stable.clone();
             if needs_drop(&var_ty, cx.structs) {
                 let inspected = iterable_outlives_loop
-                    && !aipl_mono::moves_binding(var, body)
-                    && !aipl_mono::reowns_binding(var, body);
+                    && !aipl_mono::typed::moves_binding(var, body)
+                    && !aipl_mono::typed::reowns_binding(var, body);
                 if !inspected {
                     emit_retain(builder, module, builtins, cx.structs, var_value, &var_ty);
                     scopes
@@ -23063,7 +23168,7 @@ fn compile_expr_inner<M: Module>(
                 ConcreteType::Primitive(Primitive::I64),
             )
         }
-        ExprKind::While(cond, body) => {
+        TExprKind::While(cond, body) => {
             // `while (cond) { body }`. Re-evaluates `cond` each iteration and
             // runs `body` while it's true. Body's value is discarded; the loop
             // evaluates to i64 0 (like `for`). Both `cond` and `body` see the
@@ -23117,7 +23222,7 @@ fn compile_expr_inner<M: Module>(
                 ConcreteType::Primitive(Primitive::I64),
             )
         }
-        ExprKind::Match(scrutinee, arms) => {
+        TExprKind::Match(scrutinee, arms) => {
             let (ptr, scrut_ty) = compile_expr(module, builder, cx, scopes, scrutinee)?;
 
             let merge = builder.create_block();
@@ -23134,7 +23239,7 @@ fn compile_expr_inner<M: Module>(
             // rather than riding the sequence machinery below.
             let plan = if matches!(&scrut_ty, ConcreteType::Primitive(Primitive::Char)) {
                 for (i, arm) in arms.iter().enumerate() {
-                    let Pattern::Char(c) = &arm.pattern else {
+                    let Pat::Char(c) = &arm.pattern else {
                         continue; // the `_` arm — the fallthrough jump below
                     };
                     let hit = builder.ins().icmp_imm_s(IntCC::Equal, ptr, *c as i64);
@@ -23145,7 +23250,7 @@ fn compile_expr_inner<M: Module>(
                 }
                 let wildcard = arms
                     .iter()
-                    .position(|a| matches!(a.pattern, Pattern::Wildcard))
+                    .position(|a| matches!(a.pattern, Pat::Wildcard))
                     .expect("a char match has a `_` arm (checked)");
                 builder.ins().jump(arm_blocks[wildcard], &[]);
                 None
@@ -23169,7 +23274,7 @@ fn compile_expr_inner<M: Module>(
                 };
                 let wildcard = arms
                     .iter()
-                    .position(|a| matches!(a.pattern, Pattern::Wildcard))
+                    .position(|a| matches!(a.pattern, Pat::Wildcard))
                     .expect("a str/array match has a `_` arm (checked)");
                 // Compile each array pattern's *literal* elements up front in this
                 // (dominating) block, so a tracked literal (a heap str / nested
@@ -23181,9 +23286,9 @@ fn compile_expr_inner<M: Module>(
                     .iter()
                     .map(|arm| {
                         let mut vals = Vec::new();
-                        if let Pattern::Array(elems) | Pattern::ArrayRest(elems) = &arm.pattern {
+                        if let Pat::Array(elems) | Pat::ArrayRest(elems) = &arm.pattern {
                             for (j, e) in elems.iter().enumerate() {
-                                if matches!(e.kind, ExprKind::Ident(_)) {
+                                if matches!(e.kind, TExprKind::Ident(_)) {
                                     continue; // a binder, not a comparison
                                 }
                                 let (v, _) = compile_expr(module, builder, cx, scopes, e)?;
@@ -23198,7 +23303,7 @@ fn compile_expr_inner<M: Module>(
                 // exactly as before this path was unified.
                 let scrut_len = if arms
                     .iter()
-                    .any(|a| matches!(a.pattern, Pattern::Array(_) | Pattern::ArrayRest(_)))
+                    .any(|a| matches!(a.pattern, Pat::Array(_) | Pat::ArrayRest(_)))
                 {
                     Some(seq_len(builder, ptr, &seq_ty))
                 } else {
@@ -23208,17 +23313,20 @@ fn compile_expr_inner<M: Module>(
                     match &arm.pattern {
                         // A char literal never reaches here: it only matches a
                         // `char` scrutinee, which took the scalar path above.
-                        Pattern::Char(_) => unreachable!("char arm on a str/array match"),
+                        Pat::Char(_) => unreachable!("char arm on a str/array match"),
                         // Nested patterns are compiled away by mono
                         // (`infer_nested_match`) before codegen.
-                        Pattern::Tuple(_)
-                        | Pattern::Nested { .. }
-                        | Pattern::ArrayNested(_)
-                        | Pattern::Int(_)
-                        | Pattern::Bind(_) => unreachable!("nested pattern reached codegen"),
-                        Pattern::Str(lit) => {
-                            let lit_expr =
-                                Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());
+                        Pat::Tuple(_)
+                        | Pat::Nested { .. }
+                        | Pat::ArrayNested(_)
+                        | Pat::Int(_)
+                        | Pat::Bind(_) => unreachable!("nested pattern reached codegen"),
+                        Pat::Str(lit) => {
+                            let lit_expr = Typed::new(
+                                TExprKind::Str(lit.clone()),
+                                ConcreteType::Primitive(Primitive::Str),
+                                scrutinee.span.clone(),
+                            );
                             let (lit_val, _) =
                                 compile_expr(module, builder, cx, scopes, &lit_expr)?;
                             // Both borrowed: `str_eq` keeps neither.
@@ -23228,11 +23336,11 @@ fn compile_expr_inner<M: Module>(
                             builder.switch_to_block(next);
                             builder.seal_block(next);
                         }
-                        Pattern::Array(elems) | Pattern::ArrayRest(elems) => {
+                        Pat::Array(elems) | Pat::ArrayRest(elems) => {
                             // Length must match before any element load (else out of
                             // bounds): exactly the elements written, or — for a `..`
                             // pattern — at least that many.
-                            let len_cmp = if matches!(arm.pattern, Pattern::ArrayRest(_)) {
+                            let len_cmp = if matches!(arm.pattern, Pat::ArrayRest(_)) {
                                 IntCC::SignedGreaterThanOrEqual
                             } else {
                                 IntCC::Equal
@@ -23265,7 +23373,7 @@ fn compile_expr_inner<M: Module>(
                         }
                         // The `_` arm is the fallthrough; a ctor can't reach a
                         // str/array match (checker).
-                        Pattern::Wildcard | Pattern::Ctor { .. } => {}
+                        Pat::Wildcard | Pat::Ctor { .. } => {}
                     }
                 }
                 builder.ins().jump(arm_blocks[wildcard], &[]);
@@ -23307,7 +23415,7 @@ fn compile_expr_inner<M: Module>(
             let mut merged_ty: Option<ConcreteType> = None;
             // The arm that produced `merged_ty`, so an earlier literal arm can
             // still flex to a later narrow-int one.
-            let mut merged_body: Option<&Expr> = None;
+            let mut merged_body: Option<&Typed> = None;
             for (i, arm) in arms.iter().enumerate() {
                 builder.switch_to_block(arm_blocks[i]);
                 builder.seal_block(arm_blocks[i]);
@@ -23319,7 +23427,7 @@ fn compile_expr_inner<M: Module>(
                 let binds = match &plan {
                     Some((plan, tag)) => bind_match_arm(builder, plan, arm, i, ptr, *tag, structs),
                     None => {
-                        if let Pattern::Array(elems) | Pattern::ArrayRest(elems) = &arm.pattern {
+                        if let Pat::Array(elems) | Pat::ArrayRest(elems) = &arm.pattern {
                             // A `str` scrutinee is read as its `char[]` view.
                             let seq_ty = match &scrut_ty {
                                 ConcreteType::Array(_) => scrut_ty.clone(),
@@ -23335,7 +23443,7 @@ fn compile_expr_inner<M: Module>(
                                 .iter()
                                 .enumerate()
                                 .filter_map(|(j, e)| match &e.kind {
-                                    ExprKind::Ident(name) => {
+                                    TExprKind::Ident(name) => {
                                         let idx = builder.ins().iconst(types::I64, j as i64);
                                         let val = seq_elem(
                                             module, builder, builtins, structs, ptr, idx, &seq_ty,
@@ -23368,8 +23476,8 @@ fn compile_expr_inner<M: Module>(
                     // `inspect_only_params` cancels for a parameter).
                     if needs_drop(ty, structs) {
                         let inspected = borrows
-                            && !aipl_mono::moves_binding(name, &arm.body)
-                            && !aipl_mono::reowns_binding(name, &arm.body);
+                            && !aipl_mono::typed::moves_binding(name, &arm.body)
+                            && !aipl_mono::typed::reowns_binding(name, &arm.body);
                         if !inspected {
                             emit_retain(builder, module, builtins, structs, *value, ty);
                             scopes
@@ -23444,7 +23552,7 @@ fn compile_expr_inner<M: Module>(
                 // constant either way — only its static type moves — so retyping
                 // after the fact is sound.
                 // An arm that always returns has no value to agree with.
-                merged_ty = if aipl_syntax::diverges(&arm.body) {
+                merged_ty = if diverges(&arm.body) {
                     merged_ty.take()
                 } else {
                     Some(match merged_ty.take() {
@@ -23487,7 +23595,7 @@ fn compile_expr_inner<M: Module>(
             }
             (result, merged_ty)
         }
-        ExprKind::ArrayLit(elems) => {
+        TExprKind::ArrayLit(elems) => {
             // A constant literal — every element a scalar literal, or no
             // elements at all — is read out of the data section rather than
             // built: a static block for an integer or `bool` array, and for a
@@ -23502,10 +23610,10 @@ fn compile_expr_inner<M: Module>(
             // byte of the block, an `i64` eight — so the literal is built at it
             // rather than relabelled afterwards (see the checker's
             // `lock_flexed`).
-            let fitted_elem = match expr.ty.as_ref().and_then(|t| t.to_concrete()) {
-                Some(ConcreteType::Array(inner)) if !has_placeholder_ty(&inner) => Some(*inner),
+            let fitted_elem = match expr.ty.clone() {
+                ConcreteType::Array(inner) if !has_placeholder_ty(&inner) => Some(*inner),
                 // The empty `char` sequence, written `[]` where a `str` is wanted.
-                Some(ConcreteType::Primitive(Primitive::Str)) if elems.is_empty() => {
+                ConcreteType::Primitive(Primitive::Str) if elems.is_empty() => {
                     Some(ConcreteType::Primitive(Primitive::Char))
                 }
                 _ => None,
@@ -23574,8 +23682,8 @@ fn compile_expr_inner<M: Module>(
                 let owned_temp = owned_temp_since(scopes, before, v);
                 vals.push((v, t, owned_temp));
             }
-            let elem = elem_ty.unwrap_or_else(|| match stamped_ty(expr) {
-                Some(ConcreteType::Array(e)) => *e,
+            let elem = elem_ty.unwrap_or_else(|| match expr.ty.clone() {
+                ConcreteType::Array(e) => *e,
                 _ => ConcreteType::Primitive(Primitive::I64),
             });
             let arr_ty = ConcreteType::Array(Box::new(elem.clone()));
@@ -23684,24 +23792,25 @@ fn compile_expr_inner<M: Module>(
                 .push(Tracked::new(value, &arr_ty));
             (value, arr_ty)
         }
-        ExprKind::SetLit(elems, order) => {
+        TExprKind::SetLit(elems, order) => {
             // An empty `#{}` is `__none__`-typed and coerces to any `T{}` — and
             // is the same static block an empty `[]` is (`emit_const_empty`),
             // so it allocates nothing.
             if elems.is_empty() {
                 // `#{}` is the empty literal of a set and of a dict: the type it is stamped
                 // with says which.
-                let set_ty = match stamped_ty(expr) {
-                    Some(ConcreteType::Set(e, o)) => ConcreteType::Set(e, o),
-                    Some(dict @ ConcreteType::Dict(..)) => {
+                let set_ty = match expr.ty.clone() {
+                    ConcreteType::Set(e, o) => ConcreteType::Set(e, o),
+                    dict @ ConcreteType::Dict(..) => {
                         let value = emit_const_empty(module, builder, cx)?;
                         let no_elems = builder.ins().iconst(types::I64, 0);
                         let value = arr_val_of_len(builder, value, no_elems);
                         return Ok((value, dict));
                     }
-                    _ => {
-                        ConcreteType::Set(Box::new(ConcreteType::Primitive(Primitive::I64)), *order)
-                    }
+                    _ => ConcreteType::Set(
+                        Box::new(ConcreteType::Primitive(Primitive::I64)),
+                        order.to_set_order(),
+                    ),
                 };
                 if is_char_set(&set_ty) {
                     return Ok((charset_slot(builder), set_ty));
@@ -23723,7 +23832,7 @@ fn compile_expr_inner<M: Module>(
             let literal_chars: Option<Vec<u8>> = elems
                 .iter()
                 .map(|e| match &e.kind {
-                    ExprKind::Char(c) => Some(*c),
+                    TExprKind::Char(c) => Some(*c),
                     _ => None,
                 })
                 .collect();
@@ -23746,7 +23855,10 @@ fn compile_expr_inner<M: Module>(
                 }
                 let base = builder.ins().stack_addr(types::I64, slot, 0);
                 let elem = ConcreteType::Primitive(Primitive::Char);
-                return Ok((base, ConcreteType::Set(Box::new(elem), *order)));
+                return Ok((
+                    base,
+                    ConcreteType::Set(Box::new(elem), order.to_set_order()),
+                ));
             }
             // A set reuses the array heap block. Pre-size to the literal length
             // (an upper bound), then insert each element deduplicated via
@@ -23784,7 +23896,10 @@ fn compile_expr_inner<M: Module>(
                 for v in vals {
                     emit_charset_insert(builder, base, v);
                 }
-                return Ok((base, ConcreteType::Set(Box::new(elem), *order)));
+                return Ok((
+                    base,
+                    ConcreteType::Set(Box::new(elem), order.to_set_order()),
+                ));
             }
             let esz = runtime_elem_size(&elem, structs);
             let esz_v = builder.ins().iconst(types::I64, esz);
@@ -23795,11 +23910,11 @@ fn compile_expr_inner<M: Module>(
             let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
             let ord = builder
                 .ins()
-                .iconst(types::I64, set_order_code(&elem, *order));
+                .iconst(types::I64, set_order_code(&elem, order.to_set_order()));
             let eq_fn = set_eq_fn_addr(builder, module, cx, &elem);
             let cap = builder.ins().iconst(types::I64, elems.len() as i64);
             // The set under construction, as the value each insert updates.
-            let set_ty = ConcreteType::Set(Box::new(elem.clone()), *order);
+            let set_ty = ConcreteType::Set(Box::new(elem.clone()), order.to_set_order());
             let ptr = new_seq_with_cap(builder, module, builtins, &set_ty, cap, drop_fn, esz_v);
             for v in vals {
                 // `array_ops::set_insert` reads the element through a pointer; spill
@@ -23822,7 +23937,7 @@ fn compile_expr_inner<M: Module>(
                 .push(Tracked::new(ptr, &set_ty));
             (ptr, set_ty)
         }
-        ExprKind::DictLit(pairs) => {
+        TExprKind::DictLit(pairs) => {
             // A dict reuses the array heap block, one element per `(key, value)`
             // pair laid out as `[key: 8][value: sizeof(V)]`. Pre-size to the
             // literal length (an upper bound — duplicate keys collapse), then
@@ -23835,8 +23950,8 @@ fn compile_expr_inner<M: Module>(
             // (`emit_const_empty`), so it allocates nothing.
             if pairs.is_empty() {
                 let value = emit_const_empty(module, builder, cx)?;
-                let dict_ty = match stamped_ty(expr) {
-                    Some(t @ ConcreteType::Dict(..)) => t,
+                let dict_ty = match expr.ty.clone() {
+                    t @ ConcreteType::Dict(..) => t,
                     _ => ConcreteType::Dict(
                         Box::new(ConcreteType::Primitive(Primitive::I64)),
                         Box::new(ConcreteType::Primitive(Primitive::I64)),
@@ -23911,14 +24026,14 @@ fn compile_expr_inner<M: Module>(
                 .push(Tracked::new(ptr, &dict_ty));
             (ptr, dict_ty)
         }
-        ExprKind::Index(obj, index) => {
+        TExprKind::Index(obj, index) => {
             let (recv_v, recv_ty) = compile_inspected(module, builder, cx, scopes, obj)?;
             let (idx_v, idx_t) = compile_expr(module, builder, cx, scopes, index)?;
 
             // `s[span]` — a `Span` index is slice sugar for
             // `s[span.start..span.end]`: load the two bound fields from the
             // struct (evaluated once, receiver first) and slice exactly like
-            // `ExprKind::Slice`.
+            // `TExprKind::Slice`.
             if matches!(&idx_t, ConcreteType::Named(n) if n == "__builtin_Span") {
                 let layout = structs
                     .get("__builtin_Span")
@@ -24033,7 +24148,7 @@ fn compile_expr_inner<M: Module>(
             }
             (ptr, result_ty)
         }
-        ExprKind::Slice(obj, start, end) => {
+        TExprKind::Slice(obj, start, end) => {
             // `s[start..end]` — see `emit_slice` for the receiver dispatch
             // (str / char[] / array) and ownership notes.
             let (s_v, s_ty) = compile_expr(module, builder, cx, scopes, obj)?;
@@ -24049,7 +24164,7 @@ fn compile_expr_inner<M: Module>(
             };
             return emit_slice(module, builder, cx, scopes, s_v, &s_ty, a_v, b_v, &obj.span);
         }
-        ExprKind::Try(inner) => {
+        TExprKind::Try(inner) => {
             // `r?` propagates: evaluate the result `r`; on Err, rebuild the
             // enclosing function's Err-result from the same payload and return
             // early; on Ok, yield the unwrapped Ok value.
@@ -24085,7 +24200,7 @@ fn compile_expr_inner<M: Module>(
                 // the leaf of a pushed-through branch. Its tag is the constant
                 // 0, so there is no `some` path: leave through the none block
                 // unconditionally (the mirror of the literal-`err` case below).
-                let literal_none = matches!(inner.kind, ExprKind::None);
+                let literal_none = matches!(inner.kind, TExprKind::None);
                 if literal_none {
                     builder.ins().jump(none_block, &[]);
                 } else {
@@ -24194,7 +24309,13 @@ fn compile_expr_inner<M: Module>(
             // unreachable continuation a placeholder (typed `__none__`, so it
             // merges with whatever a sibling arm yields) instead of emitting a
             // load and a branch that could never be taken.
-            let literal_err = matches!(&inner.kind, ExprKind::Call(Callee::Err, _, _));
+            let literal_err = matches!(
+                &inner.kind,
+                TExprKind::Call {
+                    callee: Callee::Err,
+                    ..
+                }
+            );
             // A fresh temporary the scrutinee produced is moved rather than
             // co-owned, on *both* paths: the Err path hands its reference to the
             // caller inside the returned result, the Ok path to the unwrapped

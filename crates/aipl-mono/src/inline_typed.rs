@@ -6,14 +6,13 @@
 
 use std::collections::HashMap;
 
-use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind};
+use aipl_syntax::ast::ConcreteType;
+use aipl_syntax::typed::{TExpr, TExprKind};
 
 use crate::early_exit::without_early_exits_typed;
-use crate::typed_adapter::{concrete, from_typed, to_typed};
-use crate::typed_util::{each_child_mut, rename_scoped};
+use crate::typed_adapter::concrete;
+use crate::typed_util::{each_child_mut, references_name, rename_scoped, Typed};
 use crate::{ConcreteFn, InlineParam, MonoProgram};
-
-type Typed = TExpr<ConcreteTy>;
 
 /// How many call sites one expansion rewrites.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -32,26 +31,18 @@ pub(crate) fn expand_calls(
     skip_itself: bool,
 ) -> bool {
     let mut replaced = false;
-    let mut callee_body: Option<Typed> = None;
-    for i in 0..program.fns.len() {
+    for g in &mut program.fns {
         if sites == Sites::First && replaced {
             break;
         }
-        let g = &program.fns[i];
-        if (skip_itself && g.name == f.name) || !crate::references_name(&g.body, &f.name) {
+        if (skip_itself && g.name == f.name) || !references_name(&g.body, &f.name) {
             continue;
         }
-        let fbody = callee_body.get_or_insert_with(|| {
-            to_typed(f, program)
-                .unwrap_or_else(|why| panic!("{}: cannot type the body: {why}", f.name))
-        });
-        let typed = to_typed(g, program)
-            .unwrap_or_else(|why| panic!("{}: cannot type the body: {why}", g.name));
         let mut here = false;
-        let body = replace_call(&typed, &f.name, fparams, fbody, &mut here, sites);
+        let body = replace_call(&g.body, &f.name, fparams, &f.body, &mut here, sites);
         if here {
             replaced = true;
-            program.fns[i].body = from_typed(&body);
+            g.body = body;
         }
     }
     replaced
@@ -82,7 +73,7 @@ fn replace_call(
 }
 
 /// A node made here carries no stamp, as the `Expr` it replaces had none.
-fn made(kind: TExprKind<ConcreteTy>, ty: ConcreteTy, like: &Typed) -> Typed {
+fn made(kind: TExprKind<ConcreteType>, ty: ConcreteType, like: &Typed) -> Typed {
     let mut out = TExpr::new(kind, ty, like.span.clone());
     out.derived = true;
     out
@@ -103,7 +94,7 @@ fn build_inlined(fparams: &[InlineParam], fbody: &Typed, args: &[Typed], at: &Ty
         })
         .collect();
     let mut expr = rename_scoped(fbody, &map, true);
-    let declared = |p: &InlineParam| -> ConcreteTy {
+    let declared = |p: &InlineParam| -> ConcreteType {
         concrete(&p.ty).expect("a parameter's declared type is concrete")
     };
 

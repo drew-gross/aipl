@@ -35,17 +35,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use aipl_syntax::ast::{Callee, ConcreteType, Expr, ExprKind, MatchArm, Pattern};
+use aipl_syntax::ast::{Callee, ConcreteType};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern};
 
 use crate::passes::Scope;
-use crate::subst::assigned_names;
+use crate::typed_util::{assigned_names, each_child, each_child_mut, Typed};
 use crate::{ConcreteFn, MonoProgram};
 
-/// Replace every arm-local rebuild of a matched case in `program` with the value
-/// matched. See the module docs.
-///
-/// `scope` names the functions to rewrite: the pass is body-local, so a function
-/// the scope leaves out would come back unchanged anyway (see [`crate::passes`]).
+/// `program` with, in each function `scope` covers, every construction of a case a parameter was
+/// just matched as replaced by that parameter.
 pub fn reuse_matched_values(program: &MonoProgram, scope: &Scope) -> MonoProgram {
     MonoProgram {
         fns: program
@@ -61,7 +59,6 @@ pub fn reuse_matched_values(program: &MonoProgram, scope: &Scope) -> MonoProgram
 }
 
 fn rewritten(f: &ConcreteFn) -> ConcreteFn {
-    // The immutable parameters that are variant instances, by name.
     let mut shadowed = HashSet::new();
     bound_names(&f.body, &mut shadowed);
     let params: HashMap<&str, &str> = f
@@ -81,38 +78,33 @@ fn rewritten(f: &ConcreteFn) -> ConcreteFn {
     ConcreteFn { body, ..f.clone() }
 }
 
-/// Every name a binding or pattern anywhere in `e` introduces.
-fn bound_names(e: &Expr, out: &mut HashSet<String>) {
+fn bound_names(e: &Typed, out: &mut HashSet<String>) {
     match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => {
+        TExprKind::Let(n, _, _) | TExprKind::LetMut(n, _, _) => {
             out.insert(n.clone());
         }
-        ExprKind::For(n, index, _, _) => {
+        TExprKind::For(n, index, _, _) => {
             out.insert(n.clone());
             out.extend(index.iter().cloned());
         }
-        ExprKind::Lambda(params, _) => out.extend(params.iter().map(|p| p.name.clone())),
-        ExprKind::Match(_, arms) => {
+        TExprKind::Lambda(params, _) => out.extend(params.iter().map(|p| p.name.clone())),
+        TExprKind::Match(_, arms) => {
             for a in arms {
                 out.extend(a.pattern.bindings());
             }
         }
-        ExprKind::IfLet(arm, _, _) => out.extend(arm.pattern.bindings()),
+        TExprKind::IfLet(arm, _, _) => out.extend(arm.pattern.bindings()),
         _ => {}
     }
-    for c in crate::children(e) {
-        bound_names(c, out);
-    }
+    each_child(e, &mut |c| bound_names(c, out));
 }
 
-fn visit(e: &mut Expr, params: &HashMap<&str, &str>) {
-    for child in crate::children_mut(e) {
-        visit(child, params);
-    }
-    let ExprKind::Match(scrutinee, arms) = &mut e.kind else {
+fn visit(e: &mut Typed, params: &HashMap<&str, &str>) {
+    each_child_mut(e, &mut |child| visit(child, params));
+    let TExprKind::Match(scrutinee, arms) = &mut e.kind else {
         return;
     };
-    let ExprKind::Ident(name) = &scrutinee.kind else {
+    let TExprKind::Ident(name) = &scrutinee.kind else {
         return;
     };
     let Some(&instance) = params.get(name.as_str()) else {
@@ -124,10 +116,8 @@ fn visit(e: &mut Expr, params: &HashMap<&str, &str>) {
     }
 }
 
-/// Replace, in `arm`'s body, the rebuild of the case its pattern matched with a
-/// reference to the scrutinee `name`.
-fn reuse_in_arm(arm: &mut MatchArm, name: &str, instance: &str) {
-    let Pattern::Ctor {
+fn reuse_in_arm(arm: &mut TMatchArm<ConcreteType>, name: &str, instance: &str) {
+    let TPattern::Ctor {
         name: case,
         bindings,
         ignore_payload: false,
@@ -139,7 +129,6 @@ fn reuse_in_arm(arm: &mut MatchArm, name: &str, instance: &str) {
         return;
     }
     let callee = format!("{}@{instance}", case.split('@').next().unwrap_or(case));
-    // The rebuild would read the scrutinee, or one of the binders, by name.
     let mut bound = HashSet::new();
     bound_names(&arm.body, &mut bound);
     let mut assigned = HashSet::new();
@@ -151,22 +140,25 @@ fn reuse_in_arm(arm: &mut MatchArm, name: &str, instance: &str) {
     replace(&mut arm.body, &callee, bindings, name);
 }
 
-fn replace(e: &mut Expr, callee: &str, bindings: &[String], name: &str) {
-    for child in crate::children_mut(e) {
-        replace(child, callee, bindings, name);
-    }
+fn replace(e: &mut Typed, callee: &str, bindings: &[String], name: &str) {
+    each_child_mut(e, &mut |child| replace(child, callee, bindings, name));
     let rebuilds = match &e.kind {
-        ExprKind::Call(Callee::User(c), args, false) if c == callee => {
+        TExprKind::Call {
+            callee: Callee::User(c),
+            args,
+            method_style: false,
+            ..
+        } if c == callee => {
             args.len() == bindings.len()
                 && args
                     .iter()
                     .zip(bindings)
-                    .all(|(a, b)| matches!(&a.kind, ExprKind::Ident(n) if n == b))
+                    .all(|(a, b)| matches!(&a.kind, TExprKind::Ident(n) if n == b))
         }
-        ExprKind::Ident(c) => c == callee && bindings.is_empty(),
+        TExprKind::Ident(c) => c == callee && bindings.is_empty(),
         _ => false,
     };
     if rebuilds {
-        *e = Expr::rebuilt(ExprKind::Ident(name.to_string()), e);
+        *e = TExpr::rebuilt(TExprKind::Ident(name.to_string()), e.ty.clone(), e);
     }
 }

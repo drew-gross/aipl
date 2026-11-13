@@ -38,7 +38,10 @@ use std::fmt;
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind};
 
-use crate::passes::Optimizable;
+use aipl_syntax::typed::TExprKind;
+
+use crate::passes::{Body, Optimizable};
+use crate::typed_util::Typed;
 
 /// What a [`Violation`] is about. See the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -107,7 +110,7 @@ pub fn violations(program: &impl Optimizable) -> BTreeSet<Violation> {
             for p in &f.params {
                 *walk.binders.entry(p.clone()).or_default() += 1;
             }
-            walk.expr(body);
+            body.hygiene(&mut walk);
         }
     }
     out
@@ -124,7 +127,7 @@ enum Target {
     Either,
 }
 
-struct Walk<'a> {
+pub struct Walk<'a> {
     function: &'a str,
     globals: &'a HashSet<&'a str>,
     /// The locals in scope, innermost last.
@@ -179,7 +182,7 @@ impl Walk<'_> {
         }
     }
 
-    fn expr(&mut self, e: &Expr) {
+    pub fn expr(&mut self, e: &Expr) {
         match &e.kind {
             ExprKind::Ident(n) => self.reference(n, Target::Either),
             ExprKind::Call(callee, args, method_style) => {
@@ -251,6 +254,79 @@ impl Walk<'_> {
                     self.expr(c);
                 }
             }
+        }
+    }
+
+    /// [`Walk::expr`] over the typed tree.
+    pub fn typed(&mut self, e: &Typed) {
+        match &e.kind {
+            TExprKind::Ident(n) => self.reference(n, Target::Either),
+            TExprKind::Call {
+                callee,
+                args,
+                method_style,
+                ..
+            } => {
+                match callee {
+                    Callee::Local(n) => self.reference(n, Target::Local),
+                    Callee::User(n) if !*method_style => self.reference(n, Target::Global),
+                    _ => {}
+                }
+                for a in args {
+                    self.typed(a);
+                }
+            }
+            TExprKind::Let(n, value, body) | TExprKind::LetMut(n, value, body) => {
+                self.typed(value);
+                self.bind(n);
+                self.typed(body);
+                self.unbind(1);
+            }
+            TExprKind::For(n, index, iterable, body) => {
+                self.typed(iterable);
+                self.bind(n);
+                let mut bound = 1;
+                if let Some(index) = index {
+                    self.bind(index);
+                    bound += 1;
+                }
+                self.typed(body);
+                self.unbind(bound);
+            }
+            TExprKind::Lambda(params, body) => {
+                for p in params {
+                    self.bind(&p.name);
+                }
+                self.typed(body);
+                self.unbind(params.len());
+            }
+            TExprKind::Match(scrutinee, arms) => {
+                self.typed(scrutinee);
+                for arm in arms {
+                    let names = arm.pattern.bindings();
+                    for n in &names {
+                        self.bind(n);
+                    }
+                    self.typed(&arm.body);
+                    self.unbind(names.len());
+                }
+            }
+            TExprKind::IfLet(arm, scrutinee, otherwise) => {
+                self.typed(scrutinee);
+                let names = arm.pattern.bindings();
+                for n in &names {
+                    self.bind(n);
+                }
+                self.typed(&arm.body);
+                self.unbind(names.len());
+                self.typed(otherwise);
+            }
+            TExprKind::Assign(place, value, rest) => {
+                self.typed(place);
+                self.typed(value);
+                self.typed(rest);
+            }
+            _ => crate::typed_util::each_child(e, &mut |c| self.typed(c)),
         }
     }
 }

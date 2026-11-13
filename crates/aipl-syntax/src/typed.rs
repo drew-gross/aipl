@@ -32,9 +32,9 @@
 //! the pipeline this one replaces while it is being replaced, and for diagnostics that print source.
 
 use crate::ast::{
-    Arity, Bound, Callee, CaseParam, Expr, ExprKind, FieldDecl, FieldInit, FileSource, Function,
-    Item, LambdaParam, MatchArm, NameSpan, Param, Pattern, Primitive, Program, SetOrder, Signature,
-    StructDecl, Type, TypeParam, VariantCase, VariantDecl,
+    Arity, Bound, Callee, CaseParam, ConcreteType, Expr, ExprKind, FieldDecl, FieldInit,
+    FileSource, Function, Item, LambdaParam, MatchArm, NameSpan, Param, Pattern, Primitive,
+    Program, SetOrder, Signature, StructDecl, Type, TypeParam, VariantCase, VariantDecl,
 };
 use crate::{Span, SpanStr};
 
@@ -254,6 +254,15 @@ impl TyRepr for Ty {
             Ty::Result(ok, err) => Type::Result(boxed(ok), boxed(err)),
             Ty::Fn(params, ret) => Type::Fn(params.iter().map(Ty::to_type).collect(), boxed(ret)),
         }
+    }
+}
+
+/// The post-monomorphization tree speaks codegen's own representation, which says the two things
+/// [`ConcreteTy`] does not yet: a concat string, and a set whose order its context has still to
+/// decide. It is what a `TExpr` holds between monomorphization and codegen.
+impl TyRepr for ConcreteType {
+    fn to_type(&self) -> Type {
+        self.widen()
     }
 }
 
@@ -874,6 +883,35 @@ impl<T: TyRepr> TPattern<T> {
     /// The names this pattern binds, as [`Pattern::bindings`] says them.
     pub fn bindings(&self) -> Vec<String> {
         self.erase().bindings().to_vec()
+    }
+
+    /// Each name this pattern binds, in [`TPattern::bindings`] order, borrowed from the pattern.
+    pub fn each_binding<'a>(&'a self, f: &mut impl FnMut(&'a str)) {
+        match self {
+            TPattern::Ctor { bindings, .. } => bindings.iter().for_each(|b| f(b)),
+            TPattern::Array(elems) | TPattern::ArrayRest(elems) => {
+                for e in elems {
+                    if let TExprKind::Ident(name) = &e.kind {
+                        f(name);
+                    }
+                }
+            }
+            TPattern::Str(_) | TPattern::Char(_) | TPattern::Wildcard | TPattern::Int(_) => {}
+            TPattern::Bind(name) => f(name),
+            TPattern::Tuple(ps) | TPattern::Nested { args: ps, .. } | TPattern::ArrayNested(ps) => {
+                for p in ps {
+                    p.each_binding(f);
+                }
+            }
+        }
+    }
+
+    /// The constructor name for a `Ctor` (or nested constructor) pattern; `None` otherwise.
+    pub fn ctor_name(&self) -> Option<&str> {
+        match self {
+            TPattern::Ctor { name, .. } | TPattern::Nested { name, .. } => Some(name),
+            _ => None,
+        }
     }
 
     fn erase(&self) -> Pattern {

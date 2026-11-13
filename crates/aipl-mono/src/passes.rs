@@ -135,19 +135,97 @@ impl<P> Pass<P> {
 /// body, and the parameter names that shadow globals inside it. Nothing else —
 /// the passes know what they are rewriting; the manager only has to tell what
 /// moved.
+/// A program the manager can run passes over: its functions, each with the body the phase works
+/// on — the source `Expr` before monomorphization, the typed tree after it.
 pub trait Optimizable {
-    fn functions(&self) -> Vec<FunctionView<'_>>;
+    type Body: Body;
+    fn functions(&self) -> Vec<FunctionView<'_, Self::Body>>;
+}
+
+/// What the manager asks of a body: which globals it references, whether a pass dropped a
+/// recorded type from it, and the hygiene walk.
+pub trait Body: PartialEq {
+    /// Count each global name's uses, with `bound` the names in scope.
+    fn count_uses<'a>(&'a self, bound: &mut HashSet<&'a str>, counts: &mut HashMap<&'a str, usize>);
+    /// The context-typed expressions of this body with a recorded type (`out`) and without one
+    /// (`unrecorded`), keyed by [`Site`].
+    fn collect_recorded(&self, file: &str, out: &mut HashSet<Site>, unrecorded: &mut HashSet<Site>);
+    /// The context-typed expressions `recorded` says had a type and this body has lost.
+    fn collect_lost(
+        &self,
+        file: &str,
+        recorded: &HashSet<Site>,
+        out: &mut Vec<(&'static str, (usize, usize))>,
+    );
+    fn hygiene(&self, walk: &mut crate::hygiene::Walk<'_>);
+}
+
+impl Body for Expr {
+    fn count_uses<'a>(
+        &'a self,
+        bound: &mut HashSet<&'a str>,
+        counts: &mut HashMap<&'a str, usize>,
+    ) {
+        crate::count_uses(self, bound, counts);
+    }
+
+    fn collect_recorded(
+        &self,
+        file: &str,
+        out: &mut HashSet<Site>,
+        unrecorded: &mut HashSet<Site>,
+    ) {
+        collect_recorded(self, file, out, unrecorded);
+    }
+
+    fn collect_lost(
+        &self,
+        file: &str,
+        recorded: &HashSet<Site>,
+        out: &mut Vec<(&'static str, (usize, usize))>,
+    ) {
+        collect_lost(self, file, recorded, out);
+    }
+
+    fn hygiene(&self, walk: &mut crate::hygiene::Walk<'_>) {
+        walk.expr(self);
+    }
+}
+
+/// Every node of the typed tree carries its type, so there is no record to lose.
+impl Body for crate::typed_util::Typed {
+    fn count_uses<'a>(
+        &'a self,
+        bound: &mut HashSet<&'a str>,
+        counts: &mut HashMap<&'a str, usize>,
+    ) {
+        crate::typed_util::count_uses(self, bound, counts);
+    }
+
+    fn collect_recorded(&self, _: &str, _: &mut HashSet<Site>, _: &mut HashSet<Site>) {}
+
+    fn collect_lost(
+        &self,
+        _: &str,
+        _: &HashSet<Site>,
+        _: &mut Vec<(&'static str, (usize, usize))>,
+    ) {
+    }
+
+    fn hygiene(&self, walk: &mut crate::hygiene::Walk<'_>) {
+        walk.typed(self);
+    }
 }
 
 /// What the manager needs of one function.
-pub struct FunctionView<'a> {
+pub struct FunctionView<'a, B> {
     pub name: &'a str,
-    pub body: &'a Expr,
+    pub body: &'a B,
     /// A `.test({ .. })` block's body, which is compiled like any other code
     /// and so is optimized like any other code — and has to be compared like
     /// it, or a pass that only improved a test would read as having done
     /// nothing.
-    pub test_body: Option<&'a Expr>,
+    pub test_body: Option<&'a B>,
     /// Parameters shadow same-named globals within the body, so a call to a
     /// `(T) -> bool` parameter named `pred` is not a reference to a top-level
     /// `pred`. Without this the call graph gains edges that do not exist, and
@@ -156,7 +234,8 @@ pub struct FunctionView<'a> {
 }
 
 impl Optimizable for Program {
-    fn functions(&self) -> Vec<FunctionView<'_>> {
+    type Body = Expr;
+    fn functions(&self) -> Vec<FunctionView<'_, Expr>> {
         self.items
             .iter()
             .filter_map(|item| match item {
@@ -173,7 +252,8 @@ impl Optimizable for Program {
 }
 
 impl Optimizable for MonoProgram {
-    fn functions(&self) -> Vec<FunctionView<'_>> {
+    type Body = crate::typed_util::Typed;
+    fn functions(&self) -> Vec<FunctionView<'_, crate::typed_util::Typed>> {
         self.fns
             .iter()
             .map(|f: &ConcreteFn| FunctionView {
@@ -363,9 +443,9 @@ fn recorded_spans(program: &impl Optimizable) -> HashSet<Site> {
     let (mut out, mut unrecorded) = (HashSet::new(), HashSet::new());
     for f in program.functions() {
         let file = origin(f.name);
-        collect_recorded(f.body, &file, &mut out, &mut unrecorded);
+        f.body.collect_recorded(&file, &mut out, &mut unrecorded);
         if let Some(test_body) = f.test_body {
-            collect_recorded(test_body, &file, &mut out, &mut unrecorded);
+            test_body.collect_recorded(&file, &mut out, &mut unrecorded);
         }
     }
     // A site that arrives with both has an expression whose type pinning left to default beside
@@ -387,7 +467,7 @@ fn recorded_spans(program: &impl Optimizable) -> HashSet<Site> {
 /// copy goes unreported, since the copy is filed under its new function; that
 /// is the price of a key that does not mistake one file's expression for
 /// another's.
-type Site = (String, usize, usize, &'static str);
+pub type Site = (String, usize, usize, &'static str);
 
 /// Which file the function `name` came from, as far as its name says: the
 /// `__m<N>__` prefix of one of an imported file's items, the `__builtin_*` name
@@ -424,9 +504,9 @@ fn lost_records(program: &impl Optimizable, recorded: &HashSet<Site>) -> Vec<Str
     for f in program.functions() {
         let file = origin(f.name);
         let mut found = Vec::new();
-        collect_lost(f.body, &file, recorded, &mut found);
+        f.body.collect_lost(&file, recorded, &mut found);
         if let Some(test_body) = f.test_body {
-            collect_lost(test_body, &file, recorded, &mut found);
+            test_body.collect_lost(&file, recorded, &mut found);
         }
         out.extend(
             found
@@ -502,7 +582,7 @@ fn named(functions: &HashSet<String>) -> String {
 /// inlined into its one caller, and that caller's body changed — so the
 /// progress is already accounted for, by the function that absorbed it.
 fn rewritten_functions<P: Optimizable>(before: &P, after: &P) -> HashSet<String> {
-    let was: HashMap<&str, (&Expr, Option<&Expr>)> = before
+    let was: HashMap<&str, (&P::Body, Option<&P::Body>)> = before
         .functions()
         .into_iter()
         .map(|f| (f.name, (f.body, f.test_body)))
@@ -533,12 +613,12 @@ fn with_callers_of<P: Optimizable>(program: &P, changed: &HashSet<String>) -> Ha
 /// what counts as a reference — and which names a parameter or a `let` shadows
 /// — is decided in exactly one place. The counts themselves are not wanted;
 /// only which names appeared.
-fn references(f: &FunctionView<'_>) -> HashSet<String> {
+fn references<B: Body>(f: &FunctionView<'_, B>) -> HashSet<String> {
     let mut bound: HashSet<&str> = f.params.iter().map(String::as_str).collect();
     let mut counts: HashMap<&str, usize> = HashMap::new();
-    crate::count_uses(f.body, &mut bound, &mut counts);
+    f.body.count_uses(&mut bound, &mut counts);
     if let Some(test_body) = f.test_body {
-        crate::count_uses(test_body, &mut bound, &mut counts);
+        test_body.count_uses(&mut bound, &mut counts);
     }
     counts.into_keys().map(str::to_string).collect()
 }

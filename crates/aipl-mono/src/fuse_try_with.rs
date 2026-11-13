@@ -31,7 +31,10 @@
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Pattern, Program};
 
-use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm, TPattern};
+use aipl_syntax::ast::ConcreteType;
+use aipl_syntax::typed::{TExprKind, TMatchArm, TPattern};
+
+use crate::typed_util::Typed;
 
 use crate::{children, children_mut, MonoProgram};
 
@@ -63,7 +66,11 @@ pub fn fuse_try_with(program: &Program) -> Program {
 
 /// [`fuse_try_with`] over monomorphized functions, on the typed tree.
 pub fn fuse_try_with_post_mono(program: &MonoProgram) -> MonoProgram {
-    crate::typed_adapter::on_typed(program, |body| fuse_typed(body, &mut Vec::new()))
+    crate::typed_util::map_bodies(
+        program,
+        |_| true,
+        |_, body| fuse_typed(body, &mut Vec::new()),
+    )
 }
 
 /// Rewrite `e` in place, children first. `aliases` are the immutable `let a = place`
@@ -243,8 +250,6 @@ fn lower(e: &mut Expr) {
 // The typed twin of `fuse` and what it calls, for the passes after monomorphization. The
 // pre-monomorphization pass above still reads `Expr`; it goes when that side is typed.
 
-type Typed = TExpr<ConcreteTy>;
-
 fn fuse_typed(e: &mut Typed, aliases: &mut Vec<(String, Place)>) {
     if let TExprKind::Let(name, value, body) = &mut e.kind {
         fuse_typed(value, aliases);
@@ -304,14 +309,14 @@ fn with_args_typed(e: &Typed) -> Option<Vec<Typed>> {
 }
 
 fn falls_back_to_typed(
-    arms: &[TMatchArm<ConcreteTy>],
+    arms: &[TMatchArm<ConcreteType>],
     receiver: &Typed,
     aliases: &[(String, Place)],
 ) -> bool {
     let [a, b] = arms else {
         return false;
     };
-    fn ctor(arm: &TMatchArm<ConcreteTy>) -> Option<(&str, &[String])> {
+    fn ctor(arm: &TMatchArm<ConcreteType>) -> Option<(&str, &[String])> {
         match &arm.pattern {
             TPattern::Ctor { name, bindings, .. } => Some((name.as_str(), bindings.as_slice())),
             _ => None,

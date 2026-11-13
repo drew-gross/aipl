@@ -55,8 +55,11 @@
 use crate::passes::Scope;
 use std::collections::HashSet;
 
+use aipl_syntax::ast::ConcreteType;
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
-use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm};
+
+use crate::typed_util::Typed;
 
 use crate::subst::read_names;
 use crate::MonoProgram;
@@ -118,7 +121,7 @@ pub(crate) fn undeferrable_fns(program: &Program, effectful: &HashSet<String>) -
             _ => None,
         })
         .collect();
-    close_over_calls(&bodies, effectful)
+    close_over_calls(&bodies, effectful, reaches_blocked)
 }
 
 /// [`undeferrable_fns`] over a monomorphized program: the same closure, seeded
@@ -136,17 +139,21 @@ pub(crate) fn undeferrable_fns_post_mono(
             .filter(|f| !f.effects.is_empty())
             .map(|f| f.name.clone()),
     );
-    let bodies: Vec<(&str, &Expr)> = program
+    let bodies: Vec<(&str, &Typed)> = program
         .fns
         .iter()
         .map(|f| (f.name.as_str(), &f.body))
         .collect();
-    close_over_calls(&bodies, &effectful)
+    close_over_calls(&bodies, &effectful, reaches_blocked_typed)
 }
 
 /// [`undeferrable_fns`]'s fixpoint, over whichever `(name, body)` pairs the
 /// caller has — source items before monomorphization, concrete instances after.
-fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> HashSet<String> {
+fn close_over_calls<B>(
+    bodies: &[(&str, &B)],
+    effectful: &HashSet<String>,
+    reaches: impl Fn(&B, &HashSet<String>) -> bool,
+) -> HashSet<String> {
     let mut blocked: HashSet<String> = effectful.clone();
     blocked.extend(ABORTING_BUILTINS.iter().map(|c| c.name().to_string()));
     // A fixpoint rather than one pass: `a` calling `b` calling a divider makes
@@ -154,7 +161,7 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
     loop {
         let mut grew = false;
         for (name, body) in bodies {
-            if !blocked.contains(*name) && reaches_blocked(body, &blocked) {
+            if !blocked.contains(*name) && reaches(body, &blocked) {
                 blocked.insert((*name).to_string());
                 grew = true;
             }
@@ -410,20 +417,18 @@ pub fn sink_bindings_post_mono(
     scope: &Scope,
 ) -> MonoProgram {
     let blocked = undeferrable_fns_post_mono(program, builtin_effects);
-    crate::typed_adapter::on_typed_where(
+    crate::typed_util::map_bodies(
         program,
         |name| scope.covers(name),
-        |body| {
+        |_, body| {
             let taken = std::mem::replace(body, placeholder());
             *body = sink_typed(taken, &blocked);
         },
     )
 }
 
-type Typed = TExpr<ConcreteTy>;
-
 fn placeholder() -> Typed {
-    TExpr::new(TExprKind::Unit, ConcreteTy::Unit, 0..0)
+    TExpr::new(TExprKind::Unit, ConcreteType::Unit, 0..0)
 }
 
 /// [`reaches_blocked`] over the typed tree.
