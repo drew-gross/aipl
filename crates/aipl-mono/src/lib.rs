@@ -2872,7 +2872,7 @@ impl Mono<'_> {
         let mutating_receiver = template.params.first().is_some_and(|p| p.mutable);
         let instance = |m: &mut Self, spec: &str| {
             let owned = if mutating_receiver {
-                m.owned_for_call(spec, &[], &new_args, &new_tys)
+                m.owned_for_call(spec, &[], &arg_shapes(&new_args), &new_tys)
             } else {
                 Vec::new()
             };
@@ -5190,7 +5190,7 @@ impl Mono<'_> {
         &self,
         template: &str,
         type_args: &[Type],
-        args: &[Expr],
+        args: &[ArgShape],
         arg_tys: &[Type],
     ) -> Vec<usize> {
         let (params, return_ty, body) = self.concrete_signature(template, type_args);
@@ -5210,7 +5210,7 @@ impl Mono<'_> {
             // An ordinary owned parameter needs a *fresh* argument: the caller
             // must have a reference of its own to give away, and only a value
             // nobody else named does.
-            if fresh_tail(&args[i]) {
+            if args[i].fresh {
                 return true;
             }
             // A `mut self` receiver is the exception, because the writeback is
@@ -5226,9 +5226,7 @@ impl Mono<'_> {
             // one of the two owners. Declining keeps a borrowed instance calling
             // borrowed instances, which is what makes the pairing consistent
             // instead of mixed.
-            mutating_receiver
-                && i == 0
-                && matches!(&args[0].kind, ExprKind::Ident(n) if !self.lends(n))
+            mutating_receiver && i == 0 && args[0].name.as_deref().is_some_and(|n| !self.lends(n))
         })
         .collect()
     }
@@ -7667,7 +7665,7 @@ impl Mono<'_> {
                     // first, so the receiver can be moved in like any argument;
                     // `owned_eligible` itself declines the one receiver that
                     // cannot be, a `mut self`.
-                    let owned = self.owned_for_call(name, &type_args, args, &atys);
+                    let owned = self.owned_for_call(name, &type_args, &arg_shapes(args), &atys);
                     // Per-parameter specialization: each parameter records whether
                     // it's moved in (`owned`) and whether a `str` argument hit a
                     // `char[]`/`T[]` parameter (`str_kept` — specialize on the str
@@ -7716,7 +7714,7 @@ impl Mono<'_> {
                         })
                         .collect();
                     // Method-style or not — see the generic site above.
-                    let mut owned = self.owned_for_call(name, &[], args, &atys);
+                    let mut owned = self.owned_for_call(name, &[], &arg_shapes(args), &atys);
                     // A specialized (element/optional) variadic parameter is
                     // borrowed — its prologue retains the value into the rebuilt
                     // sequence — so it never moves in.
@@ -9763,6 +9761,25 @@ fn slot_fits(from: &Type, to: &Type) -> bool {
 /// fine for a move — the owned instance never writes into a moved-in block
 /// without going through a guard (`array_ops::push_mut`, `array_ops::reserve`,
 /// [`writable`]) that copies a block it must not write.
+/// What choosing a callee's owned instance asks of an argument: whether it is a fresh heap value
+/// ([`fresh_tail`]) and, if it is a bare name, which.
+pub(crate) struct ArgShape {
+    pub(crate) fresh: bool,
+    pub(crate) name: Option<String>,
+}
+
+fn arg_shapes(args: &[Expr]) -> Vec<ArgShape> {
+    args.iter()
+        .map(|a| ArgShape {
+            fresh: fresh_tail(a),
+            name: match &a.kind {
+                ExprKind::Ident(n) => Some(n.clone()),
+                _ => None,
+            },
+        })
+        .collect()
+}
+
 fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
     is_heap(arg_ty) && fresh_tail(arg)
 }

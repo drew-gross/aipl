@@ -10,15 +10,15 @@ use std::collections::HashMap;
 use aipl_syntax::ast::{Callee, ConcreteType, Type};
 use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, Ty, TyRepr};
 
-use crate::{Mono, Param, ParamSpec};
+use crate::{ArgShape, Mono, Param, ParamSpec};
 
 impl Mono<'_> {
     /// Whether a node, and everything under it, is a form that is typed from the pinned tree.
-    fn supported(&self, e: &TExpr<Ty>, concrete: &dyn Fn(&Ty) -> Option<ConcreteType>) -> bool {
+    fn supported(&self, e: &TExpr<Ty>) -> bool {
         if e.unsettled || matches!(e.ty, Ty::Never | Ty::Fn(..)) {
             return false;
         }
-        let all = |xs: &[&TExpr<Ty>]| xs.iter().all(|x| self.supported(x, concrete));
+        let all = |xs: &[&TExpr<Ty>]| xs.iter().all(|x| self.supported(x));
         match &e.kind {
             TExprKind::Int(_)
             | TExprKind::Float(_)
@@ -31,23 +31,17 @@ impl Mono<'_> {
             TExprKind::If(cond, then, otherwise) => all(&[cond, then, otherwise]),
             TExprKind::Seq(first, rest) => all(&[first, rest]),
             TExprKind::Call { callee, args, .. } => {
-                (self.is_operator_call(callee, args.len())
-                    || self.is_plain_call(callee, args, concrete))
-                    && args.iter().all(|a| self.supported(a, concrete))
+                (self.is_operator_call(callee, args.len()) || self.is_plain_call(callee, args))
+                    && args.iter().all(|a| self.supported(a))
             }
             _ => false,
         }
     }
 
-    /// Whether a call is to a user function that is neither generic nor mutating, takes no
-    /// function-typed or variadic parameter, and is handed no heap value: the instance it calls is
-    /// then the plain borrow one, and the call keeps its arguments as written.
-    fn is_plain_call(
-        &self,
-        callee: &Callee,
-        args: &[TExpr<Ty>],
-        concrete: &dyn Fn(&Ty) -> Option<ConcreteType>,
-    ) -> bool {
+    /// Whether a call is to a user function that is neither generic nor mutating and takes no
+    /// function-typed or variadic parameter: the call keeps its arguments as written, and which
+    /// instance it calls follows from what they are.
+    fn is_plain_call(&self, callee: &Callee, args: &[TExpr<Ty>]) -> bool {
         let name = callee.name();
         let Some(function) = self.concrete.get(name) else {
             return false;
@@ -59,9 +53,6 @@ impl Mono<'_> {
                 .params
                 .iter()
                 .all(|p| !p.arity.is_variadic() && !matches!(p.ty, Type::Fn(..)))
-            && args
-                .iter()
-                .all(|a| concrete(&a.ty).is_some_and(|t| !self.owns_heap(&t.to_type())))
     }
 
     /// Whether a call is an arithmetic, comparison or logical operator on two operands, which is a
@@ -119,7 +110,7 @@ impl Mono<'_> {
         if !specs.iter().all(plain)
             || !self.cur_lenv.is_empty()
             || params.len() != source.sig.params.len()
-            || !self.supported(&source.body, &concrete)
+            || !self.supported(&source.body)
         {
             return None;
         }
@@ -129,23 +120,66 @@ impl Mono<'_> {
     }
 
     /// Point each call to a user function at the instance it calls, queueing the instance. Callees
-    /// are reached before their callers' own call, as inference reaches them.
+    /// are reached before their callers' own call, as inference reaches them. A parameter is owned
+    /// when the callee can take it and the argument is a fresh heap value.
     fn enqueue_calls(&mut self, e: &mut TExpr<ConcreteType>) {
         crate::typed_util::each_child_mut(e, &mut |c| self.enqueue_calls(c));
-        let TExprKind::Call { callee, .. } = &e.kind else {
+        let TExprKind::Call { callee, args, .. } = &e.kind else {
             return;
         };
         let name = callee.name().to_string();
         let Some(function) = self.concrete.get(&name) else {
             return;
         };
-        let specs = crate::ParamSpecs {
-            type_args: Vec::new(),
-            params: vec![ParamSpec::default(); function.params.len()],
-        };
-        let mangled = self.enqueue_full(&name, specs);
+        let shapes: Vec<ArgShape> = args
+            .iter()
+            .map(|a| ArgShape {
+                fresh: fresh_tail(a),
+                name: match &a.kind {
+                    TExprKind::Ident(n) => Some(n.clone()),
+                    _ => None,
+                },
+            })
+            .collect();
+        let atys: Vec<Type> = args.iter().map(|a| a.ty.to_type()).collect();
+        let owned = self.owned_for_call(&name, &[], &shapes, &atys);
+        let params: Vec<ParamSpec> = function
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, p)| ParamSpec {
+                owned: owned.contains(&i),
+                concat: matches!(p.ty, Type::Primitive(aipl_syntax::ast::Primitive::Str))
+                    && atys.get(i).is_some_and(crate::is_concat_str),
+                ..ParamSpec::default()
+            })
+            .collect();
+        let mangled = self.enqueue_full(
+            &name,
+            crate::ParamSpecs {
+                type_args: Vec::new(),
+                params,
+            },
+        );
         if let TExprKind::Call { callee, .. } = &mut e.kind {
             *callee = Callee::User(mangled);
         }
+    }
+}
+
+/// Whether a value is a fresh heap value: built here or returned by a call, possibly at the end of
+/// a chain of statements.
+fn fresh_tail(e: &TExpr<ConcreteType>) -> bool {
+    match &e.kind {
+        TExprKind::ArrayLit(_)
+        | TExprKind::SetLit(..)
+        | TExprKind::DictLit(_)
+        | TExprKind::Construct(..)
+        | TExprKind::Call { .. } => true,
+        TExprKind::Let(_, _, body)
+        | TExprKind::LetMut(_, _, body)
+        | TExprKind::Seq(_, body)
+        | TExprKind::Assign(_, _, body) => fresh_tail(body),
+        _ => false,
     }
 }
