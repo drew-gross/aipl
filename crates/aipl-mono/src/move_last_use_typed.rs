@@ -111,7 +111,7 @@ fn fields_read_once_into(names: &[&str], e: &Typed, repeats: bool, seen: &mut Ve
 
 /// `body` — the scope of the *parameter* `name`, which the instance owns — with each last use
 /// wrapped in `__move`.
-fn move_last_uses_of_param(
+pub(crate) fn move_last_uses_of_param(
     name: &str,
     body: &Typed,
     heap_fields: &HashSet<String>,

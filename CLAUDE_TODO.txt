@@ -145,4 +145,6 @@ codegen/types:
 
 typed tree:
   codegen `flex_int_ty` hands `aipl_syntax::flex_fit` a shallow `Expr` rebuilt from the typed tail/branches (codegen `flex_shape`); port `flex_fit` to `TExpr` when the pre-mono side is typed
+typed tree: mono still infers (not types from the pinned tree) an instance that keeps a parameter as a str/set (str_kept, set_kept), a concat or variadic parameter, or whose body has a shim, a grid form, rope_str, with_or_self, a tuple's to_array, a range given to an array parameter, a generic constructor used as a function value; port each in typed_infer.rs/typed_function_calls.rs, then delete `infer` and the stamp bridge
+typed tree: str_kept needs the body retyped, not only the parameter: slices and generic results of a str-kept parameter are `str` where the pinned tree says `char[]`
 typed tree: delete the Expr twins of the pre-mono passes (fold_constants, sink_bindings, fuse_*, fold_*, *_variants, inline_*, lower_*) and `typed_passes` oracle once mono reads TProgram.

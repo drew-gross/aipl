@@ -1,8 +1,28 @@
 # Plan: make the type on every expression mandatory (`TExpr` end to end)
 
-Status: step 1's probe is run (below); the port has not started. Written after the pseudo-types were
-deleted (`Remove pseudo-types`).
-Delete this file when the work is done.
+Status: the pre-mono passes, the post-mono passes and codegen read `TExpr`; mono's entry takes a
+`TProgram`, and most instances are typed from it (the "typed route" below). What is left is the
+instances the typed route does not take, then deleting `infer`, `to_program`'s stamp bridge and the
+stamp conversion in `typed_adapter`. Delete this file when the work is done.
+Written after the pseudo-types were deleted (`Remove pseudo-types`).
+
+## The typed route (where mono is now)
+
+Per instance, `typed_body` takes the body from the pinned tree (each node's type with the instance's
+type arguments substituted) and `lower` finishes what mono does besides typing it; every other
+instance runs the old `infer` on the written tree. The route covers: operators, user, generic and
+native calls; calls that hand lambdas, function parameters or function names to a function (a copy
+of the callee is specialized for them, `typed_function_calls.rs`); `map`, `filter`, `filter_map`
+and `zip_with` (`typed_higher_order.rs`); `for` with a position, over a dict or over a range; nested
+patterns (`typed_match_tree.rs`); struct construction with literal defaults, generic structs and
+variants; field-path assignment; mutating calls in value position (copy and modify); `extend` by
+shape; constructor references; owned parameters.
+
+Instances still inferred: a parameter kept as a `str` or set (`str_kept`, `set_kept`), a concat
+string or a variadic shape; a body holding a shim (closure bindings), a grid form, `rope_str`,
+`with_or_self`, a tuple's `to_array`, a range handed to an array parameter, a generic constructor
+used as a function value, or a function stored in a value. Each is a `FALLBACK` in `typed_body`'s
+caller; when none is left, delete `infer`.
 
 ## Where things stand
 

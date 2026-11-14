@@ -80,8 +80,10 @@ mod move_last_use_typed;
 mod ownership_typed;
 mod pinned_pipeline;
 mod typed_adapter;
+mod typed_function_calls;
 mod typed_higher_order;
 mod typed_infer;
+mod typed_match_tree;
 mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
 /// The post-monomorphization tree and the questions codegen asks of it.
@@ -1778,6 +1780,9 @@ pub fn monomorphize_probed(
         cur_template: String::new(),
         cur_subst: None,
         scope_names: Vec::new(),
+        in_place_call: false,
+        current_parameters: HashMap::new(),
+        specialized_from: HashMap::new(),
         typed_fns: typed
             .items
             .iter()
@@ -2665,6 +2670,12 @@ struct Mono<'a> {
     typed_fns: HashMap<&'a str, &'a aipl_syntax::typed::TFunction>,
     /// The names bound around the expression being lowered from the typed tree, innermost last.
     scope_names: Vec<String>,
+    /// Set while the call that a `set recv = recv.f(..)` updates in place is lowered.
+    in_place_call: bool,
+    /// The parameters of the instance being lowered from the typed tree, with their types.
+    current_parameters: HashMap<String, ConcreteType>,
+    /// The function each copy specialized for the functions it is handed has its body from.
+    specialized_from: HashMap<String, typed_function_calls::SpecializedFrom>,
     dbg: DebugOptions,
 }
 

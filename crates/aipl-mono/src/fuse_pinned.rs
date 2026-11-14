@@ -334,9 +334,16 @@ fn index(whole: &P, blocked: &HashSet<String>) -> Option<P> {
         return None;
     }
     let element = element_of(&xs.ty)?;
+    // A span picks a sub-range of the array, which is an array again; any other index is a position
+    // that may be out of range.
+    let indexed_ty = if matches!(&idx.ty, Ty::Named(n) if n == aipl_syntax::SPAN_TYPE) {
+        xs.ty.clone()
+    } else {
+        Ty::Optional(Box::new(element))
+    };
     let indexed = TExpr::rebuilt(
         TExprKind::Index(Box::new(xs.clone()), idx.clone()),
-        Ty::Optional(Box::new(element)),
+        indexed_ty,
         whole,
     );
     let mapped = call(
