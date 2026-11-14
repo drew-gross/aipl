@@ -871,14 +871,22 @@ fn pin_struct(decls: &Decls, s: &aipl_syntax::ast::StructDecl) -> Res<Option<TSt
             return Ok(None);
         };
         let default = match &f.default {
-            Some(d) if !s.is_generic() => {
+            Some(d) => {
                 let what = format!(
                     "default for struct {:?} field {:?}",
                     s.name.text, f.name.text
                 );
-                Some(pin_slot_default(decls, &s.name.text, &f.ty, d, &[], &what)?)
+                Some(pin_slot_default(
+                    decls,
+                    &s.name.text,
+                    &f.ty,
+                    d,
+                    &[],
+                    &s.type_vars,
+                    &what,
+                )?)
             }
-            _ => None,
+            None => None,
         };
         fields.push(TFieldDecl {
             name: f.name.clone(),
@@ -913,7 +921,7 @@ fn pin_variant(decls: &Decls, v: &aipl_syntax::ast::VariantDecl) -> Res<Option<T
                 return Ok(None);
             };
             let default = match &slot.default {
-                Some(d) if !v.is_generic() => {
+                Some(d) => {
                     let what = format!(
                         "default for variant {:?} case {:?} payload {:?}",
                         v.name.text,
@@ -926,10 +934,11 @@ fn pin_variant(decls: &Decls, v: &aipl_syntax::ast::VariantDecl) -> Res<Option<T
                         &slot.ty,
                         d,
                         &earlier,
+                        &v.type_vars,
                         &what,
                     )?)
                 }
-                _ => None,
+                None => None,
             };
             if let Some(n) = &slot.name {
                 earlier.push((n.clone(), slot.ty.clone()));
@@ -1058,9 +1067,10 @@ fn pin_slot_default(
     ty: &Type,
     default: &Expr,
     earlier: &[(String, Type)],
+    type_vars: &[aipl_syntax::ast::TypeParam],
     what: &str,
 ) -> Res<TExpr<Ty>> {
-    let mut p = pinner_for(decls, owner, &[], &[]);
+    let mut p = pinner_for(decls, owner, type_vars, &[]);
     let none = HashMap::new();
     for (name, t) in earlier {
         let t = p.lower(t, &none, &default.span)?;

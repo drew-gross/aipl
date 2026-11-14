@@ -32,7 +32,12 @@ fn mono_names(src: &str) -> Vec<String> {
     let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
         .expect("load");
     let frontend = aipl::codegen::frontend(&prog).expect("frontend");
-    let mono = monomorphize(&frontend.program, DebugOptions::OFF).expect("monomorphize");
+    let mono = monomorphize(
+        &frontend.pinned.program,
+        &frontend.pinned.instances,
+        DebugOptions::OFF,
+    )
+    .expect("monomorphize");
     mono_fn_names(&mono)
 }
 

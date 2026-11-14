@@ -3069,9 +3069,13 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     let probe = aipl_mono::probe::Probe::new(&pinned.program);
     let typed = aipl_mono::lower_reductions_pinned(&frontend.pinned.program);
     let typed = aipl_mono::lower_try_set_pinned(&typed);
-    let lowered = aipl_mono::write_back(&frontend.program, &typed, &frontend.pinned.instances);
-    aipl_mono::monomorphize_probed(&lowered, Some(&probe), DebugOptions::OFF)
-        .map_err(|e| vec![e])?;
+    aipl_mono::monomorphize_probed(
+        &typed,
+        &frontend.pinned.instances,
+        Some(&probe),
+        DebugOptions::OFF,
+    )
+    .map_err(|e| vec![e])?;
     Ok(probe.finish())
 }
 
@@ -3087,7 +3091,7 @@ fn lower_program(
     // hands back. Split out so a caller that only wants the diagnostics can
     // run it without paying for codegen; see `frontend`.
     let Frontend {
-        program: checked,
+        program: _,
         check_program,
         resolutions: _,
         pinned,
@@ -3223,11 +3227,10 @@ fn lower_program(
     let typed = aipl_mono::lower_reductions_pinned(&typed);
     let typed = aipl_mono::lower_try_set_pinned(&typed);
     // Every stamp now describes the tree monomorphization actually reads.
-    let folded = aipl_mono::write_back(&checked, &typed, &instances);
 
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
-    let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;
+    let monomorphized = aipl_mono::monomorphize(&typed, &instances, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda
     // specializations: those lifted lambdas (and any other now-single-use

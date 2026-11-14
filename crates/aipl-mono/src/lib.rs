@@ -44,7 +44,7 @@ pub use fold_lengths_pinned::fold_lengths_pinned;
 pub use fuse_pinned::effectful_fns;
 pub use fuse_pinned::fuse_operations_pinned;
 pub use inline_pinned::{inline_inspected_pinned, inline_single_use_pinned, inline_small_pinned};
-pub use pinned_pipeline::{retarget_int_parses_pinned, write_back};
+pub use pinned_pipeline::retarget_int_parses_pinned;
 
 mod fold_lengths_pinned;
 
@@ -1575,17 +1575,25 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
 /// Rewrite `program` so it contains no type variables: every generic function
 /// is replaced by zero or more concrete instances, one per distinct tuple of
 /// type arguments it's called with.
-pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram, Error> {
-    monomorphize_probed(program, None, dbg)
+pub fn monomorphize(
+    program: &aipl_syntax::typed::TProgram,
+    instances: &pin::Instances,
+    dbg: DebugOptions,
+) -> Result<MonoProgram, Error> {
+    monomorphize_probed(program, instances, None, dbg)
 }
 
 /// [`monomorphize`], comparing the type it infers for each expression with the pinned one (see
 /// [`probe`]).
 pub fn monomorphize_probed(
-    program: &Program,
+    typed: &aipl_syntax::typed::TProgram,
+    instances: &pin::Instances,
     probe: Option<&probe::Probe>,
     dbg: DebugOptions,
 ) -> Result<MonoProgram, Error> {
+    // Inference still reads the written tree; each expression of it carries what the pinner made
+    // of it.
+    let program = &pinned_pipeline::to_program(typed, instances);
     // Field types per struct (for typing `Field`/`Construct`).
     // struct name → [(field_name, field_type, default_expr)]
     let mut structs: HashMap<String, Vec<(String, Type, Option<Expr>)>> = HashMap::new();

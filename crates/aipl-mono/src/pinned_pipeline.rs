@@ -2,9 +2,7 @@
 //! the rewrite that gives each `int_parse` the call its target type asks for, and writing the
 //! optimized pinned functions back into the program monomorphization reads.
 
-use std::collections::{HashMap, HashSet};
-
-use aipl_syntax::ast::{Callee, Function, Item, Primitive, Program};
+use aipl_syntax::ast::{Callee, Item, Primitive, Program};
 use aipl_syntax::typed::{TExpr, TExprKind, TItem, TProgram, Ty};
 
 use crate::pin::{Instances, Pinned};
@@ -85,73 +83,15 @@ fn retarget(e: &mut TExpr<Ty>) {
     );
 }
 
-/// `original` with each function's body (and `.test` body) and each struct field default taken
-/// from `typed`, the functions `typed` no longer has dropped and the ones it has gained added. The
-/// generic declarations pinning leaves out stay as they are. Every expression is stamped with the
-/// type `typed` gives it.
-pub fn write_back(original: &Program, typed: &TProgram, instances: &Instances) -> Program {
-    let erased = typed.erase();
-    let mut fns: HashMap<&str, &Function> = HashMap::new();
-    let mut structs = HashMap::new();
-    for item in &erased.items {
-        match item {
-            Item::Fn(f) => {
-                fns.insert(f.name.text.as_str(), f);
-            }
-            Item::Struct(s) => {
-                structs.insert(s.name.text.as_str(), s);
-            }
-            _ => {}
-        }
-    }
-    let known: HashSet<&str> = original
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            Item::Fn(f) => Some(f.name.text.as_str()),
-            _ => None,
-        })
-        .collect();
-    let mut items: Vec<Item> = original
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            Item::Fn(f) => {
-                let new = fns.get(f.name.text.as_str())?;
-                let mut f = f.clone();
-                f.body = new.body.clone();
-                if f.test_body.is_some() && new.test_body.is_some() {
-                    f.test_body = new.test_body.clone();
-                }
-                Some(Item::Fn(f))
-            }
-            Item::Struct(s) => {
-                let mut s = s.clone();
-                if let Some(new) = structs.get(s.name.text.as_str()) {
-                    // A default the pass folded; one pinning did not carry stays as written.
-                    for (field, new) in s.fields.iter_mut().zip(&new.fields) {
-                        if new.default.is_some() {
-                            field.default = new.default.clone();
-                        }
-                    }
-                }
-                Some(Item::Struct(s))
-            }
-            other => Some(other.clone()),
-        })
-        .collect();
-    for item in &erased.items {
+/// The program monomorphization reads, from the pinned one alone: its functions, structs and
+/// variants, with every expression stamped with the type `typed` gives it.
+pub fn to_program(typed: &TProgram, instances: &Instances) -> Program {
+    let mut program = typed.erase();
+    for item in &mut program.items {
         if let Item::Fn(f) = item {
-            if !known.contains(f.name.text.as_str()) {
-                items.push(Item::Fn(f.clone()));
-            }
+            anonymous_any_again(&mut f.sig);
         }
     }
-    let mut program = Program {
-        items,
-        sources: original.sources.clone(),
-        doc: original.doc.clone(),
-    };
     let pinned = Pinned {
         program: typed.clone(),
         failures: Vec::new(),
@@ -162,6 +102,37 @@ pub fn write_back(original: &Program, typed: &TProgram, instances: &Instances) -
     stamp_everything(&mut program, &pinned, Stamping::Typed);
     stamp_test_bodies(&mut program, typed, instances);
     program
+}
+
+/// A signature as it was written: the pinner makes each bare `any` a type variable of its own, and
+/// here each is a bare `any` again.
+fn anonymous_any_again(sig: &mut aipl_syntax::ast::Signature) {
+    use aipl_syntax::ast::Type;
+    fn again(t: &mut Type) {
+        match t {
+            Type::TypeVar(v) if v.starts_with(crate::pin::ANONYMOUS_ANY) => *t = Type::Any,
+            Type::Case(i) | Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => again(i),
+            Type::Without(i, _) => again(i),
+            Type::Dict(a, b) | Type::Result(a, b) => {
+                again(a);
+                again(b);
+            }
+            Type::Fn(ps, r) => {
+                ps.iter_mut().for_each(again);
+                again(r);
+            }
+            Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter_mut().for_each(again),
+            _ => {}
+        }
+    }
+    sig.type_vars
+        .retain(|tp| !tp.name.starts_with(crate::pin::ANONYMOUS_ANY));
+    for p in &mut sig.params {
+        again(&mut p.ty);
+    }
+    if let Some(r) = sig.return_ty.as_mut() {
+        again(r);
+    }
 }
 
 /// [`stamp_everything`] stamps a function's body; a `.test` body is stamped the same way by
