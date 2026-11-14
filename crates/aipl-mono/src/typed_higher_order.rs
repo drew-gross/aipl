@@ -85,7 +85,7 @@ pub(crate) fn pattern_bindings<T: aipl_syntax::typed::TyRepr>(
 
 /// The locals of the enclosing scope that `e` reads and does not itself bind, with their types, in
 /// first-occurrence order.
-fn free_locals(
+pub(crate) fn free_locals(
     e: &Typed,
     scope: &[String],
     bound: &mut Vec<String>,

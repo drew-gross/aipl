@@ -16,11 +16,14 @@ of the callee is specialized for them, `typed_function_calls.rs`); `map`, `filte
 and `zip_with` (`typed_higher_order.rs`); `for` with a position, over a dict or over a range; nested
 patterns (`typed_match_tree.rs`); struct construction with literal defaults, generic structs and
 variants; field-path assignment; mutating calls in value position (copy and modify); `extend` by
-shape; constructor references; owned parameters; parameters kept as a `str`, set or rope, and `rope_str` (`typed_retype.rs`); a tuple's `to_array`; a grid's `with_or_self`.
+shape; constructor references; owned parameters; parameters kept as a `str`, set or rope, and `rope_str` (`typed_retype.rs`); variadic shapes; shims, closures included (`typed_shims.rs`); lambdas and function fields used as values; grid reads, writes, bounds and walks; ranges given to array parameters; a tuple's `to_array`.
 
-Instances still inferred: a variadic shape; a body holding a shim (closure bindings), a grid form, a range handed to an array parameter, a generic constructor
-used as a function value, or a function stored in a value. Each is a `FALLBACK` in `typed_body`'s
-caller; when none is left, delete `infer`.
+Instances still inferred: a body holding a node the pinner left `unsettled` (a generic application
+one of whose arguments nothing decided, which mono settles from the instances the program has: a
+`Box { .. }` with no field to pin it, a tuple of such, `grid_of`, `zip`), a `for` over an array
+whose element is an anonymous type variable (`any$N`), and a generic constructor used as a function
+value. Each is a fallback in `typed_body`'s caller; porting the settling heuristics
+(`ret_generic_args`, `sole_instance`) into the pinner removes the rest, and then `infer` goes.
 
 ## Where things stand
 

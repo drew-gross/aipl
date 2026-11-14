@@ -40,7 +40,7 @@ impl Mono<'_> {
     }
 
     /// The declared parameter types of a user function, concrete or generic.
-    fn declared_parameters(&self, name: &str) -> Option<Vec<Type>> {
+    pub(crate) fn declared_parameters(&self, name: &str) -> Option<Vec<Type>> {
         if let Some(generic) = self.generics.get(name) {
             return Some(generic.sig.params.iter().map(|p| p.ty.clone()).collect());
         }
@@ -73,10 +73,8 @@ impl Mono<'_> {
             && params.iter().any(|p| matches!(p, Type::Fn(..)))
             && params.iter().zip(args).all(|(p, a)| match p {
                 Type::Fn(..) => self.is_function_argument(a),
-                // A range given to an array parameter is the array of its positions, and a grid is
-                // walked by its cells: each is a rewrite the old path makes.
-                _ => !matches!(&a.ty, Ty::Named(n) if n == aipl_syntax::SPAN_TYPE
-                    || aipl_syntax::is_grid_instance(n)),
+                // A grid given to an array parameter is walked by its cells.
+                _ => !matches!(&a.ty, Ty::Named(n) if aipl_syntax::is_grid_instance(n)),
             })
     }
 

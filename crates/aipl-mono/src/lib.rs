@@ -85,6 +85,7 @@ mod typed_higher_order;
 mod typed_infer;
 mod typed_match_tree;
 mod typed_retype;
+mod typed_shims;
 mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
 /// The post-monomorphization tree and the questions codegen asks of it.

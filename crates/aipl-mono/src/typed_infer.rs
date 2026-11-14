@@ -17,6 +17,13 @@ use crate::{ArgShape, Mono, Param, ParamSpec};
 impl Mono<'_> {
     /// Whether a node, and everything under it, is a form that is typed from the pinned tree.
     fn supported(&self, e: &TExpr<Ty>, concrete: &dyn Fn(&Ty) -> Option<ConcreteType>) -> bool {
+        // A lambda used as a value becomes a function of its own that captures nothing.
+        if let (TExprKind::Lambda(params, body), Ty::Fn(..)) = (&e.kind, &e.ty) {
+            return !e.unsettled
+                && concrete(&e.ty).is_some()
+                && params.iter().all(|p| concrete(&p.ty).is_some())
+                && self.supported(body, concrete);
+        }
         // A function used as a value is queued for emission.
         if let (TExprKind::Ident(name), Ty::Fn(..)) = (&e.kind, &e.ty) {
             return !e.unsettled
@@ -60,6 +67,13 @@ impl Mono<'_> {
                 // A function used as a value has a function type; a plain name is a local.
                 true
             }
+            TExprKind::Let(name, ..) if aipl_syntax::is_shim_closure_name(name) => self
+                .shim_supported(e, &|x| self.supported(x, concrete), &|params| {
+                    params.iter().all(|p| concrete(&p.ty).is_some())
+                }),
+            TExprKind::Shim(..) => {
+                self.shim_supported(e, &|x| self.supported(x, concrete), &|_| true)
+            }
             TExprKind::Let(name, value, body) | TExprKind::LetMut(name, value, body) => {
                 !aipl_syntax::is_shim_closure_name(name) && sub(value) && sub(body)
             }
@@ -102,7 +116,10 @@ impl Mono<'_> {
             }
             // A grid is read by cell, which is a call to the grid's own function.
             TExprKind::Index(object, index) => {
-                sub(object) && sub(index) && !self.is_grid_read(object, index, concrete)
+                sub(object)
+                    && sub(index)
+                    && (!self.is_grid_read(object, index, concrete)
+                        || self.is_known_grid(&object.ty, concrete))
             }
             TExprKind::Field(object, field) => {
                 sub(object)
@@ -195,7 +212,6 @@ impl Mono<'_> {
                     })
                     && inits.iter().all(|i| sub(&i.value))
             }
-            _ => false,
         }
     }
 
@@ -236,6 +252,10 @@ impl Mono<'_> {
                 ))
                 && args.iter().all(|a| self.supported(a, concrete));
         }
+        // `recv.f(rest)` where `f` is a field of `recv` holding a function.
+        if self.is_function_field_call(callee, args.first().map(|a| &a.ty), concrete) {
+            return args.iter().all(|a| self.supported(a, concrete));
+        }
         // A call through a function parameter of the function being processed.
         if self.cur_lenv.contains_key(callee.name()) {
             return args.iter().all(|a| self.supported(a, concrete));
@@ -259,6 +279,29 @@ impl Mono<'_> {
             }
             _ => self.is_function_argument(a),
         };
+        // A cell pair given to a grid, and a grid walked by its cells.
+        if matches!(callee, Callee::IsInBoundsOf)
+            && args.len() == 2
+            && self.is_grid_cell_write(&args[1].ty, &args[0].ty, concrete)
+        {
+            return self.is_known_grid(&args[1].ty, concrete)
+                && args.iter().all(|a| self.supported(a, concrete));
+        }
+        if matches!(callee, Callee::Any)
+            && args.len() == 2
+            && matches!(concrete(&args[0].ty), Some(ConcreteType::Named(n)) if aipl_syntax::is_grid_instance(&n))
+        {
+            return concrete(&args[0].ty).is_some_and(|t| {
+                let ConcreteType::Named(n) = t else {
+                    return false;
+                };
+                self.structs
+                    .get(&n)
+                    .or_else(|| self.syn_structs.get(&n))
+                    .is_some_and(|fs| fs.iter().any(|(f, _, _)| f == "cells"))
+            }) && (self.is_function_argument(&args[1]) && function_argument(&args[1]))
+                && self.supported(&args[0], concrete);
+        }
         if self.is_typed_expansion(callee, args, concrete) {
             return args.iter().all(|a| match &a.kind {
                 TExprKind::Lambda(..) | TExprKind::Ident(_) if self.is_function_argument(a) => {
@@ -323,11 +366,6 @@ impl Mono<'_> {
                 .params
                 .iter()
                 .all(|p| !matches!(p.ty, Type::Fn(..)))
-            // A range handed to an array parameter is the array of its positions.
-            && generic.sig.params.iter().zip(args).all(|(p, a)| {
-                !(matches!(p.ty, Type::Array(_))
-                    && matches!(&a.ty, Ty::Named(n) if n == aipl_syntax::SPAN_TYPE))
-            })
     }
 
     /// A field's default, when it is a literal, a nullary constructor or a construction of such
@@ -351,6 +389,12 @@ impl Mono<'_> {
             (K::None, Type::Optional(_)) => TExprKind::None,
             (K::ArrayLit(elems), Type::Array(_)) if elems.is_empty() => {
                 TExprKind::ArrayLit(Vec::new())
+            }
+            (K::SetLit(elems, _), Type::Set(_, order)) if elems.is_empty() => {
+                TExprKind::SetLit(Vec::new(), aipl_syntax::typed::PinnedOrder::of(*order)?)
+            }
+            (K::DictLit(pairs), Type::Dict(..)) if pairs.is_empty() => {
+                TExprKind::DictLit(Vec::new())
             }
             // A nullary constructor of the variant the field holds.
             (K::Ident(n), Type::Named(variant))
@@ -491,6 +535,12 @@ impl Mono<'_> {
         }
     }
 
+    /// Whether `t` is a grid whose element type is recoverable from its instance.
+    fn is_known_grid(&self, t: &Ty, concrete: &dyn Fn(&Ty) -> Option<ConcreteType>) -> bool {
+        matches!(concrete(t), Some(ConcreteType::Named(n))
+            if aipl_syntax::is_grid_instance(&n) && self.instance_args(&n).is_some())
+    }
+
     /// Whether `object[index]` is a read of a grid's cell.
     fn is_grid_read(
         &self,
@@ -517,7 +567,7 @@ impl Mono<'_> {
             && function
                 .params
                 .iter()
-                .all(|p| !p.arity.is_variadic() && !matches!(p.ty, Type::Fn(..)))
+                .all(|p| !matches!(p.ty, Type::Fn(..)))
     }
 
     /// Whether a call is an arithmetic, comparison or logical operator on two operands, which is a
@@ -590,7 +640,6 @@ impl Mono<'_> {
         for (base, args) in named.into_inner() {
             let _ = self.instantiate_generic(&base, &args);
         }
-        let plain = |s: &ParamSpec| !s.concat && s.variadic == crate::VShape::Seq;
         let instance = |base: &str, args: &[ConcreteTy]| {
             let written: Vec<Type> = args.iter().map(|a| a.to_type()).collect();
             Some(crate::typing::generic_instance_name(base, &written))
@@ -605,8 +654,7 @@ impl Mono<'_> {
                 .to_type()
                 .to_concrete()
         };
-        if !specs.iter().all(plain)
-            || (specialized.is_none() && params.len() != source.sig.params.len())
+        if (specialized.is_none() && params.len() != source.sig.params.len())
             || !self.supported(&source.body, &concrete)
         {
             return None;
@@ -618,9 +666,16 @@ impl Mono<'_> {
             .return_ty
             .as_ref()
             .map_or(Some(Type::Unit), |t| Some(concrete(t)?.to_type()));
-        if returns.as_ref() != Some(&self.cur_ret) {
+        // A `T[]` result the instance answers as a `str` is the `str` itself.
+        let returns_str = returns
+            == Some(Type::Array(Box::new(Type::Primitive(
+                aipl_syntax::ast::Primitive::Char,
+            ))))
+            && self.cur_ret == Type::Primitive(aipl_syntax::ast::Primitive::Str);
+        if returns.as_ref() != Some(&self.cur_ret) && !returns_str {
             return None;
         }
+        let mut prologues: Vec<(String, TExpr<ConcreteType>)> = Vec::new();
         let mut next = 0;
         let mut kept: HashMap<String, ConcreteType> = HashMap::new();
         for declared in &source.sig.params {
@@ -632,6 +687,28 @@ impl Mono<'_> {
             }
             let instance_param = params.get(next)?;
             let declared_ty = concrete(&declared.ty)?;
+            let shape = specs.get(next).map_or(crate::VShape::Seq, |s| s.variadic);
+            if shape != crate::VShape::Seq {
+                // A variadic handed one element or an optional arrives as that, and the body
+                // starts by rebuilding the sequence it was written against.
+                let ConcreteType::Array(element) = &declared_ty else {
+                    return None;
+                };
+                let original = declared.name.clone();
+                let given = instance_param.name.clone();
+                let span = source.body.span.clone();
+                let (sequence, convert) = variadic_sequence(
+                    &given,
+                    element,
+                    shape == crate::VShape::Opt,
+                    &format!("{original}$x"),
+                    &span,
+                );
+                kept.insert(original.clone(), sequence);
+                prologues.push((original, convert));
+                next += 1;
+                continue;
+            }
             if instance_param.ty != declared_ty.to_type() {
                 let kept_ty = instance_param.ty.to_concrete()?;
                 if !crate::typed_retype::is_kept_representation(&declared_ty, &kept_ty) {
@@ -649,9 +726,39 @@ impl Mono<'_> {
         if !kept.is_empty() || has_rope {
             crate::typed_retype::retype(&mut body, &mut kept);
         }
+        for (original, convert) in prologues.into_iter().rev() {
+            let ty = body.ty.clone();
+            let span = body.span.clone();
+            body = TExpr::new(
+                TExprKind::Let(original, Box::new(convert), Box::new(body)),
+                ty,
+                span,
+            );
+        }
         self.scope_names = params.iter().map(|p| p.name.clone()).collect();
         let body = self.mark_owned_parameters(params, specs, body);
-        Some(self.lower(body))
+        let lowered = self.lower(body);
+        if returns_str {
+            // `{ let $ret: str = <body>; $ret }`: the body computes a `char[]`, the same bytes.
+            let span = lowered.span.clone();
+            let text = ConcreteType::Primitive(aipl_syntax::ast::Primitive::Str);
+            let mut wrapped = TExpr::new(
+                TExprKind::Let(
+                    "$ret".to_string(),
+                    Box::new(lowered),
+                    Box::new(TExpr::new(
+                        TExprKind::Ident("$ret".to_string()),
+                        text.clone(),
+                        span.clone(),
+                    )),
+                ),
+                text.clone(),
+                span,
+            );
+            wrapped.annotation = Some(text);
+            return Some(wrapped);
+        }
+        Some(lowered)
     }
 
     /// A struct parameter this instance owns is marked like a binding, before the body is lowered,
@@ -766,6 +873,10 @@ impl Mono<'_> {
     /// elements. `grid.with_or_self((r, c), v)` as the grid's `grid_try_set` of the two cells.
     /// `None` for a call that is neither.
     fn rewrite_expanded_call(&self, e: &TExpr<ConcreteType>) -> Option<TExpr<ConcreteType>> {
+        // `grid[(row, column)]` is the grid's `grid_get` of the two cells.
+        if let TExprKind::Index(grid, pair) = &e.kind {
+            return self.grid_call(Callee::GridGet, grid, pair, Vec::new(), e);
+        }
         let TExprKind::Call { callee, args, .. } = &e.kind else {
             return None;
         };
@@ -812,55 +923,143 @@ impl Mono<'_> {
                 ))
             }
             (Callee::WithOrSelf, [grid, pair, value]) => {
-                if !self.is_grid_cell_index(&grid.ty.to_type(), &pair.ty.to_type()) {
-                    return None;
-                }
+                self.grid_call(Callee::GridTrySet, grid, pair, vec![value.clone()], e)
+            }
+            // The pair comes first: `(row, column).is_in_bounds_of(grid)`.
+            (Callee::IsInBoundsOf, [pair, grid]) => {
+                self.grid_call(Callee::GridIsInBoundsOf, grid, pair, Vec::new(), e)
+            }
+            // A grid is walked by its cells, row by row.
+            (Callee::Any, [grid, predicate]) => {
                 let ConcreteType::Named(instance) = &grid.ty else {
                     return None;
                 };
-                let (_, type_args) = self.instance_args(instance)?;
-                let type_args = type_args
+                if !aipl_syntax::is_grid_instance(instance) {
+                    return None;
+                }
+                let cells_ty = self
+                    .structs
+                    .get(instance)
+                    .or_else(|| self.syn_structs.get(instance))?
                     .iter()
-                    .map(|t| t.to_concrete())
-                    .collect::<Option<Vec<_>>>()?;
-                let (cells, binding) = match &pair.kind {
-                    TExprKind::TupleLit(cells) => (cells.clone(), None),
-                    TExprKind::Ident(name) => (
-                        vec![field(name, &pair.ty, 0), field(name, &pair.ty, 1)],
-                        None,
-                    ),
-                    _ => {
-                        let tmp = aipl_syntax::fresh_temp("cell");
-                        (
-                            vec![field(&tmp, &pair.ty, 0), field(&tmp, &pair.ty, 1)],
-                            Some(tmp),
-                        )
-                    }
-                };
-                let mut call_args = vec![grid.clone()];
-                call_args.extend(cells);
-                call_args.push(value.clone());
-                let call = TExpr::new(
-                    TExprKind::Call {
-                        callee: Callee::GridTrySet,
-                        type_args,
-                        args: call_args,
-                        method_style: false,
-                    },
-                    e.ty.clone(),
+                    .find(|(n, _, _)| n == "cells")?
+                    .1
+                    .to_concrete()?;
+                let cells = TExpr::new(
+                    TExprKind::Field(Box::new(grid.clone()), "cells".to_string()),
+                    cells_ty,
                     span.clone(),
                 );
-                Some(match binding {
-                    Some(tmp) => TExpr::new(
-                        TExprKind::Let(tmp, Box::new(pair.clone()), Box::new(call)),
-                        e.ty.clone(),
-                        span,
-                    ),
-                    None => call,
-                })
+                let TExprKind::Call {
+                    callee,
+                    type_args,
+                    method_style,
+                    ..
+                } = &e.kind
+                else {
+                    return None;
+                };
+                Some(TExpr::new(
+                    TExprKind::Call {
+                        callee: callee.clone(),
+                        type_args: type_args.clone(),
+                        args: vec![cells, predicate.clone()],
+                        method_style: *method_style,
+                    },
+                    e.ty.clone(),
+                    span,
+                ))
             }
             _ => None,
         }
+    }
+
+    /// The call to `callee` on `grid` with the two cells of `pair` and then `rest`, when `pair`
+    /// addresses a cell of `grid`. A pair written out is its two cells already; a bound one is read
+    /// by its fields, and any other is bound first so it is evaluated once.
+    fn grid_call(
+        &self,
+        callee: Callee,
+        grid: &TExpr<ConcreteType>,
+        pair: &TExpr<ConcreteType>,
+        rest: Vec<TExpr<ConcreteType>>,
+        like: &TExpr<ConcreteType>,
+    ) -> Option<TExpr<ConcreteType>> {
+        if !self.is_grid_cell_index(&grid.ty.to_type(), &pair.ty.to_type()) {
+            return None;
+        }
+        let span = like.span.clone();
+        let ConcreteType::Named(instance) = &grid.ty else {
+            return None;
+        };
+        let (_, type_args) = self.instance_args(instance)?;
+        let type_args = type_args
+            .iter()
+            .map(|t| t.to_concrete())
+            .collect::<Option<Vec<_>>>()?;
+        let field = |name: &str, i: usize| {
+            TExpr::new(
+                TExprKind::Field(
+                    Box::new(TExpr::new(
+                        TExprKind::Ident(name.to_string()),
+                        pair.ty.clone(),
+                        span.clone(),
+                    )),
+                    format!("_{i}"),
+                ),
+                ConcreteType::Primitive(aipl_syntax::ast::Primitive::U64),
+                span.clone(),
+            )
+        };
+        let (cells, binding) = match &pair.kind {
+            TExprKind::TupleLit(cells) => (cells.clone(), None),
+            TExprKind::Ident(name) => (vec![field(name, 0), field(name, 1)], None),
+            _ => {
+                let tmp = aipl_syntax::fresh_temp("cell");
+                (vec![field(&tmp, 0), field(&tmp, 1)], Some(tmp))
+            }
+        };
+        let mut args = vec![grid.clone()];
+        args.extend(cells);
+        args.extend(rest);
+        let call = TExpr::new(
+            TExprKind::Call {
+                callee,
+                type_args,
+                args,
+                method_style: false,
+            },
+            like.ty.clone(),
+            span.clone(),
+        );
+        Some(match binding {
+            Some(tmp) => TExpr::new(
+                TExprKind::Let(tmp, Box::new(pair.clone()), Box::new(call)),
+                like.ty.clone(),
+                span,
+            ),
+            None => call,
+        })
+    }
+
+    /// Whether a call is `recv.f(rest)` with no function of that name, where `recv` is a struct
+    /// whose field `f` holds a function: the field is read and the function it holds is called.
+    fn is_function_field_call(
+        &self,
+        callee: &Callee,
+        receiver: Option<&Ty>,
+        concrete: &dyn Fn(&Ty) -> Option<ConcreteType>,
+    ) -> bool {
+        let name = callee.name();
+        !callee.is_builtin()
+            && !self.concrete.contains_key(name)
+            && !self.generics.contains_key(name)
+            && !self.ctors.contains_key(name)
+            && !self.generic_ctors.contains_key(name)
+            && !self.cur_lenv.contains_key(name)
+            && receiver
+                .and_then(|t| concrete(t))
+                .is_some_and(|t| self.fn_field_ret(&t.to_type(), name).is_some())
     }
 
     /// The tag of the case a constructor reference names (`__ctor$V$C` or `C@V`), when `ty` is the
@@ -924,8 +1123,104 @@ impl Mono<'_> {
                 }
             }
         }
+        if let TExprKind::Lambda(params, body) = &e.kind {
+            if matches!(e.ty, ConcreteType::Fn(..)) {
+                let ConcreteType::Fn(_, ret) = &e.ty else {
+                    unreachable!()
+                };
+                let name = self.lift_lambda(params, body, &[], ret.to_type());
+                e.kind = TExprKind::Ident(name);
+                return e;
+            }
+        }
+        if let TExprKind::Call {
+            callee,
+            args,
+            method_style,
+            ..
+        } = &e.kind
+        {
+            let receiver_ty = args.first().map(|a| a.ty.clone());
+            let name = callee.name().to_string();
+            let is_field_call = !callee.is_builtin()
+                && !self.concrete.contains_key(&name)
+                && !self.generics.contains_key(&name)
+                && !self.ctors.contains_key(&name)
+                && !self.generic_ctors.contains_key(&name)
+                && !self.cur_lenv.contains_key(&name)
+                && receiver_ty
+                    .as_ref()
+                    .is_some_and(|t| self.fn_field_ret(&t.to_type(), &name).is_some());
+            let _ = method_style;
+            if is_field_call {
+                let TExprKind::Call { mut args, .. } =
+                    std::mem::replace(&mut e.kind, TExprKind::Unit)
+                else {
+                    unreachable!("matched above");
+                };
+                let receiver = args.remove(0);
+                let Type::Named(sn) = receiver.ty.to_type() else {
+                    unreachable!()
+                };
+                let field_ty = self
+                    .structs
+                    .get(&sn)
+                    .or_else(|| self.syn_structs.get(&sn))
+                    .and_then(|fs| {
+                        fs.iter()
+                            .find(|(n, _, _)| *n == name)
+                            .map(|(_, t, _)| t.clone())
+                    })
+                    .and_then(|t| t.to_concrete())
+                    .expect("a function field is concrete");
+                let tmp = aipl_syntax::fresh_temp("fldcall");
+                let span = e.span.clone();
+                let field = TExpr::new(
+                    TExprKind::Field(Box::new(receiver), name.clone()),
+                    field_ty,
+                    span.clone(),
+                );
+                let call = TExpr::new(
+                    TExprKind::Call {
+                        callee: Callee::Local(tmp.clone()),
+                        type_args: Vec::new(),
+                        args,
+                        method_style: false,
+                    },
+                    e.ty.clone(),
+                    span.clone(),
+                );
+                let wrapped = TExpr::new(
+                    TExprKind::Let(tmp, Box::new(field), Box::new(call)),
+                    e.ty.clone(),
+                    span,
+                );
+                return self.lower(wrapped);
+            }
+        }
+        // A range handed to an array parameter is the array of its positions: `range.map(|i| i)`.
+        if let TExprKind::Call { callee, args, .. } = &mut e.kind {
+            if let Some(params) = self.declared_parameters(callee.name()) {
+                for (arg, param) in args.iter_mut().zip(params) {
+                    if matches!(param, Type::Array(_))
+                        && matches!(&arg.ty, ConcreteType::Named(n) if n == aipl_syntax::SPAN_TYPE)
+                    {
+                        let range = std::mem::replace(arg, unit_like(arg));
+                        *arg = positions_of(range);
+                    }
+                }
+            }
+        }
         if let Some(rewritten) = self.rewrite_expanded_call(&e) {
             return self.lower(rewritten);
+        }
+        if let TExprKind::Let(name, ..) = &e.kind {
+            if aipl_syntax::is_shim_closure_name(name) {
+                return self.lower_shim_closures(e);
+            }
+        }
+        if matches!(e.kind, TExprKind::Shim(..)) {
+            return self.lower_shim(e);
         }
         if let TExprKind::Ident(name) = &e.kind {
             if matches!(e.ty, ConcreteType::Fn(..))
@@ -1340,6 +1635,12 @@ impl Mono<'_> {
                 owned: owned.contains(&i),
                 concat: matches!(p.ty, Type::Primitive(aipl_syntax::ast::Primitive::Str))
                     && atys.get(i).is_some_and(crate::is_concat_str),
+                variadic: if p.arity.is_variadic() {
+                    atys.get(i)
+                        .map_or(crate::VShape::Seq, |a| crate::variadic_shape(a, &p.ty))
+                } else {
+                    crate::VShape::Seq
+                },
                 ..ParamSpec::default()
             })
             .collect();
@@ -1366,7 +1667,6 @@ fn is_expanded(callee: &Callee) -> bool {
             | Callee::Filter
             | Callee::FilterMap
             | Callee::ZipWith
-            | Callee::IsInBoundsOf
             | Callee::ToArray
             | Callee::WithOrSelf
             | Callee::Any
@@ -1376,8 +1676,115 @@ fn is_expanded(callee: &Callee) -> bool {
     )
 }
 
+/// The sequence a variadic parameter handed one element (`optional` false) or an optional stands
+/// for, with its type: a `char` sequence is a `str`, any other an array.
+fn variadic_sequence(
+    given: &str,
+    element: &ConcreteType,
+    optional: bool,
+    binder: &str,
+    span: &aipl_syntax::Span,
+) -> (ConcreteType, TExpr<ConcreteType>) {
+    let is_char = *element == ConcreteType::Primitive(aipl_syntax::ast::Primitive::Char);
+    let sequence = if is_char {
+        ConcreteType::Primitive(aipl_syntax::ast::Primitive::Str)
+    } else {
+        ConcreteType::Array(Box::new(element.clone()))
+    };
+    let node = |kind, ty: &ConcreteType| TExpr::new(kind, ty.clone(), span.clone());
+    let one = |x: TExpr<ConcreteType>| {
+        if is_char {
+            node(
+                TExprKind::Call {
+                    callee: Callee::CharToStr,
+                    type_args: Vec::new(),
+                    args: vec![x],
+                    method_style: false,
+                },
+                &sequence,
+            )
+        } else {
+            node(TExprKind::ArrayLit(vec![x]), &sequence)
+        }
+    };
+    if !optional {
+        return (
+            sequence.clone(),
+            one(node(TExprKind::Ident(given.to_string()), element)),
+        );
+    }
+    let optional_ty = ConcreteType::Optional(Box::new(element.clone()));
+    let empty = if is_char {
+        node(TExprKind::Str(String::new()), &sequence)
+    } else {
+        node(TExprKind::ArrayLit(Vec::new()), &sequence)
+    };
+    let arm = |pattern, body| TMatchArm {
+        pattern,
+        body,
+        span: span.clone(),
+    };
+    let matched = node(
+        TExprKind::Match(
+            Box::new(node(TExprKind::Ident(given.to_string()), &optional_ty)),
+            vec![
+                arm(
+                    TPattern::Ctor {
+                        name: "some".to_string(),
+                        bindings: vec![binder.to_string()],
+                        ignore_payload: false,
+                    },
+                    one(node(TExprKind::Ident(binder.to_string()), element)),
+                ),
+                arm(
+                    TPattern::Ctor {
+                        name: "none".to_string(),
+                        bindings: Vec::new(),
+                        ignore_payload: false,
+                    },
+                    empty,
+                ),
+            ],
+        ),
+        &sequence,
+    );
+    (sequence, matched)
+}
+
 fn is_nested_pattern<T: TyRepr>(pattern: &TPattern<T>) -> bool {
     crate::typed_match_tree::is_nested(pattern)
+}
+
+/// The array of a range's positions: `range.map(|i| i)`.
+fn positions_of(range: TExpr<ConcreteType>) -> TExpr<ConcreteType> {
+    let span = range.span.clone();
+    let index = ConcreteType::Primitive(aipl_syntax::ast::Primitive::U64);
+    let identity = TExpr::new(
+        TExprKind::Lambda(
+            vec![aipl_syntax::typed::TLambdaParam {
+                name: "$span_index".to_string(),
+                ty: index.clone(),
+                span: span.clone(),
+            }],
+            Box::new(TExpr::new(
+                TExprKind::Ident("$span_index".to_string()),
+                index.clone(),
+                span.clone(),
+            )),
+        ),
+        ConcreteType::Fn(vec![index.clone()], Box::new(index.clone())),
+        span.clone(),
+    );
+    TExpr::new(
+        TExprKind::Call {
+            callee: Callee::Map,
+            type_args: Vec::new(),
+            args: vec![range, identity],
+            method_style: false,
+        },
+        ConcreteType::Array(Box::new(index)),
+        span,
+    )
 }
 
 fn unit_like(like: &TExpr<ConcreteType>) -> TExpr<ConcreteType> {
