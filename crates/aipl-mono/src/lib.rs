@@ -80,6 +80,7 @@ mod move_last_use_typed;
 mod ownership_typed;
 mod pinned_pipeline;
 mod typed_adapter;
+mod typed_infer;
 mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
 /// The post-monomorphization tree and the questions codegen asks of it.
@@ -1774,6 +1775,14 @@ pub fn monomorphize_probed(
         probe,
         cur_template: String::new(),
         cur_subst: None,
+        typed_fns: typed
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                aipl_syntax::typed::TItem::Fn(f) => Some((f.name.text.as_str(), f)),
+                _ => None,
+            })
+            .collect(),
         dbg,
     };
 
@@ -1818,7 +1827,7 @@ pub fn monomorphize_probed(
         ),
     );
 
-    let mut out_fns: Vec<ConcreteFn<Expr>> = Vec::new();
+    let mut out_fns: Vec<ConcreteFn<typed_adapter::Inferred>> = Vec::new();
     // Drain the work-list until nothing new is discovered. Processing a body
     // enqueues the instances (concrete callees, generic specializations, and
     // their owned forms) it calls, so the reachable set grows transitively from
@@ -1826,6 +1835,7 @@ pub fn monomorphize_probed(
     // template signature and records which parameters it owns.
     let mut instantiated = 0usize;
     while let Some(inst) = mono.queue.pop_front() {
+        let mut type_args: HashMap<String, Type> = HashMap::new();
         let (params, effects, return_ty, body) =
             if let Some(Generic { sig, body }) = generics.get(&inst.template) {
                 // Generic specialization: limit-check (a runaway here means a
@@ -1846,6 +1856,7 @@ pub fn monomorphize_probed(
                     .map(|tp| tp.name.clone())
                     .zip(inst.specs.type_args.iter().cloned())
                     .collect();
+                type_args = map.clone();
                 let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
                 let params: Vec<Param> = sig
                     .params
@@ -1953,6 +1964,7 @@ pub fn monomorphize_probed(
             &return_ty,
             &body,
             &inst.specs.params,
+            &type_args,
         )?;
         out_fns.push(out);
     }
@@ -2639,6 +2651,8 @@ struct Mono<'a> {
     cur_template: String,
     /// What that instance's type variables are, when the probe could read them off its parameters.
     cur_subst: Option<probe::Substitution>,
+    /// The pinned function each source function was written as, for the instances typed from it.
+    typed_fns: HashMap<&'a str, &'a aipl_syntax::typed::TFunction>,
     dbg: DebugOptions,
 }
 
@@ -2676,7 +2690,8 @@ impl Mono<'_> {
         return_ty: &Option<Type>,
         body: &Expr,
         specs: &[ParamSpec],
-    ) -> Result<ConcreteFn<Expr>, Error> {
+        type_args: &HashMap<String, Type>,
+    ) -> Result<ConcreteFn<typed_adapter::Inferred>, Error> {
         let mut env: Env = HashMap::new();
         for p in params {
             env.insert(p.name.clone(), p.ty.clone());
@@ -2714,7 +2729,10 @@ impl Mono<'_> {
             .fold(body.clone(), |b, (_, p)| {
                 move_last_uses_of_param(&p.name, &b, &self.heap_fields_of(&p.ty), &self.mutating)
             });
-        let (body, _) = self.infer(body, &env)?;
+        let body = match self.typed_body(template, params, specs, type_args) {
+            Some(typed) => typed_adapter::Inferred::Typed(typed),
+            None => typed_adapter::Inferred::Written(self.infer(body, &env)?.0),
+        };
         Ok(ConcreteFn {
             name: name.to_string(),
             // By now `specialize_variadic` has already resolved every
@@ -3174,6 +3192,9 @@ impl Mono<'_> {
                     )
                 })?;
             type_args.push(t);
+        }
+        if let (Some(probe), Some(subst)) = (self.probe, &self.cur_subst) {
+            probe.compare_type_args(&self.cur_template, subst, &span, gname, &type_args);
         }
         // Concrete (type-substituted) template; its function-typed parameter is now
         // concrete (e.g. `(i64) -> bool`), which `specialize_call_with` will lift.
@@ -7610,6 +7631,7 @@ impl Mono<'_> {
                 // AIPL-implemented and has to specialize through the generic path
                 // exactly as a written call to it would — a late rewrite leaves an
                 // unspecialized template name for codegen to fail on.
+                let written_callee = callee;
                 let resolved_extend = self.resolve_extend_shape(callee, &atys, &mut rargs);
                 let callee: &Callee = resolved_extend.as_ref().unwrap_or(callee);
                 let name = callee.name();
@@ -7632,6 +7654,15 @@ impl Mono<'_> {
                 if self.generics.contains_key(name) {
                     let (type_args, ret) =
                         self.instantiate_types(name, &atys, expr.ty.as_deref(), span.clone())?;
+                    if let (Some(probe), Some(subst)) = (self.probe, &self.cur_subst) {
+                        probe.compare_type_args(
+                            &self.cur_template,
+                            subst,
+                            &span,
+                            written_callee.name(),
+                            &type_args,
+                        );
+                    }
                     // A method-style call is the same call with its receiver
                     // first, so the receiver can be moved in like any argument;
                     // `owned_eligible` itself declines the one receiver that

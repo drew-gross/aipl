@@ -23,6 +23,14 @@ use crate::ConcreteFn;
 
 type Typed = TExpr<ConcreteType>;
 
+/// A body as monomorphization hands it on: the typed tree when the instance was typed from the
+/// pinned program, the written tree with each expression stamped otherwise.
+#[derive(Clone)]
+pub(crate) enum Inferred {
+    Written(Expr),
+    Typed(Typed),
+}
+
 /// The declarations a body's types are read from: the program's structs and variants, and for each
 /// instance whether it mutates its receiver and what it declares it returns.
 pub(crate) struct Decls<'a> {
@@ -35,7 +43,7 @@ impl<'a> Decls<'a> {
     pub(crate) fn of(
         structs: &'a [ConcreteStructDecl],
         variants: &'a [ConcreteVariantDecl],
-        fns: &'a [ConcreteFn<Expr>],
+        fns: &'a [ConcreteFn<Inferred>],
     ) -> Decls<'a> {
         Decls {
             structs,
@@ -117,7 +125,7 @@ fn answers_unit(callee: &Callee, decls: &Decls<'_>) -> bool {
 }
 
 /// `f` with its body as a typed tree, or why a node of it cannot be typed.
-pub(crate) fn to_typed(f: &ConcreteFn<Expr>, decls: &Decls<'_>) -> Result<ConcreteFn, String> {
+pub(crate) fn to_typed(f: &ConcreteFn<Inferred>, decls: &Decls<'_>) -> Result<ConcreteFn, String> {
     let cx = Cx {
         decls,
         scope: RefCell::new(
@@ -132,7 +140,10 @@ pub(crate) fn to_typed(f: &ConcreteFn<Expr>, decls: &Decls<'_>) -> Result<Concre
         params: f.params.clone(),
         effects: f.effects.clone(),
         return_ty: f.return_ty.clone(),
-        body: typed(&f.body, &cx)?,
+        body: match &f.body {
+            Inferred::Written(body) => typed(body, &cx)?,
+            Inferred::Typed(body) => body.clone(),
+        },
     })
 }
 

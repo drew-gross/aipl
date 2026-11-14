@@ -131,6 +131,17 @@ fn mono_agreement_report() {
                 .or_insert((0, format!("{} -- {example}", file.display())))
                 .0 += n;
         }
+        total.type_args_compared += report.type_args_compared;
+        total.type_args_agreed += report.type_args_agreed;
+        total.type_args_unmatched += report.type_args_unmatched;
+        total.type_args_unbound += report.type_args_unbound;
+        for (callee, (n, example)) in report.type_arg_disagreements {
+            total
+                .type_arg_disagreements
+                .entry(callee)
+                .or_insert((0, format!("{} -- {example}", file.display())))
+                .0 += n;
+        }
         total.collisions += report.collisions;
         total.placeholder += report.placeholder;
         total.instances += report.instances;
@@ -148,6 +159,18 @@ fn mono_agreement_report() {
         total.instances, total.compared, total.agreed, total.placeholder, total.unbound,
         total.unmatched, total.collisions
     );
+    println!(
+        "type arguments: compared {} agreed {} unmatched {} unbound {}",
+        total.type_args_compared,
+        total.type_args_agreed,
+        total.type_args_unmatched,
+        total.type_args_unbound
+    );
+    let mut args: Vec<_> = total.type_arg_disagreements.iter().collect();
+    args.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    for (callee, (n, example)) in args.into_iter().take(40) {
+        println!("type args {n:6}  {callee}\n         e.g. {example}");
+    }
     let mut unbound: Vec<_> = total.unbound_forms.iter().collect();
     unbound.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
     for (form, (n, example)) in unbound.into_iter().take(25) {

@@ -438,6 +438,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/functions/recursion/mutual_recursion | 0 | 0 | 0 | 822 | 572 |
 | tests/cases/functions/return | 11 | 684 | 684 | 2592 | 6968 |
 | tests/cases/functions/simple_call | 0 | 0 | 0 | 58 | 288 |
+| tests/cases/functions/typed_body_without_calls | 0 | 0 | 0 | 2 | 8 |
 | tests/cases/functions/variadic | 7 | 265 | 247 | 1692 | 6192 |
 | tests/cases/functions/variadic_default | 28 | 1761 | 1761 | 4388 | 7644 |
 | tests/cases/functions/variadic_generic | 16 | 989 | 989 | 2992 | 7340 |

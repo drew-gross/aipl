@@ -20,6 +20,9 @@ struct PinnedFn {
     params: Vec<Ty>,
     /// `None` when several nodes with different types share the span.
     nodes: HashMap<(usize, usize, String), Option<Ty>>,
+    /// The type arguments each generic call records, by span and callee; `None` when several calls
+    /// with different ones share the span.
+    calls: HashMap<(usize, usize, String), Option<Vec<Ty>>>,
 }
 
 /// What the comparison found.
@@ -43,6 +46,15 @@ pub struct Report {
     /// Disagreements grouped by the form of the expression and the two types: count and one
     /// example (`function @ span`).
     pub disagreements: BTreeMap<String, (usize, String)>,
+    /// Generic calls whose type arguments mono worked out, and how many equal the recorded ones.
+    pub type_args_compared: usize,
+    pub type_args_agreed: usize,
+    /// Calls mono instantiated that the pinned program has no call to match, and ones whose
+    /// recorded arguments mention a type variable the instance does not bind.
+    pub type_args_unmatched: usize,
+    pub type_args_unbound: usize,
+    /// The calls whose type arguments differ, by callee: count and one example.
+    pub type_arg_disagreements: BTreeMap<String, (usize, String)>,
 }
 
 pub struct Probe {
@@ -61,7 +73,25 @@ impl Probe {
         for item in &pinned.items {
             let TItem::Fn(f) = item else { continue };
             let mut nodes: HashMap<(usize, usize, String), Option<Ty>> = HashMap::new();
+            let mut calls: HashMap<(usize, usize, String), Option<Vec<Ty>>> = HashMap::new();
             f.body.walk(&mut |e| {
+                if let aipl_syntax::typed::TExprKind::Call {
+                    callee, type_args, ..
+                } = &e.kind
+                {
+                    if !type_args.is_empty() {
+                        let key = (e.span.start, e.span.end, callee.name().to_string());
+                        match calls.get(&key) {
+                            Some(Some(existing)) if existing != type_args => {
+                                calls.insert(key, None);
+                            }
+                            Some(_) => {}
+                            None => {
+                                calls.insert(key, Some(type_args.clone()));
+                            }
+                        }
+                    }
+                }
                 let key = (e.span.start, e.span.end, typed_form(&e.kind));
                 match nodes.get(&key) {
                     Some(Some(existing)) if *existing != e.ty => {
@@ -78,6 +108,7 @@ impl Probe {
                 PinnedFn {
                     params: f.sig.params.iter().map(|p| p.ty.clone()).collect(),
                     nodes,
+                    calls,
                 },
             );
         }
@@ -159,6 +190,75 @@ impl Probe {
             mono,
             pinned,
         ));
+    }
+
+    /// Compare the type arguments mono worked out for the call to `callee` at `span` with the ones
+    /// the pinner recorded, made concrete by the instance's `subst`.
+    pub fn compare_type_args(
+        &self,
+        template: &str,
+        subst: &Substitution,
+        span: &aipl_syntax::Span,
+        callee: &str,
+        got: &[Type],
+    ) {
+        let Some(pinned) = self.fns.get(template) else {
+            return;
+        };
+        let Some(Some(want)) = pinned
+            .calls
+            .get(&(span.start, span.end, callee.to_string()))
+        else {
+            self.report.borrow_mut().type_args_unmatched += 1;
+            return;
+        };
+        let instance = |base: &str, args: &[ConcreteTy]| {
+            let written: Vec<Type> = args.iter().map(|a| a.to_type()).collect();
+            Some(crate::typing::generic_instance_name(base, &written))
+        };
+        let concretize = |t: &Ty| {
+            t.concretize_with(
+                &|v| {
+                    subst
+                        .get(v)
+                        .and_then(|t| Ty::from_type(&norm(t))?.concretize(&|_| None))
+                },
+                &instance,
+            )
+        };
+        let want: Option<Vec<ConcreteTy>> = want.iter().map(concretize).collect();
+        let got: Option<Vec<ConcreteTy>> = got
+            .iter()
+            .map(|t| Ty::from_type(&norm(t))?.concretize(&|_| None))
+            .collect();
+        let (Some(want), Some(got)) = (want, got) else {
+            self.report.borrow_mut().type_args_unbound += 1;
+            return;
+        };
+        let mut report = self.report.borrow_mut();
+        report.type_args_compared += 1;
+        if got == want {
+            report.type_args_agreed += 1;
+            return;
+        }
+        let show = |args: &[ConcreteTy]| {
+            args.iter()
+                .map(|a| aipl_syntax::type_name(&a.to_type()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let example = format!(
+            "{template} @ {}..{}: mono [{}], pinned [{}]",
+            span.start,
+            span.end,
+            show(&got),
+            show(&want)
+        );
+        report
+            .type_arg_disagreements
+            .entry(callee.to_string())
+            .or_insert((0, example))
+            .0 += 1;
     }
 
     /// The report, with the disagreements sorted: a span at which mono itself gave different types

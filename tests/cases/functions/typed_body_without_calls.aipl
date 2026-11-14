@@ -1,0 +1,10 @@
+# A body made only of names, literals, bindings and an `if`: monomorphization takes its tree from
+# the pinned program instead of inferring it.
+fn pick(x: i64, flag: bool) -> i64 {
+    let y = x;
+    if (flag) { y } else { 7 }
+}
+
+fn main() -> i64 { pick(3, true) }
+--- exit code ---
+3

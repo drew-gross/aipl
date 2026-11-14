@@ -295,6 +295,7 @@ case_tests! {
     cases_functions_recursion_mutual_recursion = "cases/functions/recursion/mutual_recursion",
     cases_functions_return = "cases/functions/return",
     cases_functions_simple_call = "cases/functions/simple_call",
+    cases_functions_typed_body_without_calls = "cases/functions/typed_body_without_calls",
     cases_functions_variadic = "cases/functions/variadic",
     cases_functions_variadic_default = "cases/functions/variadic_default",
     cases_functions_variadic_generic = "cases/functions/variadic_generic",
