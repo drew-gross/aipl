@@ -622,8 +622,24 @@ impl<T: TyRepr> TExpr<T> {
                     .collect(),
             ),
             K::Field(x, name) => ExprKind::Field(e(x), name.clone()),
-            K::Let(name, v, b) => ExprKind::Let(name.clone(), None, e(v), e(b)),
-            K::LetMut(name, v, b) => ExprKind::LetMut(name.clone(), None, e(v), e(b)),
+            K::Let(name, v, b) => ExprKind::Let(
+                name.clone(),
+                self.annotation
+                    .as_ref()
+                    .map(|t| Box::new(t.to_type()))
+                    .map(|t| *t),
+                e(v),
+                e(b),
+            ),
+            K::LetMut(name, v, b) => ExprKind::LetMut(
+                name.clone(),
+                self.annotation
+                    .as_ref()
+                    .map(|t| Box::new(t.to_type()))
+                    .map(|t| *t),
+                e(v),
+                e(b),
+            ),
             K::Assign(l, v, r) => ExprKind::Assign(e(l), e(v), e(r)),
             K::For(name, index, it, body) => {
                 ExprKind::For(name.clone(), index.clone(), e(it), e(body))

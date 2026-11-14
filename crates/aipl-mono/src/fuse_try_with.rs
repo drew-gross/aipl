@@ -61,6 +61,36 @@ pub fn fuse_try_with(program: &Program) -> Program {
     }
 }
 
+/// [`fuse_try_with`] on the pinned program.
+pub fn fuse_try_with_pinned(
+    program: &aipl_syntax::typed::TProgram,
+) -> aipl_syntax::typed::TProgram {
+    crate::typed_util::map_pinned_bodies(
+        program,
+        |_| true,
+        |_, body| fuse_typed(body, &mut Vec::new()),
+    )
+}
+
+/// [`lower_try_set`] on the pinned program.
+pub fn lower_try_set_pinned(
+    program: &aipl_syntax::typed::TProgram,
+) -> aipl_syntax::typed::TProgram {
+    fn lower_pinned<T: TyRepr>(e: &mut TExpr<T>) {
+        crate::typed_util::each_child_mut(e, &mut lower_pinned);
+        if let TExprKind::Call {
+            callee: callee @ Callee::TrySet,
+            method_style,
+            ..
+        } = &mut e.kind
+        {
+            *callee = Callee::WithOrSelf;
+            *method_style = false;
+        }
+    }
+    crate::typed_util::map_pinned_bodies(program, |_| true, |_, body| lower_pinned(body))
+}
+
 /// [`fuse_try_with`] over monomorphized functions, on the typed tree.
 pub fn fuse_try_with_post_mono(program: &MonoProgram) -> MonoProgram {
     crate::typed_util::map_bodies(

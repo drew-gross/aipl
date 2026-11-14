@@ -34,33 +34,50 @@ mod typing;
 pub use typing::{attribute, set_mangle};
 
 mod fold;
-pub use fold::{fold_constants, fold_matches_pinned, fold_matches_post_mono};
+pub use fold::{
+    fold_constants, fold_constants_pinned, fold_matches_pinned, fold_matches_post_mono,
+};
 
 mod fuse;
+mod fuse_pinned;
+pub use appending_variants_pinned::appending_variants_pinned;
+pub use counting_variants_pinned::counting_variants_pinned;
+pub use fold_extends_pinned::fold_extends_pinned;
+pub use fold_lengths_pinned::fold_lengths_pinned;
 pub use fuse::{effectful_fns, fuse_operations};
+pub use fuse_pinned::fuse_operations_pinned;
+pub use inline_pinned::{inline_inspected_pinned, inline_single_use_pinned, inline_small_pinned};
+pub use pinned_pipeline::{retarget_int_parses_pinned, write_back};
 
 mod fold_lengths;
+mod fold_lengths_pinned;
 pub use fold_lengths::fold_lengths;
 
 mod lower_reductions;
-pub use lower_reductions::lower_reductions;
+pub use lower_reductions::{lower_reductions, lower_reductions_pinned};
 
 mod fuse_try_with;
 mod grid_literals;
-pub use fuse_try_with::{fuse_try_with, fuse_try_with_post_mono, lower_try_set};
+pub use fuse_try_with::{
+    fuse_try_with, fuse_try_with_pinned, fuse_try_with_post_mono, lower_try_set,
+    lower_try_set_pinned,
+};
 pub use grid_literals::lower_grid_literals;
 
 mod counting_variants;
+mod counting_variants_pinned;
 pub use counting_variants::counting_variants;
 
 mod fold_extends;
+mod fold_extends_pinned;
 pub use fold_extends::fold_extends;
 
 mod appending_variants;
+mod appending_variants_pinned;
 pub use appending_variants::appending_variants;
 
 mod sink;
-pub use sink::{sink_bindings, sink_bindings_post_mono};
+pub use sink::{sink_bindings, sink_bindings_pinned, sink_bindings_post_mono};
 
 mod known_constructor_elimination;
 mod reuse_matched_values;
@@ -70,9 +87,11 @@ pub use reuse_matched_values::reuse_matched_values;
 mod move_last_use;
 pub use move_last_use_typed::move_last_uses_post_mono;
 mod binder_types;
+mod inline_pinned;
 mod inline_typed;
 mod move_last_use_typed;
 mod ownership_typed;
+mod pinned_pipeline;
 mod typed_adapter;
 mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
@@ -86,7 +105,7 @@ pub mod typed {
 }
 
 mod subst;
-pub use subst::inline_single_use_bindings;
+pub use subst::{inline_single_use_bindings, inline_single_use_bindings_pinned};
 
 mod early_exit;
 mod shim_closures;

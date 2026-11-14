@@ -2894,6 +2894,9 @@ pub struct Frontend {
     /// What the checker decided each written name refers to — see
     /// [`aipl_syntax::resolution`]. Names are those of `check_program`.
     pub resolutions: Vec<aipl_syntax::resolution::Resolution>,
+    /// [`Frontend::check_program`] as the pinner typed it, without the builtin declarations: the
+    /// program the optimizer starts from.
+    pub pinned: aipl_mono::pin::Pinned,
 }
 
 /// The first half of [`frontend`]: the program lowered the way the checker sees it. Returns the
@@ -2995,12 +2998,16 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     let program = &program;
     // The pinner is the type checker: what it rejects is the program's findings. A `.test` block
     // is typed as a function of its own when the tests run, and not otherwise.
-    let pinned = aipl_mono::pin::pin(&check_program);
+    let pinned = aipl_mono::pin::pin_behind(
+        &check_program,
+        check_program.items.len() - program.items.len(),
+    );
     let findings = pinned_findings(&pinned, &check_program.sources);
     if !findings.is_empty() {
         return Err(findings);
     }
     let resolutions = pinned.resolutions.clone();
+    let mut pinned = pinned;
     // `check_program` is the synthesized builtin decls followed by the real program; take back
     // the second half.
     let mut program = Program {
@@ -3019,10 +3026,12 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
         &pinned,
         aipl_mono::probe::Stamping::KeepExisting,
     );
+    aipl_mono::pin::drop_declarations(&mut pinned);
     Ok(Frontend {
         program,
         check_program,
         resolutions,
+        pinned,
     })
 }
 
@@ -3065,21 +3074,6 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     Ok(probe.finish())
 }
 
-/// `program` with every expression's stamp (`Expr::ty`) replaced by what the pinner makes of the
-/// program as it now stands. `builtins` are the declarations put ahead of the program. A function that no longer pins keeps the stamps it had.
-fn repin(builtins: &[Item], mut program: Program) -> Program {
-    let mut items = builtins.to_vec();
-    items.extend(program.items.iter().cloned());
-    let whole = Program {
-        items,
-        sources: program.sources.clone(),
-        doc: program.doc.clone(),
-    };
-    let pinned = aipl_mono::pin::pin(&whole);
-    aipl_mono::probe::stamp_everything(&mut program, &pinned, aipl_mono::probe::Stamping::Replace);
-    program
-}
-
 /// The part of compiling a program that does not depend on the backend: resolve, lower,
 /// type-check, optimize, monomorphize, optimize again and mark last uses. What it hands back is
 /// what [`emit_program`] turns into machine code, so a JIT module and an object file built from the
@@ -3095,27 +3089,27 @@ fn lower_program(
         program: checked,
         check_program,
         resolutions: _,
+        pinned,
     } = frontend(program)?;
     // Everything a deferral decision is made against: the functions that have
     // effects or can abort. Computed once from `check_program`, which is where
     // the builtin signatures (and their `!prints`) live, and shared by every
     // pass that needs it rather than recomputed per pass per round.
     let effectful = aipl_mono::effectful_fns(&check_program.items);
-    let builtin_decls = check_program.items.len() - checked.items.len();
     let max_exprs = inline_max_exprs();
 
     // The pre-monomorphization optimization pipeline. The order is the
     // dependency order and is load-bearing; what is new is that the manager
     // runs the list *again* whenever a round rewrote something, because these
     // passes feed each other — see `aipl_mono::passes`.
-    let pre_mono: Vec<Pass<Program>> = vec![
+    let pre_mono: Vec<Pass<aipl_syntax::typed::TProgram>> = vec![
         // Inline single-use private functions (a no-op unless the program has
         // a `main` — see `inline_single_use`). Runs on the checked source
         // before monomorphization; mono's reachability then drops the
         // inlined-away definitions. Whole-program: it picks its candidate by
         // use count across the program and deletes the definition it inlined,
         // neither of which a scope naming callers can answer.
-        Pass::whole_program("inline_single_use", aipl_mono::inline_single_use),
+        Pass::whole_program("inline_single_use", aipl_mono::inline_single_use_pinned),
         // Inline a call into the `is_empty`/`is_nonempty`/index that
         // immediately inspects its result, however big the callee is — the
         // caller wants almost none of what the callee builds, and the passes
@@ -3127,7 +3121,10 @@ fn lower_program(
         // and the wrapper is then too big to copy. First round only, for the same
         // reason as `inline_small`.
         Pass::whole_program("inline_inspected", |program| {
-            aipl_mono::inline_inspected(program, aipl_mono::DEFAULT_INLINE_INSPECTED_MAX_EXPRS)
+            aipl_mono::inline_inspected_pinned(
+                program,
+                aipl_mono::DEFAULT_INLINE_INSPECTED_MAX_EXPRS,
+            )
         })
         .once(),
         // Inline every function small enough to be worth duplicating, at all
@@ -3141,7 +3138,7 @@ fn lower_program(
         // round. Its candidate set can only shrink as bodies grow, so a later
         // round could not find anything that was not already its own work.
         Pass::whole_program("inline_small", move |program| {
-            aipl_mono::inline_small(program, max_exprs)
+            aipl_mono::inline_small_pinned(program, max_exprs)
         })
         .once(),
         // Substitute a binding read exactly once into its use site. This
@@ -3154,7 +3151,9 @@ fn lower_program(
         // what creates most single-use bindings.
         Pass::scoped("inline_single_use_bindings", {
             let effectful = effectful.clone();
-            move |program, scope| aipl_mono::inline_single_use_bindings(program, &effectful, scope)
+            move |program, scope| {
+                aipl_mono::inline_single_use_bindings_pinned(program, &effectful, scope)
+            }
         }),
         // Fuse a composite expression into one builtin that computes the same
         // answer with less work (`xs.count(x) < 4` stops at the fourth match).
@@ -3163,7 +3162,7 @@ fn lower_program(
         // still fold.
         Pass::scoped("fuse_operations", {
             let effectful = effectful.clone();
-            move |program, scope| aipl_mono::fuse_operations(program, &effectful, scope)
+            move |program, scope| aipl_mono::fuse_operations_pinned(program, &effectful, scope)
         }),
         // Replace a call whose result only reaches `len` with a call to the
         // callee's counting variant, and add the variant. Before the folder,
@@ -3173,7 +3172,7 @@ fn lower_program(
         // calls it has no row for).
         Pass::whole_program("counting_variants", {
             let effectful = effectful.clone();
-            move |program| aipl_mono::counting_variants(program, &effectful)
+            move |program| aipl_mono::counting_variants_pinned(program, &effectful)
         }),
         // Push each `len(..)` inward until it reaches a shape that already knows
         // the answer, so the sequence it measures is never built. Paired with
@@ -3181,22 +3180,22 @@ fn lower_program(
         // the two alternate across rounds until the family closes.
         Pass::scoped("fold_lengths", {
             let effectful = effectful.clone();
-            move |program, scope| aipl_mono::fold_lengths(program, &effectful, scope)
+            move |program, scope| aipl_mono::fold_lengths_pinned(program, &effectful, scope)
         }),
         // Replace `set v.extend(g(..))` with a call to `g`'s appending variant,
         // and add the variant. Before the folder, which is what then takes the
         // variant's body apart — and after fusion, so the body it copies has
         // already had its chains collapsed.
-        Pass::whole_program("appending_variants", aipl_mono::appending_variants),
+        Pass::whole_program("appending_variants", aipl_mono::appending_variants_pinned),
         // Push each `set v.extend(..)` inward until it reaches the elements, so
         // the sequence it would have copied from is never built. Paired with the
         // pass above, which is how an `extend` crosses into another function;
         // the two alternate across rounds until the family closes.
-        Pass::scoped("fold_extends", aipl_mono::fold_extends),
+        Pass::scoped("fold_extends", aipl_mono::fold_extends_pinned),
         // Fold constant subexpressions (`2 + 3` → `5`). After `check` so
         // diagnostics always report against the unfolded source, and after
         // inlining so bodies folded here are the ones actually emitted.
-        Pass::scoped("fold_constants", aipl_mono::fold_constants),
+        Pass::scoped("fold_constants", aipl_mono::fold_constants_pinned),
         // Sink a binding only one branch uses into that branch, so the arms
         // that ignore its value stop computing it. After inlining, which is
         // what creates most of them (a call's arguments become bindings ahead
@@ -3205,28 +3204,28 @@ fn lower_program(
         // rather than sunk.
         Pass::scoped("sink_bindings", {
             let effectful = effectful.clone();
-            move |program, scope| aipl_mono::sink_bindings(program, &effectful, scope)
+            move |program, scope| aipl_mono::sink_bindings_pinned(program, &effectful, scope)
         }),
         // `xs.with(i, v).value_or(xs)` is `xs.try_set(i, v)`, which reads `xs`
         // once and so can write in place. After inlining, which is what leaves the
         // receiver and the fallback as two aliases of one place.
-        Pass::whole_program("fuse_try_with", aipl_mono::fuse_try_with),
+        Pass::whole_program("fuse_try_with", aipl_mono::fuse_try_with_pinned),
     ];
     let rounds = optimization_rounds();
-    let folded = aipl_mono::passes::optimize(checked, &pre_mono, rounds, dbg);
-    // The passes above moved and rebuilt expressions, so the types stamped before them describe
-    // the tree as it was. Pinning the result again makes every stamp describe the tree monomorphization
-    // actually reads.
-    let folded = repin(&check_program.items[..builtin_decls], folded);
-
-    // Resolve generic `any[]` functions into concrete instances first, so the
-    // rest of codegen only ever sees concrete types.
+    let instances = pinned.instances.clone();
+    let typed = aipl_mono::retarget_int_parses_pinned(&pinned.program);
+    let typed = aipl_mono::passes::optimize(typed, &pre_mono, rounds, dbg);
     // Every reduction becomes a call to the one generic `reduce`, with its step as
     // an argument — after the optimizer, which wants to see a reduction as a
     // reduction, and before monomorphization, which is the last place that can
     // still turn it into a call to an AIPL builtin. See `lower_reductions`.
-    let folded = aipl_mono::lower_reductions(&folded);
-    let folded = aipl_mono::lower_try_set(&folded);
+    let typed = aipl_mono::lower_reductions_pinned(&typed);
+    let typed = aipl_mono::lower_try_set_pinned(&typed);
+    // Every stamp now describes the tree monomorphization actually reads.
+    let folded = aipl_mono::write_back(&checked, &typed, &instances);
+
+    // Resolve generic `any[]` functions into concrete instances first, so the
+    // rest of codegen only ever sees concrete types.
     let monomorphized = aipl_mono::monomorphize(&folded, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda

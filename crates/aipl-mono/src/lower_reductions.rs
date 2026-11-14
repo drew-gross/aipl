@@ -122,3 +122,104 @@ fn lower_expr(e: &mut Expr) {
         e.span.clone(),
     ));
 }
+
+/// [`lower_reductions`] on the pinned program: the same rewrite, the nodes it builds typed from
+/// what they stand for — the step combines two elements of the sequence being reduced.
+pub fn lower_reductions_pinned(
+    program: &aipl_syntax::typed::TProgram,
+) -> aipl_syntax::typed::TProgram {
+    use aipl_syntax::typed::TItem;
+    let mut out = program.clone();
+    for item in &mut out.items {
+        match item {
+            TItem::Fn(f) => {
+                lower_pinned(&mut f.body);
+                if let Some(t) = f.test_body.as_mut() {
+                    lower_pinned(t);
+                }
+            }
+            TItem::Struct(s) => {
+                for field in &mut s.fields {
+                    if let Some(d) = field.default.as_mut() {
+                        lower_pinned(d);
+                    }
+                }
+            }
+            TItem::Variant(_) => {}
+        }
+    }
+    out
+}
+
+fn step_ident(
+    step: &Callee,
+    sequence: &aipl_syntax::typed::Ty,
+    span: &aipl_syntax::Span,
+) -> Option<aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>> {
+    use aipl_syntax::typed::{TExpr, TExprKind, Ty};
+    let element = match sequence {
+        Ty::Array(element) | Ty::Set(element, _) => element.clone(),
+        Ty::Primitive(aipl_syntax::ast::Primitive::Str) => {
+            Box::new(Ty::Primitive(aipl_syntax::ast::Primitive::Char))
+        }
+        _ => return None,
+    };
+    Some(TExpr::new(
+        TExprKind::Ident(step.name().to_string()),
+        Ty::Fn(vec![(*element).clone(), (*element).clone()], element),
+        span.clone(),
+    ))
+}
+
+fn lower_pinned(e: &mut aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>) {
+    use aipl_syntax::typed::{TExpr, TExprKind, TLambdaParam, Ty};
+    crate::typed_util::each_child_mut(e, &mut lower_pinned);
+    if let TExprKind::Ident(name) = &e.kind {
+        let Some(step) = Callee::from_canonical(name).and_then(|c| c.reduction_step()) else {
+            return;
+        };
+        let Ty::Fn(params, result) = &e.ty else {
+            return;
+        };
+        let [sequence] = params.as_slice() else {
+            return;
+        };
+        let Some(step_ref) = step_ident(&step, sequence, &e.span) else {
+            return;
+        };
+        let param = format!("$reduce{}_xs", aipl_syntax::fresh_id());
+        let operand = TExpr::new(
+            TExprKind::Ident(param.clone()),
+            sequence.clone(),
+            e.span.clone(),
+        );
+        let call = TExpr::new(
+            TExprKind::Call {
+                callee: Callee::Reduce,
+                type_args: Vec::new(),
+                args: vec![operand, step_ref],
+                method_style: false,
+            },
+            (**result).clone(),
+            e.span.clone(),
+        );
+        let param = TLambdaParam {
+            name: param,
+            ty: sequence.clone(),
+            span: e.span.clone(),
+        };
+        e.kind = TExprKind::Lambda(vec![param], Box::new(call));
+        return;
+    }
+    let TExprKind::Call { callee, args, .. } = &mut e.kind else {
+        return;
+    };
+    let (Some(step), [sequence]) = (callee.reduction_step(), args.as_slice()) else {
+        return;
+    };
+    let Some(step_ref) = step_ident(&step, &sequence.ty, &e.span) else {
+        return;
+    };
+    *callee = Callee::Reduce;
+    args.push(step_ref);
+}

@@ -297,6 +297,17 @@ fn canon(t: &Type) -> Type {
     }
 }
 
+/// Whether `t` holds a generic application (`Rule<K>`), as opposed to the instance it names.
+fn has_generic(t: &Ty) -> bool {
+    match t {
+        Ty::Generic(..) => true,
+        Ty::Case(t) | Ty::Optional(t) | Ty::Array(t) | Ty::Set(t, _) => has_generic(t),
+        Ty::Dict(a, b) | Ty::Result(a, b) => has_generic(a) || has_generic(b),
+        Ty::Fn(ps, r) => ps.iter().any(has_generic) || has_generic(r),
+        _ => false,
+    }
+}
+
 fn has_variable(t: &Type) -> bool {
     Ty::from_type(t).is_none_or(|t| t.mentions_var())
 }
@@ -308,6 +319,10 @@ pub enum Stamping {
     KeepExisting,
     /// Overwrite it with the pinned type: the tree was pinned after the passes that moved it.
     Replace,
+    /// [`Stamping::Replace`], for a tree whose types a pass has kept up to date: a node marked
+    /// unsettled is stamped too when its type names no generic application, since there is then
+    /// no argument left for monomorphization to settle.
+    Typed,
 }
 
 /// Give every expression the pinned type of the node it was pinned as, where it has none
@@ -437,7 +452,7 @@ impl Stamper<'_> {
         }
         match (&e.ty, self.stamping) {
             // A stamp that already says this keeps its spelling.
-            (Some(old), Stamping::Replace) if canon(old) == canon(&pinned) => {}
+            (Some(old), Stamping::Replace | Stamping::Typed) if canon(old) == canon(&pinned) => {}
             (Some(_), Stamping::KeepExisting) => {}
             _ => e.ty = Some(Box::new(pinned)),
         }
@@ -484,7 +499,7 @@ impl Stamper<'_> {
             return self.by_span(e);
         }
         // A generic application the pinner had to guess an argument of is monomorphization's to settle.
-        if !t.unsettled {
+        if !t.unsettled || (self.stamping == Stamping::Typed && !has_generic(&t.ty)) {
             self.stamp(e, &t.ty);
         }
         // A value lambda's inferred parameter types become annotations, so the lambda reads
@@ -501,7 +516,8 @@ impl Stamper<'_> {
             }
         }
         let mut typed = Vec::new();
-        t.for_each_child(&mut |c| typed.push(c));
+        // An assignment's target is a name, not a child (`children_mut` leaves it out too).
+        crate::typed_util::each_child(t, &mut |c| typed.push(c));
         let children: Vec<&mut Expr> = crate::children_mut(e).collect();
         if children.len() != typed.len() {
             for child in children {
@@ -512,5 +528,30 @@ impl Stamper<'_> {
         for (child, tc) in children.into_iter().zip(typed) {
             self.together(child, tc);
         }
+    }
+}
+
+/// `e` with every stamp and every written binding type removed, so two trees that differ only in
+/// what they say about types compare equal.
+pub fn without_stamps(e: &mut Expr) {
+    e.ty = None;
+    match &mut e.kind {
+        ExprKind::Let(_, ty, _, _) | ExprKind::LetMut(_, ty, _, _) => *ty = None,
+        ExprKind::Lambda(params, _) => {
+            for p in params {
+                p.ty = None;
+            }
+        }
+        // What the arm's source spelled, which a typed tree does not carry.
+        ExprKind::Match(_, arms) => {
+            for arm in arms {
+                arm.written = Default::default();
+            }
+        }
+        ExprKind::IfLet(arm, _, _) => arm.written = Default::default(),
+        _ => {}
+    }
+    for child in crate::children_mut(e) {
+        without_stamps(child);
     }
 }

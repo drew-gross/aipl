@@ -203,8 +203,13 @@ monomorphization and the post-mono passes:
   locked onto a call. Still on `Expr`: mono's inside, the pre-mono passes, and their twins
   (`fuse_try_with`, `fold_match`, `sink_here`, `early_exit`, `aliases_or_unsafe` and friends in
   `lib.rs`, the analysis half of `move_last_use`).
-- Next: mono's inside and the pre-mono passes on `TExpr<Ty>`, deleting the twins and the stamp
-  conversion in `typed_adapter`.
+- Done (pre-mono): the frontend keeps its pinned program (`Frontend::pinned`); `lower_program` runs
+  every pre-mono pass on `TProgram` (`*_pinned` in `aipl-mono`, `Optimizable for TProgram`) and
+  `pinned_pipeline::write_back` puts the result into the `Expr` program mono reads, stamping it from
+  the typed tree (`Stamping::Typed`). `tests/suites/typed_passes.rs` checks each typed pass against
+  its `Expr` twin over the corpus.
+- Next: mono's inside (`infer`) on `TProgram`, then delete the `Expr` twins, `write_back` and the
+  stamp conversion in `typed_adapter`.
 
 ## First action when this is picked up (done; kept for the record)
 

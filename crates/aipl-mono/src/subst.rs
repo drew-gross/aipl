@@ -73,6 +73,7 @@ use crate::passes::Scope;
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TProgram, Ty, TyRepr};
 
 use crate::sink::{can_defer, undeferrable_fns};
 
@@ -109,6 +110,119 @@ pub fn inline_single_use_bindings(
                 other => other.clone(),
             })
             .collect(),
+    }
+}
+
+/// [`inline_single_use_bindings`] on the pinned program.
+pub fn inline_single_use_bindings_pinned(
+    program: &TProgram,
+    effectful: &HashSet<String>,
+    scope: &Scope,
+) -> TProgram {
+    let blocked = crate::sink::undeferrable_fns_pinned(program, effectful);
+    crate::typed_util::map_pinned_bodies(
+        program,
+        |name| scope.covers(name),
+        |_, body| {
+            let taken = std::mem::replace(body, TExpr::new(TExprKind::Unit, Ty::Unit, 0..0));
+            *body = subst_pinned(taken, &blocked);
+        },
+    )
+}
+
+/// [`subst_expr`] over the pinned tree.
+fn subst_pinned(mut e: TExpr<Ty>, blocked: &HashSet<String>) -> TExpr<Ty> {
+    crate::typed_util::each_child_mut(&mut e, &mut |child| {
+        let taken = std::mem::replace(child, TExpr::new(TExprKind::Unit, Ty::Unit, 0..0));
+        *child = subst_pinned(taken, blocked);
+    });
+    let TExprKind::Let(name, value, body) = &e.kind else {
+        return e;
+    };
+    if e.annotation.is_some() || !crate::sink::can_defer_typed(value, blocked) {
+        return e;
+    }
+    let uses = crate::typed_util::uses_of(body, name);
+    if uses.count != 1 || uses.repeated {
+        return e;
+    }
+    let mut written = HashSet::new();
+    crate::typed_util::assigned_names(body, &mut written);
+    if !written.is_empty() {
+        let mut read = HashSet::new();
+        crate::typed_util::read_names(value, &mut read);
+        if read.intersection(&written).next().is_some() {
+            return e;
+        }
+    }
+    substitute_typed(body, name, value)
+}
+
+/// [`substitute`] over the typed tree.
+pub(crate) fn substitute_typed<T: TyRepr>(e: &TExpr<T>, name: &str, value: &TExpr<T>) -> TExpr<T> {
+    let keep = |kind: TExprKind<T>| {
+        let mut out = TExpr::rebuilt(kind, e.ty.clone(), e);
+        out.annotation = e.annotation.clone();
+        out.unsettled = e.unsettled;
+        out
+    };
+    match &e.kind {
+        TExprKind::Ident(n) if n == name => value.clone(),
+        TExprKind::Let(n, v, body) | TExprKind::LetMut(n, v, body) => {
+            let v = Box::new(substitute_typed(v, name, value));
+            let body = if n == name {
+                body.clone()
+            } else {
+                Box::new(substitute_typed(body, name, value))
+            };
+            keep(match &e.kind {
+                TExprKind::Let(..) => TExprKind::Let(n.clone(), v, body),
+                _ => TExprKind::LetMut(n.clone(), v, body),
+            })
+        }
+        TExprKind::For(n, index, iterable, body) => {
+            let iterable = Box::new(substitute_typed(iterable, name, value));
+            let body = if aipl_syntax::for_binds(n, index, name) {
+                body.clone()
+            } else {
+                Box::new(substitute_typed(body, name, value))
+            };
+            keep(TExprKind::For(n.clone(), index.clone(), iterable, body))
+        }
+        TExprKind::Match(scrutinee, arms) => {
+            let scrutinee = Box::new(substitute_typed(scrutinee, name, value));
+            let arms = arms
+                .iter()
+                .map(|a| {
+                    let shadowed = a.pattern.bindings().iter().any(|b| b == name);
+                    TMatchArm {
+                        body: if shadowed {
+                            a.body.clone()
+                        } else {
+                            substitute_typed(&a.body, name, value)
+                        },
+                        ..a.clone()
+                    }
+                })
+                .collect();
+            keep(TExprKind::Match(scrutinee, arms))
+        }
+        TExprKind::Lambda(params, body) => {
+            if params.iter().any(|p| p.name == name) {
+                e.clone()
+            } else {
+                let body = Box::new(substitute_typed(body, name, value));
+                keep(TExprKind::Lambda(params.clone(), body))
+            }
+        }
+        _ => {
+            let mut out = e.clone();
+            crate::typed_util::each_child_mut(&mut out, &mut |child| {
+                let done = substitute_typed(child, name, value);
+                *child = done;
+            });
+            out
+        }
     }
 }
 

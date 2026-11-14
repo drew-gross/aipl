@@ -102,6 +102,23 @@ pub fn sink_bindings(program: &Program, effectful: &HashSet<String>, scope: &Sco
     }
 }
 
+/// [`sink_bindings`] on the pinned program.
+pub fn sink_bindings_pinned(
+    program: &aipl_syntax::typed::TProgram,
+    effectful: &HashSet<String>,
+    scope: &Scope,
+) -> aipl_syntax::typed::TProgram {
+    let blocked = undeferrable_fns_pinned(program, effectful);
+    crate::typed_util::map_pinned_bodies(
+        program,
+        |name| scope.covers(name),
+        |_, body| {
+            let taken = std::mem::replace(body, placeholder());
+            *body = sink_typed(taken, &blocked);
+        },
+    )
+}
+
 /// Every function whose call must not be deferred: one that declares an effect,
 /// one that can abort, and — transitively — everyone who calls such a function.
 ///
@@ -119,6 +136,22 @@ pub(crate) fn undeferrable_fns(program: &Program, effectful: &HashSet<String>) -
         })
         .collect();
     close_over_calls(&bodies, effectful, reaches_blocked)
+}
+
+/// [`undeferrable_fns`] over the pinned program.
+pub(crate) fn undeferrable_fns_pinned(
+    program: &aipl_syntax::typed::TProgram,
+    effectful: &HashSet<String>,
+) -> HashSet<String> {
+    let bodies: Vec<(&str, &TExpr<aipl_syntax::typed::Ty>)> = program
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            aipl_syntax::typed::TItem::Fn(f) => Some((f.name.text.as_str(), &f.body)),
+            _ => None,
+        })
+        .collect();
+    close_over_calls(&bodies, effectful, reaches_blocked_typed)
 }
 
 /// [`undeferrable_fns`] over a monomorphized program: the same closure, seeded

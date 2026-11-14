@@ -661,11 +661,36 @@ pub struct Pinned {
     pub instances: Instances,
     /// What each name written in a pinned function's body was taken to refer to.
     pub resolutions: Vec<Resolution>,
+    /// How many of [`Pinned::program`]'s leading items stand for the declarations the pinned
+    /// program had ahead of it ([`pin_behind`]).
+    pub declared: usize,
 }
 
 /// Pin every function of `program`. Functions are independent: one that fails is reported and
 /// left out of [`Pinned::program`], and the rest are still pinned.
 pub fn pin(program: &Program) -> Pinned {
+    pin_behind(program, 0)
+}
+
+/// Pin `program` with `builtins` — the declarations that stand ahead of it — in view, and give
+/// back the pinned form of `program` alone.
+pub fn pin_after(builtins: &[Item], program: &Program) -> Pinned {
+    let mut whole = program.clone();
+    whole.items.splice(0..0, builtins.iter().cloned());
+    let mut pinned = pin_behind(&whole, builtins.len());
+    drop_declarations(&mut pinned);
+    pinned
+}
+
+/// `pinned` without the items that stand for the declarations it was pinned behind.
+pub fn drop_declarations(pinned: &mut Pinned) {
+    pinned.program.items.drain(..pinned.declared);
+    pinned.declared = 0;
+}
+
+/// [`pin`], the first `declarations` items of `program` being declarations the rest is pinned
+/// against: [`Pinned::declared`] says how many of them are in the result.
+pub fn pin_behind(program: &Program, declarations: usize) -> Pinned {
     let mut decls = Decls {
         instances: Default::default(),
         resolutions: Default::default(),
@@ -735,7 +760,11 @@ pub fn pin(program: &Program) -> Pinned {
     }
     let mut items = Vec::new();
     let mut failures = Vec::new();
-    for item in &program.items {
+    let mut declared = 0;
+    for (position, item) in program.items.iter().enumerate() {
+        if position == declarations {
+            declared = items.len();
+        }
         match item {
             Item::Fn(f) => match pin_function(&decls, f) {
                 Ok(mut t) => {
@@ -790,12 +819,16 @@ pub fn pin(program: &Program) -> Pinned {
             _ => {}
         }
     }
+    if declarations >= program.items.len() {
+        declared = items.len();
+    }
     Pinned {
         program: TProgram {
             items,
             sources: program.sources.clone(),
             doc: program.doc.clone(),
         },
+        declared,
         failures,
         instances: decls.instances.take(),
         resolutions: aipl_syntax::resolution::settled(decls.resolutions.take()),
@@ -2025,6 +2058,7 @@ impl Pinner<'_> {
                     );
                 }
                 let binder = written(&e.name_span.as_deref().cloned().unwrap_or_default());
+                let declared = ann.is_some().then(|| ty.clone());
                 let old = self.env.insert(
                     name.clone(),
                     Binding {
@@ -2049,7 +2083,9 @@ impl Pinner<'_> {
                 } else {
                     K::Let(name.clone(), Box::new(v), Box::new(body))
                 };
-                self.node(kind, ty, e)
+                let mut node = self.node(kind, ty, e);
+                node.annotation = declared;
+                node
             }
             ExprKind::Assign(lhs, v, rest) => {
                 let assigned = (|| {
