@@ -3067,8 +3067,9 @@ pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec
     let frontend = frontend(program)?;
     let pinned = aipl_mono::pin::pin(&frontend.check_program);
     let probe = aipl_mono::probe::Probe::new(&pinned.program);
-    let lowered = aipl_mono::lower_reductions(&frontend.program);
-    let lowered = aipl_mono::lower_try_set(&lowered);
+    let typed = aipl_mono::lower_reductions_pinned(&frontend.pinned.program);
+    let typed = aipl_mono::lower_try_set_pinned(&typed);
+    let lowered = aipl_mono::write_back(&frontend.program, &typed, &frontend.pinned.instances);
     aipl_mono::monomorphize_probed(&lowered, Some(&probe), DebugOptions::OFF)
         .map_err(|e| vec![e])?;
     Ok(probe.finish())

@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use aipl_syntax::ast::{BinOp, Callee, Primitive, SeqShape};
+use aipl_syntax::ast::{BinOp, Callee, Item, Primitive, SeqShape};
 use aipl_syntax::typed::{TExpr, TExprKind, TLambdaParam, TMatchArm, TPattern, TProgram, Ty};
 
 use crate::passes::Scope;
@@ -1197,4 +1197,17 @@ fn product(whole: &P, var: &str, recv: &P, other: &P, iterable: &P, body: &P) ->
         TExprKind::Let(left, Box::new(recv.clone()), Box::new(right_bound)),
         ty,
     ))
+}
+
+/// The functions in `items` whose signature declares an effect — what
+/// [`fuse_operations_pinned`] wants for its `effectful` argument. Pass the declarations
+/// the checker saw, so builtin signatures (`print` is `!prints`) are included.
+pub fn effectful_fns(items: &[Item]) -> HashSet<String> {
+    items
+        .iter()
+        .filter_map(|it| match it {
+            Item::Fn(f) if !f.sig.effects.is_empty() => Some(f.name.text.clone()),
+            _ => None,
+        })
+        .collect()
 }

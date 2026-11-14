@@ -5,7 +5,7 @@
 //! types.
 
 use aipl::ast::{Item, Program};
-use aipl::mono::{inline_single_use, monomorphize, use_counts};
+use aipl::mono::{inline_single_use_pinned, monomorphize, use_counts};
 use aipl::DebugOptions;
 use std::collections::HashMap;
 
@@ -14,20 +14,6 @@ use std::collections::HashMap;
 fn parse(src: &str) -> Result<Program, aipl::Error> {
     aipl::install_parser_hooks();
     aipl::parse(src)
-}
-
-/// Sorted function names in a program.
-fn fn_names(p: &Program) -> Vec<String> {
-    let mut names: Vec<String> = p
-        .items
-        .iter()
-        .filter_map(|it| match it {
-            Item::Fn(f) => Some(f.name.text.clone()),
-            _ => None,
-        })
-        .collect();
-    names.sort();
-    names
 }
 
 /// Sorted function names in a monomorphized program.
@@ -110,7 +96,21 @@ fn use_counts_counts_function_value_references() {
 
 /// Function names remaining after inlining single-use private functions.
 fn inlined_names(src: &str) -> Vec<String> {
-    fn_names(&inline_single_use(&parse(src).expect("parse")))
+    aipl::install_parser_hooks();
+    let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
+        .expect("load");
+    let frontend = aipl::codegen::frontend(&prog).expect("frontend");
+    let inlined = inline_single_use_pinned(&frontend.pinned.program);
+    let mut names: Vec<String> = inlined
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            aipl::typed::TItem::Fn(f) => Some(f.name.text.clone()),
+            _ => None,
+        })
+        .collect();
+    names.sort();
+    names
 }
 
 #[test]
@@ -183,7 +183,12 @@ fn inlines_a_tail_return() {
     // in as `x`. This used to be refused outright — any `return` anywhere
     // disqualified a body. See `early_exit::without_early_exits`.
     let names = inlined_names(
-        "fn helper(x: i64) -> i64 { return x; }
+        "fn helper(x: i64) -> i64 {
+             match (x) {
+                 0 => { return 1; },
+                 _ => { return x; },
+             }
+         }
          fn main() -> i64 { helper(5) }",
     );
     assert!(!names.contains(&"helper".to_string()), "got {names:?}");

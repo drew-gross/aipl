@@ -672,16 +672,6 @@ pub fn pin(program: &Program) -> Pinned {
     pin_behind(program, 0)
 }
 
-/// Pin `program` with `builtins` — the declarations that stand ahead of it — in view, and give
-/// back the pinned form of `program` alone.
-pub fn pin_after(builtins: &[Item], program: &Program) -> Pinned {
-    let mut whole = program.clone();
-    whole.items.splice(0..0, builtins.iter().cloned());
-    let mut pinned = pin_behind(&whole, builtins.len());
-    drop_declarations(&mut pinned);
-    pinned
-}
-
 /// `pinned` without the items that stand for the declarations it was pinned behind.
 pub fn drop_declarations(pinned: &mut Pinned) {
     pinned.program.items.drain(..pinned.declared);

@@ -34,50 +34,36 @@ mod typing;
 pub use typing::{attribute, set_mangle};
 
 mod fold;
-pub use fold::{
-    fold_constants, fold_constants_pinned, fold_matches_pinned, fold_matches_post_mono,
-};
+pub use fold::{fold_constants_pinned, fold_matches_pinned, fold_matches_post_mono};
 
-mod fuse;
 mod fuse_pinned;
 pub use appending_variants_pinned::appending_variants_pinned;
 pub use counting_variants_pinned::counting_variants_pinned;
 pub use fold_extends_pinned::fold_extends_pinned;
 pub use fold_lengths_pinned::fold_lengths_pinned;
-pub use fuse::{effectful_fns, fuse_operations};
+pub use fuse_pinned::effectful_fns;
 pub use fuse_pinned::fuse_operations_pinned;
 pub use inline_pinned::{inline_inspected_pinned, inline_single_use_pinned, inline_small_pinned};
 pub use pinned_pipeline::{retarget_int_parses_pinned, write_back};
 
-mod fold_lengths;
 mod fold_lengths_pinned;
-pub use fold_lengths::fold_lengths;
 
 mod lower_reductions;
-pub use lower_reductions::{lower_reductions, lower_reductions_pinned};
+pub use lower_reductions::lower_reductions_pinned;
 
 mod fuse_try_with;
 mod grid_literals;
-pub use fuse_try_with::{
-    fuse_try_with, fuse_try_with_pinned, fuse_try_with_post_mono, lower_try_set,
-    lower_try_set_pinned,
-};
+pub use fuse_try_with::{fuse_try_with_pinned, fuse_try_with_post_mono, lower_try_set_pinned};
 pub use grid_literals::lower_grid_literals;
 
-mod counting_variants;
 mod counting_variants_pinned;
-pub use counting_variants::counting_variants;
 
-mod fold_extends;
 mod fold_extends_pinned;
-pub use fold_extends::fold_extends;
 
-mod appending_variants;
 mod appending_variants_pinned;
-pub use appending_variants::appending_variants;
 
 mod sink;
-pub use sink::{sink_bindings, sink_bindings_pinned, sink_bindings_post_mono};
+pub use sink::{sink_bindings_pinned, sink_bindings_post_mono};
 
 mod known_constructor_elimination;
 mod reuse_matched_values;
@@ -105,7 +91,7 @@ pub mod typed {
 }
 
 mod subst;
-pub use subst::{inline_single_use_bindings, inline_single_use_bindings_pinned};
+pub use subst::inline_single_use_bindings_pinned;
 
 mod early_exit;
 mod shim_closures;
@@ -9223,77 +9209,6 @@ pub(crate) fn count_uses<'a>(
 // libraries, the `check` driver) are left untouched, since any function may be
 // called by name there.
 
-/// Inline every single-use private function in `program` and drop it. Returns the
-/// rewritten program (a clone, unchanged when the gate below fails). Conservative
-/// (see `is_inline_candidate`): only direct, exactly-once, exact-arity calls to
-/// non-`pub`, non-generic, non-higher-order, non-recursive functions whose early
-/// exits can be rewritten into expressions are inlined. Repeats to a fixpoint,
-/// since inlining `f` into `g` can make `g` itself single-use.
-pub fn inline_single_use(program: &Program) -> Program {
-    let has_fn = |n: &str| {
-        program
-            .items
-            .iter()
-            .any(|it| matches!(it, Item::Fn(f) if f.name == n))
-    };
-    // Only when `main` is the entry and we're not building the `check` test
-    // driver (which must keep every function and its `.test` intact).
-    if !has_fn("main") || has_fn("__test_main") {
-        return program.clone();
-    }
-
-    let mut program = program.clone();
-    // Functions that are used once but only as a *value* (an `Ident`, never a
-    // direct call) — nothing to substitute, so don't re-select them forever.
-    let mut skip: HashSet<String> = HashSet::new();
-
-    loop {
-        let counts = use_counts(&program);
-        let binders = collect_binders(&program);
-        let candidate = program.items.iter().find_map(|it| match it {
-            Item::Fn(f) if is_inline_candidate(f, &counts, &binders, &skip) => Some(f.clone()),
-            _ => None,
-        });
-        let Some(f) = candidate else { break };
-
-        // Replace the single `Call(f, ..)` (it lives in exactly one body — `f`'s
-        // name is never shadowed, see the `binders` guard).
-        let fparam_names: Vec<InlineParam> = f
-            .sig
-            .params
-            .iter()
-            .map(|p| InlineParam {
-                name: p.name.clone(),
-                ty: p.ty.clone(),
-                mutable: p.mutable,
-            })
-            .collect();
-        let mut replaced = false;
-        for it in &mut program.items {
-            if let Item::Fn(g) = it {
-                let body = replace_call(
-                    &g.body,
-                    &f.name,
-                    &fparam_names,
-                    &f.body,
-                    &mut replaced,
-                    InlineSites::First,
-                );
-                g.body = body;
-            }
-        }
-        if replaced {
-            program
-                .items
-                .retain(|it| !matches!(it, Item::Fn(g) if g.name == f.name));
-        } else {
-            // The single use was an `Ident` (function value), not a call.
-            skip.insert(f.name.text.clone());
-        }
-    }
-    program
-}
-
 /// Inline single-use functions in the *monomorphized* program — same idea as
 /// [`inline_single_use`], but over [`MonoProgram`]/[`ConcreteFn`] and with `pub`
 /// no longer protecting a function from inlining. Before monomorphization a
@@ -9366,22 +9281,6 @@ pub fn inline_single_use_post_mono(
     program
 }
 
-/// Whether `f` is a single-use private function safe to inline. See the module
-/// note for the conservative criteria.
-/// How many call sites one [`replace_call`] walk rewrites.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum InlineSites {
-    /// Stop after the first — what [`inline_single_use`] wants, since by
-    /// construction there is exactly one and stopping ends the walk early.
-    First,
-    /// Every site, which is what inlining a *small* function means.
-    All,
-    /// Only a call whose result is immediately inspected: the one operand of
-    /// `is_empty`/`is_nonempty`, or the indexed side of `f(..)[i]`. See
-    /// [`inline_inspected`].
-    Inspected,
-}
-
 /// The default body-size threshold for [`inline_small`], in non-leaf
 /// expressions.
 ///
@@ -9433,165 +9332,6 @@ fn mentions_abstract_type(ty: &Type) -> bool {
     }
 }
 
-/// A body's size for [`inline_small`]: the number of *non-leaf* expressions in
-/// it — the operations, not their operands.
-///
-/// Counting every node would make the threshold hard to reason about, since a
-/// leaf costs the same as the operation containing it: `a + b` would be three
-/// nodes and a threshold of 2 would admit almost nothing. Counting operations
-/// makes the unit the thing a reader means by "an expression": `a + b` is 1,
-/// `a + b * c` is 2, `f(g(x))` is 2.
-pub(crate) fn body_size(e: &Expr) -> usize {
-    let leaf = matches!(
-        e.kind,
-        ExprKind::Num(_)
-            | ExprKind::Float(_)
-            | ExprKind::Bool(_)
-            | ExprKind::Str(_)
-            | ExprKind::Char(_)
-            | ExprKind::Ident(_)
-            | ExprKind::None
-            | ExprKind::Unit
-    );
-    usize::from(!leaf) + children(e).map(|c| body_size(c)).sum::<usize>()
-}
-
-/// Inline every function whose body is at most `max_exprs` [`body_size`], at all
-/// of its call sites.
-///
-/// Unlike [`inline_single_use`] this duplicates the body — once per call — which
-/// is why it is gated on size. The gain is not the removed call so much as what
-/// the removed call *exposes*: an argument's retain and the callee's release of
-/// it end up in one basic block with nothing between them, which is exactly the
-/// shape `ElideRcPairs` cancels. A call between them is what stops that pass, and
-/// the call is what this one removes.
-///
-/// Definitions are never removed here — only calls are rewritten. Deciding a
-/// name is dead needs to account for every way a program can still reach it, and
-/// getting that wrong turns an optimization into a "call to undefined fn". The
-/// monomorphizer already prunes by reachability from the entry point, so an
-/// inlined-away function disappears there anyway, decided by the pass that has
-/// the whole picture. [`inline_single_use`] can drop its own candidate because
-/// it has already proved the name is used exactly once — the call it just
-/// replaced.
-///
-/// Conservative in the same ways as [`inline_single_use`] — see
-/// [`is_inline_shape`] — plus never inlining a function whose name is shadowed
-/// anywhere, so a call site always means the function it appears to.
-pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
-    let mut program = program.clone();
-    let binders = collect_binders(&program);
-    // Selected once, from the original program: a function that qualifies now
-    // stays eligible, and inlining only ever *grows* callers, so re-selecting
-    // after each step could never add to this set — while re-walking it would
-    // risk an unbounded ping-pong between two small mutually-calling functions.
-    let candidates = inline_candidates(&program, &binders, max_exprs, None);
-
-    for f in candidates {
-        let fparams: Vec<InlineParam> = f
-            .sig
-            .params
-            .iter()
-            .map(|p| InlineParam {
-                name: p.name.clone(),
-                ty: p.ty.clone(),
-                mutable: p.mutable,
-            })
-            .collect();
-        let mut replaced = false;
-        for it in &mut program.items {
-            if let Item::Fn(g) = it {
-                // Not into itself: a self-referencing body was already rejected
-                // (`references_name`), but a candidate is still its own item.
-                if g.name == f.name {
-                    continue;
-                }
-                g.body = replace_call(
-                    &g.body,
-                    &f.name,
-                    &fparams,
-                    &f.body,
-                    &mut replaced,
-                    InlineSites::All,
-                );
-                // `.test` blocks are compiled too, by `check` and by the cases
-                // harness — so a call in one is a call to inline, and (below) a
-                // reference that keeps the definition alive.
-                g.test_body = g.test_body.as_ref().map(|t| {
-                    replace_call(
-                        t,
-                        &f.name,
-                        &fparams,
-                        &f.body,
-                        &mut replaced,
-                        InlineSites::All,
-                    )
-                });
-            }
-        }
-        // The definition stays. Something else may still name it — an `Ident` use
-        // (the function as a value), a `pub` name another file may call, a
-        // reference from a `.test` block — and the monomorphizer prunes whatever
-        // nothing reaches.
-        let _ = replaced;
-    }
-    program
-}
-
-/// The functions of `program` whose body is at most `max_exprs` [`body_size`] and
-/// is safe to inline (see [`is_inline_shape`]), optionally only those named in
-/// `wanted`. The one filter [`inline_small`] and [`inline_inspected`] share;
-/// they differ in how big a body they accept and where they put it.
-fn inline_candidates(
-    program: &Program,
-    binders: &HashSet<&str>,
-    max_exprs: usize,
-    wanted: Option<&HashSet<String>>,
-) -> Vec<Function> {
-    program
-        .items
-        .iter()
-        .filter_map(|it| match it {
-            Item::Fn(f)
-                if body_size(&f.body) <= max_exprs
-                    && wanted.is_none_or(|w| w.contains(f.name.as_str()))
-                    && f.name != "main"
-                    // A constant's initializer runs once, on first use, because
-                    // its calls are answered from a cache; a copy of its body in
-                    // each caller would run on every call.
-                    && !aipl_syntax::is_constant_initializer(&f.name)
-                    // A generic function is instantiated per call site by
-                    // monomorphization.
-                    && f.sig.type_vars.is_empty()
-                    // An `any`-bearing parameter (or return) is specialized by
-                    // monomorphization at the call site. Inlining removes the call,
-                    // so the specialization never happens and the pseudo-type
-                    // reaches codegen.
-                    && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
-                    && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
-                    // Never rebound by a local, so a call site means the function
-                    // it appears to.
-                    && !binders.contains(f.name.as_str())
-                    // A function-typed or variadic parameter is resolved per call
-                    // site by monomorphization, which inlining here would skip.
-                    && is_inline_shape(
-                        f.sig
-                            .params
-                            .iter()
-                            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
-                        &f.body,
-                    )
-                    // Not recursive: every copy would carry the call back to `f`, so
-                    // inlining would never get rid of it.
-                    && !references_name(&f.body, &f.name) =>
-            {
-                Some(f.clone())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 /// The body-size bound for [`inline_inspected`], in non-leaf expressions.
 ///
 /// Sixteen times [`DEFAULT_INLINE_MAX_EXPRS`], because the bodies it exists for
@@ -9600,106 +9340,6 @@ fn inline_candidates(
 /// where none of them is needed. Duplicating one costs its size once per
 /// *inspecting* call site, not per call site, so the bound can be this much looser.
 pub const DEFAULT_INLINE_INSPECTED_MAX_EXPRS: usize = 64;
-
-/// Inline a call into the place that immediately inspects its result —
-/// `is_empty(f(..))`, `is_nonempty(f(..))` or `f(..)[i]` — however big `f`'s body
-/// is, up to `max_exprs` (see [`DEFAULT_INLINE_INSPECTED_MAX_EXPRS`]).
-///
-/// [`inline_small`] inlines what is cheap to copy. This inlines what is
-/// *profitable* to copy: a caller that asks only whether a result is empty, or
-/// for one element of it, is using almost nothing of what the callee built, and
-/// the callee's body is where it can be seen how little. With the body in the
-/// caller the question and the construction are one expression, which is the
-/// shape the passes that look through a constructor can act on. The inlining
-/// itself removes no work, and is not the whole of the optimization: it is the
-/// part that has to come first.
-///
-/// Runs *before* [`inline_small`]. A small wrapper around an inspected call is
-/// itself a candidate for that pass, which copies it into every caller; run
-/// second, this would then put a copy of the big body into each of those copies.
-/// Run first, the body lands in the wrapper once, and the wrapper is too big to
-/// copy.
-///
-/// Selected like [`inline_small`] — once, from the program as it arrives, with
-/// the same safety rules — except that a function is a candidate only if some
-/// body in the program inspects a call to it, so a big function nothing
-/// inspects is never copied.
-pub fn inline_inspected(program: &Program, max_exprs: usize) -> Program {
-    let mut program = program.clone();
-    let binders = collect_binders(&program);
-    let mut inspected = HashSet::new();
-    for it in &program.items {
-        if let Item::Fn(f) = it {
-            collect_inspected_callees(&f.body, &mut inspected);
-            if let Some(t) = &f.test_body {
-                collect_inspected_callees(t, &mut inspected);
-            }
-        }
-    }
-    let candidates = inline_candidates(&program, &binders, max_exprs, Some(&inspected));
-
-    for f in candidates {
-        let fparams: Vec<InlineParam> = f
-            .sig
-            .params
-            .iter()
-            .map(|p| InlineParam {
-                name: p.name.clone(),
-                ty: p.ty.clone(),
-                mutable: p.mutable,
-            })
-            .collect();
-        let mut replaced = false;
-        for it in &mut program.items {
-            if let Item::Fn(g) = it {
-                if g.name == f.name {
-                    continue;
-                }
-                g.body = replace_call(
-                    &g.body,
-                    &f.name,
-                    &fparams,
-                    &f.body,
-                    &mut replaced,
-                    InlineSites::Inspected,
-                );
-                g.test_body = g.test_body.as_ref().map(|t| {
-                    replace_call(
-                        t,
-                        &f.name,
-                        &fparams,
-                        &f.body,
-                        &mut replaced,
-                        InlineSites::Inspected,
-                    )
-                });
-            }
-        }
-    }
-    program
-}
-
-/// The names of the functions `e` calls only to inspect the result — what
-/// [`inspected_call`] would match.
-fn collect_inspected_callees(e: &Expr, out: &mut HashSet<String>) {
-    let operand = match &e.kind {
-        ExprKind::Call(name, args, _) if is_emptiness_check(name) && args.len() == 1 => {
-            Some(&args[0])
-        }
-        ExprKind::Index(operand, _) => Some(&**operand),
-        _ => None,
-    };
-    if let Some(Expr {
-        kind: ExprKind::Call(callee, ..),
-        ..
-    }) = operand
-    {
-        out.insert(callee.name().to_string());
-    }
-    for c in children(e) {
-        collect_inspected_callees(c, out);
-    }
-}
 
 /// [`inline_small`] over the *monomorphized* program: fold a small body into
 /// **every** caller, not just a single one.
@@ -9796,47 +9436,6 @@ pub fn inline_small_post_mono(
     program
 }
 
-/// Whether the source function `f` is private, called exactly once, and can be
-/// expanded at that call: `counts` holds each name's number of uses, `binders`
-/// every name any local binds, and `skip` the functions already found to be used
-/// only as a value.
-fn is_inline_candidate(
-    f: &Function,
-    counts: &HashMap<&str, usize>,
-    binders: &HashSet<&str>,
-    skip: &HashSet<String>,
-) -> bool {
-    counts.get(f.name.as_str()) == Some(&1)
-        // A `pub` fn may be imported by another file, so its in-program use
-        // count understates its references.
-        && !f.is_pub
-        && f.name != "main"
-        // See `inline_candidates`.
-        && !aipl_syntax::is_constant_initializer(&f.name)
-        && !skip.contains(f.name.as_str())
-        // Never shadowed by a local anywhere, so the single counted use is the
-        // only `Call`/`Ident` of this name in the whole program.
-        && !binders.contains(f.name.as_str())
-        // A generic function is instantiated per call site by monomorphization.
-        && f.sig.type_vars.is_empty()
-        // An `any`-bearing parameter (or return) is specialized by
-        // monomorphization at the call site. Inlining removes the call, so the
-        // specialization never happens and the pseudo-type reaches codegen.
-        && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
-        && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
-        // A function-typed or variadic parameter is resolved per call site by
-        // monomorphization, which inlining here would skip.
-        && is_inline_shape(
-            f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
-            &f.body,
-        )
-        // Not recursive: the definition is dropped once its one call is inlined,
-        // so a body that calls itself would be left calling a function that is
-        // gone. (A candidate's name is never rebound — `binders` above — so a
-        // match by name is exact.)
-        && !references_name(&f.body, &f.name)
-}
-
 /// Whether a function's body can be moved into a caller as it stands: the
 /// function is not a higher-order or variadic template (`higher_order_or_variadic`),
 /// every early exit in the body can be rewritten into an expression, and the body
@@ -9851,38 +9450,6 @@ fn is_inline_shape_typed(higher_order_or_variadic: bool, body: &typed_util::Type
     !higher_order_or_variadic
         && early_exit::without_early_exits_typed(body).is_some()
         && !typed_util::contains_inplace_hof_intrinsic(body)
-}
-
-/// [`is_inline_shape_typed`] for a body before monomorphization.
-fn is_inline_shape(higher_order_or_variadic: bool, body: &Expr) -> bool {
-    !higher_order_or_variadic
-        // A guard clause becomes the `if` it already is, and a `return` in tail
-        // position becomes its value; an exit with no such rewrite (one inside a
-        // loop, a `?`) leaves the body where it is. `build_inlined` asks
-        // `without_early_exits` again to do the rewrite, so the gate and the
-        // expansion cannot disagree about what is inlinable.
-        && early_exit::without_early_exits(body).is_some()
-        // `__map_result` rebuilds the reused buffer from the *enclosing*
-        // function's return type, so moving one out of its own frame would leave
-        // the buffer typed as the input element — `i64` instead of `i64[]`. A body
-        // before monomorphization has none, so nothing is rejected there.
-        && !contains_inplace_hof_intrinsic(body)
-}
-
-/// Every name bound by a parameter / `let` / `for` / `match` arm / lambda
-/// parameter anywhere in `program` — used to confirm a candidate's name is never
-/// shadowed (so its single use is unambiguous).
-fn collect_binders(program: &Program) -> HashSet<&str> {
-    let mut set = HashSet::new();
-    for it in &program.items {
-        if let Item::Fn(f) = it {
-            for p in &f.sig.params {
-                set.insert(p.name.as_str());
-            }
-            collect_body_binders(&f.body, &mut set);
-        }
-    }
-    set
 }
 
 /// [`is_inline_candidate`] for a monomorphized [`ConcreteFn`]. It has no `is_pub`
@@ -9953,36 +9520,6 @@ fn collect_binders_mono(program: &MonoProgram) -> HashSet<&str> {
     set
 }
 
-fn collect_body_binders<'a>(e: &'a Expr, set: &mut HashSet<&'a str>) {
-    match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) => {
-            set.insert(n);
-        }
-        ExprKind::For(n, index, _, _) => {
-            set.insert(n);
-            if let Some(i) = index {
-                set.insert(i);
-            }
-        }
-        ExprKind::Lambda(ps, _) => {
-            for p in ps {
-                set.insert(&p.name);
-            }
-        }
-        ExprKind::Match(_, arms) => {
-            for a in arms {
-                a.pattern.each_binding(&mut |b| {
-                    set.insert(b);
-                });
-            }
-        }
-        _ => {}
-    }
-    for c in children(e) {
-        collect_body_binders(c, set);
-    }
-}
-
 /// The direct sub-expressions of `e` (read-only traversal helper), as an iterator
 /// that allocates nothing. Public so codegen's tail-position walk (`tail_callees`)
 /// can reuse the one exhaustive list of child expressions rather than keep a second
@@ -10045,49 +9582,6 @@ pub fn children_mut(e: &mut Expr) -> ChildrenMut<'_> {
     e.children_mut()
 }
 
-/// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic:
-/// one of the calls the monomorphizer synthesizes for the loop bodies of `map`,
-/// `filter` and `zip_with`. None exists before monomorphization.
-fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
-    if let ExprKind::Call(name, _, _) = &e.kind {
-        if matches!(
-            name,
-            Callee::ArrWritable
-                | Callee::MapSet
-                | Callee::MapResult
-                | Callee::FilterDrop
-                | Callee::FilterKeep
-                | Callee::FilterTruncate
-        ) {
-            return true;
-        }
-    }
-    children(e).any(|c| contains_inplace_hof_intrinsic(c))
-}
-
-/// Whether `e` (or any sub-expression) is a *context-typed* literal — `none`, or
-/// an empty `[]` / `#{}` — whose type is fixed by its surroundings (the
-/// enclosing function's return type, a sibling branch, a parameter type, …). The
-/// enclosing return type is dropped when inlining, so a function whose body holds
-/// such a literal is conservatively not inlined (it could otherwise leave the
-/// literal's type unresolved as `__none__`).
-pub(crate) fn contains_context_literal(e: &Expr) -> bool {
-    let here = match &e.kind {
-        ExprKind::None => true,
-        ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),
-        ExprKind::DictLit(v) => v.is_empty(),
-        // `ok(x)` types as `Result<typeof x, __none__>` and `err(e)` as
-        // `Result<__none__, typeof e>`: the *other* side is a placeholder that
-        // the declared return type resolves. Inlining puts the construction
-        // somewhere with no such declaration — `to_str(ok(v))` rather than a
-        // function returning `T!E` — and the placeholder survives to codegen,
-        // which fails with "rendering __none__ is not yet supported".
-        ExprKind::Call(n, _, _) => matches!(n, Callee::Ok | Callee::Err),
-        _ => false,
-    };
-    here || children(e).any(|c| contains_context_literal(c))
-}
-
 /// Whether `e` references `name` as a `Call` callee or an `Ident` value. Only
 /// called for a `name` that is never a binder, so no shadowing to consider.
 fn references_name(e: &Expr, name: &str) -> bool {
@@ -10096,218 +9590,6 @@ fn references_name(e: &Expr, name: &str) -> bool {
         ExprKind::Call(n, args, _) => n == name || args.iter().any(|a| references_name(a, name)),
         _ => children(e).any(|c| references_name(c, name)),
     }
-}
-
-/// Whether `name` is a call that only asks about the *shape* of its operand:
-/// `is_empty` or `is_nonempty`. Both want to know whether anything is there, not
-/// what — so a caller that builds the operand to answer is doing work its
-/// callee's body can often skip, once the two are in one function.
-fn is_emptiness_check(callee: &Callee) -> bool {
-    matches!(callee, Callee::IsEmpty | Callee::IsNonempty)
-}
-
-/// The call to `fname` — with arity `arity` — that `e` immediately inspects, if
-/// `e` is `is_empty(f(..))`, `is_nonempty(f(..))` or `f(..)[i]`.
-fn inspected_call<'a>(e: &'a Expr, fname: &str, arity: usize) -> Option<&'a Expr> {
-    let operand = match &e.kind {
-        ExprKind::Call(name, args, _) if is_emptiness_check(name) && args.len() == 1 => &args[0],
-        ExprKind::Index(operand, _) => &**operand,
-        _ => return None,
-    };
-    match &operand.kind {
-        ExprKind::Call(callee, args, _) if callee == fname && args.len() == arity => Some(operand),
-        _ => None,
-    }
-}
-
-/// [`replace_call`]'s rule for [`InlineSites::Inspected`]: if `e` inspects a
-/// call to `fname`, `e` rebuilt with that call replaced by the callee's body.
-/// `None` for any other node, which the walk then descends into as usual.
-fn replace_inspected_call(
-    e: &Expr,
-    fname: &str,
-    fparams: &[InlineParam],
-    fbody: &Expr,
-    replaced: &mut bool,
-) -> Option<Expr> {
-    let call = inspected_call(e, fname, fparams.len())?;
-    let ExprKind::Call(_, call_args, _) = &call.kind else {
-        return None;
-    };
-    // The arguments may inspect calls of their own.
-    let rc = |x: &Expr, replaced: &mut bool| {
-        replace_call(x, fname, fparams, fbody, replaced, InlineSites::Inspected)
-    };
-    let call_args: Vec<Expr> = call_args.iter().map(|a| rc(a, replaced)).collect();
-    *replaced = true;
-    let inlined = build_inlined(fparams, fbody, &call_args, call.span.clone());
-    let kind = match &e.kind {
-        ExprKind::Call(name, _, m) => ExprKind::Call(name.clone(), vec![inlined], *m),
-        ExprKind::Index(_, index) => {
-            ExprKind::Index(Box::new(inlined), Box::new(rc(index, replaced)))
-        }
-        _ => return None,
-    };
-    Some(Expr::rebuilt(kind, e))
-}
-
-/// Rebuild `e`, replacing direct calls to `fname` — with matching arity — by the
-/// inlined body of the function it names (`fparam_names`/`fbody`). `sites` says
-/// how many: [`InlineSites::First`] stops at one (and `replaced` short-circuits
-/// the rest of the walk), [`InlineSites::All`] rewrites every site, [`InlineSites::Inspected`] only the sites
-/// [`inspected_call`] finds. `replaced`
-/// reports whether anything was rewritten either way. Takes just the
-/// callee's parameter names (rather than a whole function/param list) so it
-/// works for both the pre-mono [`Function`]/[`Param`] and the post-mono
-/// [`ConcreteFn`]/[`ConcreteParam`] representations — inlining only ever
-/// renames and rebinds parameters by name.
-fn replace_call(
-    e: &Expr,
-    fname: &str,
-    fparams: &[InlineParam],
-    fbody: &Expr,
-    replaced: &mut bool,
-    sites: InlineSites,
-) -> Expr {
-    if sites == InlineSites::Inspected {
-        if let Some(inlined) = replace_inspected_call(e, fname, fparams, fbody, replaced) {
-            return inlined;
-        }
-    }
-    if sites != InlineSites::Inspected && (!*replaced || sites == InlineSites::All) {
-        if let ExprKind::Call(name, args, _) = &e.kind {
-            // Context-typed arguments (`none`, empty `[]`/`#{}`, an
-            // `ok(..)`/`some(..)` wrapping one) used to be skipped here: their
-            // type came from `f`'s *parameter*, which the `let`-binding this
-            // builds discards. They are now inlined like anything else, because
-            // the checker records each one's resolved type on the expression
-            // itself (`Expr::ty`) before any of this runs — so moving it no
-            // longer changes what it means.
-            //
-            // These are the *most* valuable inlinings, not the least: a literal
-            // argument is what gives the constant folder something to work with.
-            if name == fname && args.len() == fparams.len() {
-                *replaced = true;
-                return build_inlined(fparams, fbody, args, e.span.clone());
-            }
-        }
-    }
-    let rc =
-        |x: &Expr, replaced: &mut bool| replace_call(x, fname, fparams, fbody, replaced, sites);
-    let kind = match &e.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(x, tys) => ExprKind::TypeArgs(Box::new(rc(x, replaced)), tys.clone()),
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        // Only the body is rewritten: a binding names a function whose *address*
-        // is installed, so there is no call there to inline.
-        ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
-            effect.clone(),
-            bindings.clone(),
-            Box::new(rc(body, replaced)),
-        ),
-        ExprKind::Num(_)
-        | ExprKind::Float(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::Ident(_)
-        | ExprKind::None
-        | ExprKind::Unit => e.kind.clone(),
-        ExprKind::Call(name, args, m) => ExprKind::Call(
-            name.clone(),
-            args.iter().map(|a| rc(a, replaced)).collect(),
-            *m,
-        ),
-        ExprKind::Neg(x) => ExprKind::Neg(Box::new(rc(x, replaced))),
-        ExprKind::Try(x) => ExprKind::Try(Box::new(rc(x, replaced))),
-        ExprKind::Return(x) => ExprKind::Return(Box::new(rc(x, replaced))),
-        ExprKind::Field(x, fld) => ExprKind::Field(Box::new(rc(x, replaced)), fld.clone()),
-        ExprKind::Seq(a, b) => ExprKind::Seq(Box::new(rc(a, replaced)), Box::new(rc(b, replaced))),
-        ExprKind::Index(a, b) => {
-            ExprKind::Index(Box::new(rc(a, replaced)), Box::new(rc(b, replaced)))
-        }
-        ExprKind::While(a, b) => {
-            ExprKind::While(Box::new(rc(a, replaced)), Box::new(rc(b, replaced)))
-        }
-        ExprKind::Let(n, ty, a, b) => ExprKind::Let(
-            n.clone(),
-            ty.clone(),
-            Box::new(rc(a, replaced)),
-            Box::new(rc(b, replaced)),
-        ),
-        ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
-            n.clone(),
-            ty.clone(),
-            Box::new(rc(a, replaced)),
-            Box::new(rc(b, replaced)),
-        ),
-        // The LHS is a place (idents/fields only) — no calls to replace.
-        ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
-            lhs.clone(),
-            Box::new(rc(a, replaced)),
-            Box::new(rc(b, replaced)),
-        ),
-        ExprKind::For(v, i, a, b) => ExprKind::For(
-            v.clone(),
-            i.clone(),
-            Box::new(rc(a, replaced)),
-            Box::new(rc(b, replaced)),
-        ),
-        ExprKind::If(a, b, c) => ExprKind::If(
-            Box::new(rc(a, replaced)),
-            Box::new(rc(b, replaced)),
-            Box::new(rc(c, replaced)),
-        ),
-        ExprKind::Slice(a, b, c) => ExprKind::Slice(
-            Box::new(rc(a, replaced)),
-            Box::new(rc(b, replaced)),
-            c.as_ref().map(|c| Box::new(rc(c, replaced))),
-        ),
-        ExprKind::ArrayLit(xs) => ExprKind::ArrayLit(xs.iter().map(|x| rc(x, replaced)).collect()),
-        ExprKind::SetLit(xs, o) => {
-            ExprKind::SetLit(xs.iter().map(|x| rc(x, replaced)).collect(), *o)
-        }
-        ExprKind::TupleLit(xs) => ExprKind::TupleLit(xs.iter().map(|x| rc(x, replaced)).collect()),
-        ExprKind::DictLit(pairs) => ExprKind::DictLit(
-            pairs
-                .iter()
-                .map(|(k, v)| (rc(k, replaced), rc(v, replaced)))
-                .collect(),
-        ),
-        ExprKind::Construct(name, inits) => ExprKind::Construct(
-            name.clone(),
-            inits
-                .iter()
-                .map(|i| FieldInit {
-                    name: i.name.clone(),
-                    value: rc(&i.value, replaced),
-                })
-                .collect(),
-        ),
-        ExprKind::Match(s, arms) => ExprKind::Match(
-            Box::new(rc(s, replaced)),
-            arms.iter()
-                .map(|a| MatchArm {
-                    written: a.written.clone(),
-                    pattern: a.pattern.clone(),
-                    body: rc(&a.body, replaced),
-                    span: a.span.clone(),
-                })
-                .collect(),
-        ),
-        ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
-            Box::new(MatchArm {
-                written: arm.written.clone(),
-                pattern: arm.pattern.clone(),
-                body: rc(&arm.body, replaced),
-                span: arm.span.clone(),
-            }),
-            Box::new(rc(s, replaced)),
-            Box::new(rc(else_b, replaced)),
-        ),
-        ExprKind::Lambda(ps, b) => ExprKind::Lambda(ps.clone(), Box::new(rc(b, replaced))),
-    };
-    Expr::rebuilt(kind, e)
 }
 
 /// One parameter of the function being inlined — what [`build_inlined`] needs in
@@ -10323,76 +9605,6 @@ struct InlineParam {
     /// the first, and on one not named `self`. It binds with `mut` rather than
     /// `let`, and it is what the call produces — see [`build_inlined`].
     mutable: bool,
-}
-
-/// Build the inlined expression for `Call(f, args)`: bind each (freshly renamed)
-/// parameter to its argument via a `let`, in order, wrapping `f`'s body. Renaming
-/// the parameters to `$inl<N>_<name>` is required for correctness — an argument
-/// is evaluated in the parameter-binding scope, so a later argument referencing a
-/// caller name that collides with a parameter would otherwise be captured. (`$`
-/// can't appear in user identifiers, so the fresh names can never collide.)
-fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Span) -> Expr {
-    // Early exits become ordinary expressions before anything else happens, so
-    // the rest of this builds on a body that cannot leave the caller. Every
-    // path here is gated by `is_inline_shape`, which asked the same question,
-    // so a `None` means the gate and the expansion have come apart.
-    let fbody = &early_exit::without_early_exits(fbody)
-        .expect("the inline gate accepted a body whose early exits cannot be rewritten");
-    let mut map: HashMap<String, String> = HashMap::new();
-    let fresh: Vec<String> = fparams
-        .iter()
-        .map(|p| {
-            let nm = format!("$inl{}_{}", aipl_syntax::fresh_id(), p.name);
-            map.insert(p.name.clone(), nm.clone());
-            nm
-        })
-        .collect();
-    let mut expr = aipl_syntax::rename_scoped(fbody, &map, true);
-
-    // A mutating method is declared void and mutates its receiver; what a call
-    // to it *produces* is that receiver, which is why its ABI return is the
-    // receiver's type (see `ConcreteFn::abi_return_type`). Its body therefore
-    // ends having assigned to the binding rather than having produced anything,
-    // so the inlined form has to name the binding afterwards to yield a value.
-    //
-    // The same shape is correct in both positions a mutating call can occupy,
-    // which is what makes this safe to do in one place:
-    //
-    //   * `set v.f(a)` parses to `set v = v.f(a)`, so the value lands back in
-    //     `v` — an in-place update, spelled as a copy the enclosing assignment
-    //     immediately writes back.
-    //   * In value position it is copy-and-modify (mono's desugar, or the
-    //     source as written pre-mono): the receiver was copied into this fresh
-    //     `mut` binding, so mutating it leaves the caller's own binding alone —
-    //     exactly what a value-position mutating call means.
-    if fparams.first().is_some_and(|p| p.mutable) {
-        let receiver = Expr::new(ExprKind::Ident(fresh[0].clone()), span.clone());
-        expr = Expr::new(
-            ExprKind::Seq(Box::new(expr), Box::new(receiver)),
-            span.clone(),
-        );
-    }
-
-    for ((fp, p), arg) in fresh.iter().zip(fparams).zip(args).rev() {
-        // The binding carries the *parameter's* declared type, not whatever the
-        // argument inferred. It matters for a narrow int: inlining `add8(100,
-        // 50)` for `fn add8(a: i8, b: i8)` would otherwise bind two `i64`
-        // literals, and the body's `a + b` would add at 64 bits instead of
-        // wrapping at 8. (Latent until integer conversions were removed —
-        // arguments used to be written `i8(100)`, which carried the type
-        // themselves.)
-        let ty = Some(p.ty.clone());
-        let (init, body) = (Box::new(arg.clone()), Box::new(expr));
-        // A `mut self` receiver needs a reassignable binding, since the body it
-        // wraps is nothing but assignments to it.
-        let kind = if p.mutable {
-            ExprKind::LetMut(fp.clone(), ty, init, body)
-        } else {
-            ExprKind::Let(fp.clone(), ty, init, body)
-        };
-        expr = Expr::new(kind, span.clone());
-    }
-    expr
 }
 
 pub(crate) use aipl_syntax::distinct_binders;

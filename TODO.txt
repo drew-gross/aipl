@@ -553,6 +553,8 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  arms.all(|arm| arm.body.kind.is_case(Bool)) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early return)
+  push_array_literal should hit when you push before an op even if you also push after an op (see twice() test)
   lint against unused expressions
   lint against reimplementations of to_set()/distinct()
   turn trace rejection into a lint, but make some lints non-squelchable

@@ -530,28 +530,3 @@ impl Stamper<'_> {
         }
     }
 }
-
-/// `e` with every stamp and every written binding type removed, so two trees that differ only in
-/// what they say about types compare equal.
-pub fn without_stamps(e: &mut Expr) {
-    e.ty = None;
-    match &mut e.kind {
-        ExprKind::Let(_, ty, _, _) | ExprKind::LetMut(_, ty, _, _) => *ty = None,
-        ExprKind::Lambda(params, _) => {
-            for p in params {
-                p.ty = None;
-            }
-        }
-        // What the arm's source spelled, which a typed tree does not carry.
-        ExprKind::Match(_, arms) => {
-            for arm in arms {
-                arm.written = Default::default();
-            }
-        }
-        ExprKind::IfLet(arm, _, _) => arm.written = Default::default(),
-        _ => {}
-    }
-    for child in crate::children_mut(e) {
-        without_stamps(child);
-    }
-}

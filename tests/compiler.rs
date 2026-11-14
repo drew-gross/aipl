@@ -43,9 +43,6 @@ mod shims;
 #[path = "suites/source_extension.rs"]
 mod source_extension;
 
-#[path = "suites/typed_passes.rs"]
-mod typed_passes;
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
