@@ -7,28 +7,55 @@
 
 use std::collections::HashMap;
 
-use aipl_syntax::ast::{ConcreteType, Type};
+use aipl_syntax::ast::{Callee, ConcreteType, Type};
 use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, Ty, TyRepr};
 
 use crate::{Mono, Param, ParamSpec};
 
-/// Whether a node, and everything under it, is a form that is typed from the pinned tree.
-fn supported(e: &TExpr<Ty>) -> bool {
-    if e.unsettled || matches!(e.ty, Ty::Never | Ty::Fn(..)) {
-        return false;
-    }
-    match &e.kind {
-        TExprKind::Int(_) | TExprKind::Bool(_) | TExprKind::Ident(_) | TExprKind::Unit => true,
-        TExprKind::Let(_, value, body) => supported(value) && supported(body),
-        TExprKind::If(cond, then, otherwise) => {
-            supported(cond) && supported(then) && supported(otherwise)
-        }
-        TExprKind::Seq(first, rest) => supported(first) && supported(rest),
-        _ => false,
-    }
-}
-
 impl Mono<'_> {
+    /// Whether a node, and everything under it, is a form that is typed from the pinned tree.
+    fn supported(&self, e: &TExpr<Ty>) -> bool {
+        if e.unsettled || matches!(e.ty, Ty::Never | Ty::Fn(..)) {
+            return false;
+        }
+        let all = |xs: &[&TExpr<Ty>]| xs.iter().all(|x| self.supported(x));
+        match &e.kind {
+            TExprKind::Int(_)
+            | TExprKind::Float(_)
+            | TExprKind::Bool(_)
+            | TExprKind::Char(_)
+            | TExprKind::Str(_)
+            | TExprKind::Ident(_)
+            | TExprKind::Unit => true,
+            TExprKind::Let(_, value, body) => all(&[value, body]),
+            TExprKind::If(cond, then, otherwise) => all(&[cond, then, otherwise]),
+            TExprKind::Seq(first, rest) => all(&[first, rest]),
+            TExprKind::Call { callee, args, .. } => {
+                self.is_operator_call(callee, args.len()) && args.iter().all(|a| self.supported(a))
+            }
+            _ => false,
+        }
+    }
+
+    /// Whether a call is an arithmetic, comparison or logical operator on two operands, which is a
+    /// native builtin that needs no instance: the call stays as written.
+    fn is_operator_call(&self, callee: &Callee, arguments: usize) -> bool {
+        let name = callee.name();
+        arguments == 2
+            && !self.generics.contains_key(name)
+            && !self.concrete.contains_key(name)
+            && (aipl_syntax::float_operation_yields_bool(callee).is_some()
+                || matches!(
+                    callee,
+                    Callee::WrappingAdd
+                        | Callee::SaturatingAdd
+                        | Callee::WrappingSub
+                        | Callee::SaturatingSub
+                        | Callee::WrappingMul
+                )
+                || aipl_syntax::binop_for_builtin(callee).is_some())
+    }
+
     /// The body of an instance of `template`, typed from the pinned program, when it can be: the
     /// instance is the plain borrow one (no parameter is owned, kept as a `str` or set, joined as
     /// a concat string or variadic), it takes no function-typed argument, and its body is made of
@@ -51,7 +78,7 @@ impl Mono<'_> {
         if !specs.iter().all(plain)
             || !self.cur_lenv.is_empty()
             || params.len() != source.sig.params.len()
-            || !supported(&source.body)
+            || !self.supported(&source.body)
         {
             return None;
         }
