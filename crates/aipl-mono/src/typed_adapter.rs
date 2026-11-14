@@ -21,7 +21,7 @@ use aipl_syntax::typed::{TExpr, TExprKind, TFieldInit, TLambdaParam, TMatchArm, 
 use crate::binder_types::{bindings_typed, Decls as BinderDecls};
 use crate::ConcreteFn;
 
-type Typed = TExpr<ConcreteType>;
+pub(crate) type Typed = TExpr<ConcreteType>;
 
 /// A body as monomorphization hands it on: the typed tree when the instance was typed from the
 /// pinned program, the written tree with each expression stamped otherwise.

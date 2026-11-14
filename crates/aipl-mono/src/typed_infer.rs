@@ -151,6 +151,12 @@ impl Mono<'_> {
         let TExprKind::Call { callee, args, .. } = &e.kind else {
             return false;
         };
+        if self.is_typed_expansion(callee, args, concrete) {
+            return args.iter().all(|a| match &a.kind {
+                TExprKind::Lambda(_, body) => self.supported(body, concrete),
+                _ => self.supported(a, concrete),
+            });
+        }
         (self.is_operator_call(callee, args.len())
             || self.is_plain_call(callee, args, in_place)
             || self.is_generic_call(callee, args, in_place)
@@ -169,7 +175,7 @@ impl Mono<'_> {
             Callee::StartsWith(_) | Callee::EndsWith(_) | Callee::Contains(_)
         ) && arguments == 2)
             || (matches!(callee, Callee::StartsWithAt(_)) && arguments == 3);
-        (callee.is_builtin() || self.ctors.contains_key(name))
+        (!matches!(callee, Callee::User(_) | Callee::Local(_)) || self.ctors.contains_key(name))
             && !self.generics.contains_key(name)
             && !self.concrete.contains_key(name)
             && !self.generic_ctors.contains_key(name)
@@ -264,7 +270,16 @@ impl Mono<'_> {
         params: &[Param],
         specs: &[ParamSpec],
         type_args: &HashMap<String, Type>,
+        synthesized: Option<&TExpr<ConcreteType>>,
     ) -> Option<TExpr<ConcreteType>> {
+        // A function synthesized from typed code carries its tree.
+        if let Some(body) = synthesized {
+            if !self.cur_lenv.is_empty() {
+                return None;
+            }
+            self.scope_names = params.iter().map(|p| p.name.clone()).collect();
+            return Some(self.lower(body.clone()));
+        }
         let source = *self.typed_fns.get(template)?;
         let plain = |s: &ParamSpec| {
             !s.owned
@@ -295,6 +310,7 @@ impl Mono<'_> {
             return None;
         }
         let body = source.body.map_types(&mut |t| concrete(t))?;
+        self.scope_names = params.iter().map(|p| p.name.clone()).collect();
         Some(self.lower(body))
     }
 
@@ -313,10 +329,30 @@ impl Mono<'_> {
                 e.annotation = Some(value_ty);
             }
         }
+        if matches!(
+            &e.kind,
+            TExprKind::Call {
+                callee: Callee::Map | Callee::Filter | Callee::FilterMap,
+                ..
+            }
+        ) {
+            return self.lower_expansion(e);
+        }
         match &mut e.kind {
-            TExprKind::Let(_, value, body) | TExprKind::LetMut(_, value, body) => {
+            TExprKind::Let(name, value, body) | TExprKind::LetMut(name, value, body) => {
                 self.lower_in_place(value);
+                let depth = self.scope_names.len();
+                self.scope_names.push(name.clone());
                 self.lower_in_place(body);
+                self.scope_names.truncate(depth);
+            }
+            TExprKind::For(var, index, iterable, body) => {
+                self.lower_in_place(iterable);
+                let depth = self.scope_names.len();
+                self.scope_names.push(var.clone());
+                self.scope_names.extend(index.clone());
+                self.lower_in_place(body);
+                self.scope_names.truncate(depth);
             }
             TExprKind::Match(scrutinee, arms) => {
                 let scrutinee_ty = scrutinee.ty.to_type();
@@ -325,7 +361,11 @@ impl Mono<'_> {
                 }
                 self.lower_in_place(scrutinee);
                 for arm in arms.iter_mut() {
+                    let depth = self.scope_names.len();
+                    self.scope_names
+                        .extend(crate::typed_higher_order::pattern_bindings(&arm.pattern));
                     self.lower_in_place(&mut arm.body);
+                    self.scope_names.truncate(depth);
                 }
             }
             TExprKind::IfLet(..) => return self.lower_if_let(e),
@@ -431,7 +471,11 @@ impl Mono<'_> {
         self.expand_ignored_payload(&mut arm.pattern, &scrutinee_ty);
         let (mut scrutinee, mut otherwise) = (*scrutinee, *otherwise);
         self.lower_in_place(&mut scrutinee);
+        let depth = self.scope_names.len();
+        self.scope_names
+            .extend(crate::typed_higher_order::pattern_bindings(&arm.pattern));
         self.lower_in_place(&mut arm.body);
+        self.scope_names.truncate(depth);
         self.lower_in_place(&mut otherwise);
         let else_span = otherwise.span.clone();
         let else_arms: Vec<TMatchArm<ConcreteType>> = if crate::is_str_repr(&scrutinee_ty)
@@ -473,7 +517,7 @@ impl Mono<'_> {
         out
     }
 
-    fn lower_in_place(&mut self, slot: &mut TExpr<ConcreteType>) {
+    pub(crate) fn lower_in_place(&mut self, slot: &mut TExpr<ConcreteType>) {
         let taken = std::mem::replace(slot, unit_like(slot));
         *slot = self.lower(taken);
     }
@@ -616,7 +660,7 @@ fn arg_shapes_of(args: &[TExpr<ConcreteType>]) -> Vec<ArgShape> {
 
 /// Whether a value is a fresh heap value: built here or returned by a call, possibly at the end of
 /// a chain of statements.
-fn fresh_tail(e: &TExpr<ConcreteType>) -> bool {
+pub(crate) fn fresh_tail(e: &TExpr<ConcreteType>) -> bool {
     match &e.kind {
         TExprKind::ArrayLit(_)
         | TExprKind::SetLit(..)

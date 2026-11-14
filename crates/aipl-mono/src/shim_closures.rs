@@ -175,6 +175,7 @@ impl Mono<'_> {
             self.concrete.insert(
                 function.clone(),
                 ConcreteTemplate {
+                    typed: None,
                     params: function_params,
                     effects: self.cur_effects.clone(),
                     return_ty: Some(returned),

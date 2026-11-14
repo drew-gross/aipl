@@ -80,6 +80,7 @@ mod move_last_use_typed;
 mod ownership_typed;
 mod pinned_pipeline;
 mod typed_adapter;
+mod typed_higher_order;
 mod typed_infer;
 mod typed_util;
 use move_last_use::{move_field_reads, move_last_uses, move_last_uses_of_param};
@@ -1736,6 +1737,7 @@ pub fn monomorphize_probed(
             (
                 f.name.text.clone(),
                 ConcreteTemplate {
+                    typed: None,
                     params: f.sig.params.clone(),
                     effects: f.sig.effects.clone(),
                     return_ty: f.sig.return_ty.clone(),
@@ -1775,6 +1777,7 @@ pub fn monomorphize_probed(
         probe,
         cur_template: String::new(),
         cur_subst: None,
+        scope_names: Vec::new(),
         typed_fns: typed
             .items
             .iter()
@@ -1836,6 +1839,7 @@ pub fn monomorphize_probed(
     let mut instantiated = 0usize;
     while let Some(inst) = mono.queue.pop_front() {
         let mut type_args: HashMap<String, Type> = HashMap::new();
+        let mut typed_template: Option<typed_adapter::Typed> = None;
         let (params, effects, return_ty, body) =
             if let Some(Generic { sig, body }) = generics.get(&inst.template) {
                 // Generic specialization: limit-check (a runaway here means a
@@ -1909,6 +1913,7 @@ pub fn monomorphize_probed(
             } else {
                 // Concrete function: its signature is already concrete.
                 let f = mono.concrete[&inst.template].clone();
+                typed_template = f.typed;
                 (f.params, f.effects, f.return_ty, f.body)
             };
         // A concat-specialized instance retypes its marked `str` parameters to
@@ -1965,6 +1970,7 @@ pub fn monomorphize_probed(
             &body,
             &inst.specs.params,
             &type_args,
+            typed_template.as_ref(),
         )?;
         out_fns.push(out);
     }
@@ -2463,7 +2469,11 @@ struct ConcreteTemplate {
     params: Vec<Param>,
     effects: Vec<String>,
     return_ty: Option<Type>,
+    /// The body as the analyses of a callee (which parameters it can own) read it.
     body: Expr,
+    /// The same body as the typed tree it is processed from, for a function synthesized from
+    /// typed code; `body` is then this erased.
+    typed: Option<typed_adapter::Typed>,
 }
 
 /// The output of [`monomorphize`]: struct/variant declarations pass through
@@ -2653,6 +2663,8 @@ struct Mono<'a> {
     cur_subst: Option<probe::Substitution>,
     /// The pinned function each source function was written as, for the instances typed from it.
     typed_fns: HashMap<&'a str, &'a aipl_syntax::typed::TFunction>,
+    /// The names bound around the expression being lowered from the typed tree, innermost last.
+    scope_names: Vec<String>,
     dbg: DebugOptions,
 }
 
@@ -2691,6 +2703,7 @@ impl Mono<'_> {
         body: &Expr,
         specs: &[ParamSpec],
         type_args: &HashMap<String, Type>,
+        typed_template: Option<&typed_adapter::Typed>,
     ) -> Result<ConcreteFn<typed_adapter::Inferred>, Error> {
         let mut env: Env = HashMap::new();
         for p in params {
@@ -2729,7 +2742,7 @@ impl Mono<'_> {
             .fold(body.clone(), |b, (_, p)| {
                 move_last_uses_of_param(&p.name, &b, &self.heap_fields_of(&p.ty), &self.mutating)
             });
-        let body = match self.typed_body(template, params, specs, type_args) {
+        let body = match self.typed_body(template, params, specs, type_args, typed_template) {
             Some(typed) => typed_adapter::Inferred::Typed(typed),
             None => typed_adapter::Inferred::Written(self.infer(body, &env)?.0),
         };
@@ -2961,6 +2974,7 @@ impl Mono<'_> {
         self.concrete.insert(
             spec_name.clone(),
             ConcreteTemplate {
+                typed: None,
                 params: new_params,
                 effects,
                 return_ty: template.return_ty.clone(),
@@ -3261,6 +3275,7 @@ impl Mono<'_> {
             body
         };
         let template = ConcreteTemplate {
+            typed: None,
             params,
             effects: sig.effects.clone(),
             return_ty: Some(ret.clone()),
@@ -3450,6 +3465,7 @@ impl Mono<'_> {
         self.concrete.insert(
             fn_name.clone(),
             ConcreteTemplate {
+                typed: None,
                 params,
                 effects: Vec::new(),
                 return_ty: Some(lret.clone()),
@@ -3832,6 +3848,7 @@ impl Mono<'_> {
         self.concrete.insert(
             fm_name.clone(),
             ConcreteTemplate {
+                typed: None,
                 params: fm_params,
                 effects,
                 return_ty: Some(ret.clone()),
@@ -4196,6 +4213,7 @@ impl Mono<'_> {
         self.concrete.insert(
             map_name.clone(),
             ConcreteTemplate {
+                typed: None,
                 params: map_params,
                 effects,
                 return_ty: Some(ret.clone()),
@@ -4683,6 +4701,7 @@ impl Mono<'_> {
         self.concrete.insert(
             zip_name.clone(),
             ConcreteTemplate {
+                typed: None,
                 params: zip_params,
                 effects,
                 return_ty: Some(ret.clone()),
@@ -4963,6 +4982,7 @@ impl Mono<'_> {
         self.concrete.insert(
             filter_name.clone(),
             ConcreteTemplate {
+                typed: None,
                 params: filter_params,
                 effects,
                 return_ty: Some(ret.clone()),
