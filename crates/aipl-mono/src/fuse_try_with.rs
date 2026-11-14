@@ -31,10 +31,8 @@
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Pattern, Program};
 
-use aipl_syntax::ast::ConcreteType;
-use aipl_syntax::typed::{TExprKind, TMatchArm, TPattern};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern, TyRepr};
 
-use crate::typed_util::Typed;
 
 use crate::{children, children_mut, MonoProgram};
 
@@ -250,7 +248,7 @@ fn lower(e: &mut Expr) {
 // The typed twin of `fuse` and what it calls, for the passes after monomorphization. The
 // pre-monomorphization pass above still reads `Expr`; it goes when that side is typed.
 
-fn fuse_typed(e: &mut Typed, aliases: &mut Vec<(String, Place)>) {
+fn fuse_typed<T: TyRepr>(e: &mut TExpr<T>, aliases: &mut Vec<(String, Place)>) {
     if let TExprKind::Let(name, value, body) = &mut e.kind {
         fuse_typed(value, aliases);
         let alias = place_of_typed(value, aliases)
@@ -269,7 +267,7 @@ fn fuse_typed(e: &mut Typed, aliases: &mut Vec<(String, Place)>) {
     rewrite_typed(e, aliases);
 }
 
-fn rewrite_typed(e: &mut Typed, aliases: &[(String, Place)]) {
+fn rewrite_typed<T: TyRepr>(e: &mut TExpr<T>, aliases: &[(String, Place)]) {
     let args = match &e.kind {
         TExprKind::Call {
             callee: Callee::ValueOr,
@@ -297,7 +295,7 @@ fn rewrite_typed(e: &mut Typed, aliases: &[(String, Place)]) {
     }
 }
 
-fn with_args_typed(e: &Typed) -> Option<Vec<Typed>> {
+fn with_args_typed<T: TyRepr>(e: &TExpr<T>) -> Option<Vec<TExpr<T>>> {
     match &e.kind {
         TExprKind::Call {
             callee: Callee::With,
@@ -308,15 +306,15 @@ fn with_args_typed(e: &Typed) -> Option<Vec<Typed>> {
     }
 }
 
-fn falls_back_to_typed(
-    arms: &[TMatchArm<ConcreteType>],
-    receiver: &Typed,
+fn falls_back_to_typed<T: TyRepr>(
+    arms: &[TMatchArm<T>],
+    receiver: &TExpr<T>,
     aliases: &[(String, Place)],
 ) -> bool {
     let [a, b] = arms else {
         return false;
     };
-    fn ctor(arm: &TMatchArm<ConcreteType>) -> Option<(&str, &[String])> {
+    fn ctor<T: TyRepr>(arm: &TMatchArm<T>) -> Option<(&str, &[String])> {
         match &arm.pattern {
             TPattern::Ctor { name, bindings, .. } => Some((name.as_str(), bindings.as_slice())),
             _ => None,
@@ -341,14 +339,14 @@ fn falls_back_to_typed(
     }
 }
 
-fn same_typed(a: &Typed, b: &Typed, aliases: &[(String, Place)]) -> bool {
+fn same_typed<T: TyRepr>(a: &TExpr<T>, b: &TExpr<T>, aliases: &[(String, Place)]) -> bool {
     match (place_of_typed(a, aliases), place_of_typed(b, aliases)) {
         (Some(x), Some(y)) => x == y,
         _ => false,
     }
 }
 
-fn place_of_typed(e: &Typed, aliases: &[(String, Place)]) -> Option<Place> {
+fn place_of_typed<T: TyRepr>(e: &TExpr<T>, aliases: &[(String, Place)]) -> Option<Place> {
     match &e.kind {
         TExprKind::Ident(n) => Some(
             aliases
@@ -370,7 +368,7 @@ fn place_of_typed(e: &Typed, aliases: &[(String, Place)]) -> Option<Place> {
     }
 }
 
-fn disturbs_typed(e: &Typed, names: &[&str]) -> bool {
+fn disturbs_typed<T: TyRepr>(e: &TExpr<T>, names: &[&str]) -> bool {
     let named = |n: &String| names.contains(&n.as_str());
     let here = match &e.kind {
         TExprKind::Let(n, _, _) | TExprKind::LetMut(n, _, _) => named(n),

@@ -69,6 +69,15 @@ enum Ord {
 }
 
 impl TyRepr for It {
+    fn unit() -> Self {
+        It::Unit
+    }
+    fn is_unit(&self) -> bool {
+        *self == It::Unit
+    }
+    fn is_str(&self) -> bool {
+        *self == It::Prim(Primitive::Str)
+    }
     fn to_type(&self) -> Type {
         // Inference types only live inside the pinner, which resolves them before anything prints.
         Type::Unknown

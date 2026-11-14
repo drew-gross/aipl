@@ -55,11 +55,9 @@
 use crate::passes::Scope;
 use std::collections::HashSet;
 
-use aipl_syntax::ast::ConcreteType;
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
-use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
 
-use crate::typed_util::Typed;
 
 use crate::subst::read_names;
 use crate::MonoProgram;
@@ -139,7 +137,7 @@ pub(crate) fn undeferrable_fns_post_mono(
             .filter(|f| !f.effects.is_empty())
             .map(|f| f.name.clone()),
     );
-    let bodies: Vec<(&str, &Typed)> = program
+    let bodies: Vec<(&str, &crate::typed_util::Typed)> = program
         .fns
         .iter()
         .map(|f| (f.name.as_str(), &f.body))
@@ -427,12 +425,12 @@ pub fn sink_bindings_post_mono(
     )
 }
 
-fn placeholder() -> Typed {
-    TExpr::new(TExprKind::Unit, ConcreteType::Unit, 0..0)
+fn placeholder<T: TyRepr>() -> TExpr<T> {
+    TExpr::new(TExprKind::Unit, T::unit(), 0..0)
 }
 
 /// [`reaches_blocked`] over the typed tree.
-fn reaches_blocked_typed(e: &Typed, blocked: &HashSet<String>) -> bool {
+fn reaches_blocked_typed<T: TyRepr>(e: &TExpr<T>, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
         TExprKind::Call { callee, .. } => blocked.contains(callee.name()),
         TExprKind::Ident(name) => blocked.contains(name),
@@ -443,8 +441,8 @@ fn reaches_blocked_typed(e: &Typed, blocked: &HashSet<String>) -> bool {
 }
 
 /// [`can_defer`] over the typed tree.
-pub(crate) fn can_defer_typed(value: &Typed, blocked: &HashSet<String>) -> bool {
-    fn moves_control_or_writes(e: &Typed) -> bool {
+pub(crate) fn can_defer_typed<T: TyRepr>(value: &TExpr<T>, blocked: &HashSet<String>) -> bool {
+    fn moves_control_or_writes<T: TyRepr>(e: &TExpr<T>) -> bool {
         matches!(
             &e.kind,
             TExprKind::Try(_)
@@ -458,7 +456,7 @@ pub(crate) fn can_defer_typed(value: &Typed, blocked: &HashSet<String>) -> bool 
 }
 
 /// [`sink_expr`] over the typed tree.
-fn sink_typed(mut e: Typed, blocked: &HashSet<String>) -> Typed {
+fn sink_typed<T: TyRepr>(mut e: TExpr<T>, blocked: &HashSet<String>) -> TExpr<T> {
     crate::typed_util::each_child_mut(&mut e, &mut |child| {
         let taken = std::mem::replace(child, placeholder());
         *child = sink_typed(taken, blocked);
@@ -467,7 +465,7 @@ fn sink_typed(mut e: Typed, blocked: &HashSet<String>) -> Typed {
 }
 
 /// [`sink_here`] over the typed tree. A binding re-formed around an arm has the arm's type.
-fn sink_here_typed(e: Typed, blocked: &HashSet<String>) -> Typed {
+fn sink_here_typed<T: TyRepr>(e: TExpr<T>, blocked: &HashSet<String>) -> TExpr<T> {
     let TExprKind::Let(name, value, body) = &e.kind else {
         return e;
     };
@@ -476,7 +474,7 @@ fn sink_here_typed(e: Typed, blocked: &HashSet<String>) -> Typed {
     }
     let annotation = e.annotation.clone();
     // The binding, re-formed around whichever arm turned out to use it.
-    let rebind = |arm: &Typed| {
+    let rebind = |arm: &TExpr<T>| {
         let mut node = TExpr::rebuilt(
             TExprKind::Let(name.clone(), value.clone(), Box::new(arm.clone())),
             arm.ty.clone(),

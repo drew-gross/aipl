@@ -248,13 +248,12 @@ fn contains_try(e: &Expr) -> bool {
 
 // The same rewrite over the typed tree, for the inlining that happens after monomorphization.
 
-use aipl_syntax::ast::ConcreteType;
-use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
 
-use crate::typed_util::{any_child, Typed};
+use crate::typed_util::{any_child};
 
 /// [`without_early_exits`] over the typed tree.
-pub(crate) fn without_early_exits_typed(body: &Typed) -> Option<Typed> {
+pub(crate) fn without_early_exits_typed<T: TyRepr>(body: &TExpr<T>) -> Option<TExpr<T>> {
     if contains_try_typed(body) {
         return None;
     }
@@ -265,15 +264,15 @@ pub(crate) fn without_early_exits_typed(body: &Typed) -> Option<Typed> {
 }
 
 /// The type of the first of `branches` that produces a value (unit when none does).
-fn valued(branches: &[&Typed]) -> ConcreteType {
+fn valued<T: TyRepr>(branches: &[&TExpr<T>]) -> T {
     branches
         .iter()
         .map(|b| b.ty.clone())
-        .find(|t| *t != ConcreteType::Unit)
-        .unwrap_or(ConcreteType::Unit)
+        .find(|t| !t.is_unit())
+        .unwrap_or(T::unit())
 }
 
-fn in_value_position_typed(e: &Typed) -> Option<Typed> {
+fn in_value_position_typed<T: TyRepr>(e: &TExpr<T>) -> Option<TExpr<T>> {
     match &e.kind {
         TExprKind::Return(value) => match contains_return_typed(value) {
             true => None,
@@ -332,7 +331,7 @@ fn in_value_position_typed(e: &Typed) -> Option<Typed> {
             Some(out)
         }
         TExprKind::Match(scrutinee, arms) if !contains_return_typed(scrutinee) => {
-            let arms: Option<Vec<TMatchArm<ConcreteType>>> = arms
+            let arms: Option<Vec<TMatchArm<T>>> = arms
                 .iter()
                 .map(|arm| {
                     Some(TMatchArm {
@@ -356,7 +355,7 @@ fn in_value_position_typed(e: &Typed) -> Option<Typed> {
     }
 }
 
-fn guard_typed(whole: &Typed, first: &Typed, rest: &Typed) -> Option<Typed> {
+fn guard_typed<T: TyRepr>(whole: &TExpr<T>, first: &TExpr<T>, rest: &TExpr<T>) -> Option<TExpr<T>> {
     let TExprKind::If(cond, then, els) = &first.kind else {
         return None;
     };
@@ -388,7 +387,7 @@ fn guard_typed(whole: &Typed, first: &Typed, rest: &Typed) -> Option<Typed> {
     ))
 }
 
-fn then_also_typed(before: &Typed, rest: Typed) -> Typed {
+fn then_also_typed<T: TyRepr>(before: &TExpr<T>, rest: TExpr<T>) -> TExpr<T> {
     match before.kind {
         TExprKind::Unit => rest,
         _ => {
@@ -402,7 +401,7 @@ fn then_also_typed(before: &Typed, rest: Typed) -> Typed {
     }
 }
 
-fn always_returns_typed(e: &Typed) -> bool {
+fn always_returns_typed<T: TyRepr>(e: &TExpr<T>) -> bool {
     match &e.kind {
         TExprKind::Return(_) => true,
         TExprKind::Seq(first, rest) => always_returns_typed(first) || always_returns_typed(rest),
@@ -415,10 +414,10 @@ fn always_returns_typed(e: &Typed) -> bool {
     }
 }
 
-fn contains_return_typed(e: &Typed) -> bool {
+fn contains_return_typed<T: TyRepr>(e: &TExpr<T>) -> bool {
     matches!(e.kind, TExprKind::Return(_)) || any_child(e, contains_return_typed)
 }
 
-fn contains_try_typed(e: &Typed) -> bool {
+fn contains_try_typed<T: TyRepr>(e: &TExpr<T>) -> bool {
     matches!(e.kind, TExprKind::Try(_)) || any_child(e, contains_try_typed)
 }

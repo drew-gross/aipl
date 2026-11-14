@@ -42,6 +42,11 @@ use crate::{Span, SpanStr};
 pub trait TyRepr: Clone + std::fmt::Debug + PartialEq + Eq {
     /// The same type in the untyped AST's language, for [`TExpr::erase`] and for printing.
     fn to_type(&self) -> Type;
+    /// The type of a statement.
+    fn unit() -> Self;
+    fn is_unit(&self) -> bool;
+    /// Whether this is the plain `str`.
+    fn is_str(&self) -> bool;
 }
 
 /// The order a set's walk promises. [`SetOrder`] without `Context`, the checker's placeholder for
@@ -234,6 +239,15 @@ impl ConcreteTy {
 }
 
 impl TyRepr for Ty {
+    fn unit() -> Self {
+        Ty::Unit
+    }
+    fn is_unit(&self) -> bool {
+        *self == Ty::Unit
+    }
+    fn is_str(&self) -> bool {
+        *self == Ty::Primitive(Primitive::Str)
+    }
     fn to_type(&self) -> Type {
         let boxed = |t: &Ty| Box::new(t.to_type());
         match self {
@@ -261,12 +275,30 @@ impl TyRepr for Ty {
 /// [`ConcreteTy`] does not yet: a concat string, and a set whose order its context has still to
 /// decide. It is what a `TExpr` holds between monomorphization and codegen.
 impl TyRepr for ConcreteType {
+    fn unit() -> Self {
+        ConcreteType::Unit
+    }
+    fn is_unit(&self) -> bool {
+        *self == ConcreteType::Unit
+    }
+    fn is_str(&self) -> bool {
+        *self == ConcreteType::Primitive(Primitive::Str)
+    }
     fn to_type(&self) -> Type {
         self.widen()
     }
 }
 
 impl TyRepr for ConcreteTy {
+    fn unit() -> Self {
+        ConcreteTy::Unit
+    }
+    fn is_unit(&self) -> bool {
+        *self == ConcreteTy::Unit
+    }
+    fn is_str(&self) -> bool {
+        *self == ConcreteTy::Primitive(Primitive::Str)
+    }
     fn to_type(&self) -> Type {
         self.to_ty().to_type()
     }

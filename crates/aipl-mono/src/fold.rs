@@ -43,10 +43,8 @@
 
 use crate::passes::Scope;
 use crate::MonoProgram;
-use aipl_syntax::ast::ConcreteType;
-use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern, TyRepr};
 
-use crate::typed_util::Typed;
 use std::collections::HashMap;
 
 use aipl_syntax::ast::{
@@ -120,7 +118,7 @@ pub fn fold_matches_post_mono(program: &MonoProgram, scope: &Scope) -> MonoProgr
 
 /// `e` with every `match` on a literal replaced by the arm that takes it,
 /// innermost first.
-fn fold_matches_typed(e: &mut Typed) {
+fn fold_matches_typed<T: TyRepr>(e: &mut TExpr<T>) {
     crate::typed_util::each_child_mut(e, &mut fold_matches_typed);
     // A `let` of a `str` literal used only as the scrutinee of its body's `match`
     // is that `match` on the literal (see `is_match_only_use`).
@@ -301,14 +299,14 @@ fn is_match_only_use(v: &Expr, ty: Option<&Type>, body: &Expr, name: &str) -> bo
 }
 
 /// [`is_match_only_use`] over the typed tree, with the binding's `annotation`.
-fn is_match_only_use_typed(
-    v: &Typed,
-    annotation: Option<&ConcreteType>,
-    body: &Typed,
+fn is_match_only_use_typed<T: TyRepr>(
+    v: &TExpr<T>,
+    annotation: Option<&T>,
+    body: &TExpr<T>,
     name: &str,
 ) -> bool {
     if !matches!(v.kind, TExprKind::Str(_))
-        || annotation.is_some_and(|a| *a != ConcreteType::Primitive(Primitive::Str))
+        || annotation.is_some_and(|a| !a.is_str())
     {
         return false;
     }
@@ -472,11 +470,11 @@ fn fold_match(scrutinee: &Expr, arms: &[MatchArm]) -> Option<ExprKind> {
 }
 
 /// [`fold_match`] over the typed tree.
-fn fold_match_typed(
-    scrutinee: &Typed,
-    arms: &[TMatchArm<ConcreteType>],
-) -> Option<TExprKind<ConcreteType>> {
-    let accepts = |pattern: &TPattern<ConcreteType>| -> Option<bool> {
+fn fold_match_typed<T: TyRepr>(
+    scrutinee: &TExpr<T>,
+    arms: &[TMatchArm<T>],
+) -> Option<TExprKind<T>> {
+    let accepts = |pattern: &TPattern<T>| -> Option<bool> {
         match (&scrutinee.kind, pattern) {
             (_, TPattern::Wildcard) => Some(true),
             (TExprKind::Str(s), TPattern::Str(p)) => Some(s == p),
