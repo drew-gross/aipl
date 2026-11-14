@@ -577,9 +577,7 @@ impl Mono<'_> {
         for (base, args) in named.into_inner() {
             let _ = self.instantiate_generic(&base, &args);
         }
-        let plain = |s: &ParamSpec| {
-            !s.str_kept && s.set_kept.is_none() && !s.concat && s.variadic == crate::VShape::Seq
-        };
+        let plain = |s: &ParamSpec| !s.concat && s.variadic == crate::VShape::Seq;
         let instance = |base: &str, args: &[ConcreteTy]| {
             let written: Vec<Type> = args.iter().map(|a| a.to_type()).collect();
             Some(crate::typing::generic_instance_name(base, &written))
@@ -611,6 +609,7 @@ impl Mono<'_> {
             return None;
         }
         let mut next = 0;
+        let mut kept: HashMap<String, ConcreteType> = HashMap::new();
         for declared in &source.sig.params {
             if matches!(declared.ty, Ty::Fn(..)) {
                 while params.get(next).is_some_and(|p| p.name.starts_with("$cap")) {
@@ -618,12 +617,21 @@ impl Mono<'_> {
                 }
                 continue;
             }
-            if params.get(next)?.ty != concrete(&declared.ty)?.to_type() {
-                return None;
+            let instance_param = params.get(next)?;
+            let declared_ty = concrete(&declared.ty)?;
+            if instance_param.ty != declared_ty.to_type() {
+                let kept_ty = instance_param.ty.to_concrete()?;
+                if !crate::typed_retype::is_kept_representation(&declared_ty, &kept_ty) {
+                    return None;
+                }
+                kept.insert(instance_param.name.clone(), kept_ty);
             }
             next += 1;
         }
-        let body = source.body.map_types(&mut |t| concrete(t))?;
+        let mut body = source.body.map_types(&mut |t| concrete(t))?;
+        if !kept.is_empty() {
+            crate::typed_retype::retype(&mut body, &mut kept);
+        }
         self.scope_names = params.iter().map(|p| p.name.clone()).collect();
         let body = self.mark_owned_parameters(params, specs, body);
         Some(self.lower(body))

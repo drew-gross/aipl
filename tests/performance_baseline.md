@@ -616,7 +616,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/optimizations/inline_small_stale_body | 3 | 264 | 264 | 221 | 1264 |
 | tests/cases/optimizations/inspect_only_args | 1 | 21 | 21 | 1487 | 1684 |
 | tests/cases/optimizations/is_empty_keeps_push_in_place | 0 | 0 | 0 | 2 | 32 |
-| tests/cases/optimizations/join_emptiness_fusion | 38 | 2558 | 2558 | 5061 | 11384 |
+| tests/cases/optimizations/join_emptiness_fusion | 38 | 2558 | 2558 | 5061 | 11176 |
 | tests/cases/optimizations/loop_map_fusion | 30 | 1887 | 3919 | 20596 | 6644 |
 | tests/cases/optimizations/loop_map_fusion_effects | 43 | 2842 | 2842 | 6298 | 7404 |
 | tests/cases/optimizations/loop_reverse_fusion | 29 | 1746 | 3340 | 11282 | 8760 |
