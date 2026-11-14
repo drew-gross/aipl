@@ -362,9 +362,11 @@ impl Table {
         }
     }
 
+    /// Whether `t` holds a variable nothing decided and no default covers. A number or an empty
+    /// brace has its default, which is what the variable resolves to.
     fn has_open_variable(&self, t: &It) -> bool {
         match self.shallow(t) {
-            It::Var(_) => true,
+            It::Var(v) => self.slots[v].kind == Kind::Any,
             It::Case(t) | It::Opt(t) | It::Arr(t) | It::Set(t, _) | It::Without(t, _) => {
                 self.has_open_variable(&t)
             }
@@ -539,33 +541,6 @@ struct Decls {
 }
 
 impl Decls {
-    /// The type arguments of the one instance of generic variant `base` the program declares, or
-    /// `None` when there is not exactly one. A construction nothing else decides takes them.
-    fn sole_variant_instance_args(&self, base: &str) -> Option<Vec<Type>> {
-        let template = self.generic_variants.get(base)?;
-        let prefix = format!("{base}$");
-        let mut names: Vec<&String> = self
-            .variants
-            .keys()
-            .filter(|n| n.starts_with(&prefix))
-            .collect();
-        names.sort();
-        let [name] = names.as_slice() else {
-            return None;
-        };
-        let cases = &self.variants[*name];
-        let vars: HashSet<&str> = template.type_vars.iter().map(|t| t.name.as_str()).collect();
-        let mut bound = HashMap::new();
-        for case in &template.cases {
-            if let Some((_, payload)) = cases.iter().find(|(n, _)| *n == case.name.text) {
-                for (slot, instance) in case.payload.iter().zip(payload) {
-                    crate::typing::collect_var_bindings(&slot.ty, instance, &vars, &mut bound);
-                }
-            }
-        }
-        crate::typing::collect_args(&template.type_vars, &bound)
-    }
-
     /// Whether `t`, as written, may appear in a declaration or annotation.
     fn validate(&self, t: &Type, type_params: &[String], ctx: &str, at: &Span) -> Res<()> {
         crate::typing::validate_type(
@@ -614,6 +589,9 @@ struct Pinner<'a> {
     calls: Vec<CallRecord>,
     /// Generic struct constructions, whose type arguments must be pinned by their fields.
     constructions: Vec<(String, Vec<It>, Span)>,
+    /// Generic variant constructions, whose type arguments must come from their payload, the
+    /// expected type or an annotation.
+    variant_constructions: Vec<(String, Vec<It>, Span)>,
     /// The bound of each of this function's type variables.
     own_bounds: HashMap<String, aipl_syntax::ast::Bound>,
     /// Type arguments written at the call about to be typed (`f::<u8>(x)`).
@@ -1017,6 +995,7 @@ fn pinner_for<'a>(
         linking: HashSet::new(),
         calls: Vec::new(),
         constructions: Vec::new(),
+        variant_constructions: Vec::new(),
         own_bounds: type_vars
             .iter()
             .map(|t| (t.name.clone(), t.bound))
@@ -1488,6 +1467,28 @@ impl Pinner<'_> {
                 }
             }
         }
+        for (name, vars, span) in std::mem::take(&mut self.variant_constructions) {
+            let tvs = &self.decls.generic_variants[&name].type_vars;
+            if let Some(i) = vars.iter().position(|v| match self.table.shallow(v) {
+                // A number nothing else pins is the default number.
+                It::Var(x) => self.table.slots[x].kind == Kind::Any,
+                _ => false,
+            }) {
+                if self.errors.is_empty() {
+                    self.errors.push(Error::at(
+                        format!(
+                            "cannot infer type parameter {:?} of generic variant {:?} — \
+                             annotate the binding or give the construction a type to match, as \
+                             in `let r: {}<..> = ..;`",
+                            tvs[i].name,
+                            display(&name),
+                            display(&name)
+                        ),
+                        span,
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1506,63 +1507,7 @@ impl Pinner<'_> {
         });
     }
 
-    /// Resolve every inference type in `body`.
-    /// A generic variant's type argument nothing in the function decided is the argument of the
-    /// program's one instance of it, when there is exactly one (a `Rule<K>` built where no `K` is in
-    /// view, in a program that only ever uses `Rule<Tok>`). The instances counted are the ones
-    /// the program declares, the ones in the functions pinned so far, and the ones in this function.
-    fn settle_open_applications(&mut self, body: &TExpr<It>) {
-        let mut open: Vec<(String, Vec<It>)> = Vec::new();
-        let mut closed: Vec<(String, Vec<It>)> = Vec::new();
-        fn collect(
-            p: &Pinner<'_>,
-            e: &TExpr<It>,
-            open: &mut Vec<(String, Vec<It>)>,
-            closed: &mut Vec<(String, Vec<It>)>,
-        ) {
-            if let It::Gen(base, args) = p.table.shallow(&e.ty) {
-                if args.iter().any(|a| p.table.has_open_variable(a)) {
-                    open.push((base, args));
-                } else {
-                    closed.push((base, args));
-                }
-            }
-            e.for_each_child(&mut |c| collect(p, c, open, closed));
-        }
-        collect(self, body, &mut open, &mut closed);
-        for (base, args) in open {
-            let mut known: Vec<Vec<Type>> = Vec::new();
-            let mut note = |instance: Vec<Type>| {
-                if !known.contains(&instance) {
-                    known.push(instance);
-                }
-            };
-            if let Some(declared) = self.decls.sole_variant_instance_args(&base) {
-                note(declared);
-            }
-            for (b, a) in closed.iter() {
-                if *b == base {
-                    note(a.iter().map(|t| self.table.resolve(t).to_type()).collect());
-                }
-            }
-            for (b, a) in self.decls.instances.borrow().values() {
-                if *b == base {
-                    note(a.iter().map(TyRepr::to_type).collect());
-                }
-            }
-            let [sole] = known.as_slice() else {
-                continue;
-            };
-            for (arg, want) in args.iter().zip(sole) {
-                if let Ok(want) = self.lower(want, &HashMap::new(), &(0..0)) {
-                    let _ = self.table.unify(arg, &want);
-                }
-            }
-        }
-    }
-
     fn finish(&mut self, body: TExpr<It>, span: &Span) -> Res<TExpr<Ty>> {
-        self.settle_open_applications(&body);
         let mut typed = body
             .map_types(&mut |t| Some(self.table.resolve(t)))
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
@@ -2814,6 +2759,10 @@ impl Pinner<'_> {
                 .find(|c| c.name.text == bare)
                 .map(|c| c.payload.len())
                 .unwrap_or(0);
+            if payload == 0 {
+                self.variant_constructions
+                    .push((base.clone(), vars.clone(), e.span.clone()));
+            }
             let v = It::Gen(base, vars);
             let ty = if payload == 0 {
                 v
@@ -4453,6 +4402,8 @@ impl Pinner<'_> {
                 self.coerce_expr(&t, &pty, &t.span, "a constructor argument")?;
                 typed.push(t);
             }
+            self.variant_constructions
+                .push((base.clone(), vars.clone(), e.span.clone()));
             return Ok(call(typed, It::Gen(base, vars), self));
         }
         // A variant constructor `Case@Variant(..)`.
@@ -4790,6 +4741,15 @@ impl Pinner<'_> {
             )
             && aipl_syntax::ctor_ref_case(arg).is_some()
         {
+            // The variant the constructor builds is the variant the `Case` is a case of.
+            let built = match self.table.shallow(&typed.ty) {
+                It::Fn(_, ret) => *ret,
+                other => other,
+            };
+            if let It::Case(variant) = self.table.shallow(expected) {
+                self.agree(&built, &variant)
+                    .map_err(|m| Failure::Rejected(Error::at(m, arg.span.clone())))?;
+            }
             typed.ty = expected.clone();
         }
         Ok(typed)

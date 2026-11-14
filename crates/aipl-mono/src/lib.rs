@@ -5975,25 +5975,6 @@ impl Mono<'_> {
         None
     }
 
-    /// The single existing instance of generic-variant template `base`, if
-    /// exactly one has been synthesized. `None` if zero or several.
-    fn sole_instance(&self, base: &str) -> Option<String> {
-        let prefix = format!("{base}$");
-        let mut names: Vec<&String> = self
-            .variants
-            .keys()
-            .chain(self.syn_variants.keys())
-            .filter(|n| n.starts_with(&prefix))
-            .collect();
-        names.sort();
-        names.dedup();
-        if names.len() == 1 {
-            Some(names[0].clone())
-        } else {
-            None
-        }
-    }
-
     /// Infer a generic-variant construction (`OfInt(f)`): resolve the instance
     /// from the argument types, then rewrite the call to the instance-qualified
     /// constructor `<ctor>@<instance>` (which `variant_ctor` in codegen splits) so
@@ -6035,24 +6016,15 @@ impl Mono<'_> {
             }
             rargs.push(ra);
         }
-        // A variable no argument pins falls back to the enclosing function's
-        // return type first and the sole existing instance second — the same
-        // order, for the same reasons, as the checker's
-        // `infer_generic_variant_ctor`. Both copies have to agree: the checker
-        // accepting a program mono then rejects is a crash after a clean check.
+        // A variable no argument pins takes the enclosing function's return
+        // type, as the pinner's expected type does.
         let unpinned = map.len() < tmpl.type_vars.len();
         let expected: Option<Vec<Type>> = if unpinned {
             self.ret_generic_args(&base)
         } else {
             None
         };
-        let sole: Option<Vec<Type>> = if unpinned && expected.is_none() {
-            self.sole_instance(&base)
-                .and_then(|inst| self.instance_args(&inst).map(|(_, a)| a))
-        } else {
-            None
-        };
-        // A deferred integer literal settles anything the two above did not —
+        // A deferred integer literal settles anything the return type did not —
         // last, because `i64` is only what a bare literal defaults to.
         let mut lit: HashMap<String, Type> = HashMap::new();
         for (pty, at) in deferred {
@@ -6066,7 +6038,6 @@ impl Mono<'_> {
                 map.get(&tv.name)
                     .cloned()
                     .or_else(|| expected.as_ref().and_then(|a| a.get(i).cloned()))
-                    .or_else(|| sole.as_ref().and_then(|a| a.get(i).cloned()))
                     .or_else(|| lit.get(&tv.name).cloned())
                     .ok_or_else(|| {
                         Error::at(

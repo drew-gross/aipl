@@ -318,6 +318,7 @@ case_tests! {
     cases_generics_err_return_only_type_param = "cases/generics/err_return_only_type_param",
     cases_generics_err_struct_type_parameter_default = "cases/generics/err_struct_type_parameter_default",
     cases_generics_err_type_parameter_defaults = "cases/generics/err_type_parameter_defaults",
+    cases_generics_err_variant_cannot_infer = "cases/generics/err_variant_cannot_infer",
     cases_generics_errors_err_any_in_return = "cases/generics/errors/err_any_in_return",
     cases_generics_errors_err_bare_any_param = "cases/generics/errors/err_bare_any_param",
     cases_generics_errors_err_int_literal_arg_out_of_range = "cases/generics/errors/err_int_literal_arg_out_of_range",

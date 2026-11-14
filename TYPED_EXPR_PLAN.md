@@ -18,12 +18,10 @@ patterns (`typed_match_tree.rs`); struct construction with literal defaults, gen
 variants; field-path assignment; mutating calls in value position (copy and modify); `extend` by
 shape; constructor references; owned parameters; parameters kept as a `str`, set or rope, and `rope_str` (`typed_retype.rs`); variadic shapes; shims, closures included (`typed_shims.rs`); lambdas and function fields used as values; grid reads, writes, bounds and walks; ranges given to array parameters; a tuple's `to_array`.
 
-Instances still inferred: a body holding a node the pinner left `unsettled` (a generic application
-one of whose arguments nothing decided, which mono settles from the instances the program has: a
-`Box { .. }` with no field to pin it, a tuple of such, `grid_of`, `zip`), a `for` over an array
-whose element is an anonymous type variable (`any$N`), and a generic constructor used as a function
-value. Each is a fallback in `typed_body`'s caller; porting the settling heuristics
-(`ret_generic_args`, `sole_instance`) into the pinner removes the rest, and then `infer` goes.
+Instances still inferred: a `for` over an array whose element is an anonymous type variable
+(`any$N`), a generic constructor used as a function value, and any body holding a node the pinner
+left `unsettled` (none are expected now that an undecided generic argument is an error). Each is a
+fallback in `typed_body`'s caller; once they are gone `infer` goes.
 
 ## Where things stand
 
@@ -100,8 +98,10 @@ Steps 1 and 2 are independent of step 3; stopping after either leaves a coherent
 3. **Representation choices are not types.** `ConcatStr` and the `ParamSpec` flags (`owned`, `str_kept`,
    `set_kept`, `concat`, `variadic`, `drop_none`) need a home that is not `ConcreteTy`: a per-parameter
    flag, as `typed.rs` already commits to.
-4. **`unsettled` applications.** The pinner flags `Rule<K>` with `K` defaulted so mono can settle it from
-   the program's instances. Mono needs a real "settle from instances" step in place of `infer`.
+4. **`unsettled` applications.** A generic variant or struct construction whose type argument nothing
+   local decides (its payload, the expected type, an annotation) is an error: "cannot infer type
+   parameter". There is no settling from the program's other instances, so adding an instance in one
+   place cannot change another.
 5. **Pinner defaults vs mono inference.** Unresolved variables default to `i64` in the pinner; `infer`
    sometimes disagrees, and stamp-first hid it. Removing `infer` makes each disagreement a visible
    difference. Expect a tail of small bugs found by the corpus and baseline.

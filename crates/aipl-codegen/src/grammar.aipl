@@ -488,11 +488,11 @@ pub fn show<K: variant>(self: Rule<K>) -> str {
 }.test({
     assert(Term(Atom).show() == "Term(Atom)");
     assert(
-        Then([
+        rule(Then([
             Literal("("),
             Maybe(Named("x")),
             NamedIdx(2),
-        ]).show() == `Then([Literal("("), Maybe(Named("x")), NamedIdx(2)])`,
+        ])).show() == `Then([Literal("("), Maybe(Named("x")), NamedIdx(2)])`,
     );
     assert(OneOf([Term(Atom), Term(Open)]).show() == "OneOf([Term(Atom), Term(Open)])");
 
@@ -522,9 +522,9 @@ pub fn show<K: variant>(self: Rule<K>) -> str {
         ).show() == """Climb(Term(Atom), [Prec { power: 1, right: false, ops: ["+"] }])""",
     );
 
-    assert(Refuse(Msg("no")).show() == `Refuse(Msg("no"))`);
-    assert(Refuse(Fn(echo)).show() == "Refuse(Fn(..))");
-    assert(Expect(Literal(";")).show() == `Expect(Literal(";"))`);
+    assert(rule(Refuse(Msg("no"))).show() == `Refuse(Msg("no"))`);
+    assert(rule(Refuse(Fn(echo))).show() == "Refuse(Fn(..))");
+    assert(rule(Expect(Literal(";"))).show() == `Expect(Literal(";"))`);
 })
 
 # A `ListStyle` as the literal that builds it, defaults left out — `ListStyle
@@ -1096,6 +1096,10 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 variant Kind = Atom(str) | Open | Close
 
 variant Node = Leaf(str) | List(Node[])
+
+# A rule of the fixture kind: a construction that no payload gives a `Kind` (`Literal(..)`,
+# `Refuse(..)`) takes it from this parameter.
+fn rule(r: Rule<Kind>) -> Rule<Kind> { r }
 
 # A message function for the `Refuse(Fn(..))` fixtures: what was matched, back.
 fn echo(matched: str) -> str { matched }

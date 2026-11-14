@@ -1,0 +1,35 @@
+# A generic variant's type parameter comes from the construction's own payload, the expected type
+# or an annotation, and from nothing else: another instance of the same variant elsewhere in the
+# program does not decide it, so adding or removing one can never change what a construction means.
+#
+# `Literal("(")` mentions no `K`, and `r` is bound without a type, so nothing says which `Rule` it
+# is. Both `Rule<Tok>` and `Rule<Tok2>` exist in the program, and neither is preferred.
+
+import { to_str } from builtins;
+
+variant Tok = Space | Word(str)
+
+variant Tok2 = Dot | Num(i64)
+
+variant Rule<K: any> = Literal(str) | Term(K)
+
+fn tok_rule() -> Rule<Tok> { Term(Space) }
+
+fn tok2_rule() -> Rule<Tok2> { Term(Dot) }
+
+fn unannotated() -> str {
+    let r = Literal("(");
+    r.to_str()
+}
+
+// The same construction with the type written is fine.
+fn annotated() -> str {
+    let r: Rule<Tok> = Literal("(");
+    r.to_str()
+}
+--- check --compile ---
+error: cannot infer type parameter "K" of generic variant "Rule" — annotate the binding or give the construction a type to match, as in `let r: Rule<..> = ..;`
+  --> ./tests/cases/generics/err_variant_cannot_infer.aipl:21:13
+   |
+21 |     let r = Literal("(");
+   |             ^^^^^^^^^^^^

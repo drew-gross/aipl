@@ -38,7 +38,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/fn_names | 51 | 3234 | 1871 | 22486 | 26272 |
 | crates/aipl-codegen/src/format | 2193 | 168325 | 19208 | 388544 | 234232 |
 | crates/aipl-codegen/src/format_source | 31395 | 5503105 | 716468 | 25175439 | 7609596 |
-| crates/aipl-codegen/src/grammar | 653 | 72678 | 37768 | 102483 | 121396 |
+| crates/aipl-codegen/src/grammar | 653 | 72678 | 37768 | 102551 | 121672 |
 | crates/aipl-codegen/src/grammar_aipl | 1937186 | 436096207 | 1567069 | 833223347 | 6452968 |
 | crates/aipl-codegen/src/grammar_calc | 9511 | 966879 | 41210 | 5019278 | 477808 |
 | crates/aipl-codegen/src/grammar_json | 13560 | 1524189 | 32625 | 6186890 | 490648 |
@@ -144,7 +144,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1145 | 2584 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 947 | 2484 |
 | crates/aipl-mono/src/builtin_as_case | 0 | 0 | 0 | 391 | 1280 |
-| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3600 | 7548 |
+| crates/aipl-mono/src/builtin_cartesian_product | 10 | 680 | 1016 | 3560 | 7660 |
 | crates/aipl-mono/src/builtin_collect_arms | 9 | 480 | 480 | 1820 | 2832 |
 | crates/aipl-mono/src/builtin_collect_ok | 7 | 512 | 584 | 2727 | 6760 |
 | crates/aipl-mono/src/builtin_count | 1 | 104 | 104 | 1463 | 2528 |
@@ -201,7 +201,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_map_join | 16 | 883 | 474 | 5039 | 13076 |
 | crates/aipl-mono/src/builtin_map_ok | 8 | 704 | 704 | 2604 | 18540 |
 | crates/aipl-mono/src/builtin_map_reduce | 3 | 216 | 216 | 2865 | 7912 |
-| crates/aipl-mono/src/builtin_map_to_dict | 13 | 736 | 864 | 2904 | 8004 |
+| crates/aipl-mono/src/builtin_map_to_dict | 13 | 736 | 864 | 2974 | 8092 |
 | crates/aipl-mono/src/builtin_measure | 0 | 0 | 0 | 86 | 424 |
 | crates/aipl-mono/src/builtin_nonempty_first | 1 | 56 | 56 | 368 | 1840 |
 | crates/aipl-mono/src/builtin_nonempty_last | 1 | 56 | 56 | 424 | 1916 |
@@ -821,7 +821,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/structs/spread_fn_body | 14 | 877 | 877 | 2303 | 5448 |
 | tests/cases/structs/spread_nested | 14 | 877 | 877 | 2318 | 5472 |
 | tests/cases/structs/to_str_struct_optional | 20 | 1362 | 1362 | 3942 | 9600 |
-| tests/cases/syntax/map_member | 34 | 2276 | 2300 | 8118 | 19212 |
+| tests/cases/syntax/map_member | 34 | 2276 | 2300 | 8118 | 18704 |
 | tests/cases/syntax/range_precedence | 7 | 501 | 501 | 1998 | 7196 |
 | tests/cases/syntax/trailing_commas | 0 | 0 | 0 | 40 | 220 |
 | tests/cases/tail_calls/deep_accumulator | 2 | 115 | 115 | 3300565 | 4536 |
@@ -834,15 +834,15 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/tests/fn_in_test | 1 | 32 | 32 | 538 | 2432 |
 | tests/cases/tests/run_ignores_tests | 2 | 106 | 106 | 594 | 4620 |
 | tests/cases/tests/try_in_test | 1 | 37 | 37 | 328 | 2644 |
-| tests/cases/tuples/basic | 4 | 282 | 282 | 961 | 4960 |
-| tests/cases/tuples/destructure | 10 | 668 | 668 | 1829 | 5400 |
+| tests/cases/tuples/basic | 4 | 282 | 282 | 954 | 4960 |
+| tests/cases/tuples/destructure | 10 | 668 | 668 | 1822 | 5372 |
 | tests/cases/tuples/destructure_generic_result | 2 | 112 | 112 | 648 | 2404 |
 | tests/cases/tuples/field_access | 2 | 106 | 106 | 566 | 4456 |
 | tests/cases/tuples/for_loop_destructure | 15 | 1147 | 1147 | 2677 | 5616 |
 | tests/cases/tuples/for_loop_indexed_destructure | 61 | 4193 | 4161 | 5839 | 9484 |
 | tests/cases/tuples/generic_tuple | 21 | 1422 | 1422 | 3378 | 7360 |
 | tests/cases/tuples/optional_tuple | 12 | 849 | 849 | 2172 | 8352 |
-| tests/cases/tuples/three_elements | 7 | 474 | 474 | 1392 | 5164 |
+| tests/cases/tuples/three_elements | 7 | 474 | 474 | 1385 | 5164 |
 | tests/cases/tuples/to_array | 46 | 3080 | 3080 | 8074 | 12904 |
 | tests/cases/tuples/to_str | 15 | 991 | 991 | 3645 | 10332 |
 | tests/cases/tuples/trailing_comma | 7 | 474 | 474 | 1364 | 4844 |
