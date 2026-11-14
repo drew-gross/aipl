@@ -29,7 +29,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/dedent | 11 | 870 | 128 | 19539 | 5612 |
 | crates/aipl-codegen/src/desugar | 575 | 68978 | 28848 | 56369 | 222020 |
 | crates/aipl-codegen/src/doc | 296 | 20907 | 4595 | 43435 | 32592 |
-| crates/aipl-codegen/src/ebnf | 1268 | 130196 | 19328 | 346180 | 162340 |
+| crates/aipl-codegen/src/ebnf | 1268 | 130196 | 19328 | 346180 | 161836 |
 | crates/aipl-codegen/src/expr | 1039 | 113784 | 26040 | 93809 | 355612 |
 | crates/aipl-codegen/src/fill_or_add_sections | 151 | 12356 | 7146 | 56421 | 17564 |
 | crates/aipl-codegen/src/fill_or_add_sections_file | 21 | 1474 | 900 | 5493 | 16104 |
@@ -40,9 +40,9 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/format_source | 31395 | 5503105 | 716468 | 25167267 | 7609828 |
 | crates/aipl-codegen/src/grammar | 653 | 72678 | 37768 | 102483 | 121396 |
 | crates/aipl-codegen/src/grammar_aipl | 1937186 | 436096207 | 1567069 | 833184566 | 6453200 |
-| crates/aipl-codegen/src/grammar_calc | 9511 | 966879 | 41210 | 5017874 | 478216 |
-| crates/aipl-codegen/src/grammar_json | 13560 | 1524189 | 32625 | 6186890 | 492364 |
-| crates/aipl-codegen/src/grammar_sexp | 5559 | 530767 | 13176 | 2726164 | 458776 |
+| crates/aipl-codegen/src/grammar_calc | 9511 | 966879 | 41210 | 5017874 | 477712 |
+| crates/aipl-codegen/src/grammar_json | 13560 | 1524189 | 32625 | 6186890 | 491860 |
+| crates/aipl-codegen/src/grammar_sexp | 5559 | 530767 | 13176 | 2726164 | 458272 |
 | crates/aipl-codegen/src/highlight | 413 | 38595 | 6967 | 119286 | 123040 |
 | crates/aipl-codegen/src/highlight_aipl | 3617 | 365805 | 110633 | 1517514 | 174116 |
 | crates/aipl-codegen/src/hoist_test_fns | 60 | 7561 | 3215 | 6223 | 128636 |

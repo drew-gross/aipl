@@ -16,10 +16,9 @@ of the callee is specialized for them, `typed_function_calls.rs`); `map`, `filte
 and `zip_with` (`typed_higher_order.rs`); `for` with a position, over a dict or over a range; nested
 patterns (`typed_match_tree.rs`); struct construction with literal defaults, generic structs and
 variants; field-path assignment; mutating calls in value position (copy and modify); `extend` by
-shape; constructor references; owned parameters; parameters kept as a `str` or set (`typed_retype.rs`).
+shape; constructor references; owned parameters; parameters kept as a `str`, set or rope, and `rope_str` (`typed_retype.rs`); a tuple's `to_array`; a grid's `with_or_self`.
 
-Instances still inferred: a concat string or a variadic shape; a body holding a shim (closure bindings), a grid form, `rope_str`,
-`with_or_self`, a tuple's `to_array`, a range handed to an array parameter, a generic constructor
+Instances still inferred: a variadic shape; a body holding a shim (closure bindings), a grid form, a range handed to an array parameter, a generic constructor
 used as a function value, or a function stored in a value. Each is a `FALLBACK` in `typed_body`'s
 caller; when none is left, delete `infer`.
 

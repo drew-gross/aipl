@@ -223,6 +223,19 @@ impl Mono<'_> {
                 .is_some()
                 && args.iter().all(|a| self.supported(a, concrete));
         }
+        // `rope_str`, a tuple's `to_array` and a grid's `with_or_self` are rewritten, or kept as the
+        // native call, by what their arguments are.
+        if (matches!(callee, Callee::RopeStr) && args.len() == 2)
+            || (matches!(callee, Callee::ToArray) && args.len() == 1)
+            || (matches!(callee, Callee::WithOrSelf) && args.len() == 3)
+        {
+            return (!matches!(callee, Callee::WithOrSelf)
+                || !self.is_grid_cell_write(&args[0].ty, &args[1].ty, concrete)
+                || concrete(&args[0].ty).is_some_and(
+                    |t| matches!(&t, ConcreteType::Named(n) if self.instance_args(n).is_some()),
+                ))
+                && args.iter().all(|a| self.supported(a, concrete));
+        }
         // A call through a function parameter of the function being processed.
         if self.cur_lenv.contains_key(callee.name()) {
             return args.iter().all(|a| self.supported(a, concrete));
@@ -629,7 +642,11 @@ impl Mono<'_> {
             next += 1;
         }
         let mut body = source.body.map_types(&mut |t| concrete(t))?;
-        if !kept.is_empty() {
+        let mut has_rope = false;
+        body.walk(&mut |n| {
+            has_rope |= matches!(&n.kind, TExprKind::Call { callee: Callee::RopeStr, args, .. } if args.len() == 2);
+        });
+        if !kept.is_empty() || has_rope {
             crate::typed_retype::retype(&mut body, &mut kept);
         }
         self.scope_names = params.iter().map(|p| p.name.clone()).collect();
@@ -732,6 +749,120 @@ impl Mono<'_> {
         )
     }
 
+    /// Whether `receiver.with_or_self(index, ..)` writes a grid's cell named by a pair.
+    fn is_grid_cell_write(
+        &self,
+        receiver: &Ty,
+        index: &Ty,
+        concrete: &dyn Fn(&Ty) -> Option<ConcreteType>,
+    ) -> bool {
+        match (concrete(receiver), concrete(index)) {
+            (Some(r), Some(i)) => self.is_grid_cell_index(&r.to_type(), &i.to_type()),
+            _ => false,
+        }
+    }
+
+    /// `(a, b).to_array()` as `[a, b]`; any other tuple is bound once and its fields are the
+    /// elements. `grid.with_or_self((r, c), v)` as the grid's `grid_try_set` of the two cells.
+    /// `None` for a call that is neither.
+    fn rewrite_expanded_call(&self, e: &TExpr<ConcreteType>) -> Option<TExpr<ConcreteType>> {
+        let TExprKind::Call { callee, args, .. } = &e.kind else {
+            return None;
+        };
+        let span = e.span.clone();
+        let field = |name: &str, ty: &ConcreteType, i: usize| {
+            TExpr::new(
+                TExprKind::Field(
+                    Box::new(TExpr::new(
+                        TExprKind::Ident(name.to_string()),
+                        ty.clone(),
+                        span.clone(),
+                    )),
+                    format!("_{i}"),
+                ),
+                match &e.ty {
+                    ConcreteType::Array(elem) if matches!(callee, Callee::ToArray) => {
+                        (**elem).clone()
+                    }
+                    _ => ConcreteType::Primitive(aipl_syntax::ast::Primitive::U64),
+                },
+                span.clone(),
+            )
+        };
+        match (callee, args.as_slice()) {
+            (Callee::ToArray, [tuple]) => {
+                if let TExprKind::TupleLit(elems) = &tuple.kind {
+                    return Some(TExpr::new(
+                        TExprKind::ArrayLit(elems.clone()),
+                        e.ty.clone(),
+                        span,
+                    ));
+                }
+                let arity = match &tuple.ty {
+                    ConcreteType::Named(n) => crate::tuple_instance_arity(n)?,
+                    _ => return None,
+                };
+                let tmp = aipl_syntax::fresh_temp("tuple_array");
+                let elems = (0..arity).map(|i| field(&tmp, &tuple.ty, i)).collect();
+                let array = TExpr::new(TExprKind::ArrayLit(elems), e.ty.clone(), span.clone());
+                Some(TExpr::new(
+                    TExprKind::Let(tmp, Box::new(tuple.clone()), Box::new(array)),
+                    e.ty.clone(),
+                    span,
+                ))
+            }
+            (Callee::WithOrSelf, [grid, pair, value]) => {
+                if !self.is_grid_cell_index(&grid.ty.to_type(), &pair.ty.to_type()) {
+                    return None;
+                }
+                let ConcreteType::Named(instance) = &grid.ty else {
+                    return None;
+                };
+                let (_, type_args) = self.instance_args(instance)?;
+                let type_args = type_args
+                    .iter()
+                    .map(|t| t.to_concrete())
+                    .collect::<Option<Vec<_>>>()?;
+                let (cells, binding) = match &pair.kind {
+                    TExprKind::TupleLit(cells) => (cells.clone(), None),
+                    TExprKind::Ident(name) => (
+                        vec![field(name, &pair.ty, 0), field(name, &pair.ty, 1)],
+                        None,
+                    ),
+                    _ => {
+                        let tmp = aipl_syntax::fresh_temp("cell");
+                        (
+                            vec![field(&tmp, &pair.ty, 0), field(&tmp, &pair.ty, 1)],
+                            Some(tmp),
+                        )
+                    }
+                };
+                let mut call_args = vec![grid.clone()];
+                call_args.extend(cells);
+                call_args.push(value.clone());
+                let call = TExpr::new(
+                    TExprKind::Call {
+                        callee: Callee::GridTrySet,
+                        type_args,
+                        args: call_args,
+                        method_style: false,
+                    },
+                    e.ty.clone(),
+                    span.clone(),
+                );
+                Some(match binding {
+                    Some(tmp) => TExpr::new(
+                        TExprKind::Let(tmp, Box::new(pair.clone()), Box::new(call)),
+                        e.ty.clone(),
+                        span,
+                    ),
+                    None => call,
+                })
+            }
+            _ => None,
+        }
+    }
+
     /// The tag of the case a constructor reference names (`__ctor$V$C` or `C@V`), when `ty` is the
     /// `Case<V>` of its variant.
     fn ctor_reference_tag(&self, name: &str, ty: &ConcreteType) -> Option<usize> {
@@ -792,6 +923,9 @@ impl Mono<'_> {
                     return self.lower(desugared);
                 }
             }
+        }
+        if let Some(rewritten) = self.rewrite_expanded_call(&e) {
+            return self.lower(rewritten);
         }
         if let TExprKind::Ident(name) = &e.kind {
             if matches!(e.ty, ConcreteType::Fn(..))

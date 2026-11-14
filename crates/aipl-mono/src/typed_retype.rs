@@ -24,6 +24,8 @@ pub(crate) fn is_kept_representation(declared: &ConcreteType, kept: &ConcreteTyp
     match (declared, kept) {
         (d, k) if d == k => true,
         (d, ConcreteType::Primitive(Primitive::Str)) => *d == chars(),
+        // A `str` parameter handed a rope.
+        (ConcreteType::Primitive(Primitive::Str), ConcreteType::ConcatStr) => true,
         (ConcreteType::Array(a), ConcreteType::Set(s, _)) => a == s,
         _ => false,
     }
@@ -98,6 +100,13 @@ pub(crate) fn retype(e: &mut Typed, kept: &mut HashMap<String, ConcreteType>) {
         retype(c, kept);
         changed |= c.ty != was;
     });
+    // A rope is built by `rope_str`; its type remembers it, so a call that takes one can pick the
+    // instance specialized for it.
+    if matches!(&e.kind, K::Call { callee: aipl_syntax::ast::Callee::RopeStr, args, .. } if args.len() == 2)
+    {
+        e.ty = ConcreteType::ConcatStr;
+        return;
+    }
     if !changed {
         return;
     }
