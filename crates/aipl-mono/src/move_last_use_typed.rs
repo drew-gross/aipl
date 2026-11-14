@@ -123,7 +123,7 @@ fn move_last_uses_of_param(
 
 /// `body` — the scope of the binding `name`, whose initializer is `value` — with each last use of
 /// `name` that is an argument to a user function wrapped in `__move`.
-fn move_last_uses(
+pub(crate) fn move_last_uses(
     name: &str,
     value: &Typed,
     body: &Typed,
@@ -144,7 +144,7 @@ fn move_last_uses(
 
 /// `body` with each read of one of the struct binding `name`'s `heap_fields` wrapped in `__move`,
 /// when the binding owns its value and reads each such field at most once and never in a loop.
-fn move_field_reads(
+pub(crate) fn move_field_reads(
     name: &str,
     value: &Typed,
     body: &Typed,
