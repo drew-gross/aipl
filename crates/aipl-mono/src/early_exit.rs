@@ -250,7 +250,7 @@ fn contains_try(e: &Expr) -> bool {
 
 use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
 
-use crate::typed_util::{any_child};
+use crate::typed_util::any_child;
 
 /// [`without_early_exits`] over the typed tree.
 pub(crate) fn without_early_exits_typed<T: TyRepr>(body: &TExpr<T>) -> Option<TExpr<T>> {

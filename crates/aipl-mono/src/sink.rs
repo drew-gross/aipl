@@ -58,7 +58,6 @@ use std::collections::HashSet;
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
 use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
 
-
 use crate::subst::read_names;
 use crate::MonoProgram;
 

@@ -34,7 +34,7 @@ mod typing;
 pub use typing::{attribute, set_mangle};
 
 mod fold;
-pub use fold::{fold_constants, fold_matches_post_mono};
+pub use fold::{fold_constants, fold_matches_pinned, fold_matches_post_mono};
 
 mod fuse;
 pub use fuse::{effectful_fns, fuse_operations};

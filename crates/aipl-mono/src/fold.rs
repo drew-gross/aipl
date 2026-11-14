@@ -116,6 +116,18 @@ pub fn fold_matches_post_mono(program: &MonoProgram, scope: &Scope) -> MonoProgr
     )
 }
 
+/// [`fold_matches_post_mono`] on the pinned program, before monomorphization.
+pub fn fold_matches_pinned(
+    program: &aipl_syntax::typed::TProgram,
+    scope: &Scope,
+) -> aipl_syntax::typed::TProgram {
+    crate::typed_util::map_pinned_bodies(
+        program,
+        |name| scope.covers(name),
+        |_, body| fold_matches_typed(body),
+    )
+}
+
 /// `e` with every `match` on a literal replaced by the arm that takes it,
 /// innermost first.
 fn fold_matches_typed<T: TyRepr>(e: &mut TExpr<T>) {
@@ -305,9 +317,7 @@ fn is_match_only_use_typed<T: TyRepr>(
     body: &TExpr<T>,
     name: &str,
 ) -> bool {
-    if !matches!(v.kind, TExprKind::Str(_))
-        || annotation.is_some_and(|a| !a.is_str())
-    {
+    if !matches!(v.kind, TExprKind::Str(_)) || annotation.is_some_and(|a| !a.is_str()) {
         return false;
     }
     let TExprKind::Match(scrutinee, arms) = &body.kind else {

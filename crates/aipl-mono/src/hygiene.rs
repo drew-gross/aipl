@@ -41,7 +41,6 @@ use aipl_syntax::ast::{Callee, Expr, ExprKind};
 use aipl_syntax::typed::TExprKind;
 
 use crate::passes::{Body, Optimizable};
-use crate::typed_util::Typed;
 
 /// What a [`Violation`] is about. See the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -258,7 +257,7 @@ impl Walk<'_> {
     }
 
     /// [`Walk::expr`] over the typed tree.
-    pub fn typed(&mut self, e: &Typed) {
+    pub fn typed<T: aipl_syntax::typed::TyRepr>(&mut self, e: &aipl_syntax::typed::TExpr<T>) {
         match &e.kind {
             TExprKind::Ident(n) => self.reference(n, Target::Either),
             TExprKind::Call {

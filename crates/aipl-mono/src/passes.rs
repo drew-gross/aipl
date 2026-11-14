@@ -217,6 +217,32 @@ impl Body for crate::typed_util::Typed {
     }
 }
 
+/// The pinned pre-monomorphization tree. Like the post-mono one, every node carries its type, so
+/// there is no record to lose.
+impl Body for aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty> {
+    fn count_uses<'a>(
+        &'a self,
+        bound: &mut HashSet<&'a str>,
+        counts: &mut HashMap<&'a str, usize>,
+    ) {
+        crate::typed_util::count_uses(self, bound, counts);
+    }
+
+    fn collect_recorded(&self, _: &str, _: &mut HashSet<Site>, _: &mut HashSet<Site>) {}
+
+    fn collect_lost(
+        &self,
+        _: &str,
+        _: &HashSet<Site>,
+        _: &mut Vec<(&'static str, (usize, usize))>,
+    ) {
+    }
+
+    fn hygiene(&self, walk: &mut crate::hygiene::Walk<'_>) {
+        walk.typed(self);
+    }
+}
+
 /// What the manager needs of one function.
 pub struct FunctionView<'a, B> {
     pub name: &'a str,
@@ -240,6 +266,24 @@ impl Optimizable for Program {
             .iter()
             .filter_map(|item| match item {
                 Item::Fn(f) => Some(FunctionView {
+                    name: &f.name,
+                    body: &f.body,
+                    test_body: f.test_body.as_ref(),
+                    params: f.sig.params.iter().map(|p| p.name.clone()).collect(),
+                }),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+impl Optimizable for aipl_syntax::typed::TProgram {
+    type Body = aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>;
+    fn functions(&self) -> Vec<FunctionView<'_, Self::Body>> {
+        self.items
+            .iter()
+            .filter_map(|item| match item {
+                aipl_syntax::typed::TItem::Fn(f) => Some(FunctionView {
                     name: &f.name,
                     body: &f.body,
                     test_body: f.test_body.as_ref(),

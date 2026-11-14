@@ -159,3 +159,44 @@ fn mono_agreement_report() {
         println!("{n:7}  {form}\n         e.g. {example}");
     }
 }
+
+/// The pass manager drives a pinned program: a pass written once over `TExpr<T>` rewrites the
+/// bodies of a `TProgram` before monomorphization.
+#[test]
+fn the_pass_manager_runs_a_typed_pass_over_a_pinned_program() {
+    use aipl::mono::passes::{optimize, Pass};
+    use aipl::typed::{TExprKind, TItem};
+    aipl::install_parser_hooks();
+    let dir = std::env::temp_dir().join(format!("aipl-pin-pass-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("picks.aipl");
+    std::fs::write(
+        &file,
+        r#"fn picks() -> i64 {
+    match ("a") {
+        "a" => 1,
+        _ => 2,
+    }
+}
+"#,
+    )
+    .unwrap();
+    let program = aipl::loader::load_program(&file, DebugOptions::OFF).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    let (_, lowered) = aipl::codegen::lowered_for_check(&program).unwrap();
+    let pinned = pin(&lowered).program;
+    let passes = vec![Pass::scoped(
+        "fold_matches",
+        aipl::mono::fold_matches_pinned,
+    )];
+    let folded = optimize(pinned, &passes, 4, DebugOptions::OFF);
+    let body = folded
+        .items
+        .iter()
+        .find_map(|item| match item {
+            TItem::Fn(f) if f.name.text == "picks" => Some(&f.body),
+            _ => None,
+        })
+        .unwrap();
+    assert!(matches!(body.kind, TExprKind::Int(..)), "{:?}", body.kind);
+}

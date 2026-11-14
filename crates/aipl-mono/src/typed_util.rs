@@ -32,6 +32,27 @@ pub(crate) fn map_bodies(
     }
 }
 
+/// [`map_bodies`] over a pinned program: `rewrite` is applied to the body (and `.test` body) of each
+/// function `covers` names.
+pub(crate) fn map_pinned_bodies(
+    program: &aipl_syntax::typed::TProgram,
+    covers: impl Fn(&str) -> bool,
+    rewrite: impl Fn(&str, &mut TExpr<aipl_syntax::typed::Ty>),
+) -> aipl_syntax::typed::TProgram {
+    let mut out = program.clone();
+    for item in &mut out.items {
+        if let aipl_syntax::typed::TItem::Fn(f) = item {
+            if covers(&f.name.text) {
+                rewrite(&f.name.text, &mut f.body);
+                if let Some(test_body) = &mut f.test_body {
+                    rewrite(&f.name.text, test_body);
+                }
+            }
+        }
+    }
+    out
+}
+
 /// The sub-expressions of `e`, as [`crate::children`] has them: an assignment's target is a name,
 /// not an expression to walk.
 pub fn each_child<'a, T: TyRepr>(e: &'a TExpr<T>, f: &mut impl FnMut(&'a TExpr<T>)) {
