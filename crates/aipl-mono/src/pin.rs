@@ -3993,11 +3993,11 @@ impl Pinner<'_> {
         use TExprKind as K;
         let name = callee.name();
         let bool_ty = It::Prim(Primitive::Bool);
-        let call = |args: Vec<TExpr<It>>, ret: It, p: &Self| {
+        let call_with = |type_args: Vec<It>, args: Vec<TExpr<It>>, ret: It, p: &Self| {
             p.node(
                 K::Call {
                     callee: callee.clone(),
-                    type_args: Vec::new(),
+                    type_args,
                     args,
                     method_style,
                 },
@@ -4005,6 +4005,7 @@ impl Pinner<'_> {
                 e,
             )
         };
+        let call = |args: Vec<TExpr<It>>, ret: It, p: &Self| call_with(Vec::new(), args, ret, p);
         // A local that holds a function is called by its name.
         if let Some(Binding { ty, binder, .. }) = self.env.get(name).cloned() {
             if let Some(binder) = binder {
@@ -4047,7 +4048,7 @@ impl Pinner<'_> {
             Callee::Some if args.len() == 1 => {
                 let x = self.expr(&args[0])?;
                 let ty = It::Opt(Box::new(x.ty.clone()));
-                return Ok(call(vec![x], ty, self));
+                return Ok(call_with(vec![x.ty.clone()], vec![x], ty, self));
             }
             Callee::Ok | Callee::Err if args.len() <= 1 => {
                 let x = args.first().map(|a| self.expr(a)).transpose()?;
@@ -4414,7 +4415,11 @@ impl Pinner<'_> {
                 } else {
                     bool_ty
                 };
-                return Ok(call(typed, ret, self));
+                let element = match &seq {
+                    It::Arr(t) => (**t).clone(),
+                    _ => It::Prim(Primitive::Char),
+                };
+                return Ok(call_with(vec![element], typed, ret, self));
             }
         }
         // A constructor of a generic variant: its arguments pin the type arguments.

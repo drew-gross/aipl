@@ -2897,6 +2897,8 @@ pub struct Frontend {
     /// [`Frontend::check_program`] as the pinner typed it, without the builtin declarations: the
     /// program the optimizer starts from.
     pub pinned: aipl_mono::pin::Pinned,
+    /// The signature of each function, the builtin declarations included.
+    pub signatures: aipl_mono::instantiation::Signatures,
 }
 
 /// The first half of [`frontend`]: the program lowered the way the checker sees it. Returns the
@@ -3026,12 +3028,14 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
         &pinned,
         aipl_mono::probe::Stamping::KeepExisting,
     );
+    let signatures = aipl_mono::instantiation::signatures(&pinned.program);
     aipl_mono::pin::drop_declarations(&mut pinned);
     Ok(Frontend {
         program,
         check_program,
         resolutions,
         pinned,
+        signatures,
     })
 }
 
@@ -3095,6 +3099,7 @@ fn lower_program(
         check_program,
         resolutions: _,
         pinned,
+        signatures,
     } = frontend(program)?;
     // Everything a deferral decision is made against: the functions that have
     // effects or can abort. Computed once from `check_program`, which is where
@@ -3226,6 +3231,15 @@ fn lower_program(
     // still turn it into a call to an AIPL builtin. See `lower_reductions`.
     let typed = aipl_mono::lower_reductions_pinned(&typed);
     let typed = aipl_mono::lower_try_set_pinned(&typed);
+    // The passes build calls without knowing how their callee is instantiated; each call's type
+    // arguments are read back from the types it is made of.
+    let (typed, unresolved) =
+        aipl_mono::instantiation::reinstantiated(&typed, &signatures, &instances);
+    assert!(
+        unresolved.is_empty(),
+        "calls whose type arguments their parts do not determine:\n{}",
+        unresolved.join("\n")
+    );
     // Every stamp now describes the tree monomorphization actually reads.
 
     // Resolve generic `any[]` functions into concrete instances first, so the

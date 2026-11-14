@@ -145,5 +145,4 @@ codegen/types:
 
 typed tree:
   codegen `flex_int_ty` hands `aipl_syntax::flex_fit` a shallow `Expr` rebuilt from the typed tail/branches (codegen `flex_shape`); port `flex_fit` to `TExpr` when the pre-mono side is typed
-typed tree: nodes the pinned passes build (fusions, inliners, counting/appending variants, lower_reductions) carry empty or copied `type_args`; fix before mono reads `type_args` mechanically.
 typed tree: delete the Expr twins of the pre-mono passes (fold_constants, sink_bindings, fuse_*, fold_*, *_variants, inline_*, lower_*) and `typed_passes` oracle once mono reads TProgram.

@@ -75,6 +75,7 @@ pub use move_last_use_typed::move_last_uses_post_mono;
 mod binder_types;
 mod inline_pinned;
 mod inline_typed;
+pub mod instantiation;
 mod move_last_use_typed;
 mod ownership_typed;
 mod pinned_pipeline;

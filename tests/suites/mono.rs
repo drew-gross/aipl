@@ -118,6 +118,34 @@ fn inlined_names(src: &str) -> Vec<String> {
     names
 }
 
+/// The type arguments the pinner recorded for every call are the ones the call's parts determine.
+#[test]
+fn a_calls_type_arguments_follow_from_its_parts() {
+    aipl::install_parser_hooks();
+    let src = "import { equal as ==, logical_and as &&, extend, filter, is_some, len, map, push, starts_with, wrapping_add as + } \
+         from builtins;
+         fn twice<T: any>(x: T) -> T[] { [x, x] }
+         fn main() -> i64 {
+             mut xs = twice(1);
+             set xs.push(2);
+             set xs.extend([3, 4]);
+             let words = \"ab\".starts_with(\"a\");
+             let kept = xs.map(|x| x + 1).filter(|x| x == 3);
+             let found = some(kept.len());
+             if (words && found.is_some()) { 1 } else { 0 }
+         }";
+    let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
+        .expect("load");
+    let frontend = aipl::codegen::frontend(&prog).expect("frontend");
+    let (again, unresolved) = aipl::mono::instantiation::reinstantiated(
+        &frontend.pinned.program,
+        &frontend.signatures,
+        &frontend.pinned.instances,
+    );
+    assert_eq!(unresolved, Vec::<String>::new());
+    assert!(again == frontend.pinned.program);
+}
+
 #[test]
 fn inline_removes_single_use_private_helper() {
     let names = inlined_names(
