@@ -397,17 +397,6 @@ fn canon(t: &Type) -> Type {
     }
 }
 
-/// Whether `t` holds a generic application (`Rule<K>`), as opposed to the instance it names.
-fn has_generic(t: &Ty) -> bool {
-    match t {
-        Ty::Generic(..) => true,
-        Ty::Case(t) | Ty::Optional(t) | Ty::Array(t) | Ty::Set(t, _) => has_generic(t),
-        Ty::Dict(a, b) | Ty::Result(a, b) => has_generic(a) || has_generic(b),
-        Ty::Fn(ps, r) => ps.iter().any(has_generic) || has_generic(r),
-        _ => false,
-    }
-}
-
 fn has_variable(t: &Type) -> bool {
     Ty::from_type(t).is_none_or(|t| t.mentions_var())
 }
@@ -419,10 +408,6 @@ pub enum Stamping {
     KeepExisting,
     /// Overwrite it with the pinned type: the tree was pinned after the passes that moved it.
     Replace,
-    /// [`Stamping::Replace`], for a tree whose types a pass has kept up to date: a node marked
-    /// unsettled is stamped too when its type names no generic application, since there is then
-    /// no argument left for monomorphization to settle.
-    Typed,
 }
 
 /// Give every expression the pinned type of the node it was pinned as, where it has none
@@ -552,7 +537,7 @@ impl Stamper<'_> {
         }
         match (&e.ty, self.stamping) {
             // A stamp that already says this keeps its spelling.
-            (Some(old), Stamping::Replace | Stamping::Typed) if canon(old) == canon(&pinned) => {}
+            (Some(old), Stamping::Replace) if canon(old) == canon(&pinned) => {}
             (Some(_), Stamping::KeepExisting) => {}
             _ => e.ty = Some(Box::new(pinned)),
         }
@@ -598,10 +583,7 @@ impl Stamper<'_> {
         if e.span != t.span || form(&e.kind) != typed_form(&t.kind) {
             return self.by_span(e);
         }
-        // A generic application the pinner had to guess an argument of is monomorphization's to settle.
-        if !t.unsettled || (self.stamping == Stamping::Typed && !has_generic(&t.ty)) {
-            self.stamp(e, &t.ty);
-        }
+        self.stamp(e, &t.ty);
         // A value lambda's inferred parameter types become annotations, so the lambda reads
         // downstream exactly as if they had been written.
         if let (

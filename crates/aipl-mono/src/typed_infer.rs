@@ -19,20 +19,18 @@ impl Mono<'_> {
     fn supported(&self, e: &TExpr<Ty>, concrete: &dyn Fn(&Ty) -> Option<ConcreteType>) -> bool {
         // A lambda used as a value becomes a function of its own that captures nothing.
         if let (TExprKind::Lambda(params, body), Ty::Fn(..)) = (&e.kind, &e.ty) {
-            return !e.unsettled
-                && concrete(&e.ty).is_some()
+            return concrete(&e.ty).is_some()
                 && params.iter().all(|p| concrete(&p.ty).is_some())
                 && self.supported(body, concrete);
         }
         // A function used as a value is queued for emission.
         if let (TExprKind::Ident(name), Ty::Fn(..)) = (&e.kind, &e.ty) {
-            return !e.unsettled
-                && self.concrete.contains_key(name)
+            return self.concrete.contains_key(name)
                 && !self.generics.contains_key(name)
                 && !self.cur_lenv.contains_key(name)
                 && concrete(&e.ty).is_some();
         }
-        if e.unsettled || matches!(e.ty, Ty::Fn(..)) {
+        if matches!(e.ty, Ty::Fn(..)) {
             return false;
         }
         let sub = |x: &TExpr<Ty>| self.supported(x, concrete);
@@ -521,9 +519,6 @@ impl Mono<'_> {
         if crate::typing::coerce(source, &sequence).is_ok() {
             return Some(crate::VShape::Seq);
         }
-        if str_receiver {
-            return None;
-        }
         if matches!(aipl_syntax::unrefined(source), Type::Optional(_))
             && crate::typing::coerce(source, &Type::Optional(Box::new(element.clone()))).is_ok()
         {
@@ -619,6 +614,20 @@ impl Mono<'_> {
             None => (template, type_args),
         };
         let source = *self.typed_fns.get(source_name)?;
+        // The pinner names an anonymous `any` differently from monomorphization; the type variables
+        // correspond by position.
+        let type_args: HashMap<String, Type> = {
+            let mut renamed = type_args.clone();
+            if let Some(generic) = self.generics.get(source_name) {
+                for (instance, pinned) in generic.sig.type_vars.iter().zip(&source.sig.type_vars) {
+                    if let Some(t) = type_args.get(&instance.name) {
+                        renamed.insert(pinned.name.clone(), t.clone());
+                    }
+                }
+            }
+            renamed
+        };
+        let type_args = &type_args;
         // The generic types the body names are instantiated before it is checked, so a struct or
         // variant built from a generic one is known.
         let named = std::cell::RefCell::new(Vec::<(String, Vec<Type>)>::new());
@@ -639,6 +648,23 @@ impl Mono<'_> {
         }
         for (base, args) in named.into_inner() {
             let _ = self.instantiate_generic(&base, &args);
+        }
+        // An application the pinner already resolved to its instance is made where it is used.
+        let mut used: Vec<String> = Vec::new();
+        let _ = source.body.map_types(&mut |t: &Ty| {
+            if let Some(c) = t.concretize(&|v| {
+                type_args
+                    .get(v)
+                    .and_then(|t| Ty::from_type(t)?.concretize(&|_| None))
+            }) {
+                named_types(&c.to_type(), &mut used);
+            }
+            Some(ConcreteType::Unit)
+        });
+        for name in used {
+            if let Some((base, args)) = self.pinned_instances.get(&name).cloned() {
+                let _ = self.instantiate_generic(&base, &args);
+            }
         }
         let instance = |base: &str, args: &[ConcreteTy]| {
             let written: Vec<Type> = args.iter().map(|a| a.to_type()).collect();
@@ -691,15 +717,20 @@ impl Mono<'_> {
             if shape != crate::VShape::Seq {
                 // A variadic handed one element or an optional arrives as that, and the body
                 // starts by rebuilding the sequence it was written against.
-                let ConcreteType::Array(element) = &declared_ty else {
-                    return None;
+                // A sequence of characters is declared as the text it is.
+                let element = match &declared_ty {
+                    ConcreteType::Array(element) => (**element).clone(),
+                    ConcreteType::Primitive(aipl_syntax::ast::Primitive::Str) => {
+                        ConcreteType::Primitive(aipl_syntax::ast::Primitive::Char)
+                    }
+                    _ => return None,
                 };
                 let original = declared.name.clone();
                 let given = instance_param.name.clone();
                 let span = source.body.span.clone();
                 let (sequence, convert) = variadic_sequence(
                     &given,
-                    element,
+                    &element,
                     shape == crate::VShape::Opt,
                     &format!("{original}$x"),
                     &span,
@@ -1451,9 +1482,34 @@ impl Mono<'_> {
         }
         if let TExprKind::Call { callee, args, .. } = &mut e.kind {
             if matches!(callee, Callee::Extend) && args.len() == 2 {
-                match self.extend_shape(&args[0].ty.to_type(), &args[1].ty.to_type()) {
-                    Some(crate::VShape::Opt) => *callee = Callee::ExtendOptional,
-                    Some(crate::VShape::Elem) => *callee = Callee::Push,
+                let receiver = args[0].ty.to_type();
+                let shape = self.extend_shape(&receiver, &args[1].ty.to_type());
+                match shape {
+                    Some(crate::VShape::Opt) if !crate::is_str_repr(&receiver) => {
+                        *callee = Callee::ExtendOptional
+                    }
+                    Some(crate::VShape::Elem) if !crate::is_str_repr(&receiver) => {
+                        *callee = Callee::Push
+                    }
+                    // A `str` has no `push`: one element or an optional becomes the one-char
+                    // `str` it stands for, which `extend` appends like any longer source.
+                    Some(shape @ (crate::VShape::Elem | crate::VShape::Opt)) => {
+                        let source = args.pop().expect("extend has a source");
+                        let span = source.span.clone();
+                        let given = aipl_syntax::fresh_temp("extend");
+                        let (sequence, convert) = variadic_sequence(
+                            &given,
+                            &ConcreteType::Primitive(aipl_syntax::ast::Primitive::Char),
+                            shape == crate::VShape::Opt,
+                            &format!("{given}$x"),
+                            &span,
+                        );
+                        args.push(TExpr::new(
+                            TExprKind::Let(given, Box::new(source), Box::new(convert)),
+                            sequence,
+                            span,
+                        ));
+                    }
                     _ => {}
                 }
             }
@@ -1502,7 +1558,6 @@ impl Mono<'_> {
             span,
             value_span,
             name_span,
-            unsettled,
             derived,
             annotation,
         } = e
@@ -1554,7 +1609,6 @@ impl Mono<'_> {
         let mut out = TExpr::new(TExprKind::Match(Box::new(scrutinee), arms), ty, span);
         out.value_span = value_span;
         out.name_span = name_span;
-        out.unsettled = unsettled;
         out.derived = derived;
         out.annotation = annotation;
         out
@@ -1817,5 +1871,29 @@ pub(crate) fn fresh_tail(e: &TExpr<ConcreteType>) -> bool {
         | TExprKind::Seq(_, body)
         | TExprKind::Assign(_, _, body) => fresh_tail(body),
         _ => false,
+    }
+}
+
+/// Every name `t` mentions.
+fn named_types(t: &Type, out: &mut Vec<String>) {
+    match t {
+        Type::Named(n) => out.push(n.clone()),
+        Type::Case(t) | Type::Optional(t) | Type::Array(t) | Type::Set(t, _) => named_types(t, out),
+        Type::Dict(a, b) | Type::Result(a, b) => {
+            named_types(a, out);
+            named_types(b, out);
+        }
+        Type::Fn(ps, r) => {
+            ps.iter().for_each(|p| named_types(p, out));
+            named_types(r, out);
+        }
+        Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().for_each(|p| named_types(p, out)),
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::TypeVar(_)
+        | Type::Any
+        | Type::Unknown
+        | Type::Without(..)
+        | Type::ConcatStr => {}
     }
 }

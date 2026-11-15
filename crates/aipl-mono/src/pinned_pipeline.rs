@@ -99,7 +99,7 @@ pub fn to_program(typed: &TProgram, instances: &Instances) -> Program {
         instances: instances.clone(),
         resolutions: Vec::new(),
     };
-    stamp_everything(&mut program, &pinned, Stamping::Typed);
+    stamp_everything(&mut program, &pinned, Stamping::Replace);
     stamp_test_bodies(&mut program, typed, instances);
     program
 }
@@ -170,7 +170,7 @@ fn stamp_test_bodies(program: &mut Program, typed: &TProgram, instances: &Instan
         instances: instances.clone(),
         resolutions: Vec::new(),
     };
-    stamp_everything(&mut tests, &pinned, Stamping::Typed);
+    stamp_everything(&mut tests, &pinned, Stamping::Replace);
     for item in tests.items {
         if let Item::Fn(stamped) = item {
             for original in &mut program.items {

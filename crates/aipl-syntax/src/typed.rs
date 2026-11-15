@@ -315,10 +315,6 @@ pub struct TExpr<T: TyRepr = Ty> {
     pub value_span: Option<Box<Span>>,
     /// See [`Expr::name_span`].
     pub name_span: Option<Box<Span>>,
-    /// Whether `ty` is, or holds, a generic application (`Rule<K>`) one of whose arguments nothing in
-    /// the function decided, so pinning fell back to a default. Such a type is not a finding: the
-    /// argument is for monomorphization to settle from the instances the program has.
-    pub unsettled: bool,
     /// Whether `ty` was worked out from the node's form and its surroundings rather than recorded
     /// on it: the tree this one came from carried no stamp here. Going back to an `Expr` such a
     /// node is left unstamped, so a conversion round trip adds nothing a pass could trip over.
@@ -435,7 +431,6 @@ impl<T: TyRepr> TExpr<T> {
             span,
             value_span: None,
             name_span: None,
-            unsettled: false,
             derived: false,
             annotation: None,
         }
@@ -450,7 +445,6 @@ impl<T: TyRepr> TExpr<T> {
             span: like.span.clone(),
             value_span: like.value_span.clone(),
             name_span: like.name_span.clone(),
-            unsettled: false,
             derived: like.derived,
             annotation: None,
         }
@@ -806,7 +800,6 @@ impl<T: TyRepr> TExpr<T> {
             span: self.span.clone(),
             value_span: self.value_span.clone(),
             name_span: self.name_span.clone(),
-            unsettled: self.unsettled,
             derived: self.derived,
             annotation: match &self.annotation {
                 Some(t) => Some(f(t)?),

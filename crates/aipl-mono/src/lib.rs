@@ -1785,6 +1785,20 @@ pub fn monomorphize_probed(
         in_place_call: false,
         current_parameters: HashMap::new(),
         specialized_from: HashMap::new(),
+        pinned_instances: instances
+            .iter()
+            .map(|(name, (base, args))| {
+                (
+                    name.clone(),
+                    (
+                        base.clone(),
+                        args.iter()
+                            .map(aipl_syntax::typed::TyRepr::to_type)
+                            .collect(),
+                    ),
+                )
+            })
+            .collect(),
         typed_fns: typed
             .items
             .iter()
@@ -2678,6 +2692,8 @@ struct Mono<'a> {
     current_parameters: HashMap<String, ConcreteType>,
     /// The function each copy specialized for the functions it is handed has its body from.
     specialized_from: HashMap<String, typed_function_calls::SpecializedFrom>,
+    /// The generic applications the pinner named as instances (`Box$i64`), by instance name.
+    pinned_instances: HashMap<String, (String, Vec<Type>)>,
     dbg: DebugOptions,
 }
 

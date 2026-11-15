@@ -349,38 +349,6 @@ impl Table {
         }
     }
 
-    /// Whether `t` is, or holds, a generic application with an argument that resolving has to
-    /// default because nothing constrained it.
-    fn leaves_application_open(&self, t: &It) -> bool {
-        let open = |t: &It| self.leaves_application_open(t);
-        match self.shallow(t) {
-            It::Gen(_, args) => args.iter().any(|a| self.has_open_variable(a) || open(a)),
-            It::Case(t) | It::Opt(t) | It::Arr(t) | It::Set(t, _) | It::Without(t, _) => open(&t),
-            It::Dict(a, b) | It::Res(a, b) => open(&a) || open(&b),
-            It::Fn(ps, r) => ps.iter().any(open) || open(&r),
-            It::Var(_) | It::Unit | It::Prim(_) | It::Named(_) | It::Rigid(_) => false,
-        }
-    }
-
-    /// Whether `t` holds a variable nothing decided and no default covers. A number or an empty
-    /// brace has its default, which is what the variable resolves to.
-    fn has_open_variable(&self, t: &It) -> bool {
-        match self.shallow(t) {
-            It::Var(v) => self.slots[v].kind == Kind::Any,
-            It::Case(t) | It::Opt(t) | It::Arr(t) | It::Set(t, _) | It::Without(t, _) => {
-                self.has_open_variable(&t)
-            }
-            It::Dict(a, b) | It::Res(a, b) => {
-                self.has_open_variable(&a) || self.has_open_variable(&b)
-            }
-            It::Gen(_, args) => args.iter().any(|a| self.has_open_variable(a)),
-            It::Fn(ps, r) => {
-                ps.iter().any(|p| self.has_open_variable(p)) || self.has_open_variable(&r)
-            }
-            It::Unit | It::Prim(_) | It::Named(_) | It::Rigid(_) => false,
-        }
-    }
-
     /// `t` as a pinned type. A variable nothing constrained takes its kind's default.
     fn resolve(&self, t: &It) -> Ty {
         let boxed = |t: &It| Box::new(self.resolve(t));
@@ -1492,26 +1460,10 @@ impl Pinner<'_> {
         Ok(())
     }
 
-    /// Set [`TExpr::unsettled`] on each node of `typed` whose type in `source` (the tree it was
-    /// resolved from, of the same shape) holds a generic application with an open argument.
-    fn mark_unsettled(&self, typed: &mut TExpr<Ty>, source: &TExpr<It>) {
-        typed.unsettled = self.table.leaves_application_open(&source.ty);
-        let mut sources = Vec::new();
-        source.for_each_child(&mut |c| sources.push(c));
-        let mut i = 0;
-        typed.for_each_child_mut(&mut |c| {
-            if let Some(s) = sources.get(i) {
-                self.mark_unsettled(c, s);
-            }
-            i += 1;
-        });
-    }
-
     fn finish(&mut self, body: TExpr<It>, span: &Span) -> Res<TExpr<Ty>> {
-        let mut typed = body
+        let typed = body
             .map_types(&mut |t| Some(self.table.resolve(t)))
             .ok_or_else(|| Failure::Gap("unresolved type".into(), span.clone()))?;
-        self.mark_unsettled(&mut typed, &body);
         check_literals(&typed, &typed.span.clone())?;
         self.decls
             .instances
@@ -1809,7 +1761,6 @@ impl Pinner<'_> {
             span: e.span.clone(),
             value_span: e.value_span.clone(),
             name_span: e.name_span.clone(),
-            unsettled: false,
             derived: false,
             annotation: None,
         }

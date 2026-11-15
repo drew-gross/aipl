@@ -59,7 +59,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/case_match | 28128 | 3581894 | 727952 | 17182529 | 6363908 |
 | crates/aipl-codegen/src/lint/case_of_equal_is_case | 30540 | 3866430 | 718032 | 20484281 | 6395568 |
 | crates/aipl-codegen/src/lint/char_set_literal | 29235 | 3715431 | 794067 | 18423357 | 6373860 |
-| crates/aipl-codegen/src/lint/compound_assign | 30940 | 3933721 | 735489 | 20246241 | 6400216 |
+| crates/aipl-codegen/src/lint/compound_assign | 30940 | 3933721 | 735489 | 20246497 | 6400268 |
 | crates/aipl-codegen/src/lint/constant_default | 23905 | 3408596 | 706575 | 12626183 | 6340836 |
 | crates/aipl-codegen/src/lint/destructure_binding | 40810 | 5147765 | 725760 | 30116417 | 6401860 |
 | crates/aipl-codegen/src/lint/destructure_param | 45608 | 5553822 | 729496 | 36413555 | 6410400 |
@@ -74,9 +74,9 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/interp_to_str | 25958 | 3395544 | 724296 | 15008518 | 6360352 |
 | crates/aipl-codegen/src/lint/interpolation | 19321 | 2658752 | 716960 | 7371431 | 6352668 |
 | crates/aipl-codegen/src/lint/is_empty_longhand | 30473 | 3853143 | 744094 | 20493789 | 6384456 |
-| crates/aipl-codegen/src/lint/len_gt_zero | 38342 | 4811883 | 725784 | 29103078 | 6392840 |
+| crates/aipl-codegen/src/lint/len_gt_zero | 38342 | 4811883 | 725784 | 29103018 | 6392876 |
 | crates/aipl-codegen/src/lint/let_else_as_case | 40655 | 4970646 | 734875 | 30974444 | 6395288 |
-| crates/aipl-codegen/src/lint/lint | 101 | 6232 | 5048 | 30365 | 1242864 |
+| crates/aipl-codegen/src/lint/lint | 101 | 6232 | 5048 | 30429 | 1242952 |
 | crates/aipl-codegen/src/lint/lint_hit | 21952 | 3156111 | 710800 | 10578820 | 6470120 |
 | crates/aipl-codegen/src/lint/loop_shape | 68689 | 15331968 | 550120 | 32763757 | 6603936 |
 | crates/aipl-codegen/src/lint/map_constant_repeat | 37648 | 4524643 | 728539 | 29177188 | 6391040 |
@@ -108,7 +108,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/slice_to_len | 25320 | 3289624 | 715104 | 14391241 | 6398844 |
 | crates/aipl-codegen/src/lint/slice_whole | 26204 | 3417640 | 715472 | 15367840 | 6403400 |
 | crates/aipl-codegen/src/lint/squelch | 51 | 4080 | 1704 | 6932 | 11080 |
-| crates/aipl-codegen/src/lint/step_by_one | 40666 | 5009095 | 738218 | 31547277 | 6408952 |
+| crates/aipl-codegen/src/lint/step_by_one | 40666 | 5009095 | 738218 | 31548365 | 6409004 |
 | crates/aipl-codegen/src/lint/union_loop_union_all | 127114 | 12925254 | 756076 | 134288507 | 6494956 |
 | crates/aipl-codegen/src/lint/unused_binding | 40252 | 6887184 | 703536 | 19902534 | 6316660 |
 | crates/aipl-codegen/src/lint/unused_imports | 26720 | 3457135 | 738624 | 15943469 | 6379024 |
@@ -118,7 +118,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2538 | 2520 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1232 | 1232 | 3853 | 11860 |
 | crates/aipl-codegen/src/parse | 8731 | 927722 | 141927 | 5246755 | 767516 |
-| crates/aipl-codegen/src/parse_and_partial_load | 33188 | 3996423 | 765068 | 17125683 | 7821688 |
+| crates/aipl-codegen/src/parse_and_partial_load | 33188 | 3996423 | 765068 | 17126195 | 7821776 |
 | crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 169315 | 152588 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1784 | 5244 |
 | crates/aipl-codegen/src/parsed | 38 | 3441 | 2977 | 3267 | 70464 |
@@ -544,7 +544,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/lambdas/recursive_hof | 0 | 0 | 0 | 62 | 252 |
 | tests/cases/lambdas/try_error_inferred | 12 | 942 | 910 | 3556 | 15264 |
 | tests/cases/lambdas/two_lambda_args | 4 | 210 | 210 | 547 | 2660 |
-| tests/cases/lambdas/value_lambda_inferred | 24 | 1440 | 944 | 1535 | 5232 |
+| tests/cases/lambdas/value_lambda_inferred | 24 | 1440 | 944 | 1535 | 5224 |
 | tests/cases/lambdas/zip_concat_minimal | 9 | 800 | 720 | 2184 | 8764 |
 | tests/cases/lambdas/zip_with | 56 | 3821 | 3821 | 9921 | 9248 |
 | tests/cases/lambdas/zip_with_owned | 73 | 5076 | 5068 | 13680 | 18224 |

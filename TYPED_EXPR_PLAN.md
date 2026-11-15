@@ -18,10 +18,9 @@ patterns (`typed_match_tree.rs`); struct construction with literal defaults, gen
 variants; field-path assignment; mutating calls in value position (copy and modify); `extend` by
 shape; constructor references; owned parameters; parameters kept as a `str`, set or rope, and `rope_str` (`typed_retype.rs`); variadic shapes; shims, closures included (`typed_shims.rs`); lambdas and function fields used as values; grid reads, writes, bounds and walks; ranges given to array parameters; a tuple's `to_array`.
 
-Instances still inferred: a `for` over an array whose element is an anonymous type variable
-(`any$N`), a generic constructor used as a function value, and any body holding a node the pinner
-left `unsettled` (none are expected now that an undecided generic argument is an error). Each is a
-fallback in `typed_body`'s caller; once they are gone `infer` goes.
+No instance in the corpus is inferred any more: `typed_body` takes every body from the pinned tree.
+`infer` stays only as the path for a body `typed_body` declines (an unsupported node, a missing typed
+function), and goes once that is an error.
 
 ## Where things stand
 
@@ -98,10 +97,10 @@ Steps 1 and 2 are independent of step 3; stopping after either leaves a coherent
 3. **Representation choices are not types.** `ConcatStr` and the `ParamSpec` flags (`owned`, `str_kept`,
    `set_kept`, `concat`, `variadic`, `drop_none`) need a home that is not `ConcreteTy`: a per-parameter
    flag, as `typed.rs` already commits to.
-4. **`unsettled` applications.** A generic variant or struct construction whose type argument nothing
+4. **Undecided generic arguments.** A generic variant or struct construction whose type argument nothing
    local decides (its payload, the expected type, an annotation) is an error: "cannot infer type
    parameter". There is no settling from the program's other instances, so adding an instance in one
-   place cannot change another.
+   place cannot change another. Any other unconstrained variable takes its default (`i64`).
 5. **Pinner defaults vs mono inference.** Unresolved variables default to `i64` in the pinner; `infer`
    sometimes disagrees, and stamp-first hid it. Removing `infer` makes each disagreement a visible
    difference. Expect a tail of small bugs found by the corpus and baseline.

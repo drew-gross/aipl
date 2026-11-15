@@ -124,7 +124,6 @@ pub(crate) fn substitute_typed<T: TyRepr>(e: &TExpr<T>, name: &str, value: &TExp
     let keep = |kind: TExprKind<T>| {
         let mut out = TExpr::rebuilt(kind, e.ty.clone(), e);
         out.annotation = e.annotation.clone();
-        out.unsettled = e.unsettled;
         out
     };
     match &e.kind {

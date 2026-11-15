@@ -245,7 +245,6 @@ fn fold_pinned(e: &Pinned, env: &HashMap<String, Pinned>) -> Pinned {
     };
     let mut out = TExpr::rebuilt(kind, e.ty.clone(), e);
     out.annotation = e.annotation.clone();
-    out.unsettled = e.unsettled;
     if let Some(folded) = try_fold_pinned(&out) {
         return TExpr::rebuilt(folded.0, folded.1, e);
     }
