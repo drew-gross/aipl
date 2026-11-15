@@ -117,7 +117,7 @@ fn cell_labels(x: u64, y: u64, self: Record?) -> str {
             10,
             20,
             some(Record { win: 3, draw: 1 }),
-        ) == `<text x="10" y="13">87.5%</text><text class="detail" x="10" y="29">3-0-1</text>`,
+        ) == `<text x="10" y="13">87.50%</text><text class="detail" x="10" y="29">3-0-1</text>`,
     );
 })
 
@@ -133,14 +133,14 @@ fn describe(row: str, column: str, cell: Cell?) -> str {
             "A",
             "B",
             some(Cell { record: Record { win: 2, loss: 1 }, rounds: [], brackets: [] }),
-        ) == "A vs B: 66.7% (2-1-0)",
+        ) == "A vs B: 66.67% (2-1-0)",
     );
     assert(
         describe(
             "A",
             "B",
             some(Cell { record: Record { draw: 1 }, rounds: [Record {}], brackets: [] }),
-        ) == "A vs B: 50.0% (0-0-1)",
+        ) == "A vs B: 50.00% (0-0-1)",
     );
     assert(describe("A", "A", none) == "A against itself is not counted");
 })
@@ -188,7 +188,7 @@ fn panel_attributes(
             [0, 2],
             [2, 5, 4],
             10,
-        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="1,50.0%,1-0-0,100.0%;3,75.0%,2-0-1,83.3%" data-brackets="3,3-0-0,100.0%;0,-,-;1,0-0-1,50.0%" data-record="3,0,1"`,
+        ) == `data-title="A vs B" data-summary="87.50% win rate · 3-0-1|Seen in 4 of 10 matches · 40.00%" data-rounds="1,50.00%,1-0-0,100.00%;3,75.00%,2-0-1,83.33%" data-brackets="3,3-0-0,100.00%;0,-,-;1,0-0-1,50.00%" data-record="3,0,1"`,
     );
     // A slot the pairing never met in is a row of dashes.
     assert(
@@ -198,7 +198,7 @@ fn panel_attributes(
             [1],
             [2, 5, 4],
             10,
-        ) == `data-title="A vs B" data-summary="87.5% win rate · 3-0-1|Seen in 4 of 10 matches · 40.0%" data-rounds="0,-,-,-" data-brackets="3,3-0-0,100.0%;0,-,-;1,0-0-1,50.0%" data-record="3,0,1"`,
+        ) == `data-title="A vs B" data-summary="87.50% win rate · 3-0-1|Seen in 4 of 10 matches · 40.00%" data-rounds="0,-,-,-" data-brackets="3,3-0-0,100.00%;0,-,-;1,0-0-1,50.00%" data-record="3,0,1"`,
     );
 })
 
@@ -207,8 +207,8 @@ fn deck_summary(count: u64, total: u64) -> str {
     let noun = if (count == 1) { "deck" } else { "decks" };
     `{count} {noun} · {percent(count, total)}`
 }.test({
-    assert(deck_summary(92, 353) == "92 decks · 26.1%");
-    assert(deck_summary(1, 4) == "1 deck · 25.0%");
+    assert(deck_summary(92, 353) == "92 decks · 26.06%");
+    assert(deck_summary(1, 4) == "1 deck · 25.00%");
 })
 
 # The heading of the column starting at `left`, sitting on `bottom` and `rise` tall, with `attributes`
@@ -388,12 +388,12 @@ let SCRIPT = """
     function record_text(r) { return r.win + "-" + r.loss + "-" + r.draw; }
     // The win rate in percent, a draw counting as half a win (see `win_rate` in metagame.aipl).
     function rate_of(r) { return (((2 * r.win + r.draw) / (2 * played(r))) * 100); }
-    // One decimal, half to even on the float's exact value, as the page's other numbers are.
+    // Two decimals, half to even on the float's exact value, as the page's other numbers are.
     function percent(x) {
-        var tie = /^(\d+)\.(\d)50*$/.exec(x.toFixed(25));
-        if (!tie) return x.toFixed(1);
-        var digit = +tie[2];
-        return digit % 2 === 0 ? tie[1] + "." + digit : (+(tie[1] + "." + digit) + 0.1).toFixed(1);
+        var tie = /^(\d+)\.(\d\d)50*$/.exec(x.toFixed(25));
+        if (!tie) return x.toFixed(2);
+        var digit = +tie[2][1];
+        return digit % 2 === 0 ? tie[1] + "." + tie[2] : (+(tie[1] + "." + tie[2]) + 0.01).toFixed(2);
     }
     function rate_text(r) { return played(r) === 0 ? "-" : percent(rate_of(r)) + "%"; }
     // The colour of a record, the same scale as the matrix's (see `colour` in winrate_svg.aipl).
@@ -425,9 +425,10 @@ let SCRIPT = """
     function delta_text(p) {
         if (played(p.now) === 0 || played(p.was) === 0) return "-";
         var d = rate_of(p.now) - rate_of(p.was);
-        return (d < 0 ? "-" : "+") + Math.abs(d).toFixed(1);
+        return (d < 0 ? "-" : "+") + Math.abs(d).toFixed(2);
     }
-    function set_labels(cell, rate, detail) {
+    // `details` is null, one line of text, or an array of lines set under the rate.
+    function set_labels(cell, rate, details) {
         for (var old of Array.from(cell.querySelectorAll("text"))) cell.removeChild(old);
         var rect = cell.querySelector("rect");
         var x = +rect.getAttribute("x") + rect.getAttribute("width") / 2, y = +rect.getAttribute("y") + rect.getAttribute("height") / 2;
@@ -439,9 +440,16 @@ let SCRIPT = """
             node.textContent = text;
             cell.appendChild(node);
         };
-        if (detail === null) { make(rate, 0); return; }
-        make(rate, -7);
-        make(detail, 9, "detail");
+        if (details === null) { make(rate, 0); return; }
+        var lines = [].concat(details);
+        if (lines.length === 1) {
+            make(rate, -7);
+            make(lines[0], 9, "detail");
+            return;
+        }
+        make(rate, -14);
+        make(lines[0], 2, "detail");
+        make(lines[1], 16, "detail");
     }
     function refresh() {
         removed.sort(function(a, b) { return a - b; });
@@ -459,7 +467,7 @@ let SCRIPT = """
             }
             var p = project(index);
             rect.setAttribute("fill", colour(p.now));
-            set_labels(cell, rate_text(p.now), played(p.now) === 0 ? null : removed.length === 0 ? record_text(p.now) : delta_text(p));
+            set_labels(cell, rate_text(p.now), played(p.now) === 0 ? null : removed.length === 0 ? record_text(p.now) : [record_text(p.now), delta_text(p)]);
         }
         try {
             var kept = [];
@@ -780,29 +788,29 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(lines.first() == some(`<?xml version="1.0" standalone="no"?>`));
     assert(page.contains("Winrate Matrix from m"));
     // A cell says its pairing, and a name is escaped.
-    assert(page.contains(`data-info="A vs B &amp; C: 100.0% (1-0-0)"`));
-    assert(page.contains(`data-info="B &amp; C vs A: 0.0% (0-1-0)"`));
+    assert(page.contains(`data-info="A vs B &amp; C: 100.00% (1-0-0)"`));
+    assert(page.contains(`data-info="B &amp; C vs A: 0.00% (0-1-0)"`));
     assert(page.contains(`data-info="A against itself is not counted"`));
     // The panel has what a cell says of each round some match fell in.
     assert(page.contains(`data-title="A vs B &amp; C"`));
-    assert(page.contains(`data-rounds="1,100.0%,1-0-0,100.0%"`));
+    assert(page.contains(`data-rounds="1,100.00%,1-0-0,100.00%"`));
     assert(page.contains(`data-slots="Finals"`));
     assert(page.contains(`data-brackets="0-0"`));
-    assert(page.contains(`data-brackets="1,1-0-0,100.0%"`));
+    assert(page.contains(`data-brackets="1,1-0-0,100.00%"`));
     assert(page.contains(`data-title="A against itself"`));
     // A row label has the archetype's definition, escaped, under its name.
     assert(page.contains(">X, Y</text>"));
     assert(page.contains(">one of Z &amp; W</text>"));
     // A row label has the archetype's deck count and share.
-    assert(page.contains(">3 decks · 75.0%</text>"));
-    assert(page.contains(">1 deck · 25.0%</text>"));
+    assert(page.contains(">3 decks · 75.00%</text>"));
+    assert(page.contains(">1 deck · 25.00%</text>"));
     // The sort options are there to click.
     assert(page.contains(`data-sort="winrate">win rate</tspan>`));
     assert(page.contains(`data-sort="projected">projected</tspan>`));
     // One cell for each pairing, and a heading for each archetype on both axes.
     assert(page.split(`class="cell"`).len() == 5);
     // The overall column: a cell for each archetype, and its own heading.
-    assert(page.contains(`data-info="A overall: 100.0% (1-0-0)"`));
+    assert(page.contains(`data-info="A overall: 100.00% (1-0-0)"`));
     assert(page.contains(`data-title="A overall"`));
     assert(page.split(`class="cell overall"`).len() == 3);
     assert(page.split(`class="label"`).len() == 5);

@@ -191,10 +191,10 @@ fn observations(
     ) == err(unknown_deck("zz")));
 })
 
-# The win rate as a percentage with one decimal: `55.6%`.
-fn percent_text(self: Float) -> str { `{(self * 100.0).render(digits=1)}%` }.test({
-    assert(percent_text(0.5) == "50.0%");
-    assert(percent_text(2.0 / 3.0) == "66.7%");
+# The win rate as a percentage with two decimals: `55.56%`.
+fn percent_text(self: Float) -> str { `{(self * 100.0).render(digits=2)}%` }.test({
+    assert(percent_text(0.5) == "50.00%");
+    assert(percent_text(2.0 / 3.0) == "66.67%");
 })
 
 # What a cell says about `self`: the win rate, or `-` when it has no match.
@@ -203,19 +203,19 @@ pub fn rate_text(self: Record) -> str {
 }.test({
     assert(Record {}.rate_text() == "-");
     assert(Record {}.rate_text() == "-");
-    assert(Record { draw: 4 }.rate_text() == "50.0%");
-    assert(Record { win: 3, draw: 1 }.rate_text() == "87.5%");
-    assert(Record { win: 1, loss: 1, draw: 1 }.rate_text() == "50.0%");
-    assert(Record { win: 2, loss: 1 }.rate_text() == "66.7%");
+    assert(Record { draw: 4 }.rate_text() == "50.00%");
+    assert(Record { win: 3, draw: 1 }.rate_text() == "87.50%");
+    assert(Record { win: 1, loss: 1, draw: 1 }.rate_text() == "50.00%");
+    assert(Record { win: 2, loss: 1 }.rate_text() == "66.67%");
 })
 
-# What share of `total` matches `self` counts, as a percentage: `12.5%`, or `-` when there are none.
+# What share of `total` matches `self` counts, as a percentage: `12.50%`, or `-` when there are none.
 pub fn share_text(self: Record, total: u64) -> str {
     if (total == 0) { "-" } else { (self.played().to_float() / total.to_float()).percent_text() }
 }.test({
     assert(Record { win: 1 }.share_text(0) == "-");
-    assert(Record { win: 1, loss: 1 }.share_text(8) == "25.0%");
-    assert(Record {}.share_text(8) == "0.0%");
+    assert(Record { win: 1, loss: 1 }.share_text(8) == "25.00%");
+    assert(Record {}.share_text(8) == "0.00%");
 })
 
 # The total of what `self` says about how its row's archetype did against its column's.

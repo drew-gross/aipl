@@ -91,24 +91,26 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[]!str {
     ]));
 })
 
-# `count` out of `total` as a percentage with one decimal: `33.3%`. Rounded as the
-# original's formatting is, half to even on the float's exact value.
+# `count` out of `total` as a percentage with two decimals: `33.33%`. Rounded half to
+# even on the float's exact value.
 pub fn percent(count: u64, total: u64) -> str {
     let share = count.to_float() / total.to_float();
-    `{(share * 100.0).render(digits=1)}%`
+    `{(share * 100.0).render(digits=2)}%`
 }.test({
-    assert(percent(1, 3) == "33.3%");
-    assert(percent(2, 3) == "66.7%");
-    assert(percent(1, 2) == "50.0%");
-    assert(percent(0, 7) == "0.0%");
-    assert(percent(7, 7) == "100.0%");
-    assert(percent(1, 8) == "12.5%");
-    // An exact half goes to the even digit, as it does there.
-    assert(percent(1, 16) == "6.2%");
-    assert(percent(3, 16) == "18.8%");
-    // Under a percent, and 0.15 is a little under what it reads as.
-    assert(percent(1, 200) == "0.5%");
-    assert(percent(3, 2000) == "0.1%");
+    assert(percent(1, 3) == "33.33%");
+    assert(percent(2, 3) == "66.67%");
+    assert(percent(1, 2) == "50.00%");
+    assert(percent(0, 7) == "0.00%");
+    assert(percent(7, 7) == "100.00%");
+    assert(percent(1, 8) == "12.50%");
+    assert(percent(1, 16) == "6.25%");
+    assert(percent(3, 16) == "18.75%");
+    // An exact half goes to the even digit.
+    assert(percent(1, 32) == "3.12%");
+    assert(percent(3, 32) == "9.38%");
+    // Under a percent.
+    assert(percent(1, 200) == "0.50%");
+    assert(percent(3, 2000) == "0.15%");
 })
 
 # The report on `decks`, loaded from the metagame `name`, as text of one line each.
@@ -137,8 +139,8 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str!
         +-----------+------------+-------+
         | Deck Name | Metagame % | Count |
         +===========+============+=======+
-        | Landfall  |      66.7% |     2 |
-        | Other     |      33.3% |     1 |
+        | Landfall  |     66.67% |     2 |
+        | Other     |     33.33% |     1 |
         +-----------+------------+-------+
     """));
 })
