@@ -32,11 +32,11 @@ import {
     wrapping_decrement as --,
 } from builtins;
 import {
+    Binding,
     ByCase,
     ByPattern,
     ByStruct,
     ByTuple,
-    Destructure,
     Expr,
     Field,
     For,
@@ -50,6 +50,7 @@ import {
     LetPattern,
     Match,
     MatchArm,
+    Name,
     Seq,
     WrittenName,
     WrittenNames,
@@ -63,6 +64,7 @@ import {
     named_at,
     show_expr,
     struct_written,
+    synthesized_name,
 } from "./expr.aipl";
 import {
     CaseParam,
@@ -142,14 +144,14 @@ fn desugared_function(self: Function) -> Function {
 pub fn desugared(self: Expr) -> Expr {
     let inner = self.with_struct_patterns_lifted().map_subexprs(desugared);
     match (inner.kind) {
-        LetPattern(pattern, value, body) => let_pattern(
-            pattern,
+        LetPattern(binding, value, body) => let_pattern(
+            binding,
             value,
             body,
             inner.written.value_or(WrittenNames {}),
         ),
-        ForPattern(pattern, iterable, body, index) => for_pattern(
-            pattern,
+        ForPattern(binding, iterable, body, index) => for_pattern(
+            binding,
             iterable,
             body,
             index,
@@ -160,18 +162,16 @@ pub fn desugared(self: Expr) -> Expr {
         Lambda(params, body) => Expr {
             ..inner,
             kind: Lambda(
-                params.map(|p| LambdaParam { ..p, pattern: none }),
+                params.map(|p| LambdaParam { ..p, binding: Name(p.synthesized_name()) }),
                 params.right_fold(
                     body,
-                    |p: LambdaParam, result: Expr| p.pattern
-                        .map(|pattern| bind_param_pattern(
-                            p.name,
-                            pattern,
-                            p.span,
-                            result,
-                            p.written.value_or(WrittenNames {}),
-                        ))
-                        .value_or(result),
+                    |p: LambdaParam, result: Expr| bind_param_pattern(
+                        p.synthesized_name(),
+                        p.binding,
+                        p.span,
+                        result,
+                        p.written.value_or(WrittenNames {}),
+                    ),
                 ),
             ),
         },
@@ -216,6 +216,18 @@ pub fn desugared(self: Expr) -> Expr {
         looped
             .desugared()
             .show_expr() == "For([i], __fpat$0, xs, Let(a, __fpat$0._0, Let(b, __fpat$0._1, a)))",
+    );
+
+    // A plain name is a binding that takes nothing apart: the `let` or loop itself.
+    assert(
+        expr(LetPattern(Name("a"), ident("v"), ident("a")))
+            .desugared()
+            .show_expr() == "Let(a, v, a)",
+    );
+    assert(
+        expr(ForPattern(Name("a"), ident("xs"), ident("a"), index=some("i")))
+            .desugared()
+            .show_expr() == "For([i], a, xs, a)",
     );
 
     // A struct pattern inside another pattern becomes a binder, and the arm's body
@@ -370,9 +382,10 @@ fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -> Lifte
 
 # `let <pattern> = value; body`. The temporary is named for where the value
 # starts, and holds the value so it is evaluated once.
-fn let_pattern(pattern: Destructure, value: Expr, body: Expr, written: WrittenNames) -> Expr {
+fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames) -> Expr {
     let span = value.span;
-    match (pattern) {
+    match (binding) {
+        Name(name) => at(Let(name, none, value, body), join_spans(span, body.span)),
         ByTuple(names) => {
             let tmp = `__tpat${span.start}`;
             let inner = bind_fields(names, tmp, span, body, tuple_slot_names(names), written);
@@ -408,7 +421,7 @@ fn let_pattern(pattern: Destructure, value: Expr, body: Expr, written: WrittenNa
 # is checked the same way. With an `index` it is the indexed loop over that
 # temporary: the counter and the pattern compose as each does alone.
 fn for_pattern(
-    pattern: Destructure,
+    binding: Binding,
     iterable: Expr,
     body: Expr,
     index: str?,
@@ -416,7 +429,12 @@ fn for_pattern(
 ) -> Expr {
     let span = iterable.span;
     let tmp = `__fpat${span.start}`;
-    let inner = match (pattern) {
+    // A plain name is the loop variable itself.
+    if (let Name(name) = binding) {
+        return at(For(name, iterable, body, index=index), join_spans(span, body.span));
+    };
+    let inner = match (binding) {
+        Name(..) => body,
         ByTuple(names) => bind_fields(names, tmp, span, body, tuple_slot_names(names), written),
         ByCase(case_name, names) => bind_arm(case_name, names, tmp, span, body, written),
         ByStruct(struct_name, fields, names, mutable) => destructure_struct(
@@ -603,12 +621,13 @@ fn bind_one_param(p: Param, body: Expr) -> Expr {
 # `body`. The parameter's own type is what the checker holds the pattern to.
 fn bind_param_pattern(
     parameter: str,
-    pattern: Destructure,
+    pattern: Binding,
     span: Span,
     body: Expr,
     written: WrittenNames,
 ) -> Expr {
     match (pattern) {
+        Name(..) => body,
         ByCase(case_name, names) => bind_arm(case_name, names, parameter, span, body, written),
         ByStruct(_, fields, names, _) => bind_fields_mut(
             names,

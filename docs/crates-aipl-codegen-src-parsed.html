@@ -44,7 +44,7 @@
 
             </li>
 
-            <li id="item-LetDestructure"><code>LetDestructure(pattern: Destructure, value: Expr, span: Span, written: WrittenNames)</code>
+            <li id="item-LetDestructure"><code>LetDestructure(binding: Binding, value: Expr, span: Span, written: WrittenNames)</code>
 
               <div class="doc"><p><code>let (a, b) = v;</code>, <code>let Case(a) = v;</code>, <code>let T { x } = v;</code> and the <code>mut</code> struct form: the pattern as written, kept for <code>desugar.aipl</code> to lower, and where its names are written. <code>span</code> is the value's.</p></div>
 
@@ -68,7 +68,7 @@
 
             </li>
 
-            <li id="item-ForDestructure"><code>ForDestructure(pattern: Destructure, index: str?, iterable: Expr, body: Expr, span: Span, written: WrittenNames)</code>
+            <li id="item-ForDestructure"><code>ForDestructure(binding: Binding, index: str?, iterable: Expr, body: Expr, span: Span, written: WrittenNames)</code>
 
               <div class="doc"><p>A loop that takes each element apart with a pattern, as written; <code>span</code> runs from the iterable through the body.</p></div>
 

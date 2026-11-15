@@ -170,6 +170,7 @@ import { Doc, print } from "./doc.aipl";
 import {
     ArrayLit,
     Assign,
+    Binding,
     Bool,
     ByCase,
     ByPattern,
@@ -178,7 +179,6 @@ import {
     Call,
     Char,
     Construct,
-    Destructure,
     Expr,
     Field,
     FieldInit,
@@ -2112,8 +2112,8 @@ fn lower_op_value(src: str, node: Parts, kids: Ast[]) -> Ast {
         tsp,
     );
     let params = [
-        LambdaParam { name: "lhs", ty: none, span: tsp },
-        LambdaParam { name: "rhs", ty: none, span: tsp },
+        LambdaParam { binding: Binding.Name("lhs"), ty: none, span: tsp },
+        LambdaParam { binding: Binding.Name("rhs"), ty: none, span: tsp },
     ];
     AExpr(at(Lambda(params, body), tsp))
 }
@@ -2146,47 +2146,32 @@ fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
     ok(at(Lambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
 }
 
-# A function parameter that takes its argument apart, as the lambda parameter that
-# does the same.
-fn lambda_param_of(param: Ast, written: WrittenNames) -> Ast!ParseError {
-    let AParam(p) = param else { return err(wrong_kind("a destructured parameter", param, 0..0)); };
-    ok(ALambdaParam(LambdaParam {
-        name: p.name,
-        ty: some(p.ty),
-        span: p.name_span,
-        pattern: p.pattern$pattern,
-        written: some(written),
-    }))
-}
-
 fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let name_span = node.first_tok(node.tok_span());
     let toks = node.own_texts(src);
     let written = written_in(node, src, 0, "", false);
     match (toks) {
-        // `Point { x, y }` and `Wrap(inner)` — the same parameter a function would
-        // write, handed over as a lambda's.
-        [struct_name, "{", ..] => lambda_param_of(
-            destructured_param(
-                `__spat${name_span.start}`,
-                struct_name,
-                field_binders_of(toks, 2),
-                name_span,
-                written,
-            ),
-            written,
-        ),
-        [case_name, "(", ..] => lambda_param_of(
-            arm_param(
-                `__cpat${name_span.start}`,
-                case_name,
-                case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
-                name_span,
-                written,
-            ),
-            written,
-        ),
+        // `Point { x, y }`: typed as the struct it names.
+        [struct_name, "{", ..] => {
+            let FieldBinders { fields, names } = field_binders_of(toks, 2);
+            ok(ALambdaParam(LambdaParam {
+                binding: ByStruct(struct_name, fields, names, false),
+                ty: some(TyNamed(struct_name)),
+                span: name_span,
+                written: some(written),
+            }))
+        },
+        // `Wrap(inner)`: typed as the case it names.
+        [case_name, "(", ..] => {
+            let binding = case_pattern(case_name, kid(kids, 0, sp)?, sp)?.as_binding();
+            ok(ALambdaParam(LambdaParam {
+                binding,
+                ty: some(TyNamed(case_name)),
+                span: name_span,
+                written: some(written),
+            }))
+        },
         // `(a, b)` — a tuple, whose type is whatever the lambda is handed.
         ["(", ..] => {
             let names = binder_names(toks);
@@ -2197,19 +2182,26 @@ fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 });
             };
             ok(ALambdaParam(LambdaParam {
-                name: `__tpat${name_span.start}`,
+                binding: ByTuple(names),
                 ty: none,
                 span: name_span,
-                pattern: some(ByTuple(names)),
                 written: some(written),
             }))
         },
         [name, ..] => {
             if (kids.is_empty()) {
-                return ok(ALambdaParam(LambdaParam { name, ty: none, span: name_span }));
+                return ok(ALambdaParam(LambdaParam {
+                    binding: Binding.Name(name),
+                    ty: none,
+                    span: name_span,
+                }));
             };
             let ty = as_ty(kid(kids, 0, sp)?, sp)?;
-            ok(ALambdaParam(LambdaParam { name, ty: some(ty), span: name_span }))
+            ok(ALambdaParam(LambdaParam {
+                binding: Binding.Name(name),
+                ty: some(ty),
+                span: name_span,
+            }))
         },
         _ => err(ParseError { message: "a lambda parameter matched no token", span: sp }),
     }
@@ -2554,7 +2546,7 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
             let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
             let value = kid_expr(kids, 1, sp)?;
             if (has_else) { return let_else(pattern, value, kid_expr(kids, 2, sp)?, sp, spelled); };
-            ok(AStmt(SLetDestructure(pattern.destructure(), value, value.span, spelled)))
+            ok(AStmt(SLetDestructure(pattern.as_binding(), value, value.span, spelled)))
         },
         // `let T { x, y as py } = e;` — the struct name, then the braces.
         [_, struct_name, "{", ..] => {
@@ -2794,12 +2786,12 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         // `for (let i, Import(decl) : xs)` — the case name and then its binders.
         [_, _, _, index, ",", case_name, "(", ..] => {
             let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
-            ok(AStmt(for_destructure(pattern.destructure(), some(index), iterable, body, written)))
+            ok(AStmt(for_destructure(pattern.as_binding(), some(index), iterable, body, written)))
         },
         // `for (let Import(ImportDecl { source }) : xs)` — the slots are patterns.
         [_, _, _, case_name, "(", ..] => {
             let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
-            ok(AStmt(for_destructure(pattern.destructure(), none, iterable, body, written)))
+            ok(AStmt(for_destructure(pattern.as_binding(), none, iterable, body, written)))
         },
         // `for (let i, T { x, y as b } : xs)` — the struct name and then its braces.
         [_, _, _, index, ",", struct_name, "{", ..] => {
@@ -2854,13 +2846,13 @@ fn for_struct(
 }
 
 fn for_destructure(
-    pattern: Destructure,
+    binding: Binding,
     index: str?,
     iterable: Expr,
     body: Expr,
     written: WrittenNames,
 ) -> Stmt {
-    SForDestructure(pattern, index, iterable, body, join_spans(iterable.span, body.span), written)
+    SForDestructure(binding, index, iterable, body, join_spans(iterable.span, body.span), written)
 }
 
 # `wrap_stmt` — one statement and the rest of the block, folded into the chain
@@ -3695,11 +3687,7 @@ fn arm_param(name: str, case_name: str, pattern: Pat, span: Span, written: Writt
     };
     AParam(Param {
         ..param,
-        pattern: some(ParamPattern {
-            pattern: pattern.destructure(),
-            span,
-            written: some(written),
-        }),
+        pattern: some(ParamPattern { pattern: pattern.as_binding(), span, written: some(written) }),
     })
 }
 
@@ -3715,7 +3703,7 @@ fn case_pattern(case_name: str, payload: Ast, span: Span) -> Pat!ParseError {
 
 # A pattern as the binding it makes: a case whose slots are all plain names is the
 # `ByCase` form, and anything else is taken as the pattern it is.
-fn destructure(self: Pat) -> Destructure {
+fn as_binding(self: Pat) -> Binding {
     if (let Ctor(case_name, bindings, ignore_payload) = self) {
         if (bindings.is_nonempty() && !ignore_payload) { return ByCase(case_name, bindings); };
     };

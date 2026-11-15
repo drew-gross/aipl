@@ -156,11 +156,9 @@ fn rebinds(self: Expr, name: str) -> bool {
         Let(n, _, _, _) | LetMut(n, _, _, _) => n == name,
         // Both of a loop's binders shadow, the element one and the index one.
         For(n, _, _, index) => n == name || index == some(name),
-        LetPattern(pattern, _, _) => pattern.binders().contains(name),
-        ForPattern(pattern, _, _, index) => pattern.binders().contains(name) || index == some(name),
-        Lambda(params, _) => params.any(|p| p.name == name || p.pattern
-            $binders()
-            .is_some_and(|names| names.contains(name))),
+        LetPattern(binding, _, _) => binding.binders().contains(name),
+        ForPattern(binding, _, _, index) => binding.binders().contains(name) || index == some(name),
+        Lambda(params, _) => params.any(|p| p.binding.binders().contains(name)),
         Match(_, arms) => arms.any(|arm| arm.pattern.pat_bindings().contains(name)),
         _ => false,
     }

@@ -57,7 +57,21 @@
           </h3>
           <pre class="signature"><code>struct LambdaParam</code></pre>
 
-          <div class="doc"><p>One parameter of a lambda. <code>ty</code> is the annotation from <code>|x: i64| ..</code>, absent for the bare <code>|x| ..</code> form.</p><p><code>pattern</code> is the destructuring a parameter was written as (<code>|Point { x, y }| ..</code>, <code>|(a, b)| ..</code>): the parameter itself is a synthetic one named <code>name</code>, and the names are bound off it at the top of the body when <code>desugar.aipl</code> lowers it. Always <code>none</code> once that has run.</p></div>
+          <div class="doc"><p>One parameter of a lambda. <code>ty</code> is the annotation from <code>|x: i64| ..</code>, absent for the bare <code>|x| ..</code> form.</p><p><code>binding</code> is what the parameter binds: a plain name (<code>|x| ..</code>) or the destructuring it was written as (<code>|Point { x, y }| ..</code>, <code>|(a, b)| ..</code>), which has no name of its own. <code>desugar.aipl</code> lowers a destructuring to a parameter called <code>synthesized_name</code> and the names bound off it at the top of the body; after that the binding is always a <code>Name</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-synthesized_name">
+          <h3>
+            <a class="anchor" href="#item-synthesized_name">synthesized_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn synthesized_name(self: LambdaParam) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the parameter <code>self</code> lowers to: its own for a plain name, and for a destructuring one built from where the parameter starts, which no source can spell.</p></div>
 
 
         </section>
@@ -359,14 +373,14 @@
 
             </li>
 
-            <li id="item-LetPattern"><code>LetPattern(pattern: Destructure, value: Expr, body: Expr)</code>
+            <li id="item-LetPattern"><code>LetPattern(binding: Binding, value: Expr, body: Expr)</code>
 
               <div class="doc"><p><code>let T { x, y } = v; rest</code>, <code>let (a, b) = v; rest</code> and <code>let Case(a) = v; rest</code>: the pattern, what it takes apart, and the rest of the block. Written syntax, kept as it was written so the lints see it; <code>desugar.aipl</code> lowers it to the <code>let</code>s and <code>match</code>es that bind the names, and nothing downstream of it ever sees the node.</p></div>
 
 
             </li>
 
-            <li id="item-ForPattern"><code>ForPattern(pattern: Destructure, iterable: Expr, body: Expr, index: str? = none)</code>
+            <li id="item-ForPattern"><code>ForPattern(binding: Binding, iterable: Expr, body: Expr, index: str? = none)</code>
 
               <div class="doc"><p><code>for (let (a, b) : xs) { .. }</code> and its struct and case twins, with the optional index binder. Lowered by <code>desugar.aipl</code> like <code>LetPattern</code>.</p></div>
 
@@ -386,17 +400,22 @@
 
 
 
-        <section class="item" id="item-Destructure">
+        <section class="item" id="item-Binding">
           <h3>
-            <a class="anchor" href="#item-Destructure">Destructure</a>
+            <a class="anchor" href="#item-Binding">Binding</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant Destructure</code></pre>
+          <pre class="signature"><code>variant Binding</code></pre>
 
-          <div class="doc"><p>What a <code>let</code>, a <code>for</code> or a parameter takes a value apart with, as written. A tuple's slots are its positions, so only the names are kept; a case's payload is bound in order; a struct names the fields it reads and what each is bound as, and <code>mutable</code> is the <code>mut T { .. } = v</code> form.</p></div>
+          <div class="doc"><p>What a <code>let</code>, a <code>for</code> or a parameter binds a value to, as written. A plain name is the simplest binding; the rest take the value apart. A tuple's slots are its positions, so only the names are kept; a case's payload is bound in order; a struct names the fields it reads and what each is bound as, and <code>mutable</code> is the <code>mut T { .. } = v</code> form.</p></div>
 
 
           <ul class="cases">
+
+            <li id="item-Name"><code>Name(name: str)</code>
+
+
+            </li>
 
             <li id="item-ByTuple"><code>ByTuple(names: str[])</code>
 
@@ -683,7 +702,7 @@
             <a class="anchor" href="#item-reads_off">reads_off</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn reads_off(self: Destructure, base: str) -&#62; Read[]</code></pre>
+          <pre class="signature"><code>pub fn reads_off(self: Binding, base: str) -&#62; Read[]</code></pre>
 
           <div class="doc"><p>The fields <code>self</code> reads off <code>base</code>: a struct pattern's, none for the others.</p></div>
 
@@ -697,9 +716,9 @@
             <a class="anchor" href="#item-binders">binders</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn binders(self: Destructure) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn binders(self: Binding) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The names a destructuring pattern binds, in order.</p></div>
+          <div class="doc"><p>The names a binding binds, in order.</p></div>
 
 
         </section>
@@ -853,14 +872,14 @@
 
 
 
-        <section class="item" id="item-show_destructure">
+        <section class="item" id="item-show_binding">
           <h3>
-            <a class="anchor" href="#item-show_destructure">show_destructure</a>
+            <a class="anchor" href="#item-show_binding">show_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn show_destructure(self: Destructure) -&#62; str</code></pre>
+          <pre class="signature"><code>fn show_binding(self: Binding) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>f</code> applied to each of <code>xs</code>. A destructuring pattern as one line, for the dump: <code>(a, b)</code>, <code>Case(a, b)</code>, <code>T { x as a, y }</code> (and <code>mut T { .. }</code>). A field bound under its own name prints bare.</p></div>
+          <div class="doc"><p><code>f</code> applied to each of <code>xs</code>. A binding as one line, for the dump: <code>x</code>, <code>(a, b)</code>, <code>Case(a, b)</code>, <code>T { x as a, y }</code> (and <code>mut T { .. }</code>). A field bound under its own name prints bare.</p></div>
 
 
         </section>

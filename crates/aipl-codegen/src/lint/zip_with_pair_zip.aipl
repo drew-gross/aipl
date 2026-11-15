@@ -22,7 +22,7 @@ import {
     map,
     not_equal as !=,
 } from builtins;
-import { Call, Expr, Ident, Lambda, TupleLit, descendants } from "../expr.aipl";
+import { Call, Expr, Ident, Lambda, TupleLit, descendants, synthesized_name } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Program } from "../item.aipl";
 import {
@@ -106,5 +106,5 @@ fn only_pairs(self: Expr) -> bool {
     let [first, second] = parameters else { return false; };
     let TupleLit(elements) = body.kind else { return false; };
     let [left, right] = elements else { return false; };
-    left.kind == Ident(first.name) && right.kind == Ident(second.name)
+    left.kind == Ident(first.synthesized_name()) && right.kind == Ident(second.synthesized_name())
 }

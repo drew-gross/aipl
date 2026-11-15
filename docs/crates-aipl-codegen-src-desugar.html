@@ -230,7 +230,7 @@
             <a class="anchor" href="#item-let_pattern">let_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn let_pattern(pattern: Destructure, value: Expr, body: Expr, written: WrittenNames) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>let &lt;pattern&gt; = value; body</code>. The temporary is named for where the value starts, and holds the value so it is evaluated once.</p></div>
 
@@ -244,7 +244,7 @@
             <a class="anchor" href="#item-for_pattern">for_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_pattern(pattern: Destructure, iterable: Expr, body: Expr, index: str?, written: WrittenNames) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn for_pattern(binding: Binding, iterable: Expr, body: Expr, index: str?, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>for (let &lt;pattern&gt; : iterable) { body }</code> is a plain loop over a temporary whose fields (or slots, or payload) are read in front of the body, as the same pattern in a <code>let</code> reads them — through the same helpers, so the pattern's type is checked the same way. With an <code>index</code> it is the indexed loop over that temporary: the counter and the pattern compose as each does alone.</p></div>
 
@@ -384,7 +384,7 @@
             <a class="anchor" href="#item-bind_param_pattern">bind_param_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_param_pattern(parameter: str, pattern: Destructure, span: Span, body: Expr, written: WrittenNames) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_param_pattern(parameter: str, pattern: Binding, span: Span, body: Expr, written: WrittenNames) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The bindings <code>pattern</code> makes, read off the parameter called <code>parameter</code>, in front of <code>body</code>. The parameter's own type is what the checker holds the pattern to.</p></div>
 

@@ -3,6 +3,7 @@
 
 import { Span, equal as ==, value_or } from builtins;
 import {
+    Binding,
     Call,
     Construct,
     Expr,
@@ -158,7 +159,7 @@ fn spelled(text: str) -> SpanStr { text, span: 0..0 }
 fn mapped_element(Span { start, end }) -> str { `__map${start}_{end}` }
 
 fn mapped(recv: Expr, step: Expr, span: Span) -> Expr {
-    let element = LambdaParam { name: mapped_element(span), ty: none, span };
+    let element = LambdaParam { binding: Binding.Name(mapped_element(span)), ty: none, span };
     at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true), span)
 }
 

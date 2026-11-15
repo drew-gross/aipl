@@ -25,6 +25,7 @@ import {
 import {
     ArrayLit,
     Assign,
+    Binding,
     Bool,
     ByCase,
     ByPattern,
@@ -33,7 +34,6 @@ import {
     Call,
     Char,
     Construct,
-    Destructure,
     DictLit,
     Expr,
     Field,
@@ -240,16 +240,16 @@ fn own_names(self: Expr) -> #{str} {
         // A shim's name and bindings all name functions.
         Shim(effect, bindings, _) => #{effect, ..bindings$to_set().union_all()},
         Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
-        Lambda(params, _) => {
-            let taken_apart = params.map(|p| p.pattern$destructure_names().value_or(#{}));
-            #{..params$ty$optional_ty_names().union_all(), ..taken_apart.union_all()}
+        Lambda(params, _) => #{
+            ..params$ty$optional_ty_names().union_all(),
+            ..params$binding$destructure_names().union_all(),
         },
         Match(_, arms) => arms$pattern$ctor_names().union_all(),
         // `if (let P = e)` is one arm without the `match`; its pattern names a
         // constructor just as an arm's does.
         IfLet(arm, _, _) => arm.pattern.ctor_names(),
         // A destructuring `let` or `for` names the struct or case it takes apart.
-        LetPattern(pattern, _, _) | ForPattern(pattern, _, _, _) => pattern.destructure_names(),
+        LetPattern(binding, _, _) | ForPattern(binding, _, _, _) => binding.destructure_names(),
         Num(..)
         | FloatLit(..)
         | Bool(..)
@@ -277,10 +277,10 @@ fn own_names(self: Expr) -> #{str} {
     }
 }
 
-# The type or case a destructuring pattern names: a tuple names none.
-fn destructure_names(self: Destructure) -> #{str} {
+# The type or case a binding names: a plain name or a tuple names none.
+fn destructure_names(self: Binding) -> #{str} {
     match (self) {
-        ByTuple(..) => #{},
+        Name(..) | ByTuple(..) => #{},
         ByCase(case_name, _) => path_names(case_name),
         ByStruct(struct_name, _, _, _) => #{struct_name},
         ByPattern(pattern) => pattern.ctor_names(),

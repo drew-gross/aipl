@@ -424,8 +424,14 @@ fn written_names(v: &FfiValue) -> R<ast::WrittenNames> {
 }
 
 fn lambda_param(v: &FfiValue) -> R<ast::LambdaParam> {
+    // Destructuring is lowered away before the tree reaches Rust, so a parameter's
+    // binding is a plain name.
+    let name = match variant(field(v, "binding")?)? {
+        ("Name", payload) => text(at(payload, 0, "Name")?)?,
+        (other, _) => return Err(unknown("Binding", other)),
+    };
     Ok(ast::LambdaParam {
-        name: text(field(v, "name")?)?,
+        name,
         ty: maybe(field(v, "ty")?, ty)?,
         span: span(field(v, "span")?)?,
     })

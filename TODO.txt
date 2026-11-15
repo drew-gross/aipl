@@ -339,6 +339,7 @@ bugs:
     It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
+  wrong type for self in method syntax should say something like that (not arg 0)
   field access on non-struct value of type i64 <--- should show which level in case of a.b.c
   err_spread_type_mismatch.aipl is leaking internal names
   err_for_destructure_wrong_struct.aipl is leaking internal names

@@ -81,11 +81,11 @@ import {
     value_or,
 } from builtins;
 import {
+    Binding,
     ByCase,
     ByStruct,
     ByTuple,
     Construct,
-    Destructure,
     Expr,
     ForPattern,
     Let,
@@ -386,7 +386,7 @@ variant Taken = Fields(str[]) | Opening(Span, str, str[])
 # Where a name is bound, and what the advice says about it: a parameter of a
 # struct type, a `let` with the struct its annotation names, or a slot of a case
 # pattern (a tuple's has no case) over these names.
-variant Place = Parameter(str) | Binding(str?) | Slot(str?, str[])
+variant Place = Parameter(str) | Bound(str?) | Slot(str?, str[])
 
 # How `name` is taken apart in `scope`, when it is. `value` is what a `let` binds it
 # to, and `struct_name` the struct the source already names for it, if any.
@@ -453,11 +453,11 @@ fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Rea
         _ => none,
     };
     let some(taken) = inner.taken_apart(name, reads, some(value), written) else { return []; };
-    [hit(advice(Binding(written), name, taken), value.span)]
+    [hit(advice(Bound(written), name, taken), value.span)]
 }
 
 # The hits for the slots of `pattern`, the names it binds over `scope`, at `at`.
-fn slot_hits(self: Destructure, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
+fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
     match (self) {
         ByCase(case_name, names) => names.slots_taken_apart(some(case_name), scope, reads, at),
         ByTuple(names) => names.slots_taken_apart(none, scope, reads, at),
@@ -493,7 +493,7 @@ fn advice(place: Place, name: str, taken: Taken) -> str {
             Fields(fields) => param_message(name, struct_name, fields),
             Opening(_, _, fields) => param_opening_message(name, struct_name, fields),
         },
-        Binding(annotation) => match (taken) {
+        Bound(annotation) => match (taken) {
             Fields(fields) => binding_message(name, fields, annotation.value_or("<Type>")),
             Opening(_, named, fields) => binding_opening_message(name, named, fields),
         },

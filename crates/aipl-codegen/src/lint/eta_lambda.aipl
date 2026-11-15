@@ -48,7 +48,16 @@ import {
     starts_with,
     zip_with,
 } from builtins;
-import { Call, Expr, Field, Ident, Lambda, LambdaParam, descendants } from "../expr.aipl";
+import {
+    Call,
+    Expr,
+    Field,
+    Ident,
+    Lambda,
+    LambdaParam,
+    descendants,
+    synthesized_name,
+} from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Fn, Function, Item, Program } from "../item.aipl";
@@ -190,8 +199,8 @@ fn map_advice(self: Expr, map_name: str?, methods: str[]) -> MapAdvice? {
     };
     let Lambda(parameters, body) = argument.kind.as_case(Lambda)?;
     let [parameter] = parameters else { return none; };
-    if (parameter.ty.is_some() || parameter.name.contains('$')) { return none; };
-    let steps = body.chain(parameter.name, methods)?;
+    if (parameter.ty.is_some() || parameter.synthesized_name().contains('$')) { return none; };
+    let steps = body.chain(parameter.synthesized_name(), methods)?;
     if (steps.is_empty()) { return none; };
     some(MapAdvice {
         hit: hit(
@@ -249,19 +258,23 @@ fn slot_shown(self: str) -> str {
 # *nothing* — `|x| to_str(x)` against `to_str`.
 fn forwarded(self: Expr, advised: Span[]) -> LintHit? {
     let Lambda(parameters, body) = self.kind.as_case(Lambda)?;
-    if (advised.contains(self.span) || parameters.any(|parameter| parameter.name.contains('$'))) {
+    if (advised.contains(self.span) || parameters.any(
+        |parameter| parameter.synthesized_name().contains('$'),
+    )) {
         return none;
     };
     let Call(name, arguments, _) = body.kind.as_case(Call)?;
     if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
-        |parameter| parameter.name == name,
+        |parameter| parameter.synthesized_name() == name,
     )) {
         return none;
     };
     let forwards = zip_with(
         arguments,
         parameters,
-        |argument: Expr, parameter: LambdaParam| argument.kind == Ident(parameter.name),
+        |argument: Expr, parameter: LambdaParam| argument.kind == Ident(
+            parameter.synthesized_name(),
+        ),
     );
     if (!forwards.all(|same| same)) { return none; };
     some(hit(

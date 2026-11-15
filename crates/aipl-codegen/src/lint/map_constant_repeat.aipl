@@ -52,6 +52,7 @@ import {
     TupleLit,
     Unit,
     descendants,
+    synthesized_name,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Program } from "../item.aipl";
@@ -78,7 +79,7 @@ pub fn map_constant_repeat(program: Program) -> LintHit[] {
                     let Lambda(parameters, constant) = lambda.kind else { return none; };
                     let [parameter] = parameters else { return none; };
                     if (callee != map_name || receiver.is_range() || !constant.is_constant(
-                        parameter.name,
+                        parameter.synthesized_name(),
                     )) {
                         return none;
                     };

@@ -6,8 +6,8 @@
 
 import { Span, equal as ==, is_err_and, value_or_err } from builtins;
 import {
+    Binding,
     Construct as ConstructExpr,
-    Destructure,
     Expr,
     FieldInit,
     WrittenNames,
@@ -33,7 +33,7 @@ variant Stmt =
     # `let (a, b) = v;`, `let Case(a) = v;`, `let T { x } = v;` and the `mut` struct
     # form: the pattern as written, kept for `desugar.aipl` to lower, and where its
     # names are written. `span` is the value's.
-    | LetDestructure(pattern: Destructure, value: Expr, span: Span, written: WrittenNames)
+    | LetDestructure(binding: Binding, value: Expr, span: Span, written: WrittenNames)
     # `let PATTERN = value else { .. };` — the rest of the block runs with the
     # pattern's names bound when `value` matches, and `otherwise` (which returns)
     # when it does not.
@@ -43,7 +43,7 @@ variant Stmt =
     # A loop that takes each element apart with a pattern, as written; `span` runs
     # from the iterable through the body.
     | ForDestructure(
-        pattern: Destructure,
+        binding: Binding,
         index: str?,
         iterable: Expr,
         body: Expr,

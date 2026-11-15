@@ -96,17 +96,35 @@ struct FieldInit { name: str, value: Expr, name_span: Span = 0..0 }
 # One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
 # for the bare `|x| ..` form.
 #
-# `pattern` is the destructuring a parameter was written as (`|Point { x, y }| ..`,
-# `|(a, b)| ..`): the parameter itself is a synthetic one named `name`, and the
-# names are bound off it at the top of the body when `desugar.aipl` lowers it. Always
-# `none` once that has run.
-struct LambdaParam {
-    name: str,
-    ty: Ty?,
-    span: Span,
-    pattern: Destructure? = none,
-    written: WrittenNames? = none,
-}
+# `binding` is what the parameter binds: a plain name (`|x| ..`) or the
+# destructuring it was written as (`|Point { x, y }| ..`, `|(a, b)| ..`), which
+# has no name of its own. `desugar.aipl` lowers a destructuring to a parameter
+# called `synthesized_name` and the names bound off it at the top of the body; after
+# that the binding is always a `Name`.
+struct LambdaParam { binding: Binding, ty: Ty?, span: Span, written: WrittenNames? = none }
+
+# The name of the parameter `self` lowers to: its own for a plain name, and for a
+# destructuring one built from where the parameter starts, which no source can
+# spell.
+pub fn synthesized_name(self: LambdaParam) -> str {
+    match (self.binding) {
+        Name(name) => name,
+        ByTuple(..) => `__tpat${self.span.start}`,
+        ByCase(..) | ByPattern(..) => `__cpat${self.span.start}`,
+        ByStruct(..) => `__spat${self.span.start}`,
+    }
+}.test({
+    let plain = LambdaParam { binding: Name("x"), ty: none, span: 4..5 };
+    assert(plain.synthesized_name() == "x");
+    assert(LambdaParam { ..plain, binding: ByTuple(["a", "b"]) }.synthesized_name() == "__tpat$4");
+    assert(LambdaParam { ..plain, binding: ByCase("W", ["c"]) }.synthesized_name() == "__cpat$4");
+    assert(
+        LambdaParam {
+            ..plain,
+            binding: ByStruct("P", ["x"], ["x"], false),
+        }.synthesized_name() == "__spat$4",
+    );
+})
 
 # One name as it is written in a pattern, and where.
 struct WrittenName { text: str, span: Span }
@@ -251,20 +269,22 @@ variant ExprKind =
     # syntax, kept as it was written so the lints see it; `desugar.aipl` lowers it
     # to the `let`s and `match`es that bind the names, and nothing downstream of
     # it ever sees the node.
-    | LetPattern(pattern: Destructure, value: Expr, body: Expr)
+    | LetPattern(binding: Binding, value: Expr, body: Expr)
     # `for (let (a, b) : xs) { .. }` and its struct and case twins, with the
     # optional index binder. Lowered by `desugar.aipl` like `LetPattern`.
-    | ForPattern(pattern: Destructure, iterable: Expr, body: Expr, index: str? = none)
+    | ForPattern(binding: Binding, iterable: Expr, body: Expr, index: str? = none)
     # An IEEE 754 literal, as written (`1.5`, `-2e-3`). It stays text because its width
     # is the checker's to decide, from the position it sits in, and a literal has to be
     # rounded once, to the width it lands at.
     | FloatLit(str)
 
-# What a `let`, a `for` or a parameter takes a value apart with, as written. A
-# tuple's slots are its positions, so only the names are kept; a case's payload
-# is bound in order; a struct names the fields it reads and what each is bound as,
-# and `mutable` is the `mut T { .. } = v` form.
-variant Destructure =
+# What a `let`, a `for` or a parameter binds a value to, as written. A plain name
+# is the simplest binding; the rest take the value apart. A tuple's slots are its
+# positions, so only the names are kept; a case's payload is bound in order; a
+# struct names the fields it reads and what each is bound as, and `mutable` is
+# the `mut T { .. } = v` form.
+variant Binding =
+    | Name(name: str)
     | ByTuple(names: str[])
     | ByCase(case_name: str, names: str[])
     | ByStruct(struct_name: str, fields: str[], names: str[], mutable: bool)
@@ -340,10 +360,10 @@ pub fn show_expr(self: Expr) -> str {
         } else {
             `Kw({name}, {value.show_expr()})`
         },
-        LetPattern(pattern, value, body) => `LetPattern({pattern.show_destructure()}, {value.show_expr()}, {body.show_expr()})`,
-        ForPattern(pattern, iterable, body, index) => match (index) {
-            some(i) => `ForPattern([{i}], {pattern.show_destructure()}, {iterable.show_expr()}, {body.show_expr()})`,
-            none => `ForPattern({pattern.show_destructure()}, {iterable.show_expr()}, {body.show_expr()})`,
+        LetPattern(binding, value, body) => `LetPattern({binding.show_binding()}, {value.show_expr()}, {body.show_expr()})`,
+        ForPattern(binding, iterable, body, index) => match (index) {
+            some(i) => `ForPattern([{i}], {binding.show_binding()}, {iterable.show_expr()}, {body.show_expr()})`,
+            none => `ForPattern({binding.show_binding()}, {iterable.show_expr()}, {body.show_expr()})`,
         },
     }
 }.test({
@@ -389,13 +409,13 @@ pub fn show_expr(self: Expr) -> str {
     assert(expr(Match(ident("o"), [arm])).show_expr() == "Match(o, [some(v) => v])");
     assert(
         expr(Lambda(
-            [LambdaParam { name: "x", ty: none, span: 0..0 }],
+            [LambdaParam { binding: Name("x"), ty: none, span: 0..0 }],
             three,
         )).show_expr() == "Lambda([x], 3)",
     );
     assert(
         expr(Lambda(
-            [LambdaParam { name: "x", ty: some(i64_ty), span: 0..0 }],
+            [LambdaParam { binding: Name("x"), ty: some(i64_ty), span: 0..0 }],
             three,
         )).show_expr() == "Lambda([x: i64], 3)",
     );
@@ -456,7 +476,9 @@ fn show_opt_expr(self: Expr?) -> str { self$show_expr().value_or("") }
 # was not — so the dump reads like the source did.
 fn show_ann(self: Ty?) -> str { self.map(|t| `: {t.show_ty()}`).value_or("") }
 
-fn show_lambda_param(self: LambdaParam) -> str { `{self.name}{show_ann(self.ty)}` }
+fn show_lambda_param(self: LambdaParam) -> str {
+    `{self.binding.show_binding()}{show_ann(self.ty)}`
+}
 
 fn show_field_init(self: FieldInit) -> str {
     if (self.name.is_empty()) { return self.value.show_expr(); };
@@ -476,11 +498,12 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 // undefined fn "f"`) and not passed to `map` by name (`expected (Expr) -> _,
 // got (Expr) -> Expr`). Each carries the `#[allow]` the loop lint wants.
 # `f` applied to each of `xs`.
-# A destructuring pattern as one line, for the dump: `(a, b)`, `Case(a, b)`,
+# A binding as one line, for the dump: `x`, `(a, b)`, `Case(a, b)`,
 # `T { x as a, y }` (and `mut T { .. }`). A field bound under its own name prints
 # bare.
-fn show_destructure(self: Destructure) -> str {
+fn show_binding(self: Binding) -> str {
     match (self) {
+        Name(name) => name,
         ByTuple(names) => `({names.join(sep=", ")})`,
         ByCase(case_name, names) => `{case_name}({names.join(sep=", ")})`,
         ByStruct(struct_name, fields, names, mutable) => {
@@ -498,12 +521,13 @@ fn show_destructure(self: Destructure) -> str {
         ByPattern(Pat.Tuple([
             Pat.Struct("P", ["x"], ["x"]),
             Ctor("n"),
-        ])).show_destructure() == "(P { x }, n)",
+        ])).show_binding() == "(P { x }, n)",
     );
-    assert(ByTuple(["a", "b"]).show_destructure() == "(a, b)");
-    assert(ByCase("Pair", ["a", "_"]).show_destructure() == "Pair(a, _)");
-    assert(ByStruct("P", ["x", "y"], ["x", "b"], false).show_destructure() == "P { x, y as b }");
-    assert(ByStruct("P", ["x"], ["x"], true).show_destructure() == "mut P { x }");
+    assert(Name("x").show_binding() == "x");
+    assert(ByTuple(["a", "b"]).show_binding() == "(a, b)");
+    assert(ByCase("Pair", ["a", "_"]).show_binding() == "Pair(a, _)");
+    assert(ByStruct("P", ["x", "y"], ["x", "b"], false).show_binding() == "P { x, y as b }");
+    assert(ByStruct("P", ["x"], ["x"], true).show_binding() == "mut P { x }");
 })
 
 fn each_mapped(xs: Expr[], f: (Expr) -> Expr) -> Expr[] {
@@ -768,7 +792,7 @@ pub fn promoted_annotations(self: Expr, vars: str[]) -> Expr {
     );
     // A lambda's parameter, nested under a binding with no annotation.
     let lambda = expr(Lambda(
-        [LambdaParam { name: "p", ty: some(Named("T")), span: 0..0 }],
+        [LambdaParam { binding: Name("p"), ty: some(Named("T")), span: 0..0 }],
         ident("p"),
     ));
     let nested = expr(Let("f", none, lambda, ident("f")));
@@ -777,7 +801,7 @@ pub fn promoted_annotations(self: Expr, vars: str[]) -> Expr {
             "f",
             none,
             expr(Lambda(
-                [LambdaParam { name: "p", ty: some(TypeVar("T")), span: 0..0 }],
+                [LambdaParam { binding: Name("p"), ty: some(TypeVar("T")), span: 0..0 }],
                 ident("p"),
             )),
             ident("f"),
@@ -853,17 +877,17 @@ pub fn field_reads(self: Expr) -> Read[] {
 # these count as reads like any other.
 fn pattern_reads(self: Expr) -> Read[] {
     match (self.kind) {
-        LetPattern(pattern, value, _) => pattern.reads_off(`$pattern{value.span.start}`),
-        ForPattern(pattern, iterable, _, _) => pattern.reads_off(`$pattern{iterable.span.start}`),
+        LetPattern(binding, value, _) => binding.reads_off(`$pattern{value.span.start}`),
+        ForPattern(binding, iterable, _, _) => binding.reads_off(`$pattern{iterable.span.start}`),
         _ => [],
     }
 }
 
 # The fields `self` reads off `base`: a struct pattern's, none for the others.
-pub fn reads_off(self: Destructure, base: str) -> Read[] {
+pub fn reads_off(self: Binding, base: str) -> Read[] {
     match (self) {
         ByStruct(_, fields, _, _) => fields.map(|field| Read { field, base }),
-        ByTuple(..) | ByCase(..) | ByPattern(..) => [],
+        Name(..) | ByTuple(..) | ByCase(..) | ByPattern(..) => [],
     }
 }.test({
     assert(ByStruct("P", ["x", "y"], ["a", "b"], false).reads_off("v") == [
@@ -874,14 +898,16 @@ pub fn reads_off(self: Destructure, base: str) -> Read[] {
     assert(ByCase("C", ["a"]).reads_off("v") == []);
 })
 
-# The names a destructuring pattern binds, in order.
-pub fn binders(self: Destructure) -> str[] {
+# The names a binding binds, in order.
+pub fn binders(self: Binding) -> str[] {
     match (self) {
+        Name(name) => [name],
         ByTuple(names) | ByCase(_, names) | ByStruct(_, _, names, _) => names,
         ByPattern(pattern) => pattern.pat_bindings(),
     }
 }.test({
     assert(ByPattern(Pat.Nested("some", [Pat.Struct("P", ["x"], ["b"])])).binders() == ["b"]);
+    assert(Name("x").binders() == ["x"]);
     assert(ByTuple(["a", "b"]).binders() == ["a", "b"]);
     assert(ByCase("C", ["a"]).binders() == ["a"]);
     assert(ByStruct("P", ["x", "y"], ["x", "b"], false).binders() == ["x", "b"]);
