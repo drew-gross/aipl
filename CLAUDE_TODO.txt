@@ -2,7 +2,7 @@ lints:
   unused-import doesn't count `shim random seeded_with_int(..)` inside a .test block as a use
   `++`/`+=` flavor matching (operator_pairs.aipl) pairs by the `wrapping_`/`saturating_` name prefix; the old Rust lint used the canonical-callee table. Differs only for an absurd alias like `wrapping_add as ++`; use the table if it ever matters
   char_set_literal: the unspellable-character branch is untested
-  destructure_binding/destructure_slot advise "(<Type> { n }, rest)" with a placeholder; name the real type, and say to import it when the file lacks the import (as the builtin lints do), so `let r = f()?;` on an ExecResult tells you which import the destructure needs
+  destructure advises (for a binding without an annotation, and a slot) "(<Type> { n }, rest)" with a placeholder; name the real type, and say to import it when the file lacks the import (as the builtin lints do), so `let r = f()?;` on an ExecResult tells you which import the destructure needs
 
 type checker:
   Expr::ty is still Option: the passes run on ast::Expr with optional stamps, not on typed::TExpr (typed.rs, erase/concretize are only exercised by tests). Porting every pre-/post-mono pass to TExpr would make a lost type unrepresentable

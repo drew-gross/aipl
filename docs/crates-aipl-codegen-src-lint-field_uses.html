@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/field_uses.aipl</code></h1>
 
-      <div class="module-doc"><p>How a name is used inside an expression, for the lints that turn a binding into a pattern.</p><p><code>destructure_binding</code> asks it of a <code>let</code> and <code>destructure_param</code> of a parameter, and both put the same question: is every use of the name a field read, and are the names a pattern would bind free? What they share lives here; each lint keeps what only it asks.</p></div>
+      <div class="module-doc"><p>How a name is used inside an expression, for the lints that turn a binding into a pattern.</p><p><code>destructure</code> asks it of a parameter, a <code>let</code> and a slot of a pattern, and each puts the same question: is every use of the name a field read, and are the names a pattern would bind free?</p></div>
 
 
 
@@ -55,9 +55,9 @@
             <a class="anchor" href="#item-sole_fields">sole_fields</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn sole_fields(self: Expr, name: str, reads: Read[]) -&#62; str[]?</code></pre>
+          <pre class="signature"><code>pub fn sole_fields(self: Expr, name: str, reads: Read[], value: Expr?) -&#62; str[]?</code></pre>
 
-          <div class="doc"><p>The fields <code>self</code> reads off <code>name</code>, when every use of <code>name</code> in it is a field read and nothing holds a pattern back: the name is not rebound, no field is also read off another value, none is a tuple position, and no field's name is already spoken for in <code>self</code>. <code>reads</code> are the field reads in scope of <code>name</code>, which is what tells a field read off two values apart.</p></div>
+          <div class="doc"><p>The fields <code>self</code> reads off <code>name</code>, when every use of <code>name</code> in it is a field read and nothing holds a pattern back: the name is not rebound, no field is also read off another value, none is a tuple position, and no field's name is already spoken for in <code>self</code>. <code>reads</code> are the field reads in scope of <code>name</code>, which is what tells a field read off two values apart.</p><p><code>value</code> is what a <code>let</code> binds <code>name</code> to. It runs before the pattern binds anything, so the reads in it do not count against a field and no name in it is exempt; a parameter or a slot has none.</p></div>
 
 
         </section>

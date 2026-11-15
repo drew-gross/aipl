@@ -1,0 +1,566 @@
+# The `destructure` lint: a name that a pattern could take apart, because the value
+# itself is never used — only its fields are. Three places bind such a name, and
+# the argument is the same for each:
+#
+#     fn f(p: Point) { .. p.x .. p.y .. }        fn f(Point { x, y }) { .. x .. y .. }
+#     let p = pos_of(i); .. p.line .. p.col      let Pos { line, col } = pos_of(i);
+#     for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { line }
+#
+# - **A parameter**, whose type is in the signature, so the advice names the struct.
+# - **A `let`** of a plain name, with or without an annotation. A `mut` binding is a
+#   different question — whether it should be `mut` at all — and answering it here
+#   would advise a rewrite that changes more than the spelling.
+# - **A slot of a pattern**: the payload of a case, a position of a tuple, bound by a
+#   parameter, a `let` or a `for`. The slot's type is not written anywhere in the
+#   file, so the advice leaves it as a placeholder.
+#
+# The reader of `fn f(Point { x, y })` or `let P { line, col } = pos_of(i);` knows
+# the fields are the whole story; with a name they have to scan the rest of the
+# body to find out whether it is also passed somewhere, compared, or returned.
+#
+# **The name is taken apart in one of two ways**, and either is advised:
+#
+# - **Only fields are read** (`p.x`, `p.y`). One bare mention is enough to stay
+#   quiet, because a pattern cannot reproduce it — the value itself is gone, only
+#   its fields survive. That covers the obvious escapes (`f(p)`, `p == q`, a
+#   trailing `p`) without special-casing any of them.
+# - **The name's one use opens a destructuring `let`** (`let Point { x, y } = p;`
+#   right under the binding): the pattern is the one the author wrote, one step
+#   late, and moves up unchanged.
+#
+# **A pattern binds one name per field, so it is only available when each of those
+# names would mean one thing in the function.** Two conditions take the lint out,
+# and between them they are most of what it would otherwise flag (`field_uses`
+# holds the rules):
+#
+# - **The name is already spoken for.** `let b = w.bump();` reading `b.text` and
+#   `b.w` cannot become `let Bump { text, w } = w.bump();` where a `w` is in scope:
+#   the new binding shadows it and every later mention of the old one silently
+#   changes meaning. The binding's own name does not count, being the one going away.
+# - **The field is read off more than one value.** Three `let`s binding the same
+#   struct in one block are told apart by their names (`plain.cleaned`,
+#   `empty.cleaned`); destructuring them all binds `cleaned` three times and the
+#   distinction the names carried is gone. Reads inside a `let`'s own value are the
+#   exception: it is evaluated before the pattern binds anything.
+#
+# **What is left alone**:
+#
+# - **`self`.** Method-call syntax is defined by the receiver being named `self`, so
+#   its pattern is the named form `self: Span { start, end }`, not the
+#   `Span { start, end }` this lint's advice spells.
+# - **A parameter already destructured**, whose pattern the author wrote.
+# - **A keyword parameter.** Its name *is* the call-site spelling (`f(sep = ", ")`),
+#   so destructuring it would break every caller.
+# - **`mut` and variadic parameters.** A `mut` receiver is written through rather
+#   than read, and a variadic parameter's type is a sequence.
+# - **Anything but a plain named type** as a parameter's type. A generic instance is
+#   a template until monomorphization and a parameter has no value to infer
+#   arguments from, so `Box { v }` has nothing to bind; arrays, optionals and
+#   primitives have no fields to name.
+# - **A value built on the line.** Taking apart `P { a: 1 }` restates the type name
+#   and re-lists the fields that literal just set.
+# - **A name the parser made** (`__iset1$6`), which the author did not write and
+#   cannot put an `#[allow]` on, and `_`, which binds nothing.
+
+import {
+    Span,
+    as_case,
+    contains,
+    equal as ==,
+    is_case,
+    is_nonempty,
+    is_some,
+    is_some_and,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    push,
+    value_or,
+} from builtins;
+import {
+    ByCase,
+    ByStruct,
+    ByTuple,
+    Construct,
+    Destructure,
+    Expr,
+    ForPattern,
+    Let,
+    LetPattern,
+    Read,
+    descendants,
+    field_reads,
+} from "../expr.aipl";
+import { Function, One, Param, ParamPattern, pattern_reads } from "../item.aipl";
+import { Named, Ty } from "../ty.aipl";
+import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+
+# A hit for each parameter, `let` and pattern slot in the program whose name is only
+# ever taken apart.
+pub fn destructure(Function { sig, body }) -> LintHit[] {
+    // Every read is those of the whole body, so that a field read off two bases
+    // anywhere in it counts against each name it belongs to; the destructured
+    // parameters take their fields apart at the top of it, and their reads count the
+    // same way.
+    let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
+    [..sig.params$param_hits(body, reads).join(), ..body.descendants()$expr_hits(reads).join()]
+}.test({
+    // ---- a parameter ----
+    // Only fields are read: take the parameter apart in the signature.
+    assert(lint_function_messages("fn f(p: Point) -> i64 { p.x + p.y }", destructure)? == [
+        param_message("p", "Point", ["x", "y"]),
+    ]);
+    // One field is enough; the pattern names only what is read.
+    assert(lint_function_messages("fn g(p: Pos) -> i64 { p.col }", destructure)? == [
+        param_message("p", "Pos", ["col"]),
+    ]);
+
+    // Neither `pub` nor a wide struct is an exception. A public function's parameter
+    // name is not documentation enough to keep the longhand, and a pattern that lists
+    // six fields is still the honest statement of what the function reads.
+    assert(lint_function_messages(
+        "pub fn area(p: Pos) -> i64 { p.line + p.col }",
+        destructure,
+    )? == [param_message("p", "Pos", ["line", "col"])]);
+    assert(lint_function_messages(
+        "fn wide(w: Wide) -> i64 { w.a + w.b + w.c + w.d }",
+        destructure,
+    )? == [param_message("w", "Wide", ["a", "b", "c", "d"])]);
+
+    // One bare mention keeps the value whole: a pattern keeps only the fields.
+    assert(lint_function_messages("fn f(p: Point) -> i64 { g(p); p.x }", destructure)? == []);
+    assert(
+        lint_function_messages("fn passed(p: Pos) -> i64 { p.line + take(p) }", destructure)? == [],
+    );
+    // The name is spoken for: a field's name would shadow one in scope.
+    assert(lint_function_messages("fn f(p: Point, x: i64) -> i64 { p.x + x }", destructure)? == []);
+    assert(
+        lint_function_messages(
+            "fn shadowing(p: Pos) -> i64 { let line = 5; p.line + p.col + line }",
+            destructure,
+        )? == [],
+    );
+    // A field read off two values is told apart by the names of the values.
+    assert(
+        lint_function_messages("fn f(p: Point, q: Point) -> i64 { p.x + q.x }", destructure)? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn between(a: Pos, b: Pos) -> i64 { a.line + b.line + a.col + b.col }",
+            destructure,
+        )? == [],
+    );
+    // A tuple cannot be taken apart by a struct pattern.
+    assert(lint_function_messages("fn f(p: Point) -> i64 { p._0 }", destructure)? == []);
+
+    // `self` is what makes a function method-callable, so a pattern there would
+    // change how it is called.
+    assert(lint_function_messages("fn f(self: Point) -> i64 { self.x }", destructure)? == []);
+
+    // A keyword parameter's name *is* the call-site spelling, so destructuring it
+    // would break every caller.
+    assert(lint_function_messages("fn f(p: Point = g()) -> i64 { p.x }", destructure)? == []);
+
+    // `mut` is written through rather than read; a variadic is a sequence; anything
+    // but a plain named type has no fields to name.
+    assert(lint_function_messages("fn f(mut p: Point) -> i64 { p.x }", destructure)? == []);
+    assert(lint_function_messages("fn f(p: Point*) -> i64 { p.x }", destructure)? == []);
+    assert(lint_function_messages("fn f(p: Point[]) -> i64 { p.x }", destructure)? == []);
+    // A parameter the author already destructured is not advised about.
+    assert(lint_function_messages("fn f(Point { x, y }) -> i64 { x + y }", destructure)? == []);
+
+    // A `let` that opens the body and takes the parameter apart is the same pattern
+    // written one step late.
+    assert(lint_function_messages(
+        "fn f(p: Point) -> i64 { let Point { x, y } = p; x + y }",
+        destructure,
+    )? == [param_opening_message("p", "Point", ["x", "y"])]);
+    // ...unless it renames, names another type, is `mut`, or the parameter is used again.
+    assert(
+        lint_function_messages(
+            "fn f(p: Point) -> i64 { let Point { x as a } = p; a }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(p: Point) -> i64 { let Other { x } = p; x }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(p: Point) -> i64 { mut Point { x } = p; x }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn kept(p: Pos) -> i64 { let Pos { line, col } = p; line + col + take(p) }",
+            destructure,
+        )? == [],
+    );
+
+    // ---- a `let` ----
+    // Only fields are read: take it apart in the pattern.
+    assert(lint_function_messages("fn f() -> i64 { let p = g(); p.a + p.b }", destructure)? == [
+        binding_message("p", ["a", "b"], "<Type>"),
+    ]);
+    // An annotation names the struct for the advice.
+    assert(lint_function_messages("fn f() -> i64 { let p: P = g(); p.a }", destructure)? == [
+        binding_message("p", ["a"], "P"),
+    ]);
+
+    // A pattern the author wrote is not a binding to advise about, whatever the
+    // parser binds for it underneath.
+    assert(
+        lint_function_messages("fn f() -> i64 { let P { a, b } = g(); a + b }", destructure)? == [],
+    );
+    assert(lint_function_messages("fn f(P { a }) -> i64 { a }", destructure)? == []);
+    // A name the pattern binds shadows an outer one, which splits its mentions.
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let p = g(); let P { p } = h(); p.a }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages("fn f() -> i64 { let p = g(); h(|p| p); p.a }", destructure)? == [],
+    );
+    // ...and a later `let` of the same name is judged on its own.
+    assert(lint_function_messages(
+        "fn f() -> i64 { let p = g(); let p = h(); p.a }",
+        destructure,
+    )? == [binding_message("p", ["a"], "<Type>")]);
+    // One bare mention keeps the value whole.
+    assert(lint_function_messages("fn f() -> i64 { let p = g(); h(p); p.a }", destructure)? == []);
+    // The name is spoken for.
+    assert(
+        lint_function_messages("fn f(a: i64) -> i64 { let p = g(); p.a + a }", destructure)? == [],
+    );
+    // A field read off two values is told apart by the names of the values...
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let p = g(); let q = g(); p.a + q.a }",
+            destructure,
+        )? == [],
+    );
+    // ...but a read inside the binding's own value runs before the pattern binds.
+    assert(lint_function_messages("fn f() -> i64 { let p = h(q.a); p.a }", destructure)? == [
+        binding_message("p", ["a"], "<Type>"),
+    ]);
+    // A tuple cannot be taken apart by a struct pattern.
+    assert(lint_function_messages("fn f() -> i64 { let p = g(); p._0 }", destructure)? == []);
+    // A value built on the same line is not taken apart.
+    assert(lint_function_messages("fn f() -> i64 { let p = P { a: 1 }; p.a }", destructure)? == []);
+    // A `mut` binding is a different question.
+    assert(lint_function_messages("fn f() -> i64 { mut p = g(); p.a }", destructure)? == []);
+    // The `.test` block is held to it too.
+    assert(lint_function_messages(
+        "fn f() { }.test({ let p = g(); assert(p.a == 1); })",
+        destructure,
+    )? == [binding_message("p", ["a"], "<Type>")]);
+
+    // Threading a cursor: `line` is read off two values, but the competing read is
+    // inside `step`'s own value, evaluated before the pattern binds anything.
+    assert(lint_function_messages(
+        """
+            fn threaded() -> i64 {
+                let head = make();
+                let step = shift(head.line);
+                step.line + step.col
+            }
+        """,
+        destructure,
+    )? == [binding_message("step", ["line", "col"], "<Type>")]);
+
+    // The binding sharing a name with one of its own fields: the name the pattern
+    // takes over belongs to the binding that is going away.
+    assert(lint_function_messages(
+        "fn self_named() -> i64 { let col = make(); col.col + col.line }",
+        destructure,
+    )? == [binding_message("col", ["col", "line"], "<Type>")]);
+    // Taken apart by a `let` right under it: the same pattern, one `let` earlier.
+    assert(lint_function_messages(
+        "fn f() -> i64 { let p = g(); let P { a, b } = p; a + b }",
+        destructure,
+    )? == [binding_opening_message("p", "P", ["a", "b"])]);
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let p: Q = g(); let P { a } = p; a }",
+            destructure,
+        )? == [],
+    );
+
+    // ---- a slot of a pattern ----
+    // A parameter's case payload that is only read by field.
+    assert(lint_function_messages(
+        "fn f(self: Fn(function), n: i64) -> i64 { function.sig + function.body }",
+        destructure,
+    )? == [slot_message("function", "Fn(<Type> { sig, body })")]);
+    assert(lint_function_messages(
+        "fn f(Fn(function)) -> i64 { function.sig + function.body }",
+        destructure,
+    )? == [slot_message("function", "Fn(<Type> { sig, body })")]);
+    // Beside other slots, which stay as they were.
+    assert(lint_function_messages(
+        "fn f(Pair(a, function)) -> i64 { a + function.sig + function.body }",
+        destructure,
+    )? == [slot_message("function", "Pair(a, <Type> { sig, body })")]);
+    // A `let` over a case or a tuple.
+    assert(lint_function_messages(
+        "fn f(v: V) -> i64 { let Fn(function) = v; function.sig + function.body }",
+        destructure,
+    )? == [slot_message("function", "Fn(<Type> { sig, body })")]);
+    assert(lint_function_messages(
+        "fn f(t: (P, i64)) -> i64 { let (function, n) = t; function.sig + function.body + n }",
+        destructure,
+    )? == [slot_message("function", "(<Type> { sig, body }, n)")]);
+    // A `for` over a case.
+    assert(lint_function_messages(
+        "fn f(xs: V[]) -> i64 { for (let Fn(function) : xs) { g(function.sig); } 0 }",
+        destructure,
+    )? == [slot_message("function", "Fn(<Type> { sig })")]);
+    assert(lint_function_messages(
+        "fn f(xs: V[]) -> i64 { for (let i, Fn(function) : xs) { g(function.sig + i); } 0 }",
+        destructure,
+    )? == [slot_message("function", "Fn(<Type> { sig })")]);
+
+    // Taken apart by a `let` right under the slot: the type is named, because the
+    // author wrote it.
+    assert(lint_function_messages(
+        "fn f(xs: V[]) -> i64 { for (let Fn(function) : xs) { let F { sig, body } = function; g(sig + body); } 0 }",
+        destructure,
+    )? == [slot_opening_message("function", "Fn(F { sig, body })")]);
+    assert(lint_function_messages(
+        "fn f(Fn(function)) -> i64 { let F { sig } = function; sig }",
+        destructure,
+    )? == [slot_opening_message("function", "Fn(F { sig })")]);
+
+    // The slot is used whole, or read off a tuple position, or not at all.
+    assert(
+        lint_function_messages(
+            "fn f(Fn(function)) -> i64 { g(function); function.sig }",
+            destructure,
+        )? == [],
+    );
+    assert(lint_function_messages("fn f(Fn(function)) -> i64 { function._0 }", destructure)? == []);
+    assert(lint_function_messages("fn f(Fn(function)) -> i64 { 1 }", destructure)? == []);
+    // The name a field would bind is spoken for, or the field is read off two values.
+    assert(
+        lint_function_messages(
+            "fn f(Fn(function), sig: i64) -> i64 { function.sig + sig }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(Fn(function), other: P) -> i64 { function.sig + other.sig }",
+            destructure,
+        )? == [],
+    );
+    // A pattern that is already nested takes the slot apart itself.
+    assert(lint_function_messages("fn f(Fn(P { sig })) -> i64 { sig }", destructure)? == []);
+    assert(
+        lint_function_messages(
+            "fn nested(Dot(Pos { line, col })) -> i64 { line + col }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(xs: V[]) -> i64 { for (let Fn(P { sig }) : xs) { g(sig); } 0 }",
+            destructure,
+        )? == [],
+    );
+})
+
+# The way a name is taken apart: only its fields are read, or its one use is a
+# destructuring `let` of it right under it, which names the struct, at `span`.
+variant Taken = Fields(str[]) | Opening(Span, str, str[])
+
+# Where a name is bound, and what the advice says about it: a parameter of a
+# struct type, a `let` with the struct its annotation names, or a slot of a case
+# pattern (a tuple's has no case) over these names.
+variant Place = Parameter(str) | Binding(str?) | Slot(str?, str[])
+
+# How `name` is taken apart in `scope`, when it is. `value` is what a `let` binds it
+# to, and `struct_name` the struct the source already names for it, if any.
+fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: str?) -> Taken? {
+    let Uses { mentions, field_reads, shadowed, fields as _ } = self.uses_of(name);
+    if (!shadowed && field_reads == 0 && mentions == 1) {
+        if (let some((span, named, fields)) = self.opening_destructure(name, struct_name)) {
+            return some(Opening(span, named, fields));
+        };
+    };
+    some(Fields(self.sole_fields(name, reads, value)?))
+}
+
+# The hit for one parameter, or its pattern's slots.
+fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
+    // The body's span starts at the `{` that opens it, which is a single line that
+    // survives the formatter — and the closest line to the signature that a
+    // parameter can be blamed on, `Param` carrying no span of its own.
+    if (let some(ParamPattern { pattern, span as _ }) = self.pattern) {
+        return pattern.slot_hits(body, reads, body.span);
+    };
+    if (self.name == "self" || self.mutable || self.arity != One || self.default.is_some()) {
+        return [];
+    };
+    let some(Named(struct_name)) = self.ty.as_case(Named) else { return []; };
+
+    // There is no right-hand side to discount here the way a `let` has one: a
+    // parameter is bound before the body runs, so every read in the function is one
+    // the pattern's names would have to live alongside.
+    let some(taken) = body.taken_apart(self.name, reads, none, some(struct_name)) else {
+        return [];
+    };
+    match (taken) {
+        Fields(..) => [hit(advice(Parameter(struct_name), self.name, taken), body.span)],
+        Opening(span, _, _) => [hit(advice(Parameter(struct_name), self.name, taken), span)],
+    }
+}
+
+# The hits at one node: a `let` of a name, or the slots of a destructuring `let` or
+# `for`.
+fn expr_hits(self: Expr, reads: Read[]) -> LintHit[] {
+    match (self.kind) {
+        Let(name, annotation, value, inner) => binding_hits(name, annotation, value, inner, reads),
+        LetPattern(pattern, value, rest) => pattern.slot_hits(rest, reads, value.span),
+        ForPattern(pattern, iterable, body, _) => pattern.slot_hits(body, reads, iterable.span),
+        _ => [],
+    }
+}
+
+# The hit for `let name = value; inner`, at its value.
+fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -> LintHit[] {
+    // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
+    // written by the author, who cannot put an `#[allow]` on it. The destructuring
+    // forms are not among them: this reads the program before they are lowered.
+    if (name.contains("$")) { return []; };
+
+    // Taking apart a value built on the same line is not an improvement: the pattern
+    // restates the type name that literal just wrote and re-lists the fields it just
+    // set.
+    if (value.kind.is_case(Construct)) { return []; };
+    // The struct is named only where the source already names it — an annotation.
+    let written = match (annotation) {
+        some(Named(struct_name)) => some(struct_name),
+        _ => none,
+    };
+    let some(taken) = inner.taken_apart(name, reads, some(value), written) else { return []; };
+    [hit(advice(Binding(written), name, taken), value.span)]
+}
+
+# The hits for the slots of `pattern`, the names it binds over `scope`, at `at`.
+fn slot_hits(self: Destructure, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
+    match (self) {
+        ByCase(case_name, names) => names.slots_taken_apart(some(case_name), scope, reads, at),
+        ByTuple(names) => names.slots_taken_apart(none, scope, reads, at),
+        _ => [],
+    }
+}
+
+# The hits for the `names` a case pattern (or a tuple's, with no `case_name`) binds.
+fn slots_taken_apart(
+    self: str[],
+    case_name: str?,
+    scope: Expr,
+    reads: Read[],
+    at: Span,
+) -> LintHit[] {
+    mut found: LintHit[] = [];
+    for (let name : self) {
+        // The parser's own temporaries are not the author's to rewrite, and `_` binds
+        // nothing.
+        if (name != "_" && !name.contains("$")) {
+            if (let some(taken) = scope.taken_apart(name, reads, none, none)) {
+                set found.push(hit(advice(Slot(case_name, self), name, taken), at));
+            };
+        };
+    }
+    found
+}
+
+# What is said of `name`, bound at `place`, taken apart as `taken`.
+fn advice(place: Place, name: str, taken: Taken) -> str {
+    match (place) {
+        Parameter(struct_name) => match (taken) {
+            Fields(fields) => param_message(name, struct_name, fields),
+            Opening(_, _, fields) => param_opening_message(name, struct_name, fields),
+        },
+        Binding(annotation) => match (taken) {
+            Fields(fields) => binding_message(name, fields, annotation.value_or("<Type>")),
+            Opening(_, named, fields) => binding_opening_message(name, named, fields),
+        },
+        Slot(case_name, names) => match (taken) {
+            Fields(fields) => slot_message(
+                name,
+                slot_pattern(case_name, names, name, `<Type> \{ {fields.join(sep=", ")} }`),
+            ),
+            Opening(_, named, fields) => slot_opening_message(
+                name,
+                slot_pattern(case_name, names, name, `{named} \{ {fields.join(sep=", ")} }`),
+            ),
+        },
+    }
+}
+
+# The pattern over `names`, with the slot `name` taken apart in place as `taken`.
+fn slot_pattern(case_name: str?, names: str[], name: str, taken: str) -> str {
+    let spelled = names.map(|n| if (n == name) { taken } else { n }).join(sep=", ");
+    match (case_name) {
+        some(case_name) => `{case_name}({spelled})`,
+        none => `({spelled})`,
+    }
+}
+
+# What is said of a parameter `name` whose `fields` are the ones read.
+fn param_message(name: str, struct_name: str, fields: str[]) -> str {
+    `only the fields of parameter "{name}" are read — destructure it instead: "{struct_name} \{ {fields.join(sep=", ")} }" in place of "{name}: {struct_name}"`
+}
+
+# What is said of a parameter `name` that a `let` right under the signature takes
+# apart.
+fn param_opening_message(name: str, struct_name: str, fields: str[]) -> str {
+    `parameter "{name}" is only taken apart by a destructuring \`let\` — destructure it in the signature instead: "{struct_name} \{ {fields.join(sep=", ")} }" in place of "{name}: {struct_name}"`
+}
+
+# What is said of the binding `name`, whose `fields` are the ones read.
+fn binding_message(name: str, fields: str[], ty: str) -> str {
+    `only the fields of "{name}" are read — destructure the binding instead: "let {ty} \{ {fields.join(sep=", ")} } = ..."`
+}
+
+# What is said of the binding `name` that a `let` right under it takes apart.
+fn binding_opening_message(name: str, ty: str, fields: str[]) -> str {
+    `"{name}" is only taken apart by a destructuring \`let\` — destructure the binding instead: "let {ty} \{ {fields.join(sep=", ")} } = ..."`
+}
+
+# What is said of the slot `name`, whose pattern would read `rewritten`.
+fn slot_message(name: str, rewritten: str) -> str {
+    `only the fields of "{name}" are read — destructure it in the pattern instead: "{rewritten}"`
+}
+
+# What is said of the slot `name` that a `let` right under the pattern takes apart.
+fn slot_opening_message(name: str, rewritten: str) -> str {
+    `"{name}" is only taken apart by a destructuring \`let\` — destructure it in the pattern instead: "{rewritten}"`
+}
+
+# The span, struct and field names of a `let T { a, b } = <name>;` that opens `self`,
+# when it binds each field to a name of its own spelling and names `struct_name`
+# (any struct, when none is given). A field bound under another name (`T { a as x }`)
+# is not recognised: the earlier pattern would have to spell the rename too.
+fn opening_destructure(self: Expr, name: str, struct_name: str?) -> (Span, str, str[])? {
+    let LetPattern(pattern, value, _) = self.kind.as_case(LetPattern)?;
+    let ByStruct(named, fields, names, mutable) = pattern.as_case(ByStruct)?;
+    if (!struct_name.is_some_and(
+        |s| s != named,
+    ) && !mutable && fields == names && fields.is_nonempty() && value.is_name(name)) {
+        return some((value.span, named, fields));
+    };
+    none
+}

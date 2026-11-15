@@ -289,7 +289,7 @@ fn call_values_marshals_struct_param() {
     // ABI used for struct locals and returns, but on the input side. This is
     // the shape `caret_block` uses for its `Span` parameter.
     //
-    // The `#[allow]`s keep the named parameters that `destructure_param` would
+    // The `#[allow]`s keep the named parameters that `destructure` would
     // otherwise turn into patterns: a *struct parameter* is what these fixtures
     // marshal, and a pattern still passes one, so writing it that way would
     // hide the thing under test behind a desugaring.

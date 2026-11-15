@@ -10,9 +10,7 @@ import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
 import { compound_assign } from "./compound_assign.aipl";
-import { destructure_binding } from "./destructure_binding.aipl";
-import { destructure_param } from "./destructure_param.aipl";
-import { destructure_slot } from "./destructure_slot.aipl";
+import { destructure } from "./destructure.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { eta_lambda } from "./eta_lambda.aipl";
 import { extend_loop_map_join } from "./extend_loop_map_join.aipl";
@@ -63,9 +61,7 @@ pub fn lint(program: Program) -> LintHit[] {
     [
         ..unused_imports(program),
         ..duplicate_import_source(program),
-        ..program.on_functions(destructure_binding),
-        ..program.on_functions(destructure_param),
-        ..program.on_functions(destructure_slot),
+        ..program.on_functions(destructure),
         ..program.on_functions(unused_binding),
         ..program.on_functions_once(fn_body_type_stutter),
         ..program.on_functions_filled(match_bool_is_case),

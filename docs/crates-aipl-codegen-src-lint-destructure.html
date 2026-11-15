@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/destructure.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/destructure.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>destructure</code> lint: a name that a pattern could take apart, because the value itself is never used — only its fields are. Three places bind such a name, and the argument is the same for each:</p><pre><code>fn f(p: Point) { .. p.x .. p.y .. }        fn f(Point { x, y }) { .. x .. y .. }
+let p = pos_of(i); .. p.line .. p.col      let Pos { line, col } = pos_of(i);
+for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { line }
+</code></pre><ul><li><strong>A parameter</strong>, whose type is in the signature, so the advice names the struct.</li><li><strong>A <code>let</code></strong> of a plain name, with or without an annotation. A <code>mut</code> binding is a</li></ul><p>different question — whether it should be <code>mut</code> at all — and answering it here would advise a rewrite that changes more than the spelling.</p><ul><li><strong>A slot of a pattern</strong>: the payload of a case, a position of a tuple, bound by a</li></ul><p>parameter, a <code>let</code> or a <code>for</code>. The slot's type is not written anywhere in the file, so the advice leaves it as a placeholder.</p><p>The reader of <code>fn f(Point { x, y })</code> or <code>let P { line, col } = pos_of(i);</code> knows the fields are the whole story; with a name they have to scan the rest of the body to find out whether it is also passed somewhere, compared, or returned.</p><p><strong>The name is taken apart in one of two ways</strong>, and either is advised:</p><ul><li><strong>Only fields are read</strong> (<code>p.x</code>, <code>p.y</code>). One bare mention is enough to stay</li></ul><p>quiet, because a pattern cannot reproduce it — the value itself is gone, only its fields survive. That covers the obvious escapes (<code>f(p)</code>, <code>p == q</code>, a trailing <code>p</code>) without special-casing any of them.</p><ul><li><strong>The name's one use opens a destructuring <code>let</code></strong> (<code>let Point { x, y } = p;</code></li></ul><p>right under the binding): the pattern is the one the author wrote, one step late, and moves up unchanged.</p><p><strong>A pattern binds one name per field, so it is only available when each of those names would mean one thing in the function.</strong> Two conditions take the lint out, and between them they are most of what it would otherwise flag (<code>field_uses</code> holds the rules):</p><ul><li><strong>The name is already spoken for.</strong> <code>let b = w.bump();</code> reading <code>b.text</code> and</li></ul><p><code>b.w</code> cannot become <code>let Bump { text, w } = w.bump();</code> where a <code>w</code> is in scope: the new binding shadows it and every later mention of the old one silently changes meaning. The binding's own name does not count, being the one going away.</p><ul><li><strong>The field is read off more than one value.</strong> Three <code>let</code>s binding the same</li></ul><p>struct in one block are told apart by their names (<code>plain.cleaned</code>, <code>empty.cleaned</code>); destructuring them all binds <code>cleaned</code> three times and the distinction the names carried is gone. Reads inside a <code>let</code>'s own value are the exception: it is evaluated before the pattern binds anything.</p><p><strong>What is left alone</strong>:</p><ul><li><strong><code>self</code>.</strong> Method-call syntax is defined by the receiver being named <code>self</code>, so</li></ul><p>its pattern is the named form <code>self: Span { start, end }</code>, not the <code>Span { start, end }</code> this lint's advice spells.</p><ul><li><strong>A parameter already destructured</strong>, whose pattern the author wrote.</li><li><strong>A keyword parameter.</strong> Its name <em>is</em> the call-site spelling (<code>f(sep = &quot;, &quot;)</code>),</li></ul><p>so destructuring it would break every caller.</p><ul><li><strong><code>mut</code> and variadic parameters.</strong> A <code>mut</code> receiver is written through rather</li></ul><p>than read, and a variadic parameter's type is a sequence.</p><ul><li><strong>Anything but a plain named type</strong> as a parameter's type. A generic instance is</li></ul><p>a template until monomorphization and a parameter has no value to infer arguments from, so <code>Box { v }</code> has nothing to bind; arrays, optionals and primitives have no fields to name.</p><ul><li><strong>A value built on the line.</strong> Taking apart <code>P { a: 1 }</code> restates the type name</li></ul><p>and re-lists the fields that literal just set.</p><ul><li><strong>A name the parser made</strong> (<code>__iset1$6</code>), which the author did not write and</li></ul><p>cannot put an <code>#[allow]</code> on, and <code>_</code>, which binds nothing.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-destructure">
+          <h3>
+            <a class="anchor" href="#item-destructure">destructure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn destructure(__spat$4816: Function) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each parameter, <code>let</code> and pattern slot in the program whose name is only ever taken apart.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Taken">
+          <h3>
+            <a class="anchor" href="#item-Taken">Taken</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Taken</code></pre>
+
+          <div class="doc"><p>The way a name is taken apart: only its fields are read, or its one use is a destructuring <code>let</code> of it right under it, which names the struct, at <code>span</code>.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Fields"><code>Fields(str[])</code>
+
+
+            </li>
+
+            <li id="item-Opening"><code>Opening(Span, str, str[])</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Place">
+          <h3>
+            <a class="anchor" href="#item-Place">Place</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Place</code></pre>
+
+          <div class="doc"><p>Where a name is bound, and what the advice says about it: a parameter of a struct type, a <code>let</code> with the struct its annotation names, or a slot of a case pattern (a tuple's has no case) over these names.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Parameter"><code>Parameter(str)</code>
+
+
+            </li>
+
+            <li id="item-Binding"><code>Binding(str?)</code>
+
+
+            </li>
+
+            <li id="item-Slot"><code>Slot(str?, str[])</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-taken_apart">
+          <h3>
+            <a class="anchor" href="#item-taken_apart">taken_apart</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: str?) -&#62; Taken?</code></pre>
+
+          <div class="doc"><p>How <code>name</code> is taken apart in <code>scope</code>, when it is. <code>value</code> is what a <code>let</code> binds it to, and <code>struct_name</code> the struct the source already names for it, if any.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_hits">
+          <h3>
+            <a class="anchor" href="#item-param_hits">param_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_hits(self: Param, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hit for one parameter, or its pattern's slots.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-expr_hits">
+          <h3>
+            <a class="anchor" href="#item-expr_hits">expr_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn expr_hits(self: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits at one node: a <code>let</code> of a name, or the slots of a destructuring <code>let</code> or <code>for</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binding_hits">
+          <h3>
+            <a class="anchor" href="#item-binding_hits">binding_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hit for <code>let name = value; inner</code>, at its value.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_hits">
+          <h3>
+            <a class="anchor" href="#item-slot_hits">slot_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_hits(self: Destructure, scope: Expr, reads: Read[], at: Span) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits for the slots of <code>pattern</code>, the names it binds over <code>scope</code>, at <code>at</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slots_taken_apart">
+          <h3>
+            <a class="anchor" href="#item-slots_taken_apart">slots_taken_apart</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slots_taken_apart(self: str[], case_name: str?, scope: Expr, reads: Read[], at: Span) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits for the <code>names</code> a case pattern (or a tuple's, with no <code>case_name</code>) binds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-advice">
+          <h3>
+            <a class="anchor" href="#item-advice">advice</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn advice(place: Place, name: str, taken: Taken) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of <code>name</code>, bound at <code>place</code>, taken apart as <code>taken</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_pattern">
+          <h3>
+            <a class="anchor" href="#item-slot_pattern">slot_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_pattern(case_name: str?, names: str[], name: str, taken: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The pattern over <code>names</code>, with the slot <code>name</code> taken apart in place as <code>taken</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_message">
+          <h3>
+            <a class="anchor" href="#item-param_message">param_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_message(name: str, struct_name: str, fields: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of a parameter <code>name</code> whose <code>fields</code> are the ones read.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_opening_message">
+          <h3>
+            <a class="anchor" href="#item-param_opening_message">param_opening_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_opening_message(name: str, struct_name: str, fields: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of a parameter <code>name</code> that a <code>let</code> right under the signature takes apart.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binding_message">
+          <h3>
+            <a class="anchor" href="#item-binding_message">binding_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binding_message(name: str, fields: str[], ty: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the binding <code>name</code>, whose <code>fields</code> are the ones read.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binding_opening_message">
+          <h3>
+            <a class="anchor" href="#item-binding_opening_message">binding_opening_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binding_opening_message(name: str, ty: str, fields: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the binding <code>name</code> that a <code>let</code> right under it takes apart.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_message">
+          <h3>
+            <a class="anchor" href="#item-slot_message">slot_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_message(name: str, rewritten: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the slot <code>name</code>, whose pattern would read <code>rewritten</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_opening_message">
+          <h3>
+            <a class="anchor" href="#item-slot_opening_message">slot_opening_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_opening_message(name: str, rewritten: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the slot <code>name</code> that a <code>let</code> right under the pattern takes apart.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opening_destructure">
+          <h3>
+            <a class="anchor" href="#item-opening_destructure">opening_destructure</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opening_destructure(self: Expr, name: str, struct_name: str?) -&#62; (Span, str, str[])?</code></pre>
+
+          <div class="doc"><p>The span, struct and field names of a <code>let T { a, b } = &lt;name&gt;;</code> that opens <code>self</code>, when it binds each field to a name of its own spelling and names <code>struct_name</code> (any struct, when none is given). A field bound under another name (<code>T { a as x }</code>) is not recognised: the earlier pattern would have to spell the rename too.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -1,10 +1,9 @@
 # How a name is used inside an expression, for the lints that turn a binding into
 # a pattern.
 #
-# `destructure_binding` asks it of a `let` and `destructure_param` of a parameter,
-# and both put the same question: is every use of the name a field read, and are
-# the names a pattern would bind free? What they share lives here; each lint
-# keeps what only it asks.
+# `destructure` asks it of a parameter, a `let` and a slot of a pattern, and each
+# puts the same question: is every use of the name a field read, and are the names
+# a pattern would bind free?
 
 import {
     all,
@@ -24,6 +23,7 @@ import {
     not_equal as !=,
     push,
     starts_with,
+    value_or,
 } from builtins;
 import {
     Expr,
@@ -95,19 +95,29 @@ pub fn uses_of(self: Expr, name: str) -> Uses {
 # off another value, none is a tuple position, and no field's name is already
 # spoken for in `self`. `reads` are the field reads in scope of `name`, which is
 # what tells a field read off two values apart.
-pub fn sole_fields(self: Expr, name: str, reads: Read[]) -> str[]? {
+#
+# `value` is what a `let` binds `name` to. It runs before the pattern binds
+# anything, so the reads in it do not count against a field and no name in it is
+# exempt; a parameter or a slot has none.
+pub fn sole_fields(self: Expr, name: str, reads: Read[], value: Expr?) -> str[]? {
     let Uses { mentions, field_reads, fields, shadowed } = self.uses_of(name);
     if (shadowed || field_reads == 0 || field_reads != mentions) { return none; };
-    if (fields.is_shared(reads, []) || fields.any(is_tuple_field)) { return none; };
+    let inside = value$field_reads().value_or([]);
+    if (fields.is_shared(reads, inside) || fields.any(is_tuple_field)) { return none; };
 
-    // The name itself is exempt: it is the one going away, and every mention of it
-    // is the base of a read the pattern replaces.
-    if (self.mentions_any(fields, some(name))) { return none; };
+    // The name itself is exempt in `self`: it is the one going away, and every
+    // mention of it is the base of a read the pattern replaces.
+    if (self.mentions_any(fields, some(name)) || value.is_some_and(|v| v.mentions_any(
+        fields,
+        none,
+    ))) {
+        return none;
+    };
     some(fields)
 }.test({
     fn sole(src: str, name: str) -> str[]?!ParseError {
         let body = lower_aipl_block_surface(src)?;
-        ok(body.sole_fields(name, body.field_reads()))
+        ok(body.sole_fields(name, body.field_reads(), none))
     }
     assert(sole("{ f(p.a, p.b) }", "p")? == some(["a", "b"]));
     // A bare mention keeps the value whole.
@@ -118,6 +128,16 @@ pub fn sole_fields(self: Expr, name: str, reads: Read[]) -> str[]? {
     assert(sole("{ let p = 1; p.a }", "p")? == none);
     assert(sole("{ f(p.a, q.a) }", "p")? == none);
     assert(sole("{ 1 }", "p")? == none);
+
+    fn with_value(src: str, value: str) -> str[]?!ParseError {
+        let body = lower_aipl_block_surface(src)?;
+        let bound = lower_aipl_block_surface(value)?;
+        ok(body.sole_fields("p", [..body.field_reads(), ..bound.field_reads()], some(bound)))
+    }
+    // A read in the value runs before the pattern binds, so it is not a second base.
+    assert(with_value("{ p.a }", "{ h(q.a) }")? == some(["a"]));
+    // A name the value mentions is an outer one the pattern would shadow.
+    assert(with_value("{ p.a }", "{ h(a) }")? == none);
 })
 
 # Whether `self` is the bare name `name`.

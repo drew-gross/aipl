@@ -61,14 +61,12 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/char_set_literal | 29231 | 3707463 | 793851 | 18423459 | 6396024 |
 | crates/aipl-codegen/src/lint/compound_assign | 30936 | 3925753 | 735273 | 20246599 | 6422432 |
 | crates/aipl-codegen/src/lint/constant_default | 23901 | 3400628 | 706359 | 12626285 | 6363000 |
-| crates/aipl-codegen/src/lint/destructure_binding | 40806 | 5139797 | 725544 | 30116529 | 6424024 |
-| crates/aipl-codegen/src/lint/destructure_param | 45604 | 5545854 | 729280 | 36413657 | 6432564 |
-| crates/aipl-codegen/src/lint/destructure_slot | 40976 | 4942028 | 727351 | 31314903 | 6431064 |
+| crates/aipl-codegen/src/lint/destructure | 77149 | 9029214 | 757119 | 68069698 | 6511064 |
 | crates/aipl-codegen/src/lint/duplicate_import_source | 19076 | 2662936 | 716208 | 7402866 | 6357760 |
 | crates/aipl-codegen/src/lint/eta_lambda | 59886 | 6517286 | 742503 | 55780380 | 6439500 |
 | crates/aipl-codegen/src/lint/extend_loop_map_join | 48496 | 5702397 | 756040 | 39049723 | 6489260 |
 | crates/aipl-codegen/src/lint/field_init_shorthand | 24696 | 3223160 | 719744 | 13755333 | 6376796 |
-| crates/aipl-codegen/src/lint/field_uses | 63256 | 14642258 | 532400 | 26601110 | 6618952 |
+| crates/aipl-codegen/src/lint/field_uses | 77624 | 18039962 | 532400 | 32310753 | 6623756 |
 | crates/aipl-codegen/src/lint/fn_body_type_stutter | 26365 | 3456177 | 717864 | 15594736 | 6384080 |
 | crates/aipl-codegen/src/lint/interp_literal | 20811 | 2857928 | 713144 | 9023415 | 6372896 |
 | crates/aipl-codegen/src/lint/interp_to_str | 25954 | 3387576 | 724080 | 15008620 | 6382516 |
@@ -76,7 +74,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/is_empty_longhand | 30469 | 3845175 | 743878 | 20493891 | 6406620 |
 | crates/aipl-codegen/src/lint/len_gt_zero | 38338 | 4803915 | 725568 | 29103120 | 6415040 |
 | crates/aipl-codegen/src/lint/let_else_as_case | 40651 | 4962678 | 734659 | 30974546 | 6417452 |
-| crates/aipl-codegen/src/lint/lint | 101 | 6232 | 5048 | 30429 | 1243240 |
+| crates/aipl-codegen/src/lint/lint | 97 | 6024 | 4840 | 29467 | 1224168 |
 | crates/aipl-codegen/src/lint/lint_hit | 21948 | 3148143 | 710584 | 10578922 | 6492284 |
 | crates/aipl-codegen/src/lint/loop_shape | 68672 | 15267912 | 550336 | 32789521 | 6626660 |
 | crates/aipl-codegen/src/lint/map_constant_repeat | 37644 | 4516675 | 728323 | 29177290 | 6413204 |
@@ -118,7 +116,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2538 | 2520 |
 | crates/aipl-codegen/src/operator_named_forms | 16 | 1232 | 1232 | 3853 | 11860 |
 | crates/aipl-codegen/src/parse | 8731 | 927722 | 141927 | 5246755 | 767516 |
-| crates/aipl-codegen/src/parse_and_partial_load | 33184 | 3988455 | 764852 | 17126259 | 7843492 |
+| crates/aipl-codegen/src/parse_and_partial_load | 32514 | 3936799 | 764852 | 16950970 | 7826396 |
 | crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 169315 | 152588 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1784 | 5244 |
 | crates/aipl-codegen/src/parsed | 38 | 3441 | 2977 | 3267 | 70464 |
