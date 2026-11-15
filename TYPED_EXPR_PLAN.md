@@ -1,16 +1,17 @@
 # Plan: make the type on every expression mandatory (`TExpr` end to end)
 
 Status: the pre-mono passes, the post-mono passes and codegen read `TExpr`; mono's entry takes a
-`TProgram`, and most instances are typed from it (the "typed route" below). What is left is the
-instances the typed route does not take, then deleting `infer`, `to_program`'s stamp bridge and the
-stamp conversion in `typed_adapter`. Delete this file when the work is done.
+`TProgram` and types every instance from it (the "typed route" below); `infer` and the stamp
+conversion in `typed_adapter` are deleted. What is left is `to_program`'s stamp bridge, the `Expr`
+bodies mono keeps for `param_forwarded` and signatures, and the `probe` (see `CLAUDE_TODO.txt`).
+Delete this file when the work is done.
 Written after the pseudo-types were deleted (`Remove pseudo-types`).
 
 ## The typed route (where mono is now)
 
 Per instance, `typed_body` takes the body from the pinned tree (each node's type with the instance's
-type arguments substituted) and `lower` finishes what mono does besides typing it; every other
-instance runs the old `infer` on the written tree. The route covers: operators, user, generic and
+type arguments substituted) and `lower` finishes what mono does besides typing it; a body it
+declines is an internal error. The route covers: operators, user, generic and
 native calls; calls that hand lambdas, function parameters or function names to a function (a copy
 of the callee is specialized for them, `typed_function_calls.rs`); `map`, `filter`, `filter_map`
 and `zip_with` (`typed_higher_order.rs`); `for` with a position, over a dict or over a range; nested
@@ -18,9 +19,8 @@ patterns (`typed_match_tree.rs`); struct construction with literal defaults, gen
 variants; field-path assignment; mutating calls in value position (copy and modify); `extend` by
 shape; constructor references; owned parameters; parameters kept as a `str`, set or rope, and `rope_str` (`typed_retype.rs`); variadic shapes; shims, closures included (`typed_shims.rs`); lambdas and function fields used as values; grid reads, writes, bounds and walks; ranges given to array parameters; a tuple's `to_array`.
 
-No instance in the corpus is inferred any more: `typed_body` takes every body from the pinned tree.
-`infer` stays only as the path for a body `typed_body` declines (an unsupported node, a missing typed
-function), and goes once that is an error.
+`typed_body` takes every body from the pinned tree; a body it declines (an unsupported node, a
+missing typed function) is an internal error.
 
 ## Where things stand
 

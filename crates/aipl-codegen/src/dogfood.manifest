@@ -4,23 +4,23 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 966 str -> str?
-; entry strip_test_sections 1021 str -> str
-; entry split_test_sections 1020 str -> __tuple$str$str
-; entry source_loc 1011 str __builtin_Span -> str
-; entry caret_block 136 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 258 str #{str:str} -> unit!Error
-; entry normalize_output 926 str -> str
-; entry int_fits 555 i64 str -> bool
-; entry is_operator_name 556 str -> bool
-; entry aipl_token_scopes 593 str -> __m19__ScopeSpan[]!__m19__LexError
-; entry find_files 259 str str -> str[]!Error
-; entry companion_files 138 str -> __m25__Companion[]!str
-; entry parse_spec 959 str -> __m26__Spec!str
-; entry parse_and_partial_load 957 str -> __m111__PartialLoad!__m27__ParseFailure
-; entry fn_role 272 str -> __m44__FnRole
-; entry test_fn_name 263 str -> str
-; entry format_source 297 str u64 -> str!__m114__FmtError
+; entry parse_test_section_header 967 str -> str?
+; entry strip_test_sections 1022 str -> str
+; entry split_test_sections 1021 str -> __tuple$str$str
+; entry source_loc 1012 str __builtin_Span -> str
+; entry caret_block 137 str __builtin_Span str -> str
+; entry fill_or_add_sections_file 259 str #{str:str} -> unit!Error
+; entry normalize_output 927 str -> str
+; entry int_fits 556 i64 str -> bool
+; entry is_operator_name 557 str -> bool
+; entry aipl_token_scopes 594 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry find_files 260 str str -> str[]!Error
+; entry companion_files 139 str -> __m25__Companion[]!str
+; entry parse_spec 960 str -> __m26__Spec!str
+; entry parse_and_partial_load 958 str -> __m111__PartialLoad!__m27__ParseFailure
+; entry fn_role 273 str -> __m44__FnRole
+; entry test_fn_name 264 str -> str
+; entry format_source 298 str u64 -> str!__m114__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
@@ -494,4 +494,4 @@
 ; data 343 __tostr_lit_100 66616c7365
 
 ; __m116____test$all$is_nine
-; source-fingerprint 18017586030182991489
+; source-fingerprint 8929945948778463741

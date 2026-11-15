@@ -60,6 +60,7 @@ import {
     map,
     repeat,
     saturating_sub as -,
+    set_map,
     to_array,
     to_set,
     try_map,
@@ -349,7 +350,7 @@ fn render_list<K: variant>(
 fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx) -> str {
     let a = render_rule(atom, names, Seq);
     let ops = all_ops(precs);
-    let alts = ops.map(|o| `"{o}"`).join(sep=" | ");
+    let alts = ops.set_map(|o| `"{o}"`).join(sep=" | ");
     let op = match (ops.len()) {
         0 => "(* never *)",
         1 => alts,
@@ -665,8 +666,8 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
 # double quotes, each set in its own order — with `<empty>` appended when the
 # rule is nullable. A debug rendering, like `cst.aipl`'s `show`.
 pub fn show_first<K: variant>(self: First<K>) -> str {
-    let kinds = self.kinds$case_name().join(sep=" ");
-    let texts = self.texts.map(|t| `"{t}"`).join(sep=" ");
+    let kinds = self.kinds.set_map(case_name).join(sep=" ");
+    let texts = self.texts.set_map(|t| `"{t}"`).join(sep=" ");
     let syms = [kinds, texts].filter(is_nonempty).join(sep=" ");
     if (!self.nullable) { return syms; };
     if (syms.is_empty()) { return "<empty>"; };

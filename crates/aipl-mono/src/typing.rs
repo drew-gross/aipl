@@ -7,8 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast;
 use aipl_syntax::ast::{
-    BinOp, Callee, Exclusion, Expr, ExprKind, MatchArm, Pattern, Primitive, Signature, StructDecl,
-    Type, VariantDecl,
+    BinOp, Callee, Exclusion, Expr, ExprKind, Primitive, Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
     binop_spelling, is_dict_key, is_error, is_set_elem, type_name, Error, Span, SPAN_TYPE,
@@ -391,32 +390,6 @@ pub fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource])
         Some(f) if !f.source.is_empty() => e.in_file(&f.label, &f.source),
         _ => e,
     }
-}
-
-/// Whether `sig` has a function-typed parameter whose result mentions a type
-/// variable. A call's arguments may leave such a variable unpinned: a lambda has no
-/// type until its parameters are known, and a function-typed parameter of the
-/// caller is not a lambda at all.
-pub(crate) fn has_function_result_var(sig: &Signature) -> bool {
-    sig.is_generic()
-        && sig.param_types().iter().any(|p| match p {
-            Type::Fn(_, ret) => sig
-                .type_vars
-                .iter()
-                .any(|tp| super::ty_mentions(ret, &tp.name)),
-            _ => false,
-        })
-}
-
-/// Whether `sig` has a type variable that its return type mentions and no
-/// parameter does — one a call's arguments cannot pin.
-pub(crate) fn has_return_only_var(sig: &Signature) -> bool {
-    let return_ty = sig.return_type();
-    let params = sig.param_types();
-    sig.type_vars.iter().any(|tp| {
-        super::ty_mentions(&return_ty, &tp.name)
-            && !params.iter().any(|p| super::ty_mentions(p, &tp.name))
-    })
 }
 
 /// During checking, these types stand in for an as-yet-unknown scalar: the
@@ -1215,31 +1188,6 @@ pub(crate) fn collect_args(
         .collect()
 }
 
-/// A tuple written out of integer literals, which flexes slot by slot as a bare
-/// literal does.
-pub(crate) fn is_int_pair(arg: &Expr) -> bool {
-    matches!(&arg.kind, ExprKind::TupleLit(slots) if slots.iter().all(|s| aipl_syntax::const_int(s).is_some()))
-}
-
-/// Whether `arg` is a bare integer literal landing in a slot that is *exactly* a
-/// type variable — the shape whose width the literal must not be the one to
-/// decide.
-///
-/// The same bow-out [`crate::Mono::instantiate_types`] makes for a generic call,
-/// applied to a generic constructor's payload. A literal types as `i64` but
-/// flexes to whatever its context wants, so binding it here would pin the
-/// variable to `i64` against no competition at all: `let b: Box<u8> = Full(200)`
-/// resolved to a `Box<i64>` and was then rejected against its own annotation.
-/// Deferring it lets the expected type have first refusal, and the literal still
-/// pins any variable nothing else reached.
-///
-/// Only the bare-variable slot qualifies. A `T[]` or `T?` payload never receives
-/// a bare literal, and a concrete payload (`Literal(str)`) pins nothing anyway.
-pub(crate) fn literal_pins_nothing(arg: &Expr, pty: &Type, vars: &HashSet<&str>) -> bool {
-    matches!(pty, Type::TypeVar(v) if vars.contains(v.as_str()))
-        && (aipl_syntax::const_int(arg).is_some() || is_int_pair(arg))
-}
-
 pub(crate) fn collect_var_bindings(
     param_ty: &Type,
     arg_ty: &Type,
@@ -1289,16 +1237,6 @@ pub(crate) fn collect_var_bindings(
         }
         _ => {}
     }
-}
-
-/// Whether every arm takes a tuple scrutinee apart — a tuple pattern of that
-/// arity, or `_` — so the tuple need never exist as a value. A binder for the
-/// whole tuple would need one, and takes the ordinary path.
-pub(crate) fn matches_elementwise(arms: &[MatchArm], arity: usize) -> bool {
-    arms.iter().all(|a| {
-        matches!(&a.pattern, Pattern::Tuple(ps) if ps.len() == arity)
-            || matches!(a.pattern, Pattern::Wildcard)
-    })
 }
 
 /// The declaration tables a written type is validated against.

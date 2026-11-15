@@ -145,7 +145,8 @@ codegen/types:
 
 typed tree:
   codegen `flex_int_ty` hands `aipl_syntax::flex_fit` a shallow `Expr` rebuilt from the typed tail/branches (codegen `flex_shape`); port `flex_fit` to `TExpr` when the pre-mono side is typed
-typed tree: no instance in the corpus falls back to `infer` any more; delete `infer`, `infer_generic_variant_ctor`, `ret_generic_args`, `to_program`'s stamp bridge and `typed_adapter`'s stamp conversion (a body `typed_body` still declines — an unsupported node, a missing typed function — would then be an error)
+typed tree: `infer` is gone; still to delete: `to_program`'s stamp bridge (`stamp_everything`, `Expr::ty` stamps), the `Expr` bodies mono keeps (`Generic.body`, `param_forwarded` in move_last_use.rs reads one; give it a typed twin), `probe` and `mono_agreement`/`monomorphize_probed` (nothing feeds the probe now)
 pinner: a generic variant argument nothing decides is an error ("cannot infer type parameter"); alternative kept for later: a sentinel `Unpinned` type in the pinned IR that is an error only where something needs a concrete type (instantiation, layout), instead of the eager error at the construction
 typed tree: typed_retype.rs retypes a str/set-kept parameter's uses by a few rules (slice, if/match, call results that were char[]); a call whose result changes representation some other way would keep the pinned type
 typed tree: delete the Expr twins of the pre-mono passes (fold_constants, sink_bindings, fuse_*, fold_*, *_variants, inline_*, lower_*) and `typed_passes` oracle once mono reads TProgram.
+typed tree: a spread of a set into an array literal (`[..s]` with `s: #{i64}`) fails with "binding $inl12_self: expected i64[], got #{i64}" after inlining; the typed route lowers the spread without converting the set

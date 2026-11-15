@@ -4464,6 +4464,21 @@ impl Pinner<'_> {
             match self.table.shallow(&first.ty) {
                 It::Opt(_) => sig = optional_map_signature(&sig),
                 It::Named(n) if n == aipl_syntax::SPAN_TYPE => sig = span_map_signature(&sig),
+                // A set reads as a sequence everywhere else, so `map` is the obvious reach, and
+                // `set_map` the answer.
+                It::Set(..) => {
+                    return reject(
+                        format!(
+                            "map has no set form, so it does not take {} — use \"set_map\", \
+                             which maps a set to a set. It is a separate name because the \
+                             result can be *smaller* than the receiver, when two elements \
+                             map to the same answer; `map` promises one element out per \
+                             element in, and over a set it could not keep that promise",
+                            aipl_syntax::type_name(&self.refined_type(&first.ty))
+                        ),
+                        &args[0].span,
+                    );
+                }
                 _ => {}
             }
         }

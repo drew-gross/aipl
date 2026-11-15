@@ -29,7 +29,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/dedent | 11 | 870 | 128 | 19539 | 5612 |
 | crates/aipl-codegen/src/desugar | 575 | 68978 | 28848 | 56369 | 222020 |
 | crates/aipl-codegen/src/doc | 296 | 20907 | 4595 | 43435 | 32592 |
-| crates/aipl-codegen/src/ebnf | 1268 | 130196 | 19328 | 346180 | 161836 |
+| crates/aipl-codegen/src/ebnf | 1413 | 137608 | 19328 | 344808 | 159644 |
 | crates/aipl-codegen/src/expr | 1039 | 113784 | 26040 | 93809 | 355612 |
 | crates/aipl-codegen/src/fill_or_add_sections | 151 | 12356 | 7146 | 56421 | 17564 |
 | crates/aipl-codegen/src/fill_or_add_sections_file | 21 | 1474 | 900 | 5493 | 16104 |
@@ -40,11 +40,11 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/format_source | 31395 | 5503105 | 716468 | 25175439 | 7609596 |
 | crates/aipl-codegen/src/grammar | 653 | 72678 | 37768 | 102551 | 121672 |
 | crates/aipl-codegen/src/grammar_aipl | 1937186 | 436096207 | 1567069 | 833223347 | 6452968 |
-| crates/aipl-codegen/src/grammar_calc | 9511 | 966879 | 41210 | 5019278 | 477808 |
-| crates/aipl-codegen/src/grammar_json | 13560 | 1524189 | 32625 | 6186890 | 490648 |
-| crates/aipl-codegen/src/grammar_sexp | 5559 | 530767 | 13176 | 2726164 | 458272 |
-| crates/aipl-codegen/src/highlight | 413 | 38595 | 6967 | 119286 | 123040 |
-| crates/aipl-codegen/src/highlight_aipl | 3617 | 365805 | 110633 | 1517514 | 173776 |
+| crates/aipl-codegen/src/grammar_calc | 9520 | 967642 | 41210 | 5018565 | 475608 |
+| crates/aipl-codegen/src/grammar_json | 13589 | 1525792 | 32625 | 6186248 | 488424 |
+| crates/aipl-codegen/src/grammar_sexp | 5568 | 531213 | 13176 | 2726117 | 456072 |
+| crates/aipl-codegen/src/highlight | 457 | 41551 | 6967 | 117335 | 122136 |
+| crates/aipl-codegen/src/highlight_aipl | 3640 | 372988 | 110401 | 1488231 | 172872 |
 | crates/aipl-codegen/src/hoist_test_fns | 60 | 7561 | 3215 | 6223 | 128636 |
 | crates/aipl-codegen/src/indent | 24 | 1647 | 231 | 5333 | 4892 |
 | crates/aipl-codegen/src/int_fits | 0 | 0 | 0 | 2177 | 3520 |
@@ -688,7 +688,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/results/try_operator | 0 | 0 | 0 | 263 | 1440 |
 | tests/cases/results/variant_payload | 1 | 88 | 88 | 1230 | 8540 |
 | tests/cases/results/void_ok | 11 | 770 | 548 | 2354 | 11920 |
-| tests/cases/sets/as_sequence | 38 | 2147 | 1915 | 5830 | 15596 |
+| tests/cases/sets/as_sequence | 47 | 2744 | 2380 | 5521 | 12328 |
 | tests/cases/sets/basic | 2 | 96 | 96 | 309 | 1592 |
 | tests/cases/sets/char_set_to_array | 9 | 188 | 236 | 3890 | 6284 |
 | tests/cases/sets/elem_types | 2 | 34 | 34 | 346 | 1692 |

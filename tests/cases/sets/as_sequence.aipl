@@ -14,6 +14,7 @@ import {
     greater_than as >,
     join,
     print,
+    set_map,
     to_set,
     to_str,
     union_all,
@@ -30,12 +31,12 @@ test({
         },
     } {
         let s = [3, 1, 2, 3].to_set();
-        print(s$to_str().join(sep=", "));
+        print(s.set_map(to_str).join(sep=", "));
         print(`{s.all(|x| x > 0)} {s.find_if(|x| x > 2)} {s.count_if(|x| x > 1)}`);
         let asc: #<{i64} = [3, 1, 2].to_set();
-        print(asc$to_str().join(sep=" "));
+        print(asc.set_map(to_str).join(sep=" "));
         let desc: #>{i64} = [3, 1, 2].to_set();
-        print(desc$to_str().join(sep=" "));
+        print(desc.set_map(to_str).join(sep=" "));
 
         // `join` reads the sequence and nothing else, so a set of parts joins
         // exactly as an array of them would.
