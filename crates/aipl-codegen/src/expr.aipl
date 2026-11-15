@@ -112,12 +112,16 @@ pub fn synthesized_name(self: LambdaParam) -> str {
         ByTuple(..) => `__tpat${self.span.start}`,
         ByCase(..) | ByPattern(..) => `__cpat${self.span.start}`,
         ByStruct(..) => `__spat${self.span.start}`,
+        Alias(name, _) => name,
     }
 }.test({
     let plain = LambdaParam { binding: Name("x"), ty: none, span: 4..5 };
     assert(plain.synthesized_name() == "x");
     assert(LambdaParam { ..plain, binding: ByTuple(["a", "b"]) }.synthesized_name() == "__tpat$4");
     assert(LambdaParam { ..plain, binding: ByCase("W", ["c"]) }.synthesized_name() == "__cpat$4");
+    assert(
+        LambdaParam { ..plain, binding: Alias("p", ByCase("W", ["c"])) }.synthesized_name() == "p",
+    );
     assert(
         LambdaParam {
             ..plain,
@@ -293,6 +297,9 @@ variant Binding =
     # `match` arm is, so it is any pattern an arm takes; whether it can fail to
     # match is for the type checker to say, as it is for `ByCase`.
     | ByPattern(pattern: Pat)
+    # A name bound to the whole value that is also taken apart, `p: Point { x, y }`: the
+    # value is `name` and the inner binding reads its parts off it.
+    | Alias(name: str, inner: Binding)
 
 # Two spans as the one that covers both — `aipl_syntax::join_spans`, mirrored.
 #
@@ -515,6 +522,7 @@ fn show_binding(self: Binding) -> str {
             `{if (mutable) { "mut " } else { "" }}{struct_name} \{ {reads.join(sep=", ")} }`
         },
         ByPattern(pattern) => pattern.show_pat(),
+        Alias(name, inner) => `{name}: {inner.show_binding()}`,
     }
 }.test({
     assert(
@@ -524,6 +532,7 @@ fn show_binding(self: Binding) -> str {
         ])).show_binding() == "(P { x }, n)",
     );
     assert(Name("x").show_binding() == "x");
+    assert(Alias("p", ByStruct("P", ["x"], ["x"], false)).show_binding() == "p: P { x }");
     assert(ByTuple(["a", "b"]).show_binding() == "(a, b)");
     assert(ByCase("Pair", ["a", "_"]).show_binding() == "Pair(a, _)");
     assert(ByStruct("P", ["x", "y"], ["x", "b"], false).show_binding() == "P { x, y as b }");
@@ -887,6 +896,7 @@ fn pattern_reads(self: Expr) -> Read[] {
 pub fn reads_off(self: Binding, base: str) -> Read[] {
     match (self) {
         ByStruct(_, fields, _, _) => fields.map(|field| Read { field, base }),
+        Alias(_, inner) => inner.reads_off(base),
         Name(..) | ByTuple(..) | ByCase(..) | ByPattern(..) => [],
     }
 }.test({
@@ -896,6 +906,9 @@ pub fn reads_off(self: Binding, base: str) -> Read[] {
     ]);
     assert(ByTuple(["a", "b"]).reads_off("v") == []);
     assert(ByCase("C", ["a"]).reads_off("v") == []);
+    assert(Alias("p", ByStruct("P", ["x"], ["x"], false)).reads_off("v") == [
+        Read { field: "x", base: "v" },
+    ]);
 })
 
 # The names a binding binds, in order.
@@ -904,10 +917,12 @@ pub fn binders(self: Binding) -> str[] {
         Name(name) => [name],
         ByTuple(names) | ByCase(_, names) | ByStruct(_, _, names, _) => names,
         ByPattern(pattern) => pattern.pat_bindings(),
+        Alias(name, inner) => [name, ..inner.binders()],
     }
 }.test({
     assert(ByPattern(Pat.Nested("some", [Pat.Struct("P", ["x"], ["b"])])).binders() == ["b"]);
     assert(Name("x").binders() == ["x"]);
+    assert(Alias("p", ByCase("C", ["a"])).binders() == ["p", "a"]);
     assert(ByTuple(["a", "b"]).binders() == ["a", "b"]);
     assert(ByCase("C", ["a"]).binders() == ["a"]);
     assert(ByStruct("P", ["x", "y"], ["x", "b"], false).binders() == ["x", "b"]);

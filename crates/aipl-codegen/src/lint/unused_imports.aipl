@@ -23,6 +23,7 @@ import {
     value_or,
 } from builtins;
 import {
+    Alias,
     ArrayLit,
     Assign,
     Binding,
@@ -284,6 +285,7 @@ fn destructure_names(self: Binding) -> #{str} {
         ByCase(case_name, _) => path_names(case_name),
         ByStruct(struct_name, _, _, _) => #{struct_name},
         ByPattern(pattern) => pattern.ctor_names(),
+        Alias(_, inner) => inner.destructure_names(),
     }
 }
 

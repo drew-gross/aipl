@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">219 files, 1903 items.</p>
+      <p class="summary">219 files, 1909 items.</p>
 
       <ul class="files">
 
@@ -307,7 +307,7 @@
           <p class="file-summary">Lowering the destructuring forms, after the lints have read them.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-desugar.html#private">21 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-desugar.html#private">22 private</a></span>
 
 
           <ul class="items">
@@ -944,7 +944,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">205 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">206 private</a></span>
 
 
           <ul class="items">
@@ -976,6 +976,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-grammar_aipl.html#item-DocSplit"><code>DocSplit</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-grammar_aipl.html#item-WrittenBinding"><code>WrittenBinding</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
 
@@ -4001,7 +4006,7 @@
           <p class="file-summary">The formatter's token-stream walker. It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">168 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">170 private</a></span>
 
 
           <ul class="items">

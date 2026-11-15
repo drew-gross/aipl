@@ -1,0 +1,67 @@
+# A name can be bound to a whole value and take it apart in the same breath:
+# `p: Point { x, y }` makes `p` the point and `x`, `y` its fields. It is what a function
+# parameter has always spelled (`self: Span { start, end }`), and a lambda parameter, a
+# `let` and a `for` take it too.
+
+import { equal as ==, map, push, wrapping_add as + } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+fn total(Point { x, y }) -> i64 { x + y }
+
+variant Shape = Dot(Point)
+
+fn shape_total(s: Shape) -> i64 {
+    let Dot(p) = s;
+    total(p)
+}
+
+// A parameter, as before.
+fn sum_of(self: Point { x }) -> i64 { x + total(self) }.test({
+    assert(Point { x: 1, y: 2 }.sum_of() == 4);
+})
+
+// A lambda parameter: `x` is the field, `p` is the point.
+fn lambda_sums(points: Point[]) -> i64[] { points.map(|p: Point { x }| x + total(p)) }.test({
+    assert(lambda_sums([Point { x: 1, y: 2 }, Point { x: 10, y: 20 }]) == [4, 40]);
+})
+
+// A `let`.
+fn let_sum(point: Point) -> i64 {
+    let p: Point { x, y } = point;
+    x + y + total(p)
+}.test({
+    assert(let_sum(Point { x: 3, y: 4 }) == 14);
+})
+
+// A `for`, with and without the index.
+fn loop_sums(points: Point[]) -> i64[] {
+    mut sums: i64[] = [];
+    for (let p: Point { x } : points) {
+        set sums.push(x + total(p));
+    }
+    sums
+}.test({
+    assert(loop_sums([Point { x: 1, y: 2 }, Point { x: 10, y: 20 }]) == [4, 40]);
+})
+
+fn indexed_sums(points: Point[]) -> (u64, i64)[] {
+    mut seen: (u64, i64)[] = [];
+    for (let i, p: Point { y } : points) {
+        set seen.push((i, y + total(p)));
+    }
+    seen
+}.test({
+    assert(indexed_sums([Point { x: 1, y: 2 }, Point { x: 10, y: 20 }]) == [(0, 5), (1, 50)]);
+})
+
+// A case, whose slot is itself a pattern.
+fn case_sums(shapes: Shape[]) -> i64[] {
+    mut sums: i64[] = [];
+    for (let s: Dot(Point { x }) : shapes) {
+        set sums.push(x + shape_total(s));
+    }
+    [..sums, ..shapes.map(|s: Dot(Point { y })| y + shape_total(s))]
+}.test({
+    assert(case_sums([Dot(Point { x: 1, y: 2 })]) == [4, 5]);
+})

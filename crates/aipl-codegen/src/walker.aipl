@@ -1604,6 +1604,13 @@ fn let_stmt(self: W) -> WDoc!FmtError {
             .expect("=")?.w
             .let_tail(Text(`let {n.text}({ids.names.join(sep=", ")}) = `));
     };
+    // `let p: Point { x, y } = v;`: a name that is also taken apart.
+    if (n.w.peek_text() == ":" && n.w.pattern_follows_name()) {
+        let pat = n.w.bump().w.pattern()?;
+        return pat.w
+            .expect("=")?.w
+            .let_tail(Concat([Text(`let {n.text}: `), pat.doc, Text(" = ")]));
+    };
     let a = n.w.binding_ann()?;
     let v = a.w.expect("=")?.w.expr()?;
     let done = v.w.expect(";")?.w;
@@ -1651,6 +1658,30 @@ fn let_tail(self: W, head: Doc) -> WDoc!FmtError {
         walker_of("let some ( v ) = o else { return none ; } ;")?
             .let_stmt()
             .rendered(20)? == "let some(v) = o else {\n    return none;\n};\n",
+    );
+    // A name that is also taken apart.
+    assert(
+        walker_of("let  p : P { a , b }  =  v ;")?
+            .let_stmt()
+            .rendered(100)? == "let p: P { a, b } = v;",
+    );
+    assert(walker_of("let  p : W ( a )  =  v ;")?.let_stmt().rendered(100)? == "let p: W(a) = v;");
+    // An annotation is not a pattern, however it opens.
+    assert(
+        walker_of("let  m : #{ str : u8 }  =  v ;")?
+            .let_stmt()
+            .rendered(100)? == "let m: #{str: u8} = v;",
+    );
+    assert(
+        walker_of("let  t : ( i64 , i64 )  =  v ;")?
+            .let_stmt()
+            .rendered(100)? == "let t: (i64, i64) = v;",
+    );
+    // An annotation is not a pattern.
+    assert(
+        walker_of("let  p : Box < i64 >  =  v ;")?
+            .let_stmt()
+            .rendered(100)? == "let p: Box<i64> = v;",
     );
     // Without an `else` the statement is the plain one.
     assert(walker_of("let  some ( v )  =  o ;")?.let_stmt().rendered(100)? == "let some(v) = o;");
@@ -1845,6 +1876,22 @@ fn for_stmt(self: W) -> WDoc!FmtError {
             .rendered(100)? == "for (let Import(D { a, b }) : xs) {\n    f(a);\n}\n",
     );
     assert(
+        walker_of("for ( let  p : P { a , b }  :  xs ) { f ( a ) ; }")?
+            .for_stmt()
+            .rendered(100)? == "for (let p: P { a, b } : xs) {\n    f(a);\n}\n",
+    );
+    assert(
+        walker_of("for ( let i , p : Pair ( a , b )  :  xs ) { f ( a ) ; }")?
+            .for_stmt()
+            .rendered(100)? == "for (let i, p: Pair(a, b) : xs) {\n    f(a);\n}\n",
+    );
+    // A plain loop over a call has the same first tokens as an alias.
+    assert(
+        walker_of("for ( let  x : f ( y ) ) { g ( x ) ; }")?
+            .for_stmt()
+            .rendered(100)? == "for (let x : f(y)) {\n    g(x);\n}\n",
+    );
+    assert(
         walker_of("for ( let i , Pair ( a , b )  :  xs ) { f ( a ) ; }")?
             .for_stmt()
             .rendered(100)? == "for (let i, Pair(a, b) : xs) {\n    f(a);\n}\n",
@@ -1854,6 +1901,15 @@ fn for_stmt(self: W) -> WDoc!FmtError {
 # One binder of a `for` header. A pattern with another pattern inside it goes
 # through `pattern`, as a `let`'s does; the rest are laid out by `binder_item`.
 fn for_binder(self: W) -> WDoc!FmtError {
+    // `p: Point { x } : xs`: a name that is also taken apart. A plain `x : f(y)` has the
+    // same first tokens, so the pattern has to be followed by the loop's own `:`.
+    if (self.peek_text_n(1) == ":" && self.opens_pattern_at(3)) {
+        let name = self.bump();
+        let inner = name.w.bump().w.for_binder()?;
+        if (inner.w.peek_text() == ":") {
+            return ok(WDoc { w: inner.w, doc: Concat([Text(`{name.text}: `), inner.doc]) });
+        };
+    };
     if (self.general_pattern_ahead()) { return self.pattern(); };
     let WStr { w, text } = self.binder_item();
     ok(WDoc { w, doc: Text(text) })
@@ -2692,8 +2748,29 @@ fn lambda_param(self: W) -> WDoc!FmtError {
         let closed = slots.w.expect(")")?.w;
         return ok(WDoc { w: closed, doc: Concat([Text(n.text), flat_parens(slots.docs)]) });
     };
+    // `p: Point { x, y }` and `p: Wrap(inner)`: a name that is also taken apart.
+    if (n.w.peek_text() == ":" && n.w.pattern_follows_name()) {
+        let inner = n.w.bump().w.lambda_param()?;
+        return ok(WDoc { w: inner.w, doc: Concat([Text(`{n.text}: `), inner.doc]) });
+    };
     if (n.w.peek_text() == ":") { return n.w.lambda_param_ty(n.text); };
     ok(WDoc { w: n.w, doc: Text(n.text) })
+}.test({
+    assert(walker_of("p : P { a , b }")?.lambda_param().rendered(100)? == "p: P { a, b }");
+    assert(walker_of("p : W ( a )")?.lambda_param().rendered(100)? == "p: W(a)");
+    assert(walker_of("p : i64")?.lambda_param().rendered(100)? == "p: i64");
+    assert(walker_of("P { a }")?.lambda_param().rendered(100)? == "P { a }");
+})
+
+# Whether the tokens after a `:` are a type name opening a pattern — `Point {` or
+# `Wrap(` — which is a name that is also taken apart, where a type annotation would
+# not be followed by either.
+fn pattern_follows_name(self: W) -> bool { self.opens_pattern_at(2) }
+
+# Whether the token `n` ahead opens a struct or case pattern's body: a `{` or `(` right
+# after a name, where a type (`#{str: u8}`, `(A, B)`) has none.
+fn opens_pattern_at(self: W, n: u64) -> bool {
+    self.peek_is_n(n - 1, Ident) && (self.peek_text_n(n) == "{" || self.peek_text_n(n) == "(")
 }
 
 fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {

@@ -168,6 +168,7 @@ import {
 import { desugar, desugared } from "./desugar.aipl";
 import { Doc, print } from "./doc.aipl";
 import {
+    Alias,
     ArrayLit,
     Assign,
     Binding,
@@ -560,8 +561,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         // Ahead of `name: T`, which would otherwise take `self: Span` and leave
         // the `{` unparsed. The same goes for `self: Import(decl)`, which takes
         // apart a value that can only be the one case.
-        Then([Term(Name), Lit(":"), Term(Name), field_binders()]),
-        Then([Term(Name), Lit(":"), Term(Name), case_payload()]),
+        aliased_pattern(),
         Then([Term(Name), Lit(":"), Named("ty"), variadic, Lit("="), Named("expr")]),
         // `k?: T = none` — a parameter that may be *omitted*, as against `k: T?`
         // whose type is optional. Ordered choice makes this an ordinary
@@ -928,6 +928,16 @@ fn statements() -> Production<AiplTok, Ast>[] {
             Maybe(Then([Lit("else"), Named("block")])),
             Expect(Lit(";")),
         ]),
+        // `let p: Point { x, y } = v;` and `let p: Wrap(inner) = v;`: the name is the
+        // whole value, which is also taken apart.
+        Then([
+            Lit("let"),
+            aliased_pattern(),
+            Lit("="),
+            Named("expr"),
+            Maybe(Then([Lit("else"), Named("block")])),
+            Expect(Lit(";")),
+        ]),
         Then([
             Lit("let"),
             Term(Name),
@@ -1019,6 +1029,29 @@ fn statements() -> Production<AiplTok, Ast>[] {
             Lit("for"),
             one(
                 Then([Lit("let"), Term(Name), Lit(","), bind_target, Lit(":"), Named("expr")]),
+                nested_in=parens(),
+            ),
+            Named("loop_body"),
+        ]),
+        // `p: Point { x, y }` and `p: Wrap(inner)`: the element is `p` and is taken apart.
+        // These come after the plain forms as whole alternatives: `x : f(y)` starts like
+        // an alias and is told from it only by the `:` that must follow one.
+        Then([
+            Lit("for"),
+            one(Then([Lit("let"), aliased_pattern(), Lit(":"), Named("expr")]), nested_in=parens()),
+            Named("loop_body"),
+        ]),
+        Then([
+            Lit("for"),
+            one(
+                Then([
+                    Lit("let"),
+                    Term(Name),
+                    Lit(","),
+                    aliased_pattern(),
+                    Lit(":"),
+                    Named("expr"),
+                ]),
                 nested_in=parens(),
             ),
             Named("loop_body"),
@@ -1299,6 +1332,8 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let lambda_param: Rule<AiplTok> = OneOf([
         Then([Term(Name), field_binders()]),
         Then([Term(Name), case_payload()]),
+        // `p: Point { x, y }` and `p: Wrap(inner)` name the argument and take it apart.
+        aliased_pattern(),
         arm_binders(),
         Then([Term(Name), Maybe(Then([Lit(":"), Named("ty")]))]),
     ]);
@@ -2151,27 +2186,23 @@ fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let name_span = node.first_tok(node.tok_span());
     let toks = node.own_texts(src);
     let written = written_in(node, src, 0, "", false);
+
+    // `Point { x, y }`, `Wrap(inner)` or `p: Point { x, y }`: typed as the struct or case
+    // it names.
+    if (let some(WrittenBinding { binding, type_name, type_at }) = written_binding(
+        toks,
+        0,
+        kids,
+        sp,
+    )?) {
+        return ok(ALambdaParam(LambdaParam {
+            binding,
+            ty: some(TyNamed(type_name)),
+            span: name_span,
+            written: some(written_in(node, src, type_at, "", false)),
+        }));
+    };
     match (toks) {
-        // `Point { x, y }`: typed as the struct it names.
-        [struct_name, "{", ..] => {
-            let FieldBinders { fields, names } = field_binders_of(toks, 2);
-            ok(ALambdaParam(LambdaParam {
-                binding: ByStruct(struct_name, fields, names, false),
-                ty: some(TyNamed(struct_name)),
-                span: name_span,
-                written: some(written),
-            }))
-        },
-        // `Wrap(inner)`: typed as the case it names.
-        [case_name, "(", ..] => {
-            let binding = case_pattern(case_name, kid(kids, 0, sp)?, sp)?.as_binding();
-            ok(ALambdaParam(LambdaParam {
-                binding,
-                ty: some(TyNamed(case_name)),
-                span: name_span,
-                written: some(written),
-            }))
-        },
         // `(a, b)` — a tuple, whose type is whatever the lambda is handed.
         ["(", ..] => {
             let names = binder_names(toks);
@@ -2495,11 +2526,32 @@ fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!Parse
         [_, _, "(", ..] => true,
         _ => false,
     };
+    let aliased = match (toks) {
+        [_, _, ":", _, "{", ..] => true,
+        [_, _, ":", _, "(", ..] => true,
+        _ => false,
+    };
+    if (has_else && aliased) {
+        return err(ParseError {
+            message: "a name that is also taken apart takes no `else` block; match the value with `let Case(..) = v else { .. };` and name it separately",
+            span: node.tok_span(),
+        });
+    };
     if (has_else && !refutable) {
         return err(ParseError {
             message: "`else` follows a pattern that can fail to match, like `Some(x)`; a name, a tuple or a struct pattern always matches",
             span: node.tok_span(),
         });
+    };
+
+    // `let p: T { x, y } = e;` and `let p: Wrap(inner) = e;` — the name is the whole value,
+    // which is taken apart as well.
+    if (toks[2] == some(":")) {
+        if (let some(WrittenBinding { binding, type_at }) = written_binding(toks, 1, kids, sp)?) {
+            let value = kid_expr(kids, kids.len() - 1, sp)?;
+            let spelled = written_in(node, src, type_at, "=", false);
+            return ok(AStmt(SLetDestructure(binding, value, value.span, spelled)));
+        };
     };
     match (toks) {
         // `let [a, b] = e else { .. };` — an array pattern, its elements children
@@ -2776,6 +2828,17 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // is what a plain loop is spanned from.
     let name_span = node.tokens[3].value_or(node.tok_span());
     let span = join_spans(name_span, body.span);
+    // The pattern starts after an index and its comma, when one was written.
+    let indexed = toks[4] == some(",");
+    let index = if (indexed) { toks[3] } else { none };
+    let at = if (indexed) { 5 } else { 3 };
+
+    // `for (let Import(decl) : xs)`, `for (let T { x, y as b } : xs)` and
+    // `for (let p: T { x } : xs)`, each with or without the index.
+    if (let some(WrittenBinding { binding, type_at }) = written_binding(toks, at, kids, sp)?) {
+        let spelled = written_in(node, src, type_at, ":", false);
+        return ok(AStmt(for_destructure(binding, index, iterable, body, spelled)));
+    };
     match (toks) {
         // `for (let i, (a, b) : xs)`
         [_, _, _, index, ",", "(", ..] => {
@@ -2783,26 +2846,6 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         },
         // `for (let (a, b) : xs)`
         [_, _, _, "(", ..] => ok(AStmt(for_tuple(names, none, iterable, body, sp, written)?)),
-        // `for (let i, Import(decl) : xs)` — the case name and then its binders.
-        [_, _, _, index, ",", case_name, "(", ..] => {
-            let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
-            ok(AStmt(for_destructure(pattern.as_binding(), some(index), iterable, body, written)))
-        },
-        // `for (let Import(ImportDecl { source }) : xs)` — the slots are patterns.
-        [_, _, _, case_name, "(", ..] => {
-            let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
-            ok(AStmt(for_destructure(pattern.as_binding(), none, iterable, body, written)))
-        },
-        // `for (let i, T { x, y as b } : xs)` — the struct name and then its braces.
-        [_, _, _, index, ",", struct_name, "{", ..] => {
-            let FieldBinders { fields, names as bound } = field_binders_of(toks, 7);
-            ok(AStmt(for_struct(struct_name, fields, bound, some(index), iterable, body, written)))
-        },
-        // `for (let T { x, y as b } : xs)`
-        [_, _, _, struct_name, "{", ..] => {
-            let FieldBinders { fields, names as bound } = field_binders_of(toks, 5);
-            ok(AStmt(for_struct(struct_name, fields, bound, none, iterable, body, written)))
-        },
         // `for (let i, x : xs)` — two names, the first of which is the index.
         [_, _, _, index, ",", name, ..] => {
             ok(AStmt(SFor(name, name_span, some(index), iterable, body, span)))
@@ -2831,18 +2874,6 @@ fn for_tuple(
         });
     };
     ok(for_destructure(ByTuple(names), index, iterable, body, written))
-}
-
-fn for_struct(
-    struct_name: str,
-    fields: str[],
-    names: str[],
-    index: str?,
-    iterable: Expr,
-    body: Expr,
-    written: WrittenNames,
-) -> Stmt {
-    for_destructure(ByStruct(struct_name, fields, names, false), index, iterable, body, written)
 }
 
 fn for_destructure(
@@ -3699,6 +3730,37 @@ fn case_pattern(case_name: str, payload: Ast, span: Span) -> Pat!ParseError {
     };
     if (ignore_payload) { return ok(PatCtor(case_name, ignore_payload=true)); };
     ok(nested_or_ctor(case_name, slots))
+}
+
+# A binding written with a type or case name: what it binds, the name of the type or
+# case, and the index of that name among the tokens, where the names it spells begin.
+struct WrittenBinding { binding: Binding, type_name: str, type_at: u64 }
+
+# The binding written from token `at`: `T { x, y }` or `Case(x, y)`, or a name bound to
+# one of them, `p: T { x, y }`. `none` when the tokens there are neither, as for a plain
+# name, a tuple or an annotation. A case's payload is the first child.
+fn written_binding(toks: str[], at: u64, kids: Ast[], sp: Span) -> WrittenBinding?!ParseError {
+    if (toks[at + 1] == some(":")) {
+        let some(inner) = written_binding(toks, at + 2, kids, sp)? else { return ok(none); };
+        let name = toks[at].value_or("");
+        return ok(some(WrittenBinding { ..inner, binding: Alias(name, inner.binding) }));
+    };
+    let type_name = toks[at].value_or("");
+    match (toks[at + 1].value_or("")) {
+        "{" => {
+            let FieldBinders { fields, names } = field_binders_of(toks, at + 2);
+            ok(some(WrittenBinding {
+                binding: ByStruct(type_name, fields, names, false),
+                type_name,
+                type_at: at,
+            }))
+        },
+        "(" => {
+            let binding = case_pattern(type_name, kid(kids, 0, sp)?, sp)?.as_binding();
+            ok(some(WrittenBinding { binding, type_name, type_at: at }))
+        },
+        _ => ok(none),
+    }
 }
 
 # A pattern as the binding it makes: a case whose slots are all plain names is the
@@ -4771,6 +4833,12 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
             "xs.map(|P { x, y as b }| b)",
         ) == "xs.map(Lambda([__spat$8: P], Let(x, __spat$8.x, Let(b, __spat$8.y, b))))",
     );
+    assert(expr_dump("xs.map(|p: P { x }| x)") == "xs.map(Lambda([p: P], Let(x, p.x, x)))");
+    assert(
+        expr_dump(
+            "xs.map(|p: W(c)| c)",
+        ) == "xs.map(Lambda([p: W], Let(c, Match(p, [W(c) => c]), c)))",
+    );
     assert(
         expr_dump(
             "xs.map(|(a, b)| a)",
@@ -5055,6 +5123,29 @@ pub fn lower_aipl_block_surface(src: str) -> Expr!ParseError {
         surface_dump(
             "{ for (let i, Import(P { x }) : xs) { f(x); } 0 }",
         ) == "Seq(ForPattern([i], Import(P { x }), xs, Seq(f(x), 0)), 0)",
+    );
+
+    // A name bound to the whole value that is also taken apart.
+    // A plain loop over a call starts like an alias and is not one.
+    assert(
+        surface_dump("{ for (let x : f(y)) { g(x); } 0 }") == "Seq(For(x, f(y), Seq(g(x), 0)), 0)",
+    );
+    assert(
+        surface_dump(
+            "{ for (let i, x : f(y)) { g(x); } 0 }",
+        ) == "Seq(For([i], x, f(y), Seq(g(x), 0)), 0)",
+    );
+    assert(surface_dump("{ let p: P { x } = v; x }") == "LetPattern(p: P { x }, v, x)");
+    assert(surface_dump("{ let p: Pair(a, b) = v; a }") == "LetPattern(p: Pair(a, b), v, a)");
+    assert(
+        surface_dump(
+            "{ for (let p: P { x } : xs) { f(x); } 0 }",
+        ) == "Seq(ForPattern(p: P { x }, xs, Seq(f(x), 0)), 0)",
+    );
+    assert(
+        surface_dump(
+            "{ for (let i, p: Wrap(c) : xs) { f(c); } 0 }",
+        ) == "Seq(ForPattern([i], p: Wrap(c), xs, Seq(f(c), 0)), 0)",
     );
 
     // `let PATTERN = e else { .. };` binds the pattern's names in the rest of the
@@ -6278,6 +6369,12 @@ fn nest3(
 fn case_payload() -> Rule<AiplTok> {
     // A case pattern's parenthesized slots, each a pattern of its own.
     nest("(", Named("ctor_payload"), ")", strict())
+}
+
+// `p: Point { x, y }` and `p: Wrap(inner)`: a name bound to the whole value, which is
+// also taken apart. Its body is the pattern that follows a type name anywhere else.
+fn aliased_pattern() -> Rule<AiplTok> {
+    Then([Term(Name), Lit(":"), Term(Name), OneOf([field_binders(), case_payload()])])
 }
 
 fn arm_binders() -> Rule<AiplTok> {

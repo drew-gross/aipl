@@ -2500,6 +2500,34 @@
 
 
 
+        <section class="item" id="item-pattern_follows_name">
+          <h3>
+            <a class="anchor" href="#item-pattern_follows_name">pattern_follows_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pattern_follows_name(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether the tokens after a <code>:</code> are a type name opening a pattern — <code>Point {</code> or <code>Wrap(</code> — which is a name that is also taken apart, where a type annotation would not be followed by either.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opens_pattern_at">
+          <h3>
+            <a class="anchor" href="#item-opens_pattern_at">opens_pattern_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opens_pattern_at(self: W, n: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether the token <code>n</code> ahead opens a struct or case pattern's body: a <code>{</code> or <code>(</code> right after a name, where a type (<code>#{str: u8}</code>, <code>(A, B)</code>) has none.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lambda_param_ty">
           <h3>
             <a class="anchor" href="#item-lambda_param_ty">lambda_param_ty</a>

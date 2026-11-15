@@ -1,0 +1,17 @@
+# A name bound to a whole value that is taken apart cannot carry an `else` block: the
+# alias form has no fall-through to run it from.
+
+struct Point { x: i64, y: i64 }
+
+variant Shape = Dot(Point) | Blank
+
+fn first(s: Shape) -> i64 {
+    let d: Dot(Point { x }) = s else { return 0; };
+    x
+}
+--- check --compile ---
+error: a name that is also taken apart takes no `else` block; match the value with `let Case(..) = v else { .. };` and name it separately
+ --> ./tests/cases/destructuring/err_alias_else.aipl:9:5
+  |
+9 |     let d: Dot(Point { x }) = s else { return 0; };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

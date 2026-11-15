@@ -106,6 +106,20 @@
 
 
 
+        <section class="item" id="item-WrittenBinding">
+          <h3>
+            <a class="anchor" href="#item-WrittenBinding">WrittenBinding</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct WrittenBinding</code></pre>
+
+          <div class="doc"><p>A binding written with a type or case name: what it binds, the name of the type or case, and the index of that name among the tokens, where the names it spells begin.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_source">
           <h3>
             <a class="anchor" href="#item-aipl_source">aipl_source</a>
@@ -818,7 +832,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$72385: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$73597: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1475,7 +1489,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$112571: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$114355: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1506,20 +1520,6 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span, written: WrittenNames) -&#62; Stmt!ParseError</code></pre>
 
           <div class="doc"><p><code>for (let (a, b) : xs) { body }</code>, and its struct and case twins, with an optional index in front: the pattern as written, for <code>desugar.aipl</code> to lower. A tuple pattern needs two names or more, which is checked here, where the span of the written pattern is at hand.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-for_struct">
-          <h3>
-            <a class="anchor" href="#item-for_struct">for_struct</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn for_struct(struct_name: str, fields: str[], names: str[], index: str?, iterable: Expr, body: Expr, written: WrittenNames) -&#62; Stmt</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -1769,7 +1769,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$128788: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$129671: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -2254,6 +2254,20 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-written_binding">
+          <h3>
+            <a class="anchor" href="#item-written_binding">written_binding</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn written_binding(toks: str[], at: u64, kids: Ast[], sp: Span) -&#62; WrittenBinding?!ParseError</code></pre>
+
+          <div class="doc"><p>The binding written from token <code>at</code>: <code>T { x, y }</code> or <code>Case(x, y)</code>, or a name bound to one of them, <code>p: T { x, y }</code>. <code>none</code> when the tokens there are neither, as for a plain name, a tuple or an annotation. A case's payload is the first child.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-as_binding">
           <h3>
             <a class="anchor" href="#item-as_binding">as_binding</a>
@@ -2273,7 +2287,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-destructured_param">destructured_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$153449: FieldBinders, span: Span, written: WrittenNames) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn destructured_param(name: str, struct_name: str, __spat$155781: FieldBinders, span: Span, written: WrittenNames) -&#62; Ast</code></pre>
 
           <div class="doc"><p>A parameter named <code>name</code>, of the struct <code>struct_name</code>, whose <code>fields</code> are bound to <code>names</code> at the top of the body.</p></div>
 
@@ -2567,7 +2581,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$171672: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$174004: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2941,6 +2955,20 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn case_payload() -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
           <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's. <code>(a, b)</code> after a case's name: one binder per payload slot, <code>_</code> for a slot not wanted. Only a <code>let</code>, a <code>for</code> and a parameter take one, and only over a value that can be nothing but that case.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-aliased_pattern">
+          <h3>
+            <a class="anchor" href="#item-aliased_pattern">aliased_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn aliased_pattern() -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

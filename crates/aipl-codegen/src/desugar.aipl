@@ -32,6 +32,7 @@ import {
     wrapping_decrement as --,
 } from builtins;
 import {
+    Alias,
     Binding,
     ByCase,
     ByPattern,
@@ -230,6 +231,18 @@ pub fn desugared(self: Expr) -> Expr {
             .show_expr() == "For([i], a, xs, a)",
     );
 
+    // An alias is the value bound to its name, with the inner binding read off that name.
+    assert(
+        expr(LetPattern(Alias("p", ByStruct("P", ["x"], ["x"], false)), ident("v"), ident("x")))
+            .desugared()
+            .show_expr() == "Let(p: P, v, Let(x, p.x, x))",
+    );
+    assert(
+        expr(ForPattern(Alias("p", ByCase("W", ["c"])), ident("xs"), ident("c")))
+            .desugared()
+            .show_expr() == "For(p, xs, Let(c, Match(p, [W(c) => c]), c))",
+    );
+
     // A struct pattern inside another pattern becomes a binder, and the arm's body
     // reads the fields off it.
     let inside = MatchArm {
@@ -412,6 +425,25 @@ fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames)
             let inner = bind_pattern(pattern, tmp, span, body, written);
             at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
+        // The value is the name, and the inner binding reads its parts off it. A struct
+        // annotates the name itself, which is what holds the value to the struct written.
+        Alias(name, inner) => match (inner) {
+            ByStruct(struct_name, fields, names, mutable) => destructure_struct(
+                struct_name,
+                fields,
+                names,
+                value,
+                span,
+                body,
+                mutable,
+                name,
+                written.struct_written(0),
+            ),
+            _ => {
+                let rest = bind_off(inner, name, span, body, written);
+                at(Let(name, none, value, rest), join_spans(span, rest.span))
+            },
+        },
     }
 }
 
@@ -428,12 +460,24 @@ fn for_pattern(
     written: WrittenNames,
 ) -> Expr {
     let span = iterable.span;
-    let tmp = `__fpat${span.start}`;
-    // A plain name is the loop variable itself.
+    // A plain name is the loop variable itself, and so is an alias's.
     if (let Name(name) = binding) {
         return at(For(name, iterable, body, index=index), join_spans(span, body.span));
     };
-    let inner = match (binding) {
+    if (let Alias(name, inner) = binding) {
+        let rest = bind_off(inner, name, span, body, written);
+        return at(For(name, iterable, rest, index=index), join_spans(span, rest.span));
+    };
+    let tmp = `__fpat${span.start}`;
+    let inner = bind_off(binding, tmp, span, body, written);
+    at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
+}
+
+# The names `binding` binds, read off the variable `tmp` in front of `body`. A
+# struct is read through a binding annotated with its type, which is what checks the
+# pattern names the right one.
+fn bind_off(binding: Binding, tmp: str, span: Span, body: Expr, written: WrittenNames) -> Expr {
+    match (binding) {
         Name(..) => body,
         ByTuple(names) => bind_fields(names, tmp, span, body, tuple_slot_names(names), written),
         ByCase(case_name, names) => bind_arm(case_name, names, tmp, span, body, written),
@@ -449,8 +493,11 @@ fn for_pattern(
             written.struct_written(0),
         ),
         ByPattern(pattern) => bind_pattern(pattern, tmp, span, body, written),
-    };
-    at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
+        Alias(name, inner) => {
+            let rest = bind_off(inner, name, span, body, written);
+            at(Let(name, none, at(Ident(tmp), span), rest), join_spans(span, rest.span))
+        },
+    }
 }
 
 # The field names a tuple pattern reads: `_0`, `_1`, ... one per binder, which is
@@ -647,5 +694,12 @@ fn bind_param_pattern(
             tuple_slot_names(names),
             written,
         ),
+        // The parameter is the name when it was written with one.
+        Alias(name, inner) => if (name == parameter) {
+            bind_param_pattern(parameter, inner, span, body, written)
+        } else {
+            let rest = bind_param_pattern(name, inner, span, body, written);
+            at(Let(name, none, at(Ident(parameter), span), rest), join_spans(span, rest.span))
+        },
     }
 }

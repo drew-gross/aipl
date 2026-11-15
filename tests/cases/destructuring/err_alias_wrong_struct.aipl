@@ -1,0 +1,16 @@
+# The struct an alias names is the type of the name, so it has to be the value's.
+
+struct Point { x: i64, y: i64 }
+
+struct Other { x: i64 }
+
+fn pick(point: Point) -> i64 {
+    let p: Other { x } = point;
+    x
+}
+--- check --compile ---
+error: binding "p" is declared Other, but its value is Point
+ --> ./tests/cases/destructuring/err_alias_wrong_struct.aipl:8:26
+  |
+8 |     let p: Other { x } = point;
+  |                          ^^^^^

@@ -81,6 +81,7 @@ import {
     value_or,
 } from builtins;
 import {
+    Alias,
     Binding,
     ByCase,
     ByStruct,
@@ -461,6 +462,7 @@ fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
     match (self) {
         ByCase(case_name, names) => names.slots_taken_apart(some(case_name), scope, reads, at),
         ByTuple(names) => names.slots_taken_apart(none, scope, reads, at),
+        Alias(_, inner) => inner.slot_hits(scope, reads, at),
         _ => [],
     }
 }
