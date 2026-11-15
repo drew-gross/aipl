@@ -12,8 +12,7 @@ import { LintHit, hit, lint_hits } from "./lint_hit.aipl";
 pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     mut seen: #{ImportSource} = #{};
     mut hits: LintHit[] = [];
-    for (let Import(decl) : items.collect_arms(Import)) {
-        let ImportDecl { source, source_span } = decl;
+    for (let Import(ImportDecl { source, source_span }) : items.collect_arms(Import)) {
         if (seen.has(source)) { set hits.push(hit(source.message(), source_span)); };
         set seen = #{..seen, source};
     }

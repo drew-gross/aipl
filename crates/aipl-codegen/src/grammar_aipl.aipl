@@ -905,7 +905,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let bind_target: Rule<AiplTok> = OneOf([
         tuple_binders,
         Then([Term(Name), field_binders()]),
-        Then([Term(Name), arm_binders()]),
+        Then([Term(Name), case_payload()]),
         Term(Name),
     ]);
     let let_stmt: Rule<AiplTok> = OneOf([
@@ -2774,8 +2774,10 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
     let names = binder_names(toks);
-    let iterable = kid_expr(kids, 0, sp)?;
-    let body = kid_expr(kids, 1, sp)?;
+    // A case pattern's payload is a child ahead of the iterable and the body.
+    let payload = kids.len() - 2;
+    let iterable = kid_expr(kids, payload, sp)?;
+    let body = kid_expr(kids, payload + 1, sp)?;
     let written = written_in(node, src, 3, ":", false);
 
     // The index, when one was written, is the name in front of the comma. Its span
@@ -2791,18 +2793,13 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         [_, _, _, "(", ..] => ok(AStmt(for_tuple(names, none, iterable, body, sp, written)?)),
         // `for (let i, Import(decl) : xs)` — the case name and then its binders.
         [_, _, _, index, ",", case_name, "(", ..] => {
-            ok(AStmt(for_arm(
-                case_name,
-                binder_names(toks[6..]),
-                some(index),
-                iterable,
-                body,
-                written,
-            )))
+            let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
+            ok(AStmt(for_destructure(pattern.destructure(), some(index), iterable, body, written)))
         },
-        // `for (let Import(decl) : xs)`
+        // `for (let Import(ImportDecl { source }) : xs)` — the slots are patterns.
         [_, _, _, case_name, "(", ..] => {
-            ok(AStmt(for_arm(case_name, binder_names(toks[4..]), none, iterable, body, written)))
+            let pattern = case_pattern(case_name, kid(kids, 0, sp)?, sp)?;
+            ok(AStmt(for_destructure(pattern.destructure(), none, iterable, body, written)))
         },
         // `for (let i, T { x, y as b } : xs)` — the struct name and then its braces.
         [_, _, _, index, ",", struct_name, "{", ..] => {
@@ -2855,15 +2852,6 @@ fn for_struct(
 ) -> Stmt {
     for_destructure(ByStruct(struct_name, fields, names, false), index, iterable, body, written)
 }
-
-fn for_arm(
-    case_name: str,
-    names: str[],
-    index: str?,
-    iterable: Expr,
-    body: Expr,
-    written: WrittenNames,
-) -> Stmt { for_destructure(ByCase(case_name, names), index, iterable, body, written) }
 
 fn for_destructure(
     pattern: Destructure,
@@ -5069,6 +5057,16 @@ pub fn lower_aipl_block_surface(src: str) -> Expr!ParseError {
         surface_dump(
             "{ for (let i, P { x } : xs) { f(x); } 0 }",
         ) == "Seq(ForPattern([i], P { x }, xs, Seq(f(x), 0)), 0)",
+    );
+    assert(
+        surface_dump(
+            "{ for (let Pair(a, b) : xs) { f(a); } 0 }",
+        ) == "Seq(ForPattern(Pair(a, b), xs, Seq(f(a), 0)), 0)",
+    );
+    assert(
+        surface_dump(
+            "{ for (let i, Import(P { x }) : xs) { f(x); } 0 }",
+        ) == "Seq(ForPattern([i], Import(P { x }), xs, Seq(f(x), 0)), 0)",
     );
 
     // `let PATTERN = e else { .. };` binds the pattern's names in the rest of the

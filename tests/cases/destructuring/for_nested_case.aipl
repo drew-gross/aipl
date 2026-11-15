@@ -1,0 +1,20 @@
+# A `for` loop takes a case pattern whose slot is itself a pattern, as `let` does.
+
+import { print } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+variant Shape = Dot(Point)
+
+fn main() !prints {
+    for (let Dot(Point { x, y }) : [Dot(Point { x: 1, y: 2 }), Dot(Point { x: 3, y: 4 })]) {
+        print(`{x},{y}`);
+    }
+    for (let i, Dot(Point { x }) : [Dot(Point { x: 5, y: 6 })]) {
+        print(`{i}:{x}`);
+    }
+}
+--- stdout ---
+1,2
+3,4
+0:5

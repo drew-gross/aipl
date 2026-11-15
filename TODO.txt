@@ -552,6 +552,8 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  slots_read_by_field is looking at names - it should know from a flag
+  destructure_binding and destructure_param should be combined, and maybe destructure_slot too? less confident on that one
   arms.all(|arm| arm.body.kind.is_case(Bool)) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early returng123)
   push_array_literal should hit when you push before an op even if you also push after an op (see twice() test)
   lint against unused expressions

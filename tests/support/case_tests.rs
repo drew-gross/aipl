@@ -198,6 +198,7 @@ case_tests! {
     cases_debug_err_trace_takes_one_argument = "cases/debug/err_trace_takes_one_argument",
     cases_debug_trace = "cases/debug/trace",
     cases_debug_trace_fails_check = "cases/debug/trace_fails_check",
+    cases_destructuring_for_nested_case = "cases/destructuring/for_nested_case",
     cases_dicts_basic = "cases/dicts/basic",
     cases_dicts_empty_literal_flexes = "cases/dicts/empty_literal_flexes",
     cases_dicts_equality = "cases/dicts/equality",

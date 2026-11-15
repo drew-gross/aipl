@@ -1821,14 +1821,14 @@ fn member_path(self: W, acc0: str) -> WStr {
 
 fn for_stmt(self: W) -> WDoc!FmtError {
     let opened = self.bump().w.expect("(")?.w.expect("let")?.w;
-    let first = opened.binder_item();
+    let first = opened.for_binder()?;
     let binder = if (first.w.peek_text() == ",") {
         // `for (let i, x : xs)` — the index-and-item form: the comma is part of the
         // binder rather than a separator the header walker would otherwise stop
         // on. The item may itself be a tuple or a struct pattern:
         // `for (let i, (a, b) : xs)`, `for (let i, P { x } : xs)`.
-        let item = first.w.bump().w.binder_item();
-        WStr { w: item.w, text: `{first.text}, {item.text}` }
+        let item = first.w.bump().w.for_binder()?;
+        WDoc { w: item.w, doc: Concat([first.doc, Text(", "), item.doc]) }
     } else {
         first
     };
@@ -1836,8 +1836,27 @@ fn for_stmt(self: W) -> WDoc!FmtError {
     let body = it.w.expect(")")?.w.block()?;
     ok(WDoc {
         w: body.w,
-        doc: Concat([Text(`for (let {binder.text} : `), it.doc, Text(") "), body.doc]),
+        doc: Concat([Text("for (let "), binder.doc, Text(" : "), it.doc, Text(") "), body.doc]),
     })
+}.test({
+    assert(
+        walker_of("for ( let  Import ( D { a , b } )  :  xs ) { f ( a ) ; }")?
+            .for_stmt()
+            .rendered(100)? == "for (let Import(D { a, b }) : xs) {\n    f(a);\n}\n",
+    );
+    assert(
+        walker_of("for ( let i , Pair ( a , b )  :  xs ) { f ( a ) ; }")?
+            .for_stmt()
+            .rendered(100)? == "for (let i, Pair(a, b) : xs) {\n    f(a);\n}\n",
+    );
+})
+
+# One binder of a `for` header. A pattern with another pattern inside it goes
+# through `pattern`, as a `let`'s does; the rest are laid out by `binder_item`.
+fn for_binder(self: W) -> WDoc!FmtError {
+    if (self.general_pattern_ahead()) { return self.pattern(); };
+    let WStr { w, text } = self.binder_item();
+    ok(WDoc { w, doc: Text(text) })
 }
 
 # One binder of a `for` header: a name, a tuple pattern `(a, b)`, a case pattern
