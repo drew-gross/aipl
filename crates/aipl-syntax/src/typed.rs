@@ -1118,8 +1118,9 @@ impl<T: TyRepr> TSignature<T> {
 }
 
 impl TProgram {
-    /// The untyped program this one stands for.
-    pub fn erase(&self) -> Program {
+    /// The declarations of this program as the untyped program carries them: signatures, structs
+    /// and variants. A function's body is left empty, since the typed tree is where it is read.
+    pub fn declarations(&self) -> Program {
         Program {
             items: self
                 .items
@@ -1129,8 +1130,8 @@ impl TProgram {
                         name: f.name.clone(),
                         is_pub: f.is_pub,
                         sig: f.sig.erase(),
-                        body: f.body.erase(),
-                        test_body: f.test_body.as_ref().map(TExpr::erase),
+                        body: Expr::new(ExprKind::Unit, f.body.span.clone()),
+                        test_body: None,
                         test_fns: Vec::new(),
                         doc: f.doc.clone(),
                     }),

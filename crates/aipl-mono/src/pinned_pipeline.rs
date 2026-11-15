@@ -2,7 +2,7 @@
 //! the rewrite that gives each `int_parse` the call its target type asks for, and writing the
 //! optimized pinned functions back into the program monomorphization reads.
 
-use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Primitive, Program};
+use aipl_syntax::ast::{Callee, Item, Primitive, Program};
 use aipl_syntax::typed::{TExpr, TExprKind, TProgram, Ty};
 
 use crate::typed_util::{each_child_mut, map_pinned_bodies};
@@ -81,15 +81,12 @@ fn retarget(e: &mut TExpr<Ty>) {
     );
 }
 
-/// The declarations monomorphization reads: signatures, structs and variants. A function's body
-/// is read from the pinned program, so it is left empty here.
-pub fn to_program(typed: &TProgram) -> Program {
-    let mut program = typed.erase();
+/// The declarations monomorphization reads: signatures, structs and variants.
+pub fn declarations(typed: &TProgram) -> Program {
+    let mut program = typed.declarations();
     for item in &mut program.items {
         if let Item::Fn(f) = item {
             anonymous_any_again(&mut f.sig);
-            f.body = Expr::new(ExprKind::Unit, f.body.span.clone());
-            f.test_body = None;
         }
     }
     program

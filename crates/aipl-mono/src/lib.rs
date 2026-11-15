@@ -1416,7 +1416,7 @@ pub fn monomorphize(
     dbg: DebugOptions,
 ) -> Result<MonoProgram, Error> {
     // Signatures, structs and variants are read from the written declarations.
-    let program = &pinned_pipeline::to_program(typed);
+    let program = &pinned_pipeline::declarations(typed);
     // Field types per struct (for typing `Field`/`Construct`).
     // struct name → [(field_name, field_type, default_expr)]
     let mut structs: HashMap<String, Vec<(String, Type, Option<Expr>)>> = HashMap::new();
