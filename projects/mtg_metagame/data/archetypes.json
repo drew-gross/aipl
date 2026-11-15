@@ -2460,5 +2460,322 @@
    "name": "Airbending",
    "not_cards": []
   }
+ ],
+ "Standard2026Q4Worlds": [
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Earthbender Ascension"
+   ],
+   "name": "Landfall",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Earthbender Ascension"
+   ],
+   "name": "Landfall (Mono G)",
+   "not_cards": [
+    "Breeding Pool",
+    "Overgrown Tomb",
+    "Stomping Ground",
+    "Swamp",
+    "Temple Garden"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Superior Spider-Man",
+    "Uldaros Theorix"
+   ],
+   "name": "Uladros",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Amalia Benavides Aguirre",
+    "Hinterland Sanctifier"
+   ],
+   "name": "Lifegain",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Enduring Curiosity",
+    "Floodpits Drowner",
+    "Kaito, Bane of Nightmares"
+   ],
+   "name": "Dimir Midrange",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Consult the Star Charts",
+    "Day of Judgment",
+    "The Theorist, Jace Beleren"
+   ],
+   "name": "Azorius Control",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Cryogen Relic",
+    "Simulacrum Synthesizer",
+    "United Battlefront"
+   ],
+   "name": "Artifacts",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Sarkhan, Dragon Ascendant"
+   ],
+   "name": "Dragons",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Hearth Elemental // Stoke Genius",
+    "Sunderflock"
+   ],
+   "name": "Spellementals",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Master of Barbs"
+   ],
+   "name": "Lizards",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Pompous Battlemage // Improvised Act",
+    "Slickshot Show-Off"
+   ],
+   "maindeck_cards": [],
+   "name": "Prowess",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Inevitable Defeat",
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "name": "Teblet Control (4c)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Inevitable Defeat",
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "name": "Teblet Control (Jeskai)",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Biotech Specialist",
+    "The Sackville-Bagginses"
+   ],
+   "name": "Sacrifice",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Momo, Friendly Flier",
+    "Quantum Riddler"
+   ],
+   "maindeck_cards": [],
+   "name": "Momo",
+   "not_cards": [
+    "High Noon"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Dwarven Mauler",
+    "Kíli the Resourceful"
+   ],
+   "name": "Dwarves",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Hardened Academic",
+    "Moonshadow"
+   ],
+   "maindeck_cards": [],
+   "name": "Discard",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Stadium Headliner",
+    "Voice of Victory",
+    "Warleader's Call"
+   ],
+   "name": "Warleader Tokens",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Hired Claw",
+    "Mountain",
+    "Nova Hellkite"
+   ],
+   "name": "Mono-Red Aggro",
+   "not_cards": [
+    "Steam Vents"
+   ]
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Ajani Unrelenting",
+    "Ashling, Rekindled // Ashling, Rimebound",
+    "Rewrite Regrets"
+   ],
+   "name": "Ajani Reanimator",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Demonic Pact",
+    "Greed's Gambit",
+    "Harmless Offering"
+   ],
+   "name": "Demonic Pact",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Aang, Swift Savior // Aang and La, Ocean's Fury ",
+    "Aven Interrupter",
+    "Floodpits Drowner"
+   ],
+   "name": "High Noon Tempo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Kona, Rescue Beastie",
+    "Omniscience"
+   ],
+   "name": "Kona Omniscience",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Bramble Familiar // Fetch Quest"
+   ],
+   "name": "Airbending",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Nurturing Pixie",
+    "The Naked Time"
+   ],
+   "name": "Boros Pixie",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Feed the Cycle",
+    "Nowhere to Run"
+   ],
+   "name": "Dimir Control",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Michelangelo, Weirdness to 11",
+    "Ouroboroid"
+   ],
+   "name": "Selesnya Michelangelo",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Darklight Phoenix",
+    "Quag Feast"
+   ],
+   "name": "Rakdos Phoenix",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Anthropological Mission",
+    "Traumatic Critique"
+   ],
+   "name": "Izzet Mission",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Grim Bauble",
+    "Mabel, Bitter Recluse"
+   ],
+   "name": "Esper Pixie",
+   "not_cards": []
+  }
  ]
 }

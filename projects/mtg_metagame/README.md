@@ -57,7 +57,7 @@ archetypes and prints how much of the field each is. A deck counts in every arch
 matches, so the percentages can add up to more than 100; the decks that match none are
 one `Other` row, last whatever its size. The metagame is a file in
 `data/` without its `.json.gz`, or one of the names in `data/index.json`; `--archetypes` names
-a list in `data/archetypes.json` (default `Standard2026Q4RC`). Run it from this directory.
+a list in `data/archetypes.json` (default `Standard2026Q4Worlds`). Run it from this directory.
 
 ## Layout
 
@@ -104,3 +104,7 @@ Archetypes are not in the data: the original derives them from a canonicalizatio
 per format and season, which `tools/archetypes_to_json.py` dumps into `data/archetypes.json`
 (a list of identifiers per config: cards a deck must hold, must not hold, or must hold one of,
 and cards it must hold in the main deck).
+
+`Standard2026Q4Worlds` is not from the original: it is `Standard2026Q4RC` plus the six archetypes
+the Worlds field (`metagame_worlds_32`) added, each identified by two main-deck cards. Rerunning
+`tools/archetypes_to_json.py` rewrites the file without it.

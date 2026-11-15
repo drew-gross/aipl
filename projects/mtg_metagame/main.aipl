@@ -38,7 +38,7 @@ let USAGE = """
 """;
 
 # The archetype list `share` uses when `--archetypes` is not given.
-let DEFAULT_ARCHETYPES = "Standard2026Q4RC";
+let DEFAULT_ARCHETYPES = "Standard2026Q4Worlds";
 
 # The file in `data/` that `name` stands for: the file `index` maps it to, or
 # `name` itself when the index does not know it.
@@ -103,7 +103,7 @@ fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
 }.test({
     assert(parse_deck_options("share", ["m"]) == ok(DeckOptions {
         metagame: "m",
-        archetypes: "Standard2026Q4RC",
+        archetypes: "Standard2026Q4Worlds",
         output: none,
     }));
     assert(parse_deck_options("share", ["--archetypes", "Modern2026Q3RC", "m"]) == ok(DeckOptions {
@@ -113,7 +113,7 @@ fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
     }));
     assert(parse_deck_options("winrate", ["m", "--output", "out.svg"]) == ok(DeckOptions {
         metagame: "m",
-        archetypes: "Standard2026Q4RC",
+        archetypes: "Standard2026Q4Worlds",
         output: some("out.svg"),
     }));
     assert(parse_deck_options("winrate", ["m", "--output"]) == err(
