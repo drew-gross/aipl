@@ -12,8 +12,11 @@ import {
     float_div as /,
     float_mul as *,
     get,
+    is_some,
     join,
     len,
+    logical_and as &&,
+    logical_not as !,
     map,
     push,
     render,
@@ -22,7 +25,16 @@ import {
     to_float,
     try_map,
 } from builtins;
-import { Identifier, archetype_of, definition, label } from "./archetypes.aipl";
+import {
+    Identifier,
+    Meta,
+    Other,
+    archetype_of,
+    definition,
+    label,
+    sub_archetype_of,
+} from "./archetypes.aipl";
+import { Counted, ranked } from "./counted.aipl";
 import { shares } from "./meta_share.aipl";
 import {
     Card,
@@ -53,8 +65,16 @@ import {
 # One match, from the point of view of an archetype the player's deck is, against an archetype
 # the opponent's deck is. `slot` is where the match's round falls counting back from the end of its
 # tournament, if it does, and `bracket` the player's record going into it, if it is a numbered round
-# and the player's history says (see `rounds.aipl`).
-struct Observation { player: str, opponent: str, result: Result, slot: u64?, bracket: Bracket? }
+# and the player's history says (see `rounds.aipl`). `player_sub` is the sub-archetype of `player`
+# the player's deck is, if it has one.
+struct Observation {
+    player: str,
+    opponent: str,
+    result: Result,
+    slot: u64?,
+    bracket: Bracket?,
+    player_sub: str? = none,
+}
 
 # How the same match ended for the other side.
 fn flipped(self: Result) -> Result {
@@ -69,17 +89,39 @@ fn flipped(self: Result) -> Result {
     assert(Draw.flipped() == Draw);
 })
 
-# The name of the archetype `self` is, as a report reads it.
-fn label_of(self: Deck, identifiers: Identifier[]) -> str!str {
-    ok(self.archetype_of(identifiers)?.label())
+# Where a deck sits in the matrix: its archetype as a report reads it, and the sub-archetype of that
+# archetype it is, if the archetype has any.
+struct Placement { archetype: str, sub: str? }
+
+# The placement of `self`.
+fn placement_of(self: Deck, identifiers: Identifier[]) -> Placement!str {
+    let archetype = self.archetype_of(identifiers)?;
+    let sub = match (archetype) {
+        Meta(name) => self.sub_archetype_of(name, identifiers)?,
+        Other(..) => none,
+    };
+    ok(Placement { archetype: archetype.label(), sub })
 }.test({
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
-    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.label_of([landfall]) == ok(
-        "Landfall",
-    ));
-    assert(Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] }.label_of([landfall]) == ok(
-        "Other",
-    ));
+    let plains = Identifier { name: "Selesnya", cards: ["Plains"], parent: some("Landfall") };
+    let forest = Card { name: "Forest" };
+    assert(Deck { deck_id: "d", maindeck: [forest] }.placement_of([landfall]) == ok(Placement {
+        archetype: "Landfall",
+        sub: none,
+    }));
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] }.placement_of([
+        landfall,
+    ]) == ok(Placement { archetype: "Other", sub: none }));
+
+    // A sub-archetype is read for the decks of its archetype only.
+    assert(Deck { deck_id: "d", maindeck: [forest, Card { name: "Plains" }] }.placement_of([
+        landfall,
+        plains,
+    ]) == ok(Placement { archetype: "Landfall", sub: some("Selesnya") }));
+    assert(Deck { deck_id: "d", maindeck: [forest] }.placement_of([
+        landfall,
+        plains,
+    ]) == ok(Placement { archetype: "Landfall", sub: some("Other") }));
 })
 
 # Every match of `matches`, once from each side. A match with a deck not in `decks` is an error. `last_rounds` is
@@ -90,36 +132,38 @@ fn observations(
     identifiers: Identifier[],
     last_rounds: #{str: u64},
 ) -> Observation[]!str {
-    let labelled: #{str: str} = decks
+    let placed: #{str: Placement} = decks
         .try_map(|deck| {
-            let label = deck.label_of(identifiers)?;
-            ok((deck.deck_id, label))
+            let placement = deck.placement_of(identifiers)?;
+            ok((deck.deck_id, placement))
         })?
         .to_dict();
     mut out: Observation[] = [];
     for (let each : matches) {
-        let some(first) = labelled.get(each.first_deck_id) else {
+        let some(first) = placed.get(each.first_deck_id) else {
             return err(unknown_deck(each.first_deck_id));
         };
-        let some(second) = labelled.get(each.second_deck_id) else {
+        let some(second) = placed.get(each.second_deck_id) else {
             return err(unknown_deck(each.second_deck_id));
         };
         let slot = each.slot_of(last_rounds);
         let first_bracket = each.first_bracket();
         let second_bracket = each.second_bracket();
         set out.push(Observation {
-            player: first,
-            opponent: second,
+            player: first.archetype,
+            opponent: second.archetype,
             result: each.result,
             slot,
             bracket: first_bracket,
+            player_sub: first.sub,
         });
         set out.push(Observation {
-            player: second,
-            opponent: first,
+            player: second.archetype,
+            opponent: first.archetype,
             result: each.result.flipped(),
             slot,
             bracket: second_bracket,
+            player_sub: second.sub,
         });
     }
     ok(out)
@@ -286,6 +330,19 @@ struct Matrix {
     brackets: Bracket[],
     rows: Cell?[][],
     overall: Cell[],
+    sub_archetypes: SubArchetype[] = [],
+}
+
+# How one sub-archetype did: of the archetype `parent` (an index into the matrix's `names`) it is
+# named `name`, said in a line by `definition`, and has `count` decks. `cells` has the cell against
+# each of the matrix's archetypes, in order, and `overall` the one against all of them.
+struct SubArchetype {
+    parent: u64,
+    name: str,
+    definition: str,
+    count: u64,
+    cells: Cell?[],
+    overall: Cell,
 }
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
@@ -297,6 +354,36 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     let seen = observations(decks, matches, identifiers, last_rounds)?;
     let placed = matches$slot_of(last_rounds);
     let brackets = seen$bracket.collect_ok().distinct().sort_by(is_above);
+    let placements = decks.try_map(|deck| deck.placement_of(identifiers))?;
+    // Each archetype's sub-archetypes, most decks first, in the order of the archetypes.
+    mut sub_archetypes: SubArchetype[] = [];
+    for (let parent, archetype : names) {
+        let subs = placements.filter(|each| each.archetype == archetype)$sub.collect_ok();
+        let counted = subs
+            .distinct()
+            .map(|sub| Counted { name: sub, count: subs.count_if(|each| each == sub) })
+            .ranked();
+        for (let sub : counted) {
+            let mine = seen.filter(|each| each.player == archetype && each.player_sub == some(
+                sub.name,
+            ));
+            set sub_archetypes.push(SubArchetype {
+                parent,
+                name: sub.name,
+                definition: identifiers
+                    .filter(|i| i.parent == some(archetype) && i.name == sub.name)
+                    $definition()
+                    .join(sep=" | "),
+                count: sub.count,
+                cells: names.map(|opponent| {
+                    some(
+                        mine.filter(|each| each.opponent == opponent).cell_of(slot_count, brackets),
+                    )
+                }),
+                overall: mine.cell_of(slot_count, brackets),
+            });
+        }
+    }
     let rows = names.map(|player| {
         let mine = seen.filter(|each| each.player == player);
         names.map(|opponent| {
@@ -311,7 +398,10 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     ok(Matrix {
         names,
         definitions: names.map(|name| {
-            identifiers.filter(|i| i.name == name)$definition().join(sep=" | ")
+            identifiers
+                .filter(|i| i.name == name && !i.parent.is_some())
+                $definition()
+                .join(sep=" | ")
         }),
         counts: found$count,
         total: decks.len(),
@@ -323,6 +413,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         overall: names.map(
             |player| seen.filter(|each| each.player == player).cell_of(slot_count, brackets),
         ),
+        sub_archetypes,
     })
 }.test({
     let forest = Identifier { name: "Forest", cards: ["Forest"] };
@@ -400,6 +491,29 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             },
         ],
     }));
+
+    // A sub-archetype has a row of its own: the decks of its archetype that it claims, with their
+    // record against each archetype, and the rest of the archetype's decks as `Other`.
+    let plains = Identifier { name: "Plains", cards: ["Plains"], parent: some("Forest") };
+    let with_plains = [
+        Deck { deck_id: "a", maindeck: [Card { name: "Forest" }, Card { name: "Plains" }] },
+        Deck { deck_id: "b", maindeck: [Card { name: "Swamp" }] },
+        Deck { deck_id: "c", maindeck: [Card { name: "Forest" }] },
+        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }, Card { name: "Plains" }] },
+    ];
+    let subs = winrate_matrix(
+        with_plains,
+        [Match { ..played, round: "Round 1" }],
+        [forest, plains],
+    )?.sub_archetypes;
+    assert(subs$name == ["Plains", "Other"]);
+    assert(subs$parent == [0, 0]);
+    assert(subs$count == [2, 1]);
+    assert(subs$definition == ["Plains", ""]);
+    assert(subs$overall$record == [Record { win: 1 }, Record {}]);
+    // Against the archetype `Other` (column 1) the Plains decks won once; against Forest, never met.
+    assert(subs[0]?.cells.map(|cell| cell$record) == [some(Record {}), some(Record { win: 1 })]);
+
     // A match with a deck the metagame does not have is an error.
     assert(winrate_matrix(
         decks,

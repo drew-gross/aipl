@@ -4,12 +4,14 @@
 # back from the end of the tournament.
 
 import {
+    any,
     contains,
     equal as ==,
     first,
     join,
     len,
     less_than as <,
+    logical_not as !,
     map,
     max,
     push,
@@ -23,7 +25,7 @@ import {
 import { percent } from "./meta_share.aipl";
 import { Record, played } from "./metagame.aipl";
 import { Bracket, bracket_text } from "./rounds.aipl";
-import { Cell, Matrix, rate_text, share_text } from "./winrate_matrix.aipl";
+import { Cell, Matrix, SubArchetype, rate_text, share_text } from "./winrate_matrix.aipl";
 
 # The size of a cell, and the space around the matrix, in pixels.
 let CELL: u64 = 64;
@@ -242,6 +244,9 @@ let STYLE = """
     .cell .detail { font-size: 10px; fill: #222; opacity: 0.85; }
     .row-label { text-anchor: end; dominant-baseline: central; }
     .row-label .detail { font-size: 11px; font-weight: normal; fill: #888; }
+    .row-label .expander { text-anchor: start; fill: #1a6fb5; cursor: pointer; }
+    .row-label.sub .hit { fill: #fafafa; }
+    .row-label.sub { cursor: default; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
     .cell { cursor: pointer; }
     .label[data-row], .label[data-column] { cursor: pointer; }
@@ -278,22 +283,29 @@ let STYLE = """
 # other archetype's overall record would be without its matches against the removed ones. The
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
-    var root, panel, locked = null, removed = [], names = [], folded = [], sorting = "share";
+    var root, panel, locked = null, removed = [], expanded = [], names = [], folded = [], sorting = "share";
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
         panel = document.getElementById("panel");
         for (var each of root.querySelectorAll(".row-label")) names[+each.getAttribute("data-row")] = each.getAttribute("data-name");
         var saved = /removed=([\d,]+)/.exec(location.hash);
-        if (saved) removed = saved[1].split(",").map(Number).filter(function(i) { return i < names.length; });
+        var parents = +panel.getAttribute("data-parents");
+        if (saved) removed = saved[1].split(",").map(Number).filter(function(i) { return i < parents; });
+        var opened = /expanded=([\d,]+)/.exec(location.hash);
+        if (opened) expanded = opened[1].split(",").map(Number).filter(function(i) { return i < parents; });
         var sort = /sort=(share|winrate|projected|change)/.exec(location.hash);
         if (sort) sorting = sort[1];
         refresh();
     }
     // Lay the rows and columns out in the order `sorting` names, by moving them from where the page
     // drew them (meta share order): a row or column keeps its index, which the cells' attributes use.
+    // The archetypes are the first `data-parents` rows and every column; a sub-archetype's row follows
+    // its archetype's when that is expanded, and is hidden otherwise.
     function apply_sort() {
-        var records = [], order = names.map(function(name, i) { return i; });
+        var parents = +panel.getAttribute("data-parents");
+        var records = [], order = [];
+        for (var i = 0; i < parents; i++) order.push(i);
         for (var cell of root.querySelectorAll(".cell.overall")) records[+cell.getAttribute("data-row")] = record_of(cell);
         if (sorting !== "share") {
             // Projected and change order put the removed archetypes last, below those with no matches.
@@ -311,12 +323,28 @@ let SCRIPT = """
         }
         var position = [], size = +root.querySelector(".cell.overall rect").getAttribute("height");
         order.forEach(function(index, at) { position[index] = at; });
+        var subs = {}, slot = [], rows = 0;
+        for (var sub of root.querySelectorAll(".row-label.sub")) {
+            (subs[sub.getAttribute("data-parent")] = subs[sub.getAttribute("data-parent")] || []).push(+sub.getAttribute("data-row"));
+        }
+        order.forEach(function(index) {
+            slot[index] = rows++;
+            if (expanded.indexOf(index) >= 0) (subs[index] || []).forEach(function(row) { slot[row] = rows++; });
+        });
         for (var each of root.querySelectorAll("[data-row], [data-column]")) {
             if (!each.classList.contains("label") && !each.classList.contains("cell")) continue;
             var row = each.getAttribute("data-row"), column = each.getAttribute("data-column");
-            var dx = column === null ? 0 : (position[+column] - column) * size, dy = row === null ? 0 : (position[+row] - row) * size;
+            if (row !== null && slot[+row] === undefined) { each.setAttribute("display", "none"); continue; }
+            each.removeAttribute("display");
+            var dx = column === null ? 0 : (position[+column] - column) * size, dy = row === null ? 0 : (slot[+row] - row) * size;
             each.setAttribute("transform", dx || dy ? "translate(" + dx + "," + dy + ")" : "");
         }
+        for (var mark of root.querySelectorAll(".expander")) mark.textContent = expanded.indexOf(+mark.getAttribute("data-expand")) >= 0 ? "\u25be" : "\u25b8";
+        // The page is as tall as its visible rows need, and no shorter than the panel needs.
+        var height = Math.max(+panel.getAttribute("data-height"), +panel.getAttribute("data-grid-top") + rows * size + +panel.getAttribute("data-margin"));
+        root.setAttribute("height", height);
+        root.setAttribute("viewBox", "0 0 " + root.getAttribute("width") + " " + height);
+        document.getElementById("background").setAttribute("height", height);
         for (var option of root.querySelectorAll(".sort")) option.classList.toggle("active", option.getAttribute("data-sort") === sorting);
     }
     function ancestor(node, test) {
@@ -470,7 +498,8 @@ let SCRIPT = """
         apply_sort();
         for (var each of root.querySelectorAll(".cell, .label")) {
             var row = each.getAttribute("data-row"), column = each.getAttribute("data-column");
-            each.classList.toggle("removed", (row !== null && removed.indexOf(+row) >= 0) || (column !== null && removed.indexOf(+column) >= 0));
+            var parent = each.getAttribute("data-parent");
+            each.classList.toggle("removed", (row !== null && removed.indexOf(+row) >= 0) || (column !== null && removed.indexOf(+column) >= 0) || (parent !== null && removed.indexOf(+parent) >= 0));
         }
         for (var cell of root.querySelectorAll(".cell.projected")) {
             var index = +cell.getAttribute("data-row"), rect = cell.querySelector("rect");
@@ -486,6 +515,7 @@ let SCRIPT = """
         try {
             var kept = [];
             if (removed.length) kept.push("removed=" + removed.join(","));
+            if (expanded.length) kept.push("expanded=" + expanded.join(","));
             if (sorting !== "share") kept.push("sort=" + sorting);
             history.replaceState(null, "", kept.length ? "#" + kept.join("&") : location.pathname + location.search);
         } catch (error) {}
@@ -615,6 +645,13 @@ let SCRIPT = """
     window.addEventListener("click", function(e) {
         var order = e.target.getAttribute && e.target.getAttribute("data-sort");
         if (order) { sorting = order; refresh(); return; }
+        var expand = e.target.getAttribute && e.target.getAttribute("data-expand");
+        if (expand !== null && expand !== undefined && expand !== false) {
+            var open_at = expanded.indexOf(+expand);
+            if (open_at >= 0) expanded.splice(open_at, 1); else expanded.push(+expand);
+            refresh();
+            return;
+        }
         var key = e.target.getAttribute && e.target.getAttribute("data-fold");
         if (key) {
             var at = folded.indexOf(key);
@@ -626,6 +663,7 @@ let SCRIPT = """
         if (action === "restore") { removed = []; refresh(); return; }
         if (action === "unlock") { unlock(); return; }
         var label = label_of(e.target);
+        if (label && label.classList.contains("sub")) return;
         if (label) {
             toggle(+(label.hasAttribute("data-row") ? label.getAttribute("data-row") : label.getAttribute("data-column")));
             return;
@@ -655,14 +693,30 @@ let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall } = self;
+    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall, sub_archetypes } = self;
     let summaries = counts.map(|count| deck_summary(count, decks));
+
+    // The rows of the page: each archetype, then every sub-archetype, which the page shows under its
+    // archetype when that is expanded.
+    let parent_count = names.len();
+    let row_labels = [..names, ..sub_archetypes.map(|sub| `↳ {sub.name}`)];
+    let row_names = [
+        ..names,
+        ..sub_archetypes.map(|sub| `{names[sub.parent].value_or("")}: {sub.name}`),
+    ];
+    let row_definitions = [..definitions, ..sub_archetypes$definition];
+    let row_summaries = [..summaries, ..sub_archetypes.map(|sub| deck_summary(sub.count, decks))];
+    let row_totals = [..overall, ..sub_archetypes$overall];
+    let row_cells = [..rows, ..sub_archetypes$cells];
     mut longest = PROJECTED.len();
     for (let each : names) {
         set longest = max(longest, each.len());
     }
     mut label_characters = longest;
-    for (let each : [..summaries, ..definitions]) {
+    for (let each : row_labels) {
+        set label_characters = max(label_characters, each.len());
+    }
+    for (let each : [..row_summaries, ..row_definitions]) {
         // The summary and the definition are set smaller than a name.
         set label_characters = max(label_characters, each.len() * 6 / CHARACTER_WIDTH);
     }
@@ -701,13 +755,26 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             each,
         ));
     }
-    for (let row, total : overall) {
+    for (let row, total : row_totals) {
         let y = grid_top + row * CELL;
-        let row_name = names[row].value_or("");
-        let summary = summaries[row].value_or("");
-        let definition = definitions[row].value_or("");
+        let row_name = row_names[row].value_or("");
+        let summary = row_summaries[row].value_or("");
+        let definition = row_definitions[row].value_or("");
+
+        // A sub-archetype's elements start out hidden; the page shows them when its archetype is
+        // expanded.
+        let hidden = if (row < parent_count) {
+            ""
+        } else {
+            ` display="none" data-parent="{sub_archetypes[row - parent_count]$parent.value_or(0)}"`
+        };
+        let expander = if (sub_archetypes.any(|each| each.parent == row)) {
+            `<text class="expander" data-expand="{row}" x="10" y="{y + CELL / 2 - 17}">▸</text>`
+        } else {
+            ""
+        };
         set parts.push(
-            `<g class="label row-label" data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/><text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
+            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{expander}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
@@ -718,12 +785,12 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             matches,
         );
         set parts.push(
-            `<g class="cell overall" data-row="{row}" data-info="{overall_info}" {overall_panel}><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(overall_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
+            `<g class="cell overall"{hidden} data-row="{row}" data-info="{overall_info}" {overall_panel}><title>{overall_info}</title><rect x="{overall_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(overall_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
         );
         set parts.push(
-            `<g class="cell projected" data-row="{row}"><title>{row_name.xml_escape()} without the removed archetypes' matches</title><rect x="{projected_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(projected_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
+            `<g class="cell projected"{hidden} data-row="{row}"><title>{row_name.xml_escape()} without the removed archetypes' matches</title><rect x="{projected_left}" y="{y}" width="{CELL}" height="{CELL}" fill="{total.record.colour()}"/>{cell_labels(projected_left + CELL / 2, y + CELL / 2, some(total.record))}</g>`,
         );
-        for (let column, cell : rows[row].value_or([])) {
+        for (let column, cell : row_cells[row].value_or([])) {
             let column_name = names[column].value_or("");
             let info = describe(row_name, column_name, cell).xml_escape();
             let x = grid_left + column * CELL;
@@ -740,7 +807,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             };
             let shown_cell = cell$record;
             set parts.push(
-                `<g class="cell" data-row="{row}" data-column="{column}" data-info="{info}" {attributes}><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{if (cell == none) { "rgb(255,255,255)" } else { fill }}"/>{cell_labels(x + CELL / 2, y + CELL / 2, shown_cell)}</g>`,
+                `<g class="cell"{hidden} data-row="{row}" data-column="{column}" data-info="{info}" {attributes}><title>{info}</title><rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" fill="{if (cell == none) { "rgb(255,255,255)" } else { fill }}"/>{cell_labels(x + CELL / 2, y + CELL / 2, shown_cell)}</g>`,
             );
         }
     }
@@ -748,12 +815,12 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <svg version="1.1" width="{width}" height="{height}" viewBox="0 0 {width} {height}" onload="init(evt)" xmlns="http://www.w3.org/2000/svg">
 <style type="text/css">{STYLE}</style>
 <script type="text/ecmascript"><![CDATA[{SCRIPT}]]></script>
-<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
+<rect id="background" x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
 <text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan> · <tspan class="sort" data-sort="projected">projected</tspan> · <tspan class="sort" data-sort="change">change</tspan></text>
 {parts.join(sep="\n")}
-<g id="panel" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}" data-brackets="{bracket_labels}"></g>
+<g id="panel" data-parents="{parent_count}" data-grid-top="{grid_top}" data-height="{height}" data-margin="{MARGIN}" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}" data-brackets="{bracket_labels}"></g>
 </svg>
 `
 }.test({
@@ -836,4 +903,35 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-record="1,0,0"`));
     assert(page.contains(`data-name="B &amp; C"`));
     assert(page.split(`class="label row-label"`).len() == 3);
+
+    // Nothing is expandable without sub-archetypes.
+    assert(!page.contains(`class="expander"`));
+
+    // A sub-archetype has a row of its own, hidden until its archetype is expanded: a label that
+    // names it under its archetype, and its cells, all marked with the archetype's row.
+    let sub = SubArchetype {
+        parent: 0,
+        name: "X & Y",
+        definition: "Z",
+        count: 2,
+        cells: [some(Cell { record: Record { win: 1 }, rounds: [], brackets: [] }), none],
+        overall: Cell { record: Record { win: 1 }, rounds: [], brackets: [] },
+    };
+    let expandable = winrate_svg(Matrix { ..matrix, sub_archetypes: [sub] }, "m");
+    assert(expandable.contains(`data-parents="2"`));
+    assert(expandable.contains(`class="expander" data-expand="0"`));
+    assert(expandable.split(`class="expander"`).len() == 2);
+    assert(expandable.contains(
+        `class="label row-label sub" display="none" data-parent="0" data-row="2" data-name="A: X &amp; Y"`,
+    ));
+    assert(expandable.contains(`>↳ X &amp; Y</text>`));
+    assert(expandable.contains(`>2 decks · 50%</text>`));
+    assert(expandable.contains(`class="cell overall" display="none" data-parent="0" data-row="2"`));
+    assert(expandable.contains(
+        `class="cell projected" display="none" data-parent="0" data-row="2"`,
+    ));
+    assert(expandable.contains(
+        `class="cell" display="none" data-parent="0" data-row="2" data-column="0"`,
+    ));
+    assert(expandable.contains(`data-info="A: X &amp; Y vs A: 100%`));
 })

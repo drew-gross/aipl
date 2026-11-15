@@ -10,6 +10,7 @@ import {
     filter,
     is_empty,
     is_nonempty,
+    is_some,
     join,
     logical_and as &&,
     logical_not as !,
@@ -20,21 +21,28 @@ import {
     value_or,
     value_or_err,
 } from builtins;
-import { keys, list_field, scalar_text, text_field } from "./json.aipl";
+import { field, keys, list_field, optional_text_field, scalar_text, text_field } from "./json.aipl";
 import { Card, Deck } from "./metagame.aipl";
 import { Json, parse } from json;
 import { has, to_array, to_set, union } from sets;
 
 # What it takes for a deck to be an archetype, as its identifier in the original wrote it.
 # `cards` must all be in the main deck or the sideboard, none of `not_cards` may be, one of
-# `any_cards` must be if there are any, and `maindeck_cards` must all be in the main deck. An
-# identifier that asks for nothing matches every deck, as it does there.
+# `any_cards` must be if there are any, `maindeck_cards` must all be in the main deck, and none of
+# `not_maindeck_cards` may be (the sideboard does not count). An identifier that asks for nothing
+# matches every deck, as it does there.
+#
+# An identifier with a `parent` names a sub-archetype of the archetype with that name: it is only
+# asked of the decks that archetype claimed, and it asks only what tells it from the parent's
+# other sub-archetypes.
 struct Identifier {
     name: str,
     cards: str[],
     not_cards: str[] = [],
     any_cards: str[] = [],
     maindeck_cards: str[] = [],
+    not_maindeck_cards: str[] = [],
+    parent: str? = none,
 }
 
 # What `self` asks of a deck, in a line: the cards it must hold, then `one of` the cards of which it
@@ -46,6 +54,9 @@ pub fn definition(self: Identifier) -> str {
     if (required.is_nonempty()) { set parts.push(required.join(sep=", ")); };
     if (self.any_cards.is_nonempty()) { set parts.push(`one of {self.any_cards.join(sep=", ")}`); };
     if (self.not_cards.is_nonempty()) { set parts.push(`no {self.not_cards.join(sep=", ")}`); };
+    if (self.not_maindeck_cards.is_nonempty()) {
+        set parts.push(`no {self.not_maindeck_cards.join(sep=", ")} in the main deck`);
+    };
     if (parts.is_empty()) { "any deck" } else { parts.join(sep="; ") }
 }.test({
     assert(Identifier { name: "x", cards: ["Island"] }.definition() == "Island");
@@ -92,7 +103,7 @@ fn holdings(self: Deck) -> Holdings {
 fn matches(self: Identifier, Holdings { main, held }) -> bool {
     self.cards.all(|c| held.has(c)) && !self.not_cards.any(|c| held.has(
         c,
-    )) && self.maindeck_cards.all(|c| main.has(
+    )) && self.maindeck_cards.all(|c| main.has(c)) && !self.not_maindeck_cards.any(|c| main.has(
         c,
     )) && (self.any_cards.is_empty() || self.any_cards.any(|c| held.has(c)))
 }.test({
@@ -144,7 +155,9 @@ pub fn label(self: Archetype) -> str {
 # name is an error naming them, since a deck is one archetype.
 pub fn archetype_of(self: Deck, identifiers: Identifier[]) -> Archetype!str {
     let deck_holdings = self.holdings();
-    let found: #<{str} = identifiers.filter(|i| i.matches(deck_holdings))$name.to_set();
+    let found: #<{str} = identifiers
+        .filter(|i| !i.parent.is_some() && i.matches(deck_holdings))$name
+        .to_set();
     let names = found.to_array();
     match (names) {
         [] => ok(Other(self.name)),
@@ -190,6 +203,83 @@ pub fn archetype_of(self: Deck, identifiers: Identifier[]) -> Archetype!str {
     ]) == err("deck d1 (Ramp) is more than one archetype: Both, Control"));
 })
 
+# The sub-archetype of the archetype `archetype` that `self` is, by name: the one identifier in
+# `identifiers` with that parent that it matches. `none` when the archetype has no sub-archetypes.
+# A deck that matches none of them is `Other`, and one that matches more than one name is an error
+# naming them, as for archetypes.
+pub fn sub_archetype_of(self: Deck, archetype: str, identifiers: Identifier[]) -> str?!str {
+    let own = identifiers.filter(|i| i.parent == some(archetype));
+    if (own.is_empty()) { return ok(none); };
+    let deck_holdings = self.holdings();
+    let found: #<{str} = own.filter(|i| i.matches(deck_holdings))$name.to_set();
+    let names = found.to_array();
+    match (names) {
+        [] => ok(some("Other")),
+        [name] => ok(some(name)),
+        _ => err(
+            `deck {self.deck_id} ({self.name}) is more than one {archetype}: {names.join(sep=", ")}`,
+        ),
+    }
+}.test({
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
+    let white = Identifier {
+        name: "Selesnya",
+        cards: [],
+        maindeck_cards: ["Plains"],
+        parent: some("Landfall"),
+    };
+    let mono = Identifier {
+        name: "Mono-G",
+        cards: [],
+        not_maindeck_cards: ["Plains"],
+        parent: some("Landfall"),
+    };
+    let identifiers = [landfall, white, mono];
+    let forest = Card { name: "Forest" };
+
+    assert(Deck { deck_id: "d", maindeck: [forest, Card { name: "Plains" }] }.sub_archetype_of(
+        "Landfall",
+        identifiers,
+    ) == ok(some("Selesnya")));
+    // The sideboard does not count against `not_maindeck_cards`.
+    assert(Deck {
+        deck_id: "d",
+        maindeck: [forest],
+        sideboard: [Card { name: "Plains" }],
+    }.sub_archetype_of("Landfall", identifiers) == ok(some("Mono-G")));
+
+    // An archetype with none has none, and a deck none of them claims is `Other`.
+    assert(Deck { deck_id: "d", maindeck: [forest] }.sub_archetype_of("Control", identifiers) == ok(
+        none,
+    ));
+    assert(Deck { deck_id: "d", maindeck: [forest] }.sub_archetype_of(
+        "Landfall",
+        [landfall, white],
+    ) == ok(some("Other")));
+
+    // More than one is an error, and a sub-archetype is not an archetype of its own.
+    assert(Deck {
+        deck_id: "d1",
+        name: "Ramp",
+        maindeck: [forest, Card { name: "Plains" }],
+    }.sub_archetype_of("Landfall", [white, Identifier { ..mono, not_maindeck_cards: [] }]) == err(
+        "deck d1 (Ramp) is more than one Landfall: Mono-G, Selesnya",
+    ));
+    assert(Deck { deck_id: "d", maindeck: [forest] }.archetype_of(identifiers) == ok(Meta(
+        "Landfall",
+    )));
+})
+
+# The strings under `key`, or none when there is no such key.
+fn optional_string_list(self: Json, key: str) -> str[]!str {
+    if (!self.field(key).is_some()) { return ok([]); };
+    self.string_list(key)
+}.test({
+    let json = parse("""{"names":["a"]}""")?;
+    assert(json.optional_string_list("names") == ok(["a"]));
+    assert(json.optional_string_list("other") == ok([]));
+})
+
 # `self` as an identifier.
 fn decode_identifier(self: Json) -> Identifier!str {
     ok(Identifier {
@@ -198,6 +288,8 @@ fn decode_identifier(self: Json) -> Identifier!str {
         not_cards: self.string_list("not_cards")?,
         any_cards: self.string_list("any_cards")?,
         maindeck_cards: self.string_list("maindeck_cards")?,
+        not_maindeck_cards: self.optional_string_list("not_maindeck_cards")?,
+        parent: self.optional_text_field("parent"),
     })
 }.test({
     let json = parse("""

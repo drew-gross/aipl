@@ -35,6 +35,12 @@ of the bracket instead of at round 1: finals, semifinals and quarterfinals first
 2nd last, and so on. Each row says how many times the pairing met in that slot, what share of the metagame's matches in the
 slot that is, and its record and win rate there. Metagames merging several tournaments are counted per tournament.
 
+An archetype with sub-archetypes has a ▸ before its name. Click it to expand the archetype: a row
+for each sub-archetype appears under it (`↳ Mono-G`), with its record against every archetype, and
+its own overall and projected cells, so removing an archetype projects them too. Click the ▾ to fold
+them away. The expanded archetypes are kept in the page's address with the removed ones. A
+sub-archetype is a row only: the columns stay the archetypes.
+
 Click an archetype's name, on its row or its column heading, to remove it from the metagame, as a rotation would:
 its row and column fade, and the Projected column beside Overall shows what every other archetype's win rate would be
 without its matches against the removed ones, with the change in points underneath. That is the simple model: the
@@ -104,6 +110,13 @@ them. Archetypes are not in the data: the original derives them from a canonical
 per format and season, which `tools/archetypes_to_json.py` dumps into `data/archetypes.json`
 (a list of identifiers per config: cards a deck must hold, must not hold, or must hold one of,
 and cards it must hold in the main deck).
+
+An identifier with a `parent` (an archetype's name) is a sub-archetype of it: it is asked only of the
+decks that archetype claimed, and a deck matching more than one of an archetype's sub-archetypes
+is an error, as for archetypes. A deck of the archetype that none claims is its `Other`. An
+identifier may also list `not_maindeck_cards`, which it must not hold in the main deck (the
+sideboard does not count). `Landfall` has two, `Selesnya` (Plains in the main deck) and `Mono-G`
+(none there). Sub-archetypes show on the winrate page only, not in `share`.
 
 `archetypes.json` holds one config, `Standard2026Q4Worlds`. It is not from the original: it is
 `Standard2026Q4RC` with the archetypes of the Worlds field added, the two `Landfall` lists merged

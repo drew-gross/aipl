@@ -140,6 +140,27 @@
    "maindeck_cards": [],
    "name": "Tablet Control",
    "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Plains"
+   ],
+   "name": "Selesnya",
+   "not_cards": [],
+   "parent": "Landfall"
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [],
+   "name": "Mono-G",
+   "not_cards": [],
+   "not_maindeck_cards": [
+    "Plains"
+   ],
+   "parent": "Landfall"
   }
  ]
 }
