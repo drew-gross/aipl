@@ -249,7 +249,6 @@ impl Mono<'_> {
                     params: function_params,
                     effects: self.cur_effects.clone(),
                     return_ty: Some(returned),
-                    body: body.erase(),
                     typed: Some(body),
                 },
             );

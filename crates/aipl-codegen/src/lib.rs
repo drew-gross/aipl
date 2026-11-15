@@ -2882,9 +2882,8 @@ pub fn install_parser_hooks() {
 /// What [`frontend`] produces: a program that has passed the type checker, plus
 /// the two things the rest of the pipeline needs from how it was checked.
 pub struct Frontend {
-    /// The program as the checker left it, with the types of
-    /// context-dependent expressions stamped in and `without` refinements
-    /// erased. Everything after the frontend runs on this.
+    /// The program as the checker left it, with `without` refinements erased: the declarations,
+    /// sources and spans the language server reads places from.
     pub program: Program,
     /// The view the checker actually saw: the synthesized builtin declarations
     /// followed by [`Frontend::program`]'s items. Kept because the effect sets
@@ -3021,13 +3020,6 @@ pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     // it has verified every value entering one, and from here on a
     // `T[] without []` is the `T[]` it is at runtime (see `Type::Without`).
     aipl_syntax::erase_refinements(&mut program);
-    // Every expression the pinner typed says what it is (`Expr::ty`), not only the context-dependent
-    // ones the checker stamped.
-    aipl_mono::probe::stamp_everything(
-        &mut program,
-        &pinned,
-        aipl_mono::probe::Stamping::KeepExisting,
-    );
     let signatures = aipl_mono::instantiation::signatures(&pinned.program);
     aipl_mono::pin::drop_declarations(&mut pinned);
     Ok(Frontend {
@@ -3062,25 +3054,6 @@ fn pinned_findings(
             aipl_mono::attribute(error, name, sources)
         })
         .collect()
-}
-
-/// How far monomorphization's inference is from the pinner's on `program`: the program is checked
-/// and pinned, then monomorphized *without* the optimizer, so the trees are the ones the pinner saw,
-/// and every inferred type is compared with the pinned one. See `aipl_mono::probe`.
-pub fn mono_agreement(program: &Program) -> Result<aipl_mono::probe::Report, Vec<Error>> {
-    let frontend = frontend(program)?;
-    let pinned = aipl_mono::pin::pin(&frontend.check_program);
-    let probe = aipl_mono::probe::Probe::new(&pinned.program);
-    let typed = aipl_mono::lower_reductions_pinned(&frontend.pinned.program);
-    let typed = aipl_mono::lower_try_set_pinned(&typed);
-    aipl_mono::monomorphize_probed(
-        &typed,
-        &frontend.pinned.instances,
-        Some(&probe),
-        DebugOptions::OFF,
-    )
-    .map_err(|e| vec![e])?;
-    Ok(probe.finish())
 }
 
 /// The part of compiling a program that does not depend on the backend: resolve, lower,

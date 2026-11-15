@@ -367,7 +367,6 @@ impl Mono<'_> {
                 params: lifted,
                 effects: Vec::new(),
                 return_ty: Some(return_ty),
-                body: body.erase(),
                 typed: Some(body.clone()),
             },
         );
@@ -462,7 +461,6 @@ impl Mono<'_> {
                 params: expansion.params,
                 effects: self.cur_effects.clone(),
                 return_ty: Some(result_ty.to_type()),
-                body: body.erase(),
                 typed: Some(body),
             },
         );

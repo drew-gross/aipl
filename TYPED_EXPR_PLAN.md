@@ -1,10 +1,11 @@
 # Plan: make the type on every expression mandatory (`TExpr` end to end)
 
 Status: the pre-mono passes, the post-mono passes and codegen read `TExpr`; mono's entry takes a
-`TProgram` and types every instance from it (the "typed route" below); `infer` and the stamp
-conversion in `typed_adapter` are deleted. What is left is `to_program`'s stamp bridge, the `Expr`
-bodies mono keeps for `param_forwarded` and signatures, and the `probe` (see `CLAUDE_TODO.txt`).
-Delete this file when the work is done.
+`TProgram` and types every instance from it (the "typed route" below); `infer`, the stamp bridge,
+the probe and the `Expr` bodies mono kept are deleted (mono reads only declarations from the `Expr`
+program `to_program` makes, and the ownership analyses run on the pinned tree). What is left is the
+`Expr` twins of the pre-mono passes and the `typed_passes` oracle (see `CLAUDE_TODO.txt`). Delete this
+file when the work is done.
 Written after the pseudo-types were deleted (`Remove pseudo-types`).
 
 ## The typed route (where mono is now)
@@ -22,7 +23,7 @@ shape; constructor references; owned parameters; parameters kept as a `str`, set
 `typed_body` takes every body from the pinned tree; a body it declines (an unsupported node, a
 missing typed function) is an internal error.
 
-## Where things stand
+## Where things stood when this started (historical)
 
 - `crates/aipl-syntax/src/typed.rs` has `TExpr<T>`, `TExprKind<T>`, `TProgram`, `Ty` and `ConcreteTy`.
   `ty` is mandatory on every node; `Ty` can name a rigid `Var`, `ConcreteTy` cannot.
@@ -104,8 +105,8 @@ Steps 1 and 2 are independent of step 3; stopping after either leaves a coherent
 5. **Pinner defaults vs mono inference.** Unresolved variables default to `i64` in the pinner; `infer`
    sometimes disagrees, and stamp-first hid it. Removing `infer` makes each disagreement a visible
    difference. Expect a tail of small bugs found by the corpus and baseline.
-6. **Diagnostics now raised in `infer`** (ambiguous instance, missing impl) need a new home in the
-   pinner or in substitution.
+6. **Diagnostics `infer` raised.** Only the ones a test pins need a home in the pinner (the `map`-on-a-set
+   error was one, and is there). An untested diagnostic that went with `infer` is not chased.
 
 ## What it buys
 
@@ -119,8 +120,8 @@ Steps 1 and 2 are independent of step 3; stopping after either leaves a coherent
 
 - Silent pinner/`infer` disagreement (item 5). Last round's 181 moved baseline rows show how sensitive the
   corpus is.
-- Step 3 touches the passes that carry the most `--- report ---` and baseline claims: moved rows are
-  likely there and must be explained, not refreshed blindly.
+- Step 3 touches the passes that carry the most `--- report ---` claims. Baseline rows that move are
+  refreshed by handoff and are not explained: this is feature work, and performance is its own project.
 - Estimate to trust least: step 1, because it depends on how many disagreements exist, which only the
   probe reveals. Rough total: 2 to 4 days.
 
@@ -237,6 +238,9 @@ Write the side-by-side probe (pinner type vs `infer` type per node, over `tests/
 and read the disagreement list. Its size decides whether step 1 is a day or three.
 
 ## Related, not part of this
+
+- Typed-route bugs found on the way (a set spread into an array literal, `typed_retype.rs`'s rule list)
+  are tracked in `CLAUDE_TODO.txt` only.
 
 - `fold_extends` receiver rule and the `tuple_windows` optional carry (CLAUDE_TODO.txt).
 - The stale `__none__` comment sweep (CLAUDE_TODO.txt).

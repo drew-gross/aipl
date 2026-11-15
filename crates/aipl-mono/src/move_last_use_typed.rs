@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, ConcreteType};
-use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm};
+use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
 
 use crate::typed_util::{any_child, each_child, each_child_mut, Typed};
 use crate::{is_heap_concrete, MonoProgram};
@@ -31,8 +31,8 @@ fn moved(inner: Typed) -> Typed {
     node
 }
 
-fn count_ident(name: &str, e: &Typed) -> usize {
-    let c = |x: &Typed| count_ident(name, x);
+pub(crate) fn count_ident<T: TyRepr>(name: &str, e: &TExpr<T>) -> usize {
+    let c = |x: &TExpr<T>| count_ident(name, x);
     match &e.kind {
         TExprKind::Ident(n) => usize::from(n == name),
         // A bare-ident target is an lvalue, not a read; a field-path target also *reads* its base.
@@ -52,28 +52,33 @@ fn count_ident(name: &str, e: &Typed) -> usize {
     }
 }
 
-fn mentions(name: &str, e: &Typed) -> bool {
+fn mentions<T: TyRepr>(name: &str, e: &TExpr<T>) -> bool {
     count_ident(name, e) > 0
 }
 
-fn is_name(e: &Typed, name: &str) -> bool {
+fn is_name<T: TyRepr>(e: &TExpr<T>, name: &str) -> bool {
     matches!(&e.kind, TExprKind::Ident(n) if n == name)
 }
 
-fn binds(arm: &TMatchArm<ConcreteType>, name: &str) -> bool {
+fn binds<T: TyRepr>(arm: &TMatchArm<T>, name: &str) -> bool {
     arm.pattern.bindings().iter().any(|b| b == name)
 }
 
 /// Whether `body` uses `param` only as `param.f` reads, with no field read twice, in a loop, or in
 /// a lambda.
-fn fields_read_once(param: &str, body: &Typed) -> bool {
+pub(crate) fn fields_read_once<T: TyRepr>(param: &str, body: &TExpr<T>) -> bool {
     let mut seen: Vec<String> = Vec::new();
     fields_read_once_into(&[param], body, false, &mut seen)
 }
 
-fn fields_read_once_into(names: &[&str], e: &Typed, repeats: bool, seen: &mut Vec<String>) -> bool {
+fn fields_read_once_into<T: TyRepr>(
+    names: &[&str],
+    e: &TExpr<T>,
+    repeats: bool,
+    seen: &mut Vec<String>,
+) -> bool {
     let is_alias =
-        |x: &Typed| matches!(&x.kind, TExprKind::Ident(n) if names.contains(&n.as_str()));
+        |x: &TExpr<T>| matches!(&x.kind, TExprKind::Ident(n) if names.contains(&n.as_str()));
     match &e.kind {
         TExprKind::Field(obj, f) if is_alias(obj) => {
             if repeats || seen.contains(f) {
@@ -382,13 +387,13 @@ fn remark(e: &Typed, program: &MonoProgram, mutating: &HashSet<String>) -> Typed
 /// Whether every occurrence of `name` in `e` is a direct call argument — or, for a struct, a read
 /// of one of its fields outside `heap_fields` — with none under a lambda and no rebinding of the
 /// name. `as_argument` says whether `e` itself sits in argument position.
-fn only_call_arguments(
+fn only_call_arguments<T: TyRepr>(
     name: &str,
-    e: &Typed,
+    e: &TExpr<T>,
     as_argument: bool,
     heap_fields: &HashSet<String>,
 ) -> bool {
-    let all = |es: &[&Typed]| {
+    let all = |es: &[&TExpr<T>]| {
         es.iter()
             .all(|c| only_call_arguments(name, c, false, heap_fields))
     };
@@ -432,9 +437,14 @@ fn only_call_arguments(
     }
 }
 
-fn forwarded(name: &str, e: &Typed, tail: bool, heap_fields: &HashSet<String>) -> bool {
-    let rec = |x: &Typed| forwarded(name, x, false, heap_fields);
-    let rec_tail = |x: &Typed| forwarded(name, x, tail, heap_fields);
+pub(crate) fn forwarded<T: TyRepr>(
+    name: &str,
+    e: &TExpr<T>,
+    tail: bool,
+    heap_fields: &HashSet<String>,
+) -> bool {
+    let rec = |x: &TExpr<T>| forwarded(name, x, false, heap_fields);
+    let rec_tail = |x: &TExpr<T>| forwarded(name, x, tail, heap_fields);
     match &e.kind {
         TExprKind::Ident(n) if n == name => tail,
         TExprKind::Let(n, value, body) | TExprKind::LetMut(n, value, body) if n != name => {
@@ -483,7 +493,7 @@ fn forwarded(name: &str, e: &Typed, tail: bool, heap_fields: &HashSet<String>) -
     }
 }
 
-fn is_composite_literal(e: &Typed) -> bool {
+fn is_composite_literal<T: TyRepr>(e: &TExpr<T>) -> bool {
     matches!(
         &e.kind,
         TExprKind::Construct(..)
@@ -679,4 +689,20 @@ mod tests {
         assert_eq!(**first, f(id("x")));
         assert_eq!(**last, f(moved(id("x"))));
     }
+}
+
+/// The `mut y = p` binding (`p` named by `param`) in `e`, as `(y, the body it scopes over)`: the
+/// local a moved parameter is consumed into.
+pub(crate) fn find_move_into<'a, T: TyRepr>(
+    param: &str,
+    e: &'a TExpr<T>,
+) -> Option<(&'a str, &'a TExpr<T>)> {
+    if let TExprKind::LetMut(y, value, body) = &e.kind {
+        if matches!(&value.kind, TExprKind::Ident(n) if n == param) {
+            return Some((y.as_str(), body));
+        }
+    }
+    let mut children = Vec::new();
+    each_child(e, &mut |c| children.push(c));
+    children.into_iter().find_map(|c| find_move_into(param, c))
 }

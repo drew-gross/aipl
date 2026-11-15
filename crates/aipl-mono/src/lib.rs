@@ -28,7 +28,6 @@ use std::{
 mod match_check;
 mod patterns;
 pub mod pin;
-pub mod probe;
 mod typing;
 pub use typing::{attribute, set_mangle};
 
@@ -69,7 +68,6 @@ mod reuse_matched_values;
 pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
 pub use reuse_matched_values::reuse_matched_values;
 
-mod move_last_use;
 pub use move_last_use_typed::move_last_uses_post_mono;
 mod inline_pinned;
 mod inline_typed;
@@ -1413,24 +1411,12 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
 /// is replaced by zero or more concrete instances, one per distinct tuple of
 /// type arguments it's called with.
 pub fn monomorphize(
-    program: &aipl_syntax::typed::TProgram,
-    instances: &pin::Instances,
-    dbg: DebugOptions,
-) -> Result<MonoProgram, Error> {
-    monomorphize_probed(program, instances, None, dbg)
-}
-
-/// [`monomorphize`], comparing the type it infers for each expression with the pinned one (see
-/// [`probe`]).
-pub fn monomorphize_probed(
     typed: &aipl_syntax::typed::TProgram,
     instances: &pin::Instances,
-    probe: Option<&probe::Probe>,
     dbg: DebugOptions,
 ) -> Result<MonoProgram, Error> {
-    // Inference still reads the written tree; each expression of it carries what the pinner made
-    // of it.
-    let program = &pinned_pipeline::to_program(typed, instances);
+    // Signatures, structs and variants are read from the written declarations.
+    let program = &pinned_pipeline::to_program(typed);
     // Field types per struct (for typing `Field`/`Construct`).
     // struct name → [(field_name, field_type, default_expr)]
     let mut structs: HashMap<String, Vec<(String, Type, Option<Expr>)>> = HashMap::new();
@@ -1575,7 +1561,6 @@ pub fn monomorphize_probed(
                     params: f.sig.params.clone(),
                     effects: f.sig.effects.clone(),
                     return_ty: f.sig.return_ty.clone(),
-                    body: f.body.clone(),
                 },
             )
         })
@@ -1605,9 +1590,6 @@ pub fn monomorphize_probed(
         spec_memo: HashMap::new(),
         resolving: std::cell::RefCell::new(HashSet::new()),
         cur_ret: Type::Unit,
-        probe,
-        cur_template: String::new(),
-        cur_subst: None,
         scope_names: Vec::new(),
         in_place_call: false,
         current_parameters: HashMap::new(),
@@ -2044,12 +2026,19 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
     (params, return_ty)
 }
 
+/// The body of a callee as the analyses of which parameters it can own read it: the pinned tree of
+/// a source function, the typed tree of one synthesized from typed code, or nothing for a builtin.
+enum OwnershipBody<'b> {
+    Pinned(&'b aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>),
+    Concrete(&'b typed_adapter::Typed),
+    None,
+}
+
 /// A generic function template ready to monomorphize: a [`Signature`] plus the
 /// body to substitute into when specializing a call.
 #[derive(Clone)]
 struct Generic {
     sig: Signature,
-    body: Expr,
 }
 
 /// A fully-resolved function: every type variable has been substituted (there
@@ -2204,8 +2193,6 @@ struct ConcreteTemplate {
     params: Vec<Param>,
     effects: Vec<String>,
     return_ty: Option<Type>,
-    /// The body as the analyses of a callee (which parameters it can own) read it.
-    body: Expr,
     /// The same body as the typed tree it is processed from, for a function synthesized from
     /// typed code; `body` is then this erased.
     typed: Option<typed_adapter::Typed>,
@@ -2376,12 +2363,6 @@ struct Mono<'a> {
     resolving: std::cell::RefCell<HashSet<String>>,
     /// Return type of the function currently being processed.
     cur_ret: Type,
-    /// Compares each inferred type with the pinner's; see [`probe`].
-    probe: Option<&'a probe::Probe>,
-    /// The source function the instance being processed came from.
-    cur_template: String,
-    /// What that instance's type variables are, when the probe could read them off its parameters.
-    cur_subst: Option<probe::Substitution>,
     /// The pinned function each source function was written as, for the instances typed from it.
     typed_fns: HashMap<&'a str, &'a aipl_syntax::typed::TFunction>,
     /// The names bound around the expression being lowered from the typed tree, innermost last.
@@ -2420,11 +2401,6 @@ impl Mono<'_> {
         // Lambdas synthesized while processing this body inherit its effects,
         // and are named under it.
         self.cur_fn = name.to_string();
-        if let Some(probe) = self.probe {
-            self.cur_template = template.to_string();
-            let tys: Vec<Type> = params.iter().map(|p| p.ty.clone()).collect();
-            self.cur_subst = probe.substitution(template, &tys);
-        }
         self.cur_receiver = params
             .first()
             .filter(|p| p.mutable)
@@ -2710,15 +2686,30 @@ impl Mono<'_> {
     ) -> Vec<usize> {
         let (params, return_ty, body) = self.concrete_signature(template, type_args);
         let mutating_receiver = params.first().is_some_and(|p| p.mutable);
-        owned_eligible(
-            template,
-            &params,
-            &return_ty,
-            &body,
-            &|t| self.owns_heap(t),
-            &|t| self.heap_fields_of(t),
-            &|f| self.mutating.contains(f),
-        )
+        let owns = |t: &Type| self.owns_heap(t);
+        let heap_fields = |t: &Type| self.heap_fields_of(t);
+        let mutating = |f: &str| self.mutating.contains(f);
+        match body {
+            OwnershipBody::Pinned(body) => owned_eligible(
+                template,
+                &params,
+                &return_ty,
+                body,
+                &owns,
+                &heap_fields,
+                &mutating,
+            ),
+            OwnershipBody::Concrete(body) => owned_eligible(
+                template,
+                &params,
+                &return_ty,
+                body,
+                &owns,
+                &heap_fields,
+                &mutating,
+            ),
+            OwnershipBody::None => Vec::new(),
+        }
         .into_iter()
         .filter(|&i| i < args.len() && self.owns_heap(&arg_tys[i]))
         .filter(|&i| {
@@ -2746,22 +2737,35 @@ impl Mono<'_> {
         .collect()
     }
 
-    /// The concrete signature (params, return type, body) of `template` under
-    /// `type_args` — substituting a generic's type variables, or returning a
+    /// The concrete signature (params, return type) of `template` under `type_args`, and the body
+    /// the ownership analyses read: substituting a generic's type variables, or returning a
     /// concrete fn's signature directly. Used for ownership eligibility.
     fn concrete_signature(
         &self,
         template: &str,
         type_args: &[Type],
-    ) -> (Vec<Param>, Option<Type>, Expr) {
-        if let Some(Generic { sig, body }) = self.generics.get(template) {
+    ) -> (Vec<Param>, Option<Type>, OwnershipBody<'_>) {
+        let pinned = |name: &str| {
+            let source = self
+                .specialized_from
+                .get(name)
+                .map_or(name, |from| from.source.as_str());
+            self.typed_fns
+                .get(source)
+                .map_or(OwnershipBody::None, |f| OwnershipBody::Pinned(&f.body))
+        };
+        if let Some(Generic { sig }) = self.generics.get(template) {
             let (params, return_ty) = make_concrete(sig, type_args);
-            (params, return_ty, body.clone())
+            (params, return_ty, pinned(template))
         } else if let Some(f) = self.concrete.get(template) {
-            (f.params.clone(), f.return_ty.clone(), f.body.clone())
+            let body = match &f.typed {
+                Some(typed) => OwnershipBody::Concrete(typed),
+                None => pinned(template),
+            };
+            (f.params.clone(), f.return_ty.clone(), body)
         } else {
             // Not a user function (e.g. a builtin) — never owned-eligible.
-            (Vec::new(), None, Expr::new(ExprKind::Unit, 0..0))
+            (Vec::new(), None, OwnershipBody::None)
         }
     }
 
@@ -3861,7 +3865,6 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
             return_ty: f.sig.return_ty.clone(),
             effects: f.sig.effects.clone(),
         },
-        body: f.body.clone(),
     })
 }
 
@@ -3989,136 +3992,6 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
                 .map(|a| normalize_inner(a, type_vars, counter))
                 .collect(),
         ),
-    }
-}
-
-/// Substitute type variables in every type annotation *inside* a generic's
-/// body, using the same map that concretizes its signature.
-///
-/// `subst_vars` handles the signature — parameters and return type — but a body
-/// carries annotations of its own: a `let x: T = ..` / `mut x: T = ..` binding,
-/// and a lambda parameter's `|a: T|`. Those reach codegen verbatim, so without
-/// this a specialized instance compares a leftover `T[]` against the concrete
-/// `i64[]` and rejects its own body.
-///
-/// The motivating case is seeding a generic accumulator: `mut out: T[] = [];`
-/// is how you give an empty literal the element type `T` rather than the
-/// `__none__` an untyped `[]` infers.
-///
-/// Exhaustive rather than a catch-all, so a future annotation-carrying
-/// expression has to decide here instead of silently keeping its type variable.
-fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
-    use ExprKind as K;
-    let r = |x: &Expr| Box::new(subst_expr_tys(x, map));
-    let kind = match &e.kind {
-        // The three annotation carriers — the whole point of this walk.
-        K::Let(n, ty, v, b) => K::Let(
-            n.clone(),
-            ty.as_ref().map(|t| subst_vars(t, map)),
-            r(v),
-            r(b),
-        ),
-        K::LetMut(n, ty, v, b) => K::LetMut(
-            n.clone(),
-            ty.as_ref().map(|t| subst_vars(t, map)),
-            r(v),
-            r(b),
-        ),
-        K::Lambda(params, body) => K::Lambda(
-            params
-                .iter()
-                .map(|p| LambdaParam {
-                    ty: p.ty.as_ref().map(|t| subst_vars(t, map)),
-                    ..p.clone()
-                })
-                .collect(),
-            r(body),
-        ),
-        // Leaves: nothing to rewrite.
-        K::Num(_)
-        | K::Float(_)
-        | K::Bool(_)
-        | K::Str(_)
-        | K::Char(_)
-        | K::Ident(_)
-        | K::None
-        | K::Unit => e.kind.clone(),
-        // Everything else just carries the substitution to its children.
-        K::Call(name, args, m) => K::Call(name.clone(), args.iter().map(|a| *r(a)).collect(), *m),
-        K::Neg(x) => K::Neg(r(x)),
-        K::Try(x) => K::Try(r(x)),
-        K::Return(x) => K::Return(r(x)),
-        K::Field(x, f) => K::Field(r(x), f.clone()),
-        K::If(a, b, c) => K::If(r(a), r(b), r(c)),
-        K::Seq(a, b) => K::Seq(r(a), r(b)),
-        K::Index(a, b) => K::Index(r(a), r(b)),
-        K::While(a, b) => K::While(r(a), r(b)),
-        K::Assign(lhs, v, b) => K::Assign(lhs.clone(), r(v), r(b)),
-        K::For(v, i, iter, body) => K::For(v.clone(), i.clone(), r(iter), r(body)),
-        K::Slice(a, b, c) => K::Slice(r(a), r(b), c.as_ref().map(|x| r(x))),
-        K::Shim(effect, bindings, body) => K::Shim(effect.clone(), bindings.clone(), r(body)),
-        K::Construct(name, fields) => K::Construct(
-            name.clone(),
-            fields
-                .iter()
-                .map(|f| FieldInit {
-                    name: f.name.clone(),
-                    value: *r(&f.value),
-                })
-                .collect(),
-        ),
-        K::Match(scrut, arms) => K::Match(
-            r(scrut),
-            arms.iter()
-                .map(|a| MatchArm {
-                    written: a.written.clone(),
-                    pattern: a.pattern.clone(),
-                    body: *r(&a.body),
-                    span: a.span.clone(),
-                })
-                .collect(),
-        ),
-        K::IfLet(arm, scrut, else_b) => K::IfLet(
-            Box::new(MatchArm {
-                written: arm.written.clone(),
-                pattern: arm.pattern.clone(),
-                body: *r(&arm.body),
-                span: arm.span.clone(),
-            }),
-            r(scrut),
-            r(else_b),
-        ),
-        K::ArrayLit(es) => K::ArrayLit(es.iter().map(|x| *r(x)).collect()),
-        K::SetLit(es, o) => K::SetLit(es.iter().map(|x| *r(x)).collect(), *o),
-        K::TupleLit(es) => K::TupleLit(es.iter().map(|x| *r(x)).collect()),
-        K::DictLit(entries) => K::DictLit(entries.iter().map(|(k, v)| (*r(k), *r(v))).collect()),
-        K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        K::TypeArgs(x, tys) => K::TypeArgs(r(x), tys.iter().map(|t| subst_vars(t, map)).collect()),
-        K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-    };
-    Expr {
-        kind,
-        span: e.span.clone(),
-        // The checker's recorded type is the fourth annotation carrier, and it
-        // gets the same treatment as the other three. A pinned `none` inside a
-        // generic body records `T?`, and the instance needs `i64?` — so the
-        // record is substituted through, not merely copied, or an instance
-        // would carry a type variable in exactly the way this walk exists to
-        // prevent.
-        //
-        // This used to be `None`, which read as a decision rather than the loss
-        // it was: hand-building the struct makes every field look deliberate,
-        // where `Expr::rebuilt` would have carried it. Dropping it throws away
-        // the resolution the checker made from the expected type, and codegen
-        // then picks a representation from nothing — for an empty `#{}`, the
-        // shared empty block instead of a 256-bit bitfield. Caught by the
-        // record-preservation check in `crate::passes`, which attributes it to
-        // monomorphization rather than to the pass that happened to run next.
-        ty: e.ty.as_ref().map(|t| Box::new(subst_vars(t, map))),
-        // Carried over with `span`: substituting a type variable in an
-        // annotation moves no text.
-        value_span: e.value_span.clone(),
-        name_span: e.name_span.clone(),
     }
 }
 
@@ -5059,9 +4932,9 @@ pub(crate) struct ArgShape {
 /// on entry, which copies only above a refcount of one — so a caller whose
 /// receiver really is aliased pays a copy and its alias is untouched, and one
 /// whose receiver is its own pays nothing.
-fn mut_receiver_owned(
+fn mut_receiver_owned<T: aipl_syntax::typed::TyRepr>(
     params: &[Param],
-    body: &Expr,
+    body: &aipl_syntax::typed::TExpr<T>,
     owns_heap: &dyn Fn(&Type) -> bool,
     mutating: &dyn Fn(&str) -> bool,
 ) -> Option<usize> {
@@ -5072,7 +4945,7 @@ fn mut_receiver_owned(
     (p.mutable
         && matches!(aipl_syntax::unrefined(&p.ty), Type::Array(_))
         && owns_heap(&p.ty)
-        && binding_is_exclusive(&p.name, body, true, mutating))
+        && ownership_typed::binding_is_exclusive(&p.name, body, true, mutating))
     .then_some(0)
 }
 
@@ -5092,11 +4965,11 @@ fn mut_receiver_owned(
 /// it never read is released at exit. `owns_heap` is the struct-aware test for
 /// "has something to move" (the caller's tables know the fields); a struct
 /// with no heap field has nothing to own.
-fn owned_eligible(
+fn owned_eligible<T: aipl_syntax::typed::TyRepr>(
     name: &str,
     params: &[Param],
     return_ty: &Option<Type>,
-    body: &Expr,
+    body: &aipl_syntax::typed::TExpr<T>,
     owns_heap: &dyn Fn(&Type) -> bool,
     heap_fields_of: &dyn Fn(&Type) -> HashSet<String>,
     mutating: &dyn Fn(&str) -> bool,
@@ -5117,71 +4990,24 @@ fn owned_eligible(
         .filter(|(_, p)| !p.mutable && owns_heap(&p.ty))
         .filter(|(_, p)| {
             if is_heap(&p.ty) {
-                count_ident(&p.name, body) == 1
-                    && find_move_into(&p.name, body).is_some_and(|(y, body_after)| {
-                        binding_is_exclusive(y, body_after, true, mutating)
-                    })
+                move_last_use_typed::count_ident(&p.name, body) == 1
+                    && move_last_use_typed::find_move_into(&p.name, body).is_some_and(
+                        |(y, body_after)| {
+                            ownership_typed::binding_is_exclusive(y, body_after, true, mutating)
+                        },
+                    )
             } else {
                 // Either each heap field is read once and moved out, or the
                 // parameter is only ever handed on whole (see `param_forwarded`):
                 // a function that reads `self` several times and passes it to
                 // the next at the end still owns what it was given.
-                fields_read_once(&p.name, body)
-                    || move_last_use::param_forwarded(&p.name, body, &heap_fields_of(&p.ty))
+                move_last_use_typed::fields_read_once(&p.name, body)
+                    || move_last_use_typed::forwarded(&p.name, body, true, &heap_fields_of(&p.ty))
             }
         })
         .map(|(i, _)| i)
         .chain(receiver)
         .collect()
-}
-
-/// Whether `body` uses `param` only as `param.f` reads, with no field read
-/// twice, in a loop, or in a lambda — the shape under which each read of a
-/// heap field can be the move of that field. Conservative on every count: a
-/// read of the whole value, a second read of one field (on any path), and any
-/// read that could run more than once all disqualify.
-pub(crate) fn fields_read_once(param: &str, body: &Expr) -> bool {
-    let mut seen: Vec<String> = Vec::new();
-    fields_read_once_into(&[param], body, false, &mut seen)
-}
-
-/// `names` are the bindings that stand for the struct: the parameter, and any
-/// `let alias = param` made of it (what a struct spread `T { ..self, f: v }`
-/// and an inlined call both leave). A field read through any of them is a read
-/// of that field of the one struct, so `seen` is shared; the alias itself is
-/// not a whole-value use, and its own bare mentions are.
-fn fields_read_once_into(names: &[&str], e: &Expr, repeats: bool, seen: &mut Vec<String>) -> bool {
-    let is_alias = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if names.contains(&n.as_str()));
-    match &e.kind {
-        ExprKind::Field(obj, f) if is_alias(obj) => {
-            if repeats || seen.contains(f) {
-                return false;
-            }
-            seen.push(f.clone());
-            true
-        }
-        ExprKind::Ident(n) => !names.contains(&n.as_str()),
-        // `let a = param; body`: `a` is the struct under another name.
-        ExprKind::Let(a, _, value, body) | ExprKind::LetMut(a, _, value, body)
-            if is_alias(value) && !names.contains(&a.as_str()) =>
-        {
-            let mut inner: Vec<&str> = names.to_vec();
-            inner.push(a);
-            fields_read_once_into(&inner, body, repeats, seen)
-        }
-        ExprKind::For(_, _, iter, fbody) => {
-            fields_read_once_into(names, iter, repeats, seen)
-                && fields_read_once_into(names, fbody, true, seen)
-        }
-        ExprKind::While(cond, wbody) => {
-            fields_read_once_into(names, cond, true, seen)
-                && fields_read_once_into(names, wbody, true, seen)
-        }
-        ExprKind::Lambda(_, lbody) => fields_read_once_into(names, lbody, true, seen),
-        _ => children(e)
-            .into_iter()
-            .all(|c| fields_read_once_into(names, c, repeats, seen)),
-    }
 }
 
 // ---- Borrow-only parameter analysis (retain elision) ------------------------
@@ -5222,285 +5048,6 @@ fn fields_read_once_into(names: &[&str], e: &Expr, repeats: bool, seen: &mut Vec
 // Everything else is an inspecting use — reading, comparing, iterating,
 // indexing, slicing, passing it on (a nested call retains it itself, or is
 // itself elided and touches no refcount at all).
-
-/// Whether `name`'s slot can be treated as the sole owner of its block, so a
-/// `push`/`extend` into it may write in place instead of copying.
-///
-/// `mutating` answers whether a *function* name mutates its receiver — the
-/// caller supplies it because the answer is program-dependent and this module
-/// is asked from both sides of monomorphization. It matters for the
-/// `set a = a.f(x)` writeback shape, which leaves `a` exclusive for a mutating
-/// `f`: reading only the *builtin* mutating names made a binding grown by a
-/// user `mut self` method non-exclusive for its whole scope, so every append
-/// copied the accumulator — and a recursive one paid that at every level.
-pub(crate) fn binding_is_exclusive(
-    name: &str,
-    body: &Expr,
-    allow_tail_move: bool,
-    mutating: &dyn Fn(&str) -> bool,
-) -> bool {
-    !aliases_or_unsafe(name, body, false, allow_tail_move, mutating)
-}
-
-/// Whether `e` is the receiver `name` in a writeback: the bare binding, or the
-/// binding handed over with [`Callee::Move`].
-///
-/// Both spellings mean the same thing to the writeback — the slot's value goes
-/// into the call and the result comes back into the slot — and which one a site
-/// carries depends only on whether the callee owns its receiver. Every place
-/// that recognises the shape asks this, so the two cannot drift apart.
-pub(crate) fn is_receiver(e: &Expr, name: &str) -> bool {
-    match &e.kind {
-        ExprKind::Ident(n) => n == name,
-        ExprKind::Call(Callee::Move, args, _) => {
-            matches!(args.as_slice(), [a] if matches!(&a.kind, ExprKind::Ident(n) if n == name))
-        }
-        _ => false,
-    }
-}
-
-/// True if `name` is used in `e` in a way that makes in-place mutation unsafe.
-/// `iterating` is set inside a `for` over `name`; `tail` means `e` is in tail
-/// position, where a use of `name` is a move-out, not an alias.
-///
-/// What "tail" buys is exactly this: an alias is only dangerous if a mutation
-/// of `name` can *follow* it in this function, and nothing follows the tail
-/// expression. So a bare `name`, a `return name`, and — the case that matters
-/// in practice — `name` handed to a composite or a call that *is* the tail
-/// (`(xs, n)`, `Step { kids: xs }`, `Wrap(xs)`, `ok(xs)`) are all last uses.
-/// Before the composite and call arms knew this, a `mut` array that ended its
-/// function inside one lost the in-place path for its whole scope, and every
-/// `push` copied: building a 30,000-element list that way took seventeen
-/// seconds. The forms that *do* run code afterwards — `Let`, `Seq`, `Assign`,
-/// a loop body — pass `tail` only to what comes last.
-fn aliases_or_unsafe(
-    name: &str,
-    e: &Expr,
-    iterating: bool,
-    tail: bool,
-    mutating: &dyn Fn(&str) -> bool,
-) -> bool {
-    let is_n = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if n == name);
-    let rec = |x: &Expr| aliases_or_unsafe(name, x, iterating, false, mutating);
-    let rec_tail = |x: &Expr| aliases_or_unsafe(name, x, iterating, tail, mutating);
-    match &e.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(x, _) => rec(x),
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        // The shim's bindings name globals, so only the body can alias `name`.
-        // Its value is the shim's value, so tail position carries through.
-        ExprKind::Shim(_, _, body) => rec_tail(body),
-        ExprKind::Ident(n) => n == name && !tail,
-        ExprKind::Num(_)
-        | ExprKind::Float(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::None
-        | ExprKind::Unit => false,
-        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) => is_n(x) || rec(x),
-        // `return value` moves `value` out of the function, exactly like a tail
-        // expression — a bare `return name` is a move-out, not an alias.
-        ExprKind::Return(x) => rec_tail(x),
-        ExprKind::Seq(a, b) => rec(a) || rec_tail(b),
-        ExprKind::If(c, t, f) => rec(c) || rec_tail(t) || rec_tail(f),
-        ExprKind::Index(base, idx) => (!is_n(base) && rec(base)) || rec(idx),
-        // Slicing `name` makes a *view* that shares `name`'s buffer, so it
-        // aliases — disqualify in-place mutation (don't exempt `is_n(obj)`).
-        ExprKind::Slice(obj, start, end) => {
-            is_n(obj) || rec(obj) || rec(start) || end.as_ref().is_some_and(|e| rec(e))
-        }
-        ExprKind::Call(fname, args, method_style) => {
-            // `__map_result($a)` hands the (reused) array back as the function
-            // result — in tail position that's a move-out, exactly like a bare
-            // trailing `$a`, so it doesn't alias the binding.
-            if *fname == Callee::MapResult {
-                return args.iter().any(|a| if is_n(a) { !tail } else { rec(a) });
-            }
-            // `__move(name)` is the binding's last use by construction — a
-            // move-out, never an alias, wherever it sits.
-            if *fname == Callee::Move {
-                return args.iter().any(|a| !is_n(a) && rec(a));
-            }
-            // An operator, resolved to its canonical impl. Its operands are read,
-            // not aliased — a bare `name` operand does not disqualify the binding
-            // — which is what the `Binop` arm above says for the same operators
-            // reached as primitive nodes. Both spellings have to answer alike:
-            // this arm is the one a *user's* `a == b` now takes, and without it
-            // every comparison against an exclusive binding would look like the
-            // binding escaping into a call, silently switching `push` off its
-            // in-place path.
-            if aipl_syntax::binop_for_builtin(fname).is_some() || *fname == Callee::LogicalNot {
-                return args.iter().any(|a| !is_n(a) && rec(a));
-            }
-            if *method_style {
-                // Method form: `args[0]` is the receiver, which a few builtins
-                // consume (or mutate in place) without aliasing it; any other
-                // method, or any *non-receiver* arg that is `name`, aliases it.
-                let recv = &args[0];
-                let recv_bad = if is_n(recv) {
-                    match fname {
-                        // A mutating builtin updates its receiver in place
-                        // rather than aliasing it — safe unless we're iterating
-                        // that very binding.
-                        f if builtin_is_mutating(f.name()) => iterating,
-                        Callee::Len
-                        | Callee::IsEmpty
-                        | Callee::IsNonempty
-                        | Callee::ToStr
-                        | Callee::ToStrLen
-                        | Callee::Trim => false,
-                        // `with` takes the receiver's reference and writes into
-                        // it when nothing else holds the block, or copies it:
-                        // it never keeps `name` and the result both.
-                        Callee::With | Callee::WithOrSelf => false,
-                        _ => !tail,
-                    }
-                } else {
-                    rec_tail(recv)
-                };
-                recv_bad
-                    || args[1..].iter().enumerate().any(|(k, a)| {
-                        if is_n(a) {
-                            !tail && !builtin_reads_arg(fname, k + 1)
-                        } else {
-                            rec_tail(a)
-                        }
-                    })
-            } else {
-                let consuming = matches!(
-                    fname,
-                    Callee::Len
-                        | Callee::IsEmpty
-                        | Callee::IsNonempty
-                        | Callee::ToStr
-                        | Callee::ToStrLen
-                        | Callee::Print
-                        | Callee::Put
-                        | Callee::Trim
-                        // In-place-filter/map intrinsics mutate the array in place
-                        // without aliasing it (see `expand_filter`/`expand_map`/
-                        // `expand_filter_map`), so they don't disqualify the array
-                        // binding from being exclusive.
-                        | Callee::FilterKeep
-                        | Callee::FilterTruncate
-                        | Callee::MapSet
-                );
-                args.iter().enumerate().any(|(k, a)| {
-                    if is_n(a) {
-                        // `with`'s array (argument 0), as in the method form above.
-                        let consuming = consuming
-                            || (matches!(fname, Callee::With | Callee::WithOrSelf) && k == 0);
-                        !consuming && !tail && !builtin_reads_arg(fname, k)
-                    } else {
-                        rec_tail(a)
-                    }
-                })
-            }
-        }
-        // A composite that is the tail is built from its elements and then
-        // returned, so every element is a last use — including `name` nested
-        // inside one (`(f(xs), 1)`): the call runs, the tuple is built, and
-        // nothing in this function touches `xs` again.
-        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems, _) | ExprKind::TupleLit(elems) => elems
-            .iter()
-            .any(|x| if is_n(x) { !tail } else { rec_tail(x) }),
-        ExprKind::DictLit(pairs) => pairs.iter().any(|(k, v)| {
-            (if is_n(k) { !tail } else { rec_tail(k) })
-                || (if is_n(v) { !tail } else { rec_tail(v) })
-        }),
-        ExprKind::Construct(_, inits) => inits.iter().any(|i| {
-            if is_n(&i.value) {
-                !tail
-            } else {
-                rec_tail(&i.value)
-            }
-        }),
-        // A capture of `name` inside a lambda body counts as a use (conservative).
-        ExprKind::Lambda(_, body) => rec(body),
-        ExprKind::Let(_, _, val, b) | ExprKind::LetMut(_, _, val, b) => {
-            is_n(val) || rec(val) || rec_tail(b)
-        }
-        ExprKind::Assign(lhs, val, b) => {
-            // A field-path LHS (`set target.f = v`) both reads and rewrites
-            // `target` (the functional-update desugar copies its other
-            // fields), so recurse into it — a matching base ident makes it
-            // conservatively unsafe.
-            let ExprKind::Ident(target) = &lhs.kind else {
-                return rec(lhs) || is_n(val) || rec(val) || rec_tail(b);
-            };
-            let lhs_bad = if target == name {
-                match &val.kind {
-                    // `set a = a.trim()` / `set a = trim(a)` both fold to the
-                    // same arg list `[a]`, so one pattern covers both forms.
-                    ExprKind::Call(Callee::Trim, cargs, _)
-                        if cargs.len() == 1
-                            && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
-                    {
-                        iterating
-                    }
-                    // `set a = a.union(b)` / `set a = union(a, b)` reuse `a`'s
-                    // allocation in place — safe unless we're iterating `a`, or
-                    // the other operand aliases `a` (it's read while `a` grows).
-                    // Both forms fold to `[a, b]`.
-                    ExprKind::Call(Callee::Union, cargs, _)
-                        if cargs.len() == 2
-                            && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
-                    {
-                        iterating || rec(&cargs[1])
-                    }
-                    // `set a = a.f(x)` (the `set a.f(x)` writeback form) for a
-                    // mutating builtin updates `a` in place — safe unless we're
-                    // iterating `a`, or an argument aliases `a` (it would be read
-                    // while `a` is rewritten). Keeping `a` exclusive routes the
-                    // mutation through the in-place path (a per-iteration copy in
-                    // a loop would free the live buffer — see `set self = out`).
-                    // A *user* `mut self` method counts, not only a builtin
-                    // one: it is the same writeback, the receiver going in and
-                    // coming back into the slot. The receiver may also arrive
-                    // *moved* rather than as a bare name — `move_last_use`
-                    // wraps it where the callee owns it — which is a stronger
-                    // reason for `a` to stay exclusive, not a weaker one.
-                    ExprKind::Call(f, cargs, _)
-                        if (builtin_is_mutating(f.name()) || mutating(f.name()))
-                            && cargs.first().is_some_and(|a| is_receiver(a, name)) =>
-                    {
-                        iterating || cargs[1..].iter().any(|a| is_n(a) || rec(a))
-                    }
-                    _ => true,
-                }
-            } else if is_n(val) {
-                // `set other = name` moves `name`'s buffer into another binding.
-                // In tail position that's a last-use move-out (like `return
-                // name`), not an alias — so `name` stays exclusive and its
-                // in-loop `push` mutates in place instead of tracking each fresh
-                // buffer in the loop-body scope (which would free the live buffer
-                // mid-loop). Any use of `name` *after* the move is still caught by
-                // the `rec_tail(b)` below.
-                !tail
-            } else {
-                rec(val)
-            };
-            lhs_bad || rec_tail(b)
-        }
-        ExprKind::For(_, _, iter, fbody) => {
-            if is_n(iter) {
-                aliases_or_unsafe(name, fbody, true, false, mutating)
-            } else {
-                rec(iter) || aliases_or_unsafe(name, fbody, iterating, false, mutating)
-            }
-        }
-        // A loop body re-runs, so nothing in it is a tail-move; the condition
-        // and body are both ordinary (non-tail) uses.
-        ExprKind::While(cond, wbody) => rec(cond) || rec(wbody),
-        ExprKind::Match(scrut, arms) => {
-            is_n(scrut) || rec(scrut) || arms.iter().any(|arm| rec_tail(&arm.body))
-        }
-        ExprKind::IfLet(arm, scrut, else_b) => {
-            is_n(scrut) || rec(scrut) || rec_tail(&arm.body) || rec_tail(else_b)
-        }
-    }
-}
 
 /// Count `Ident(name)` reads in `e`. Used to confirm a moved parameter is
 /// consumed exactly once. Overcounts never undercount, so a miscount only
@@ -5550,57 +5097,5 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         ExprKind::Match(s, arms) => c(s) + arms.iter().map(|a| c(&a.body)).sum::<usize>(),
         ExprKind::IfLet(arm, s, else_b) => c(s) + c(&arm.body) + c(else_b),
         ExprKind::Lambda(_, body) => c(body),
-    }
-}
-
-/// Find a `mut y = p` binding (`p` is `Ident(param)`), returning `(y, the LetMut
-/// body)` — the local a moved parameter is consumed into.
-fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
-    match &e.kind {
-        ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
-        ExprKind::TypeArgs(x, _) => find_move_into(param, x),
-        ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        ExprKind::Shim(_, _, body) => find_move_into(param, body),
-        ExprKind::LetMut(y, _, val, body) if matches!(&val.kind, ExprKind::Ident(n) if n == param) => {
-            Some((y.as_str(), body))
-        }
-        ExprKind::Let(_, _, a, b)
-        | ExprKind::LetMut(_, _, a, b)
-        | ExprKind::Assign(_, a, b)
-        | ExprKind::Seq(a, b)
-        | ExprKind::Index(a, b)
-        | ExprKind::For(_, _, a, b)
-        | ExprKind::While(a, b) => find_move_into(param, a).or_else(|| find_move_into(param, b)),
-        ExprKind::If(a, b, d) => find_move_into(param, a)
-            .or_else(|| find_move_into(param, b))
-            .or_else(|| find_move_into(param, d)),
-        ExprKind::Slice(a, b, d) => find_move_into(param, a)
-            .or_else(|| find_move_into(param, b))
-            .or_else(|| d.as_ref().and_then(|d| find_move_into(param, d))),
-        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
-            find_move_into(param, x)
-        }
-        ExprKind::Call(_, args, _)
-        | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args, _)
-        | ExprKind::TupleLit(args) => args.iter().find_map(|a| find_move_into(param, a)),
-        ExprKind::DictLit(pairs) => pairs
-            .iter()
-            .find_map(|(k, v)| find_move_into(param, k).or_else(|| find_move_into(param, v))),
-        ExprKind::Construct(_, inits) => inits.iter().find_map(|i| find_move_into(param, &i.value)),
-        ExprKind::Match(s, arms) => find_move_into(param, s)
-            .or_else(|| arms.iter().find_map(|a| find_move_into(param, &a.body))),
-        ExprKind::IfLet(arm, s, else_b) => find_move_into(param, s)
-            .or_else(|| find_move_into(param, &arm.body))
-            .or_else(|| find_move_into(param, else_b)),
-        ExprKind::Lambda(_, body) => find_move_into(param, body),
-        ExprKind::Ident(_)
-        | ExprKind::Num(_)
-        | ExprKind::Float(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::None
-        | ExprKind::Unit => None,
     }
 }

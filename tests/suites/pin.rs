@@ -1,24 +1,7 @@
-//! The pinner (`aipl_mono::pin`): what it makes of the parts of a program, and how its types
-//! compare with monomorphization's inference.
+//! The pinner (`aipl_mono::pin`): what it makes of the parts of a program.
 
 use aipl::mono::pin::{pin, Failure};
 use aipl::DebugOptions;
-use std::path::{Path, PathBuf};
-
-fn aipl_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    let mut entries: Vec<_> = entries.flatten().map(|e| e.path()).collect();
-    entries.sort();
-    for path in entries {
-        if path.is_dir() {
-            aipl_files(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aipl") {
-            out.push(path);
-        }
-    }
-}
 
 /// What the pinner makes of the parts of a program that are not a function's body: a `.test`
 /// block, a parameter's default, a struct field's default, and a `return` nothing reads.
@@ -79,108 +62,6 @@ fn scaled(n: i64, by: i64 = 2) -> i64 {
         (true, true, true, true),
         "(test block, parameter default, diverging statement, field default) pinned"
     );
-}
-
-/// Author helper: how often monomorphization's inferred types differ from the pinned ones, by the
-/// form of the expression, over `tests/cases` and `crates` (`AIPL_CASE=a,b` narrows it).
-#[test]
-#[ignore = "author helper: prints where mono's inference and the pinner disagree"]
-fn mono_agreement_report() {
-    use aipl::mono::probe::Report;
-    aipl::install_parser_hooks();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut files = Vec::new();
-    aipl_files(&root.join("tests/cases"), &mut files);
-    aipl_files(&root.join("crates"), &mut files);
-    if let Ok(only) = std::env::var("AIPL_CASE") {
-        files.retain(|f| only.split(',').any(|o| f.to_string_lossy().contains(o)));
-    }
-    let mut total = Report::default();
-    let (mut programs, mut failed) = (0usize, 0usize);
-    for file in &files {
-        let Ok(program) = aipl::loader::load_program(file, DebugOptions::OFF) else {
-            continue;
-        };
-        let run = std::panic::catch_unwind(|| aipl::codegen::mono_agreement(&program));
-        let report = match run {
-            Ok(Ok(report)) => report,
-            other => {
-                failed += 1;
-                if failed <= 5 {
-                    let why = match other {
-                        Ok(Err(errors)) => errors
-                            .first()
-                            .map(|e| e.message.lines().next().unwrap_or("").to_string())
-                            .unwrap_or_default(),
-                        _ => "panicked".to_string(),
-                    };
-                    println!("failed: {} -- {why}", file.display());
-                }
-                continue;
-            }
-        };
-        programs += 1;
-        total.compared += report.compared;
-        total.agreed += report.agreed;
-        total.unmatched += report.unmatched;
-        total.unbound += report.unbound;
-        for (form, (n, example)) in report.unbound_forms {
-            total
-                .unbound_forms
-                .entry(form)
-                .or_insert((0, format!("{} -- {example}", file.display())))
-                .0 += n;
-        }
-        total.type_args_compared += report.type_args_compared;
-        total.type_args_agreed += report.type_args_agreed;
-        total.type_args_unmatched += report.type_args_unmatched;
-        total.type_args_unbound += report.type_args_unbound;
-        for (callee, (n, example)) in report.type_arg_disagreements {
-            total
-                .type_arg_disagreements
-                .entry(callee)
-                .or_insert((0, format!("{} -- {example}", file.display())))
-                .0 += n;
-        }
-        total.collisions += report.collisions;
-        total.placeholder += report.placeholder;
-        total.instances += report.instances;
-        for (form, (n, example)) in report.disagreements {
-            let entry = total
-                .disagreements
-                .entry(form)
-                .or_insert((0, format!("{} -- {example}", file.display())));
-            entry.0 += n;
-        }
-    }
-    println!(
-        "programs {programs} (failed to monomorphize {failed}); instances {}; compared {} agreed {} \
-         placeholder {} unbound {} unmatched {} collisions {}",
-        total.instances, total.compared, total.agreed, total.placeholder, total.unbound,
-        total.unmatched, total.collisions
-    );
-    println!(
-        "type arguments: compared {} agreed {} unmatched {} unbound {}",
-        total.type_args_compared,
-        total.type_args_agreed,
-        total.type_args_unmatched,
-        total.type_args_unbound
-    );
-    let mut args: Vec<_> = total.type_arg_disagreements.iter().collect();
-    args.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-    for (callee, (n, example)) in args.into_iter().take(40) {
-        println!("type args {n:6}  {callee}\n         e.g. {example}");
-    }
-    let mut unbound: Vec<_> = total.unbound_forms.iter().collect();
-    unbound.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-    for (form, (n, example)) in unbound.into_iter().take(25) {
-        println!("unbound {n:6}  {form}\n         e.g. {example}");
-    }
-    let mut rows: Vec<_> = total.disagreements.iter().collect();
-    rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-    for (form, (n, example)) in rows.into_iter().take(40) {
-        println!("{n:7}  {form}\n         e.g. {example}");
-    }
 }
 
 /// The pass manager drives a pinned program: a pass written once over `TExpr<T>` rewrites the

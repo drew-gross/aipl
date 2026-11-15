@@ -171,7 +171,7 @@ impl Mono<'_> {
         args: &[Typed],
         ret: &Type,
     ) -> (String, ConcreteTemplate, SpecializedFrom) {
-        let Generic { sig, body } = self.generics[name].clone();
+        let Generic { sig } = self.generics[name].clone();
         let wanted = sig.type_var_names().len();
         let type_args: Vec<Type> = type_args.iter().take(wanted).map(TyRepr::to_type).collect();
         assert_eq!(
@@ -222,24 +222,6 @@ impl Mono<'_> {
                 .return_ty
                 .as_ref()
                 .is_some_and(|t| crate::subst_vars(t, &map) == chars);
-        let body = crate::subst_expr_tys(&body, &map);
-        let body = if str_ret {
-            let bspan = body.span.clone();
-            aipl_syntax::ast::Expr::new(
-                aipl_syntax::ast::ExprKind::Let(
-                    "$ret".to_string(),
-                    Some(Type::Primitive(Primitive::Str)),
-                    Box::new(body),
-                    Box::new(aipl_syntax::ast::Expr::new(
-                        aipl_syntax::ast::ExprKind::Ident("$ret".to_string()),
-                        bspan.clone(),
-                    )),
-                ),
-                bspan,
-            )
-        } else {
-            body
-        };
         // A function that updates its receiver in place is typed, as a call, by that receiver; what
         // it returns is what it declares.
         let declared_return = match &sig.return_ty {
@@ -254,7 +236,6 @@ impl Mono<'_> {
             params,
             effects: sig.effects.clone(),
             return_ty: Some(declared_return),
-            body,
         };
         let mut base = name.to_string();
         for t in &type_args {
@@ -430,7 +411,6 @@ impl Mono<'_> {
                 params: new_params,
                 effects,
                 return_ty: template.return_ty.clone(),
-                body: template.body.clone(),
             },
         );
         self.lambda_envs.insert(spec_name.clone(), lenv);

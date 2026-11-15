@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::Callee;
-use aipl_syntax::typed::TExprKind;
+use aipl_syntax::typed::{TExpr, TExprKind, TyRepr};
 
 use crate::typed_util::{any_child, Typed};
 use crate::{builtin_is_mutating, builtin_reads_arg, is_heap_concrete, MonoProgram};
@@ -125,9 +125,9 @@ pub fn moves_binding(name: &str, body: &Typed) -> bool {
 /// Whether `name`'s slot can be treated as the sole owner of its block, so a `push`/`extend` into
 /// it may write in place instead of copying. `mutating` answers whether a *function* name mutates
 /// its receiver.
-pub fn binding_is_exclusive(
+pub fn binding_is_exclusive<T: TyRepr>(
     name: &str,
-    body: &Typed,
+    body: &TExpr<T>,
     allow_tail_move: bool,
     mutating: &dyn Fn(&str) -> bool,
 ) -> bool {
@@ -136,7 +136,7 @@ pub fn binding_is_exclusive(
 
 /// Whether `e` is the receiver `name` in a writeback: the bare binding, or the binding handed over
 /// with [`Callee::Move`].
-pub fn is_receiver(e: &Typed, name: &str) -> bool {
+pub fn is_receiver<T: TyRepr>(e: &TExpr<T>, name: &str) -> bool {
     match &e.kind {
         TExprKind::Ident(n) => n == name,
         TExprKind::Call {
@@ -153,16 +153,16 @@ pub fn is_receiver(e: &Typed, name: &str) -> bool {
 /// True if `name` is used in `e` in a way that makes in-place mutation unsafe. `iterating` is set
 /// inside a `for` over `name`; `tail` means `e` is in tail position, where a use of `name` is a
 /// move-out, not an alias. The `Expr` twin in `lib.rs` says why each arm answers as it does.
-fn aliases_or_unsafe(
+fn aliases_or_unsafe<T: TyRepr>(
     name: &str,
-    e: &Typed,
+    e: &TExpr<T>,
     iterating: bool,
     tail: bool,
     mutating: &dyn Fn(&str) -> bool,
 ) -> bool {
-    let is_n = |x: &Typed| matches!(&x.kind, TExprKind::Ident(n) if n == name);
-    let rec = |x: &Typed| aliases_or_unsafe(name, x, iterating, false, mutating);
-    let rec_tail = |x: &Typed| aliases_or_unsafe(name, x, iterating, tail, mutating);
+    let is_n = |x: &TExpr<T>| matches!(&x.kind, TExprKind::Ident(n) if n == name);
+    let rec = |x: &TExpr<T>| aliases_or_unsafe(name, x, iterating, false, mutating);
+    let rec_tail = |x: &TExpr<T>| aliases_or_unsafe(name, x, iterating, tail, mutating);
     match &e.kind {
         TExprKind::Shim(_, _, body) => rec_tail(body),
         TExprKind::Ident(n) => n == name && !tail,
