@@ -3,8 +3,10 @@
 # piece at a time.
 
 import {
+    ExecResult,
     drop_first,
     equal as ==,
+    execute_program,
     first,
     join,
     len,
@@ -57,7 +59,10 @@ fn card_line(self: Counted) -> str { `{self.count} {self.name}` }.test({
 # The metagame `name` stands for, with `data/index.json` read to find it.
 fn load_named(name: str) !read_files !execute_program -> Metagame!str {
     let index = parse(read_file_to_string("data/index.json")?)?;
-    load_metagame(data_path(index, name))
+    let path = data_path(index, name);
+    let ExecResult { exit_code } = "test".execute_program(args=["-f", path])?;
+    if (exit_code != 0) { return err(`no such metagame: {name}`); };
+    load_metagame(path)
 }
 
 # One line per card played in the metagame named by `args`, most played first.
