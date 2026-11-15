@@ -270,7 +270,6 @@ import {
     One,
     OneOrMore,
     Param,
-    ParamPattern,
     Path,
     Program,
     Refinement as ItemRefinement,
@@ -2186,20 +2185,18 @@ fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let name_span = node.first_tok(node.tok_span());
     let toks = node.own_texts(src);
     let written = written_in(node, src, 0, "", false);
-
-    // `Point { x, y }`, `Wrap(inner)` or `p: Point { x, y }`: typed as the struct or case
-    // it names.
-    if (let some(WrittenBinding { binding, type_name, type_at }) = written_binding(
-        toks,
-        0,
+    // A pattern in place of a name makes the parameter a function's would.
+    if (let some(Param { binding, ty, name_span as pattern_span, written as spelled }) = pattern_param(
+        src,
+        node,
         kids,
         sp,
     )?) {
         return ok(ALambdaParam(LambdaParam {
             binding,
-            ty: some(TyNamed(type_name)),
-            span: name_span,
-            written: some(written_in(node, src, type_at, "", false)),
+            ty: some(ty),
+            span: pattern_span,
+            written: spelled,
         }));
     };
     match (toks) {
@@ -3663,63 +3660,35 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # scrutinee the caller never named.
 fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let name_span = node.first_tok(node.tok_span());
-
-    // `Point { x, y }` and `p: Point { x, y }` — the destructuring forms. They
-    // are the alternatives holding a repetition, so their positions do not line
-    // up one per sub-rule and they are recognised by their `{` rather than by
-    // their shape.
-    let toks = node.own_texts(src);
-    let bare = written_in(node, src, 0, "", false);
-    let named = written_in(node, src, 2, "", false);
-    match (toks) {
-        [struct_name, "{", ..] => ok(destructured_param(
-            `__spat${name_span.start}`,
-            struct_name,
-            field_binders_of(toks, 2),
-            name_span,
-            bare,
-        )),
-        [name, ":", struct_name, "{", ..] => ok(destructured_param(
-            name,
-            struct_name,
-            field_binders_of(toks, 4),
-            name_span,
-            named,
-        )),
-        [case_name, "(", ..] => ok(arm_param(
-            `__cpat${name_span.start}`,
-            case_name,
-            case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
-            name_span,
-            bare,
-        )),
-        [name, ":", case_name, "(", ..] => ok(arm_param(
-            name,
-            case_name,
-            case_pattern(case_name, kid(kids, 0, sp)?, sp)?,
-            name_span,
-            named,
-        )),
-        _ => named_param_by_shape(src, node, kids, sp),
-    }
+    if (let some(param) = pattern_param(src, node, kids, sp)?) { return ok(AParam(param)); };
+    named_param_by_shape(src, node, kids, sp)
 }
 
-# A parameter named `name`, of the type `case_name` — the case of its variant and
-# no other — whose payload is bound to `names` at the top of the body.
-fn arm_param(name: str, case_name: str, pattern: Pat, span: Span, written: WrittenNames) -> Ast {
-    let param = Param {
-        name,
-        ty: TyNamed(case_name),
+# The parameter a pattern makes when it is written in place of a name — `Point { x, y }`,
+# `Wrap(inner)`, or `p: Point { x, y }` with the name — typed as the struct or case it
+# names. `none` for any other parameter. These are the alternatives holding a
+# repetition, so their positions do not line up one per sub-rule and they are
+# recognised by the `{` or `(` after a type name rather than by their shape.
+fn pattern_param(src: str, node: Parts, kids: Ast[], sp: Span) -> Param?!ParseError {
+    let toks = node.own_texts(src);
+    let some(WrittenBinding { binding, type_name, type_at }) = written_binding(
+        toks,
+        0,
+        kids,
+        sp,
+    )? else {
+        return ok(none);
+    };
+    ok(some(Param {
+        binding,
+        ty: TyNamed(type_name),
         mutable: false,
         arity: One,
         default: none,
         implicit_some: false,
-    };
-    AParam(Param {
-        ..param,
-        pattern: some(ParamPattern { pattern: pattern.as_binding(), span, written: some(written) }),
-    })
+        written: some(written_in(node, src, type_at, "", false)),
+        name_span: node.first_tok(node.tok_span()),
+    }))
 }
 
 # The pattern `case_name(..slots..)` writes: its `payload` child holds the slots, or
@@ -3770,27 +3739,6 @@ fn as_binding(self: Pat) -> Binding {
         if (bindings.is_nonempty() && !ignore_payload) { return ByCase(case_name, bindings); };
     };
     ByPattern(self)
-}
-
-# A parameter named `name`, of the struct `struct_name`, whose `fields` are bound
-# to `names` at the top of the body.
-fn destructured_param(
-    name: str,
-    struct_name: str,
-    FieldBinders { fields, names },
-    span: Span,
-    written: WrittenNames,
-) -> Ast {
-    let param = Param {
-        name,
-        ty: TyNamed(struct_name),
-        mutable: false,
-        arity: One,
-        default: none,
-        implicit_some: false,
-    };
-    let pattern = ByStruct(struct_name, fields, names, false);
-    AParam(Param { ..param, pattern: some(ParamPattern { pattern, span, written: some(written) }) })
 }
 
 # The six named shapes. Every sub-rule is one position, and *which*
@@ -3862,7 +3810,7 @@ fn named_param(
     };
     let default = if (has_default) { some(kid_expr(kids, 1, sp)?) } else { none };
     ok(AParam(Param {
-        name: name.slot_text(src),
+        binding: Binding.Name(name.slot_text(src)),
         ty,
         mutable,
         arity,

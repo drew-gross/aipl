@@ -91,11 +91,12 @@ import {
     ForPattern,
     Let,
     LetPattern,
+    Name,
     Read,
     descendants,
     field_reads,
 } from "../expr.aipl";
-import { Function, One, Param, ParamPattern, pattern_reads } from "../item.aipl";
+import { Function, One, Param, pattern_reads } from "../item.aipl";
 import { Named, Ty } from "../ty.aipl";
 import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
 import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
@@ -406,10 +407,8 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
     // The body's span starts at the `{` that opens it, which is a single line that
     // survives the formatter — and the closest line to the signature that a
     // parameter can be blamed on, `Param` carrying no span of its own.
-    if (let some(ParamPattern { pattern, span as _ }) = self.pattern) {
-        return pattern.slot_hits(body, reads, body.span);
-    };
-    if (self.name == "self" || self.mutable || self.arity != One || self.default.is_some()) {
+    let Name(name) = self.binding else { return self.binding.slot_hits(body, reads, body.span); };
+    if (name == "self" || self.mutable || self.arity != One || self.default.is_some()) {
         return [];
     };
     let some(Named(struct_name)) = self.ty.as_case(Named) else { return []; };
@@ -417,12 +416,10 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
     // There is no right-hand side to discount here the way a `let` has one: a
     // parameter is bound before the body runs, so every read in the function is one
     // the pattern's names would have to live alongside.
-    let some(taken) = body.taken_apart(self.name, reads, none, some(struct_name)) else {
-        return [];
-    };
+    let some(taken) = body.taken_apart(name, reads, none, some(struct_name)) else { return []; };
     match (taken) {
-        Fields(..) => [hit(advice(Parameter(struct_name), self.name, taken), body.span)],
-        Opening(span, _, _) => [hit(advice(Parameter(struct_name), self.name, taken), span)],
+        Fields(..) => [hit(advice(Parameter(struct_name), name, taken), body.span)],
+        Opening(span, _, _) => [hit(advice(Parameter(struct_name), name, taken), span)],
     }
 }
 

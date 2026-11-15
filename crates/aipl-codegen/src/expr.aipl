@@ -103,18 +103,8 @@ struct FieldInit { name: str, value: Expr, name_span: Span = 0..0 }
 # that the binding is always a `Name`.
 struct LambdaParam { binding: Binding, ty: Ty?, span: Span, written: WrittenNames? = none }
 
-# The name of the parameter `self` lowers to: its own for a plain name, and for a
-# destructuring one built from where the parameter starts, which no source can
-# spell.
-pub fn synthesized_name(self: LambdaParam) -> str {
-    match (self.binding) {
-        Name(name) => name,
-        ByTuple(..) => `__tpat${self.span.start}`,
-        ByCase(..) | ByPattern(..) => `__cpat${self.span.start}`,
-        ByStruct(..) => `__spat${self.span.start}`,
-        Alias(name, _) => name,
-    }
-}.test({
+# The name of the parameter `self` lowers to: see `name_at`.
+pub fn synthesized_name(self: LambdaParam) -> str { self.binding.name_at(self.span) }.test({
     let plain = LambdaParam { binding: Name("x"), ty: none, span: 4..5 };
     assert(plain.synthesized_name() == "x");
     assert(LambdaParam { ..plain, binding: ByTuple(["a", "b"]) }.synthesized_name() == "__tpat$4");
@@ -128,6 +118,24 @@ pub fn synthesized_name(self: LambdaParam) -> str {
             binding: ByStruct("P", ["x"], ["x"], false),
         }.synthesized_name() == "__spat$4",
     );
+})
+
+# The name of the variable a parameter bound as `self` is lowered to, for a parameter
+# that starts at `span`: the name it was written with, and for a destructuring built
+# from where it starts, which no source can spell.
+pub fn name_at(self: Binding, Span { start }) -> str {
+    match (self) {
+        Name(name) | Alias(name, _) => name,
+        ByTuple(..) => `__tpat${start}`,
+        ByCase(..) | ByPattern(..) => `__cpat${start}`,
+        ByStruct(..) => `__spat${start}`,
+    }
+}.test({
+    assert(Name("x").name_at(4..5) == "x");
+    assert(ByTuple(["a", "b"]).name_at(4..5) == "__tpat$4");
+    assert(ByCase("W", ["c"]).name_at(4..5) == "__cpat$4");
+    assert(ByStruct("P", ["x"], ["x"], false).name_at(4..5) == "__spat$4");
+    assert(Alias("p", ByCase("W", ["c"])).name_at(4..5) == "p");
 })
 
 # One name as it is written in a pattern, and where.

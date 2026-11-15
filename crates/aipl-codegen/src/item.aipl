@@ -6,12 +6,15 @@
 import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
 import {
+    Alias,
     Binding,
     ByStruct,
     Expr,
     FieldInit,
+    Name,
     Read,
     WrittenNames,
+    name_at,
     reads_off,
     show_expr,
 } from "./expr.aipl";
@@ -43,31 +46,31 @@ struct ImportDecl { names: ImportName[], source: ImportSource, source_span: Span
 # `k?: T` stores `T?` with `implicit_some` recording that the call site passes
 # a bare `T`.
 struct Param {
-    name: str,
+    // What the parameter binds: a name, or a destructuring (`fn f(Point { x, y })`),
+    // which is a parameter of the pattern's type with no name of its own. The names
+    // are bound off it at the top of the body when `desugar.aipl` lowers it, after
+    // which the binding is always a `Name`.
+    binding: Binding,
     ty: Ty,
     mutable: bool,
     arity: Arity,
     default: Expr?,
     implicit_some: bool,
-    // The pattern a destructured parameter (`fn f(Point { x, y })`) was written
-    // with. The parameter itself is a synthetic one of the pattern's type; the
-    // names are bound off it at the top of the body when `desugar.aipl` lowers it.
-    // Always `none` once that has run.
-    pattern: ParamPattern? = none,
-    // Where the parameter's name is written; empty for one a pass made up.
+    // The names a destructuring spells and where, for the language server.
+    written: WrittenNames? = none,
+    // Where the binding is written; empty for one a pass made up.
     name_span: Span = 0..0,
 }
 
-# A parameter's destructuring pattern and where it was written, which is the span
-# the bindings it makes carry.
-struct ParamPattern { pattern: Binding, span: Span, written: WrittenNames? = none }
+# The name of the variable the parameter is, see `name_at`.
+pub fn synthesized_name(self: Param) -> str { self.binding.name_at(self.name_span) }
 
 # The fields a destructured parameter reads off itself, none for an ordinary one.
 pub fn pattern_reads(self: Param) -> Read[] {
-    self.pattern$pattern$reads_off(self.name).value_or([])
+    self.binding.reads_off(self.synthesized_name())
 }.test({
     let plain = Param {
-        name: "p",
+        binding: Name("p"),
         ty: Named("P"),
         mutable: false,
         arity: One,
@@ -75,10 +78,13 @@ pub fn pattern_reads(self: Param) -> Read[] {
         implicit_some: false,
     };
     assert(plain.pattern_reads() == []);
-    let pattern = ParamPattern { pattern: ByStruct("P", ["x"], ["x"], false), span: 0..0 };
-    assert(Param { ..plain, pattern: some(pattern) }.pattern_reads() == [
-        Read { field: "x", base: "p" },
+    assert(Param { ..plain, binding: ByStruct("P", ["x"], ["x"], false) }.pattern_reads() == [
+        Read { field: "x", base: "__spat$0" },
     ]);
+    assert(Param {
+        ..plain,
+        binding: Alias("p", ByStruct("P", ["x"], ["x"], false)),
+    }.pattern_reads() == [Read { field: "x", base: "p" }]);
 })
 
 # How many arguments a parameter takes at a call site: one, or — for a
@@ -269,7 +275,7 @@ fn show_type_param(self: TypeParam) -> str {
 fn show_param(self: Param) -> str {
     let prefix = if (self.mutable) { "mut " } else { "" };
     let opt = if (self.implicit_some) { "?" } else { "" };
-    `{prefix}{self.name}{opt}: {self.ty.show_ty()}{self.arity.arity_marker()}{show_default(self.default)}`
+    `{prefix}{self.synthesized_name()}{opt}: {self.ty.show_ty()}{self.arity.arity_marker()}{show_default(self.default)}`
 }
 
 fn show_default(self: Expr?) -> str { self.map(|e| ` = {e.show_expr()}`).value_or("") }

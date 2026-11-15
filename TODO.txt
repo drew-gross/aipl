@@ -120,6 +120,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  unused_imports should be rephrased as a set difference
   move the name gathering functions from unused_imports.aipl to item.aipl and make sure all you might need are available
   so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
@@ -374,6 +375,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  support partial destructure
   spread optionals into arrays to make tabulate's widths computation simpler
   arr$[i] syntax for getting all items at specified index
   lets make it allowed to ignore fields when destructuring, so that let Expr { kind, span, value_span as _, name_span as _ } = body; can just be let Expr { kind, span } = body;.

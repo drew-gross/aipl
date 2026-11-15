@@ -56,6 +56,7 @@ import {
     Lambda,
     LambdaParam,
     descendants,
+    name_at,
     synthesized_name,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -153,9 +154,11 @@ fn methods_in_view(self: Item[]) -> str[] {
 }
 
 # The name of the function `self`, when it takes a `self`.
-fn method_name(self: Fn(function)) -> str? {
-    if (function.sig.params.first().is_some_and(|parameter| parameter.name == "self")) {
-        some(function.name.text)
+fn method_name(self: Fn(Function { sig, name })) -> str? {
+    if (sig.params
+        .first()
+        .is_some_and(|parameter| parameter.binding.name_at(parameter.name_span) == "self")) {
+        some(name.text)
     } else {
         none
     }

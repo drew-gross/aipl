@@ -113,7 +113,7 @@ pub fn unused_imports(Program { items }) -> LintHit[] {
                 ..f.sig.params
                     .map(|param| #{
                         ..field_names(param.ty, param.default),
-                        ..param.pattern$pattern$destructure_names().value_or(#{}),
+                        ..param.binding.destructure_names(),
                     })
                     .union_all(),
                 ..f.sig.return_ty.optional_ty_names(),

@@ -71,7 +71,21 @@
           </h3>
           <pre class="signature"><code>pub fn synthesized_name(self: LambdaParam) -&#62; str</code></pre>
 
-          <div class="doc"><p>The name of the parameter <code>self</code> lowers to: its own for a plain name, and for a destructuring one built from where the parameter starts, which no source can spell.</p></div>
+          <div class="doc"><p>The name of the parameter <code>self</code> lowers to: see <code>name_at</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-name_at">
+          <h3>
+            <a class="anchor" href="#item-name_at">name_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5083: Span) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
 
 
         </section>

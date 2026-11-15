@@ -173,7 +173,12 @@ fn param(v: &FfiValue) -> R<ast::Param> {
             Some(name_span) => span(name_span)?,
             None => 0..0,
         }),
-        name: text(field(v, "name")?)?,
+        // Destructuring is lowered away before the tree reaches Rust, so a parameter's
+        // binding is a plain name.
+        name: match variant(field(v, "binding")?)? {
+            ("Name", payload) => text(at(payload, 0, "Name")?)?,
+            (other, _) => return Err(unknown("Binding", other)),
+        },
         ty: ty(field(v, "ty")?)?,
         mutable: flag(field(v, "mutable")?)?,
         arity: arity(field(v, "arity")?)?,

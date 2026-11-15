@@ -62,10 +62,10 @@ import {
     ident,
     join_spans,
     map_subexprs,
+    name_at,
     named_at,
     show_expr,
     struct_written,
-    synthesized_name,
 } from "./expr.aipl";
 import {
     CaseParam,
@@ -76,7 +76,6 @@ import {
     Function,
     Item,
     Param,
-    ParamPattern,
     Program,
     Signature,
     Struct,
@@ -131,7 +130,7 @@ fn desugared_function(self: Function) -> Function {
     let plain = self.sig.params.map(|p| Param {
         ..p,
         default: p.default$desugared(),
-        pattern: none,
+        binding: Name(p.binding.name_at(p.name_span)),
     });
     Function {
         ..self,
@@ -163,11 +162,11 @@ pub fn desugared(self: Expr) -> Expr {
         Lambda(params, body) => Expr {
             ..inner,
             kind: Lambda(
-                params.map(|p| LambdaParam { ..p, binding: Name(p.synthesized_name()) }),
+                params.map(|p| LambdaParam { ..p, binding: Name(p.binding.name_at(p.span)) }),
                 params.right_fold(
                     body,
                     |p: LambdaParam, result: Expr| bind_param_pattern(
-                        p.synthesized_name(),
+                        p.binding.name_at(p.span),
                         p.binding,
                         p.span,
                         result,
@@ -656,12 +655,9 @@ fn destructure_struct(
 # A destructured parameter's bindings in front of `body`: the case's payload, or
 # the struct's fields, read off the parameter itself. Folded from the right by the
 # caller so they come out in source order.
-fn bind_one_param(p: Param, body: Expr) -> Expr {
-    let ParamPattern { pattern, span, written } = p.pattern.value_or(ParamPattern {
-        pattern: ByTuple([]),
-        span: 0..0,
-    });
-    bind_param_pattern(p.name, pattern, span, body, written.value_or(WrittenNames {}))
+fn bind_one_param(Param { binding, name_span, written }, body: Expr) -> Expr {
+    let name = binding.name_at(name_span);
+    bind_param_pattern(name, binding, name_span, body, written.value_or(WrittenNames {}))
 }
 
 # The bindings `pattern` makes, read off the parameter called `parameter`, in front of
