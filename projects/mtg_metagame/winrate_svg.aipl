@@ -244,7 +244,12 @@ let STYLE = """
     .cell .detail { font-size: 10px; fill: #222; opacity: 0.85; }
     .row-label { text-anchor: end; dominant-baseline: central; }
     .row-label .detail { font-size: 11px; font-weight: normal; fill: #888; }
-    .row-label .expander { text-anchor: start; fill: #1a6fb5; cursor: pointer; }
+    .row-label .expander { text-anchor: start; dominant-baseline: central; font-size: 18px; fill: #1a6fb5; cursor: pointer; }
+    .row-label .checkbox { cursor: pointer; }
+    .row-label .checkbox rect { fill: #fff; stroke: #888; stroke-width: 1.5; }
+    .row-label .checkbox path { fill: none; stroke: #1a6fb5; stroke-width: 2.2; }
+    .row-label.removed .checkbox path { display: none; }
+    .row-label .checkbox:hover rect { stroke: #1a6fb5; }
     .row-label.sub .hit { fill: #fafafa; }
     .row-label.sub { cursor: default; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
@@ -278,8 +283,8 @@ let STYLE = """
 # What hovering does: light up the cell's row and column, and fill the panel, which stays at the
 # top of the page, from the cell's attributes. A line wider than the panel is wrapped at a space.
 # Clicking a cell locks the panel on it, whatever the mouse then passes over, until the Unlock
-# button, the same cell or the Escape key is clicked or pressed. Clicking an archetype's name
-# removes it from the metagame: its row and column fade, and the Projected column is what every
+# button, the same cell or the Escape key is clicked or pressed. Unticking an
+# archetype's checkbox (or clicking its column heading) removes it from the metagame: its row and column fade, and the Projected column is what every
 # other archetype's overall record would be without its matches against the removed ones. The
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
@@ -529,7 +534,7 @@ let SCRIPT = """
     function clear() {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + panel.getAttribute("data-top") + ")");
-        var y = put_wrapped("Hover a cell for how the pairing did in each round, or click one to lock it. Click an archetype's name to remove it from the metagame and see everyone else's projected win rate.", 14, "head");
+        var y = put_wrapped("Hover a cell for how the pairing did in each round, or click one to lock it. Untick an archetype to remove it from the metagame and see everyone else's projected win rate.", 14, "head");
         if (removed.length) {
             y += 30;
             var open = fold("Removed from the metagame", "removed", y, "heading");
@@ -556,7 +561,7 @@ let SCRIPT = """
         y += 20;
         put("Now " + rate_text(p.was) + " · " + record_text(p.was) + (removed.length ? " · " + delta_text(p) : ""), 0, y, "summary");
         if (!removed.length) {
-            put_wrapped("Click an archetype's name to remove it from the metagame.", y + 20, "head");
+            put_wrapped("Untick an archetype to remove it from the metagame.", y + 20, "head");
             return;
         }
         y += 30;
@@ -645,6 +650,8 @@ let SCRIPT = """
     window.addEventListener("click", function(e) {
         var order = e.target.getAttribute && e.target.getAttribute("data-sort");
         if (order) { sorting = order; refresh(); return; }
+        var include = e.target.closest && e.target.closest("[data-include]");
+        if (include) { toggle(+include.getAttribute("data-include")); return; }
         var expand = e.target.getAttribute && e.target.getAttribute("data-expand");
         if (expand !== null && expand !== undefined && expand !== false) {
             var open_at = expanded.indexOf(+expand);
@@ -663,7 +670,8 @@ let SCRIPT = """
         if (action === "restore") { removed = []; refresh(); return; }
         if (action === "unlock") { unlock(); return; }
         var label = label_of(e.target);
-        if (label && label.classList.contains("sub")) return;
+        // A row is taken out of the metagame by its checkbox; a column heading does it too.
+        if (label && label.hasAttribute("data-row")) return;
         if (label) {
             toggle(+(label.hasAttribute("data-row") ? label.getAttribute("data-row") : label.getAttribute("data-column")));
             return;
@@ -768,13 +776,22 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         } else {
             ` display="none" data-parent="{sub_archetypes[row - parent_count]$parent.value_or(0)}"`
         };
+
+        // An archetype has a checkbox, ticked while it is in the metagame, and an arrow when it has
+        // sub-archetypes to show.
+        let line = y + CELL / 2 - 17;
         let expander = if (sub_archetypes.any(|each| each.parent == row)) {
-            `<text class="expander" data-expand="{row}" x="10" y="{y + CELL / 2 - 17}">▸</text>`
+            `<text class="expander" data-expand="{row}" x="6" y="{line}">▸</text>`
+        } else {
+            ""
+        };
+        let checkbox = if (row < parent_count) {
+            `<g class="checkbox" data-include="{row}"><rect x="28" y="{line - 7}" width="14" height="14" rx="2"/><path d="M31,{line} l3,3 l6,-7"/></g>`
         } else {
             ""
         };
         set parts.push(
-            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{expander}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
+            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{expander}{checkbox}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
@@ -904,8 +921,10 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-name="B &amp; C"`));
     assert(page.split(`class="label row-label"`).len() == 3);
 
-    // Nothing is expandable without sub-archetypes.
+    // Nothing is expandable without sub-archetypes, and every archetype has a checkbox.
     assert(!page.contains(`class="expander"`));
+    assert(page.split(`class="checkbox"`).len() == 3);
+    assert(page.contains(`data-include="1"`));
 
     // A sub-archetype has a row of its own, hidden until its archetype is expanded: a label that
     // names it under its archetype, and its cells, all marked with the archetype's row.
@@ -921,6 +940,8 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(expandable.contains(`data-parents="2"`));
     assert(expandable.contains(`class="expander" data-expand="0"`));
     assert(expandable.split(`class="expander"`).len() == 2);
+    // A sub-archetype has no checkbox: it leaves with its archetype.
+    assert(expandable.split(`class="checkbox"`).len() == 3);
     assert(expandable.contains(
         `class="label row-label sub" display="none" data-parent="0" data-row="2" data-name="A: X &amp; Y"`,
     ));

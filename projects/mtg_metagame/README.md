@@ -41,11 +41,11 @@ its own overall and projected cells, so removing an archetype projects them too.
 them away. The expanded archetypes are kept in the page's address with the removed ones. A
 sub-archetype is a row only: the columns stay the archetypes.
 
-Click an archetype's name, on its row or its column heading, to remove it from the metagame, as a rotation would:
+Untick an archetype's checkbox, at the left of its row (or click its column heading), to remove it from the metagame, as a rotation would:
 its row and column fade, and the Projected column beside Overall shows what every other archetype's win rate would be
 without its matches against the removed ones, with the change in points underneath. That is the simple model: the
 removed decks' matches are dropped, and nobody is assumed to switch to anything else. Hovering a Projected cell lists the
-matches each removal took out of that row. Click a name again to bring it back, or use Restore all in the panel; the
+matches each removal took out of that row. Tick it again to bring it back, or use Restore all in the panel; the
 removed archetypes are kept in the page's address (`#removed=1,4`), so a reload or a shared link keeps them.
 
 The top-left links sort the rows and columns by meta share (the default), overall win rate, or projected win rate (the removed archetypes last); the choice is kept in the address too (`&sort=winrate`).
