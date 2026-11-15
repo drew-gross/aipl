@@ -24,7 +24,6 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
-    when projecting a winrate show the project w/l/d, not just the +/-
     sub-archetypes
     make a better templating language (in aipl maybe?) for making the svgs
     winrate:

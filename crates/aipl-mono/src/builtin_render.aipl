@@ -14,16 +14,40 @@
 import {
     IEEE754Float32 as F32,
     IEEE754Float64 as F64,
+    any,
+    drop_first,
+    drop_last,
     equal as ==,
+    find_index,
+    first,
     float_add as +,
     float_div as /,
+    greater_than as >,
+    is_digit,
+    is_some_and,
+    join,
+    last,
     len,
+    less_than as <,
+    less_than_or_equal as <=,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    max,
     min,
+    not_equal as !=,
+    push,
     repeat,
+    reverse,
+    saturating_remainder as %,
     saturating_sub,
+    split,
     starts_with,
+    to_digit,
     to_fixed,
     to_str,
+    value_or,
+    wrapping_add,
 } from builtins;
 
 # The float `self` as text. With no options that is `to_str(self)`: the shortest decimal that
@@ -33,7 +57,21 @@ import {
 #   from the float's exact value (halves to even: `0.25` is `0.2` to one digit, `2.5` is `2`
 #   to none), so `render(1.0 / 3.0, digits=3)` is `0.333`. A count past the 1074 digits a
 #   float's exact value has gives the rest as zeros. `NaN` and `inf` have no digits.
-pub fn render<T: any>(self: T, digits?: u64 = none) -> str {
+# - `significant`: for a float, write that many significant digits, correctly rounded from
+#   the exact value the same way (a count of 0 is 1), with zeros where the digits run out
+#   before the point: `12345.0` is `12000` to two, `12.345` is `12`, `1.2345` is `1.2` and
+#   `0.0012345` is `0.0012`. Trailing zeros are kept (`1.0`), and zero is `0`. It is used
+#   instead of `digits` when both are given.
+pub fn render<T: any>(self: T, digits?: u64 = none, significant?: u64 = none) -> str {
+    if (let some(count) = significant) {
+        let exact = self.to_fixed(1074);
+        let negative = exact.starts_with("-");
+        let unsigned = if (negative) { exact[1..] } else { exact };
+        // `NaN` and the infinities have no digits to round.
+        if (!unsigned.first().is_some_and(is_digit)) { return exact; };
+        let rounded = unsigned.round_significant(max(count, 1));
+        return if (negative) { `-{rounded}` } else { rounded };
+    };
     let some(wanted) = digits else { return to_str(self); };
     let shown = min(wanted, 1074);
     let text = self.to_fixed(shown);
@@ -74,9 +112,98 @@ pub fn render<T: any>(self: T, digits?: u64 = none) -> str {
     assert(render(1.0 / zero, digits=2) == "inf");
     assert(render(-1.0 / zero, digits=2) == "-inf");
 
+    // Significant digits count from the first nonzero digit, in either direction from the point.
+    assert(render(12345.0, significant=2) == "12000");
+    assert(render(12.345, significant=2) == "12");
+    assert(render(1.2345, significant=2) == "1.2");
+    assert(render(0.0012345, significant=2) == "0.0012");
+    assert(render(1.2345, significant=4) == "1.234");
+    assert(render(1.2345, significant=1) == "1");
+    assert(render(0.5, significant=1) == "0.5");
+
+    // Trailing zeros are kept, so the count is how many digits are written, and zero is `0`.
+    assert(render(1.0, significant=2) == "1.0");
+    assert(render(50.0, significant=3) == "50.0");
+    assert(render(0.0, significant=2) == "0");
+    assert(render(100.0, significant=2) == "100");
+    assert(render(0.1, significant=3) == "0.100");
+
+    // Halves go to even here too, and a carry moves the digits a place left.
+    assert(render(12.5, significant=2) == "12");
+    assert(render(13.5, significant=2) == "14");
+    assert(render(0.125, significant=2) == "0.12");
+    assert(render(87.5, significant=2) == "88");
+    assert(render(9.96, significant=2) == "10");
+    assert(render(99.6, significant=2) == "100");
+    assert(render(0.996, significant=2) == "1.0");
+    assert(render(0.0996, significant=2) == "0.10");
+    assert(render(0.35, significant=1) == "0.3");
+    assert(render(0.45, significant=1) == "0.5");
+
+    // Signs, a count of zero as one, and `significant` over `digits`.
+    assert(render(-12345.0, significant=2) == "-12000");
+    assert(render(-0.0012345, significant=2) == "-0.0012");
+    assert(render(1234.0, significant=0) == "1000");
+    assert(render(1.2345, digits=3, significant=2) == "1.2");
+
+    // Very large and very small values and the values with no digits.
+    assert(render(1.0e21, significant=3) == "1000000000000000000000");
+    assert(render(1.5e-5, significant=2) == "0.000015");
+    assert(render(zero / zero, significant=2) == "NaN");
+    assert(render(1.0 / zero, significant=2) == "inf");
+    assert(render(-1.0 / zero, significant=2) == "-inf");
+    assert(render(narrow_tenth, significant=3) == "0.100");
+
     // A very large count is the exact digits and then zeros.
     let wide = render(1.5, digits=1100);
     assert(wide.len() == 1102);
     assert(wide.starts_with("1.5000"));
     assert(render(1.5, digits=1074).len() == 1076);
 })
+
+# The decimal text `self` (digits, a point, digits, no sign) rounded to `count` significant
+# digits, halves to even on the exact digits that follow.
+fn round_significant(self: str, count: u64) -> str {
+    let [whole, fraction] = self.split(".") else { return self; };
+
+    // A loop, not `map` or `$`: the typed route declines both on a string receiver, though the
+    // `map` lint asks for them (see CLAUDE_TODO.txt).
+    mut digits: i64[] = []; #[allow]
+    for (let character : `{whole}{fraction}`) {
+        set digits.push(character.to_digit().value_or(0));
+    }
+    let some(first_digit) = digits.find_index(|d| d != 0) else { return "0"; };
+    let stop = min(wrapping_add(first_digit, count), digits.len());
+    let missing = saturating_sub(count, saturating_sub(stop, first_digit));
+    let kept = digits[first_digit..stop];
+    let rest = digits[stop..];
+    let round_up = rest
+        .first()
+        .is_some_and(|next| {
+            next > 5 || (next == 5 && (rest.drop_first().any(|d| d != 0) || kept
+                .last()
+                .value_or(0) % 2 == 1))
+        });
+    mut rounded: i64[] = [];
+    mut carry = round_up;
+    for (let digit : kept.reverse()) {
+        let sum = if (carry) { wrapping_add(digit, 1) } else { digit };
+        set rounded.push(sum % 10);
+        set carry = 9 < sum;
+    }
+    // A carry out of the first digit leaves `1` and zeros, one place left of where it was.
+    let result = if (carry) { [1, ..rounded.drop_last()] } else { rounded.reverse() };
+    // Digits that ran out before `count` are zeros.
+    let shown = `{result$to_str().join(sep="")}{"0".repeat(missing)}`;
+    let point = whole.len();
+    let before = saturating_sub(point, first_digit);
+    let zeros = saturating_sub(first_digit, point);
+    let before_now = if (carry && zeros == 0) { wrapping_add(before, 1) } else { before };
+    let zeros_now = if (carry && 0 < zeros) { saturating_sub(zeros, 1) } else { zeros };
+    let with_point = if (count <= before_now) {
+        `{shown}{"0".repeat(saturating_sub(before_now, count))}`
+    } else {
+        `{shown[..before_now]}.{shown[before_now..]}`
+    };
+    if (0 < before_now) { with_point } else { `0.{"0".repeat(zeros_now)}{shown}` }
+}
