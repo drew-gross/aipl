@@ -12,6 +12,7 @@ import {
     float_div as /,
     float_mul as *,
     get,
+    join,
     len,
     map,
     push,
@@ -21,7 +22,7 @@ import {
     to_float,
     try_map,
 } from builtins;
-import { Identifier, archetype_of, label } from "./archetypes.aipl";
+import { Identifier, archetype_of, definition, label } from "./archetypes.aipl";
 import { shares } from "./meta_share.aipl";
 import {
     Card,
@@ -270,12 +271,13 @@ fn cell_of(self: Observation[], slot_count: u64, brackets: Bracket[]) -> Cell {
 # `names` did against every archetype, its own included: a mirror match is one win and one loss,
 # which pulls the archetype's overall rate toward even as it does at an event.
 #
-# `counts` is how many decks each of `names` has, out of `total` decks. `slots` names the slots
+# `definitions` says in a line what makes a deck each of `names` (empty for `Other`). `counts` is how many decks each of `names` has, out of `total` decks. `slots` names the slots
 # rounds fall in, finals first, `slot_matches` is how many of the metagame's `matches` fall in each,
 # and each cell's `rounds` is indexed alike. `brackets` are the records going into a round that
 # some archetype had, highest first, and each cell's `brackets` is indexed alike.
 struct Matrix {
     names: str[],
+    definitions: str[],
     counts: u64[],
     total: u64,
     slots: str[],
@@ -308,6 +310,9 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     });
     ok(Matrix {
         names,
+        definitions: names.map(|name| {
+            identifiers.filter(|i| i.name == name)$definition().join(sep=" | ")
+        }),
         counts: found$count,
         total: decks.len(),
         slots: (0..slot_count)$slot_label(),
@@ -344,6 +349,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     ];
     assert(winrate_matrix(decks, matches, [forest]) == ok(Matrix {
         names: ["Forest", "Other"],
+        definitions: ["Forest", ""],
         counts: [2, 1],
         total: 3,
         slots: ["Finals", "Semifinals", "Quarterfinals", "Last round", "2nd last round"],

@@ -633,15 +633,15 @@ let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall } = self;
+    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall } = self;
     let summaries = counts.map(|count| deck_summary(count, decks));
     mut longest = PROJECTED.len();
     for (let each : names) {
         set longest = max(longest, each.len());
     }
     mut label_characters = longest;
-    for (let each : summaries) {
-        // The summary is set smaller than a name.
+    for (let each : [..summaries, ..definitions]) {
+        // The summary and the definition are set smaller than a name.
         set label_characters = max(label_characters, each.len() * 6 / CHARACTER_WIDTH);
     }
     // The slots some match fell in: the panel has a row for each.
@@ -683,8 +683,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
         let y = grid_top + row * CELL;
         let row_name = names[row].value_or("");
         let summary = summaries[row].value_or("");
+        let definition = definitions[row].value_or("");
         set parts.push(
-            `<g class="label row-label" data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/><text x="{overall_left - 8}" y="{y + CELL / 2 - 7}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 9}">{summary}</text></g>`,
+            `<g class="label row-label" data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/><text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_name.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
@@ -736,6 +737,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 }.test({
     let matrix = Matrix {
         names: ["A", "B & C"],
+        definitions: ["X, Y", "one of Z & W"],
         counts: [3, 1],
         total: 4,
         slots: ["Finals", "Semifinals"],
@@ -788,6 +790,9 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-brackets="0-0"`));
     assert(page.contains(`data-brackets="1,1-0-0,100.0%"`));
     assert(page.contains(`data-title="A against itself"`));
+    // A row label has the archetype's definition, escaped, under its name.
+    assert(page.contains(">X, Y</text>"));
+    assert(page.contains(">one of Z &amp; W</text>"));
     // A row label has the archetype's deck count and share.
     assert(page.contains(">3 decks · 75.0%</text>"));
     assert(page.contains(">1 deck · 25.0%</text>"));

@@ -9,10 +9,12 @@ import {
     equal as ==,
     filter,
     is_empty,
+    is_nonempty,
     join,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    push,
     read_file_to_string,
     try_map,
     value_or,
@@ -34,6 +36,37 @@ struct Identifier {
     any_cards: str[] = [],
     maindeck_cards: str[] = [],
 }
+
+# What `self` asks of a deck, in a line: the cards it must hold, then `one of` the cards of which it
+# must hold some, then `no` cards it must not hold, separated by `; `. An identifier that asks for
+# nothing says so.
+pub fn definition(self: Identifier) -> str {
+    mut parts: str[] = [];
+    let required = [..self.cards, ..self.maindeck_cards];
+    if (required.is_nonempty()) { set parts.push(required.join(sep=", ")); };
+    if (self.any_cards.is_nonempty()) { set parts.push(`one of {self.any_cards.join(sep=", ")}`); };
+    if (self.not_cards.is_nonempty()) { set parts.push(`no {self.not_cards.join(sep=", ")}`); };
+    if (parts.is_empty()) { "any deck" } else { parts.join(sep="; ") }
+}.test({
+    assert(Identifier { name: "x", cards: ["Island"] }.definition() == "Island");
+    // Cards that must be anywhere come first, then those that must be in the main deck.
+    assert(
+        Identifier {
+            name: "x",
+            cards: ["Island"],
+            maindeck_cards: ["Bolt", "Duress"],
+        }.definition() == "Island, Bolt, Duress",
+    );
+    assert(
+        Identifier {
+            name: "x",
+            cards: [],
+            any_cards: ["Swamp", "Mountain"],
+            not_cards: ["Forest"],
+        }.definition() == "one of Swamp, Mountain; no Forest",
+    );
+    assert(Identifier { name: "x", cards: [] }.definition() == "any deck");
+})
 
 # The names of the cards a deck holds: in its main deck, and in its main deck or sideboard.
 struct Holdings { main: #{str}, held: #{str} }
