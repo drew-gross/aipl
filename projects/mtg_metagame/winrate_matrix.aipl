@@ -1,6 +1,6 @@
-# The winrate matrix: how each archetype fares against each other one. A deck counts in every
-# archetype it matches, so a match is held against every pairing of one deck's archetypes and
-# the other's, from each deck's side.
+# The winrate matrix: how each archetype fares against each other one. A deck is one
+# archetype, so a match is held against the pairing of the two decks' archetypes, from each
+# deck's side.
 
 import {
     IEEE754Float64 as Float,
@@ -19,8 +19,9 @@ import {
     sort_by,
     to_dict,
     to_float,
+    try_map,
 } from builtins;
-import { Identifier, archetypes_of, label } from "./archetypes.aipl";
+import { Identifier, archetype_of, label } from "./archetypes.aipl";
 import { shares } from "./meta_share.aipl";
 import {
     Card,
@@ -67,21 +68,20 @@ fn flipped(self: Result) -> Result {
     assert(Draw.flipped() == Draw);
 })
 
-# The names of the archetypes `self` is, each once, as a report reads them.
-fn labels_of(self: Deck, identifiers: Identifier[]) -> str[] {
-    self.archetypes_of(identifiers)$label().distinct()
+# The name of the archetype `self` is, as a report reads it.
+fn label_of(self: Deck, identifiers: Identifier[]) -> str!str {
+    ok(self.archetype_of(identifiers)?.label())
 }.test({
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
-    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.labels_of([landfall]) == [
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.label_of([landfall]) == ok(
         "Landfall",
-    ]);
-    assert(Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] }.labels_of([landfall]) == [
+    ));
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] }.label_of([landfall]) == ok(
         "Other",
-    ]);
+    ));
 })
 
-# Every match of `matches`, once for each pairing of an archetype of the one deck and an archetype
-# of the other, from each side. A match with a deck not in `decks` is an error. `last_rounds` is
+# Every match of `matches`, once from each side. A match with a deck not in `decks` is an error. `last_rounds` is
 # the last round of each tournament, which a match's slot is counted back from.
 fn observations(
     decks: Deck[],
@@ -89,38 +89,37 @@ fn observations(
     identifiers: Identifier[],
     last_rounds: #{str: u64},
 ) -> Observation[]!str {
-    let labelled: #{str: str[]} = decks
-        .map(|deck| (deck.deck_id, deck.labels_of(identifiers)))
+    let labelled: #{str: str} = decks
+        .try_map(|deck| {
+            let label = deck.label_of(identifiers)?;
+            ok((deck.deck_id, label))
+        })?
         .to_dict();
     mut out: Observation[] = [];
     for (let each : matches) {
-        let some(firsts) = labelled.get(each.first_deck_id) else {
+        let some(first) = labelled.get(each.first_deck_id) else {
             return err(unknown_deck(each.first_deck_id));
         };
-        let some(seconds) = labelled.get(each.second_deck_id) else {
+        let some(second) = labelled.get(each.second_deck_id) else {
             return err(unknown_deck(each.second_deck_id));
         };
         let slot = each.slot_of(last_rounds);
         let first_bracket = each.first_bracket();
         let second_bracket = each.second_bracket();
-        for (let first : firsts) {
-            for (let second : seconds) {
-                set out.push(Observation {
-                    player: first,
-                    opponent: second,
-                    result: each.result,
-                    slot,
-                    bracket: first_bracket,
-                });
-                set out.push(Observation {
-                    player: second,
-                    opponent: first,
-                    result: each.result.flipped(),
-                    slot,
-                    bracket: second_bracket,
-                });
-            }
-        }
+        set out.push(Observation {
+            player: first,
+            opponent: second,
+            result: each.result,
+            slot,
+            bracket: first_bracket,
+        });
+        set out.push(Observation {
+            player: second,
+            opponent: first,
+            result: each.result.flipped(),
+            slot,
+            bracket: second_bracket,
+        });
     }
     ok(out)
 }.test({
@@ -289,7 +288,7 @@ struct Matrix {
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
 pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]) -> Matrix!str {
-    let found = shares(decks, identifiers);
+    let found = shares(decks, identifiers)?;
     let names = found$name;
     let last_rounds = matches.last_rounds();
     let slot_count = slot_count(last_rounds);

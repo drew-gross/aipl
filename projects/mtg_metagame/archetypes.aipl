@@ -1,7 +1,7 @@
 # Which archetypes a deck is. The original decides it from a list of identifiers per
 # format and season, each naming cards the deck must hold, must not hold, or must hold
 # one of; `data/archetypes.json` has those lists (see `tools/archetypes_to_json.py`).
-# A deck can match several identifiers and then counts in each of them.
+# A deck matches the identifiers of at most one name, and is that archetype.
 
 import {
     all,
@@ -106,37 +106,55 @@ pub fn label(self: Archetype) -> str {
     assert(Other("Some Deck").label() == "Other");
 })
 
-# The archetypes `self` is, each once: the identifiers in `identifiers` it matches, by name. A
-# deck that matches none is `Other`, under its own name.
-pub fn archetypes_of(self: Deck, identifiers: Identifier[]) -> Archetype[] {
+# The archetype `self` is: the one identifier in `identifiers` it matches, by name. A deck that
+# matches none is `Other`, under its own name, and one that matches identifiers of more than one
+# name is an error naming them, since a deck is one archetype.
+pub fn archetype_of(self: Deck, identifiers: Identifier[]) -> Archetype!str {
     let deck_holdings = self.holdings();
     let found: #<{str} = identifiers.filter(|i| i.matches(deck_holdings))$name.to_set();
-    if (found.is_empty()) { [Other(self.name)] } else { found.to_array()$Meta() }
+    let names = found.to_array();
+    match (names) {
+        [] => ok(Other(self.name)),
+        [name] => ok(Meta(name)),
+        _ => err(
+            `deck {self.deck_id} ({self.name}) is more than one archetype: {names.join(sep=", ")}`,
+        ),
+    }
 }.test({
-    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
-    let mono = Identifier { name: "Mono-G", cards: ["Forest"], not_cards: ["Island"] };
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"], not_cards: ["Island"] };
     let control = Identifier { name: "Control", cards: ["Island"] };
-    let identifiers = [landfall, mono, control];
+    let identifiers = [landfall, control];
 
-    // Every match, once, in name order; matching twice under one name counts once.
-    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.archetypes_of(
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.archetype_of(
         identifiers,
-    ) == [Meta("Landfall"), Meta("Mono-G")]);
-    assert(Deck {
-        deck_id: "d",
-        maindeck: [Card { name: "Forest" }, Card { name: "Island" }],
-    }.archetypes_of(identifiers) == [Meta("Control"), Meta("Landfall")]);
-    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.archetypes_of([
+    ) == ok(Meta("Landfall")));
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Island" }] }.archetype_of(
+        identifiers,
+    ) == ok(Meta("Control")));
+
+    // Matching twice under one name is still one archetype.
+    assert(Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }.archetype_of([
         landfall,
         landfall,
-    ]) == [Meta("Landfall")]);
+    ]) == ok(Meta("Landfall")));
 
     // None: `Other`, with the deck's own name.
     assert(Deck {
         deck_id: "d",
         name: "Some Deck",
         maindeck: [Card { name: "Swamp" }],
-    }.archetypes_of(identifiers) == [Other("Some Deck")]);
+    }.archetype_of(identifiers) == ok(Other("Some Deck")));
+
+    // More than one name is an error, naming the deck and the archetypes in name order.
+    assert(Deck {
+        deck_id: "d1",
+        name: "Ramp",
+        maindeck: [Card { name: "Forest" }, Card { name: "Island" }],
+    }.archetype_of([
+        landfall,
+        control,
+        Identifier { name: "Both", cards: ["Forest", "Island"] },
+    ]) == err("deck d1 (Ramp) is more than one archetype: Both, Control"));
 })
 
 # `self` as an identifier.

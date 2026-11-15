@@ -100,11 +100,13 @@ pilot, `maindeck`/`sideboard` (cards with name, count, type) and `match_history`
 original used (`standard_26Q2_rc_japan`) to the file holding them. Three of those
 names pointed at pickles that no longer exist and are left out.
 
-Archetypes are not in the data: the original derives them from a canonicalization config, one
+A deck is one archetype: a deck that matches identifiers of more than one name is an error naming
+them. Archetypes are not in the data: the original derives them from a canonicalization config, one
 per format and season, which `tools/archetypes_to_json.py` dumps into `data/archetypes.json`
 (a list of identifiers per config: cards a deck must hold, must not hold, or must hold one of,
 and cards it must hold in the main deck).
 
 `Standard2026Q4Worlds` is not from the original: it is `Standard2026Q4RC` plus the six archetypes
-the Worlds field (`metagame_worlds_32`) added, each identified by two main-deck cards. Rerunning
+the Worlds field (`metagame_worlds_32`) added, each identified by two main-deck cards, with `Landfall`
+and the two `Teblet Control` lists made exclusive of each other. Rerunning
 `tools/archetypes_to_json.py` rewrites the file without it.

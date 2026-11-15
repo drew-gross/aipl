@@ -134,7 +134,7 @@ fn share_listing(args: str[]) !read_files !execute_program -> str!str {
     let DeckOptions { metagame, archetypes } = parse_deck_options("share", args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks } = load_named(metagame)?;
-    ok(share_report(metagame, decks, identifiers))
+    share_report(metagame, decks, identifiers)
 }
 
 # Write the winrate matrix for the metagame named by `args` as an SVG page, to the file `--output`

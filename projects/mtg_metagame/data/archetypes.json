@@ -2463,7 +2463,13 @@
  ],
  "Standard2026Q4Worlds": [
   {
-   "any_cards": [],
+   "any_cards": [
+    "Breeding Pool",
+    "Overgrown Tomb",
+    "Stomping Ground",
+    "Swamp",
+    "Temple Garden"
+   ],
    "cards": [],
    "maindeck_cards": [
     "Earthbender Ascension"
@@ -2578,7 +2584,16 @@
    "not_cards": []
   },
   {
-   "any_cards": [],
+   "any_cards": [
+    "Blood Crypt",
+    "Deadly Cover-Up",
+    "Floodfarm Verge",
+    "Gloomlake Verge",
+    "Godless Shrine",
+    "Shattered Sanctum",
+    "Swamp",
+    "Watery Grave"
+   ],
    "cards": [],
    "maindeck_cards": [
     "Inevitable Defeat",
@@ -2597,7 +2612,16 @@
     "Tablet of Discovery"
    ],
    "name": "Teblet Control (Jeskai)",
-   "not_cards": []
+   "not_cards": [
+    "Blood Crypt",
+    "Deadly Cover-Up",
+    "Floodfarm Verge",
+    "Gloomlake Verge",
+    "Godless Shrine",
+    "Shattered Sanctum",
+    "Swamp",
+    "Watery Grave"
+   ]
   },
   {
    "any_cards": [],

@@ -1,5 +1,5 @@
 # The metagame share report: how much of a tournament field each archetype is. A deck
-# counts toward every archetype it matches, so the shares can add up to more than all.
+# is one archetype, so the shares add up to the whole field.
 
 import {
     Left,
@@ -10,14 +10,14 @@ import {
     float_div as /,
     float_mul as *,
     is_case,
-    join,
     len,
     less_than as <,
     map,
     render,
     to_float,
+    try_map,
 } from builtins;
-import { Identifier, Meta, Other, archetypes_of, label } from "./archetypes.aipl";
+import { Identifier, Meta, Other, archetype_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
 import { Card, Deck } from "./metagame.aipl";
 import { Column, tabulate } from tabulate;
@@ -25,8 +25,8 @@ import { Column, tabulate } from tabulate;
 # The decks of each archetype, most decks first, then the decks that are none of `identifiers`
 # as one `Other` row at the end, whatever its count (and not at all when there are none).
 # The `Other` decks are counted together whatever they are called.
-pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
-    let found = decks$archetypes_of(identifiers).join();
+pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[]!str {
+    let found = decks.try_map(|deck| deck.archetype_of(identifiers))?;
     let named = found
         .distinct()
         .filter(|archetype| archetype.is_case(Meta))
@@ -35,10 +35,10 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
         })
         .ranked();
     let others = found.count_if(|each| each.is_case(Other));
-    if (0 < others) { [..named, Counted { name: "Other", count: others }] } else { named }
+    ok(if (0 < others) { [..named, Counted { name: "Other", count: others }] } else { named })
 }.test({
-    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
-    let mono = Identifier { ..landfall, name: "Mono-G", not_cards: ["Island"] };
+    let landfall = Identifier { name: "Landfall", cards: ["Forest"], not_cards: ["Island"] };
+    let mono = Identifier { name: "Mono-G", cards: ["Forest", "Island"] };
     let decks = [
         Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
         Deck { deck_id: "d", maindeck: [Card { name: "Forest" }, Card { name: "Island" }] },
@@ -48,11 +48,11 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
 
     // Each archetype once per deck, most decks first, and the decks that are none of them as
     // one `Other` row last.
-    assert(shares(decks, [landfall, mono]) == [
-        Counted { name: "Landfall", count: 3 },
-        Counted { name: "Mono-G", count: 2 },
+    assert(shares(decks, [landfall, mono]) == ok([
+        Counted { name: "Landfall", count: 2 },
+        Counted { name: "Mono-G", count: 1 },
         Counted { name: "Other", count: 1 },
-    ]);
+    ]));
 
     // `Other` stays last when it is the largest, and decks with different names are one row.
     let many = [
@@ -61,16 +61,21 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
         Deck { deck_id: "d", name: "Burn", maindeck: [Card { name: "Mountain" }] },
         Deck { deck_id: "d", name: "Control", maindeck: [Card { name: "Island" }] },
     ];
-    assert(shares(many, [landfall]) == [
+    assert(shares(many, [landfall]) == ok([
         Counted { name: "Landfall", count: 1 },
         Counted { name: "Other", count: 3 },
-    ]);
+    ]));
 
     // No decks, or no deck that is none of them: no `Other` row.
-    assert(shares([], [landfall]) == []);
-    assert(shares([Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }], [landfall]) == [
+    assert(shares([], [landfall]) == ok([]));
+    assert(shares([Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] }], [landfall]) == ok([
         Counted { name: "Landfall", count: 1 },
-    ]);
+    ]));
+
+    // A deck that is two archetypes is an error, not a count in each.
+    assert(shares(decks, [landfall, Identifier { name: "Forest", cards: ["Forest"] }]) == err(
+        "deck d () is more than one archetype: Forest, Landfall",
+    ));
 
     // `Other` is told from an archetype by its case, not by what it is called: an archetype
     // an identifier names "Other" is a `Meta` one, ranked with the rest, and the two stay two.
@@ -80,10 +85,10 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[] {
         Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
         Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
     ];
-    assert(shares(both, [named_other]) == [
+    assert(shares(both, [named_other]) == ok([
         Counted { name: "Other", count: 1 },
         Counted { name: "Other", count: 2 },
-    ]);
+    ]));
 })
 
 # `count` out of `total` as a percentage with one decimal: `33.3%`. Rounded as the
@@ -107,9 +112,9 @@ pub fn percent(count: u64, total: u64) -> str {
 })
 
 # The report on `decks`, loaded from the metagame `name`, as text of one line each.
-pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str {
+pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str!str {
     let total = decks.len();
-    let rows = shares(decks, identifiers).map(|share| {
+    let rows = shares(decks, identifiers)?.map(|share| {
         [share.name, percent(share.count, total), `{share.count}`]
     });
     let table = rows.tabulate([
@@ -117,7 +122,7 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str 
         Column { header: "Metagame %", side: Left },
         Column { header: "Count", side: Left },
     ]);
-    `Metagame Breakdown from {name}\nOrder by Metagame %\n{table}`
+    ok(`Metagame Breakdown from {name}\nOrder by Metagame %\n{table}`)
 }.test({
     let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
     let decks = [
@@ -126,7 +131,7 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str 
         Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
     ];
     // Shares are of all the decks, and the `Other` decks are one row at the end.
-    assert(share_report("a_meta", decks, [landfall]) == """
+    assert(share_report("a_meta", decks, [landfall]) == ok("""
         Metagame Breakdown from a_meta
         Order by Metagame %
         +-----------+------------+-------+
@@ -135,5 +140,5 @@ pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str 
         | Landfall  |      66.7% |     2 |
         | Other     |      33.3% |     1 |
         +-----------+------------+-------+
-    """);
+    """));
 })
