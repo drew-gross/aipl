@@ -104,6 +104,9 @@ pub fn eta_lambda(program: Program) -> LintHit[] {
     assert(messages("map, wrapping_add as +", "xs.map(|n| n + 1)")? == []);
     assert(messages("", "xs.map(|p| p.name)")? == []);
 
+    // A `$` inside the lambda maps its own receiver, so it is not a step of the outer chain.
+    assert(messages("map", "xs.map(|p| p.name$shout().len())")? == []);
+
     // A name that is no method of this file (`g` is nothing declared here), and a lambda that is not
     // a `map`'s argument.
     assert(messages("map", "ys.map(g)")? == []);
@@ -211,8 +214,14 @@ fn chain(self: Expr, parameter: str, methods: str[]) -> str[]? {
     let Call(name, arguments, method_style) = self.kind.as_case(Call)?;
     let target = arguments.first()?;
     let rest = arguments.drop_first();
-    // An operator use is a call named for its spelling.
-    if (name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(
+
+    // An operator use is a call named for its spelling. A call named `__builtin_..` is
+    // what the parser made of a `$` the author wrote inside the lambda (`p.a$f()` is a
+    // `map` of its own, over the optional or sequence `p.a`); that is a level of mapping
+    // of its own, not a step of this chain, and has no spelling here.
+    if (name.starts_with(
+        "__builtin_",
+    ) || name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(
         [parameter],
         none,
     )) || !(method_style || methods.contains(name))) {

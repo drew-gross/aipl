@@ -120,6 +120,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  move the name gathering functions from unused_imports.aipl to item.aipl and make sure all you might need are available
   so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
   in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
@@ -552,6 +553,8 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  xs.map(|p| p.name$shout().len()) should hit the "use $" lint
+  lint should happend after resolution so that we don't need to check fn.name.starts_with("__builtin_"), it should just be fn.is_builtin
   slots_read_by_field is looking at names - it should know from a flag
   destructure_binding and destructure_param should be combined, and maybe destructure_slot too? less confident on that one
   arms.all(|arm| arm.body.kind.is_case(Bool)) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early returng123)
