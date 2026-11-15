@@ -286,7 +286,7 @@ let SCRIPT = """
         for (var each of root.querySelectorAll(".row-label")) names[+each.getAttribute("data-row")] = each.getAttribute("data-name");
         var saved = /removed=([\d,]+)/.exec(location.hash);
         if (saved) removed = saved[1].split(",").map(Number).filter(function(i) { return i < names.length; });
-        var sort = /sort=(share|winrate|projected)/.exec(location.hash);
+        var sort = /sort=(share|winrate|projected|change)/.exec(location.hash);
         if (sort) sorting = sort[1];
         refresh();
     }
@@ -296,10 +296,15 @@ let SCRIPT = """
         var records = [], order = names.map(function(name, i) { return i; });
         for (var cell of root.querySelectorAll(".cell.overall")) records[+cell.getAttribute("data-row")] = record_of(cell);
         if (sorting !== "share") {
-            // Projected order puts the removed archetypes last, below those with no matches.
+            // Projected and change order put the removed archetypes last, below those with no matches.
+            // Change order is by how far the projection moves the win rate, either way.
             var key = function(i) {
-                if (sorting === "projected" && removed.indexOf(i) >= 0) return -2;
-                var record = sorting === "projected" ? project(i).now : records[i];
+                if (sorting !== "winrate" && removed.indexOf(i) >= 0) return -2;
+                var p = project(i);
+                if (sorting === "change") {
+                    return played(p.now) === 0 || played(p.was) === 0 ? -1 : Math.abs(rate_of(p.now) - rate_of(p.was));
+                }
+                var record = sorting === "projected" ? p.now : records[i];
                 return played(record) === 0 ? -1 : rate_of(record);
             };
             order.sort(function(a, b) { return key(b) - key(a) || a - b; });
@@ -434,7 +439,7 @@ let SCRIPT = """
     function delta_text(p) {
         if (played(p.now) === 0 || played(p.was) === 0) return "-";
         var d = rate_of(p.now) - rate_of(p.was);
-        return (d < 0 ? "-" : "+") + percent(Math.abs(d));
+        return (d < 0 ? "-" : "+") + percent(Math.abs(d)) + "%";
     }
     // `details` is null, one line of text, or an array of lines set under the rate.
     function set_labels(cell, rate, details) {
@@ -519,7 +524,7 @@ let SCRIPT = """
         y += 20;
         put(rate_text(p.now) + " win rate · " + record_text(p.now), 0, y, "summary");
         y += 20;
-        put("Now " + rate_text(p.was) + " · " + record_text(p.was) + (removed.length ? " · " + delta_text(p) + " points" : ""), 0, y, "summary");
+        put("Now " + rate_text(p.was) + " · " + record_text(p.was) + (removed.length ? " · " + delta_text(p) : ""), 0, y, "summary");
         if (!removed.length) {
             put_wrapped("Click an archetype's name to remove it from the metagame.", y + 20, "head");
             return;
@@ -746,7 +751,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
 <text id="title" x="{middle}" y="26">Winrate Matrix from {name.xml_escape()}</text>
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
-<text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan> · <tspan class="sort" data-sort="projected">projected</tspan></text>
+<text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan> · <tspan class="sort" data-sort="projected">projected</tspan> · <tspan class="sort" data-sort="change">change</tspan></text>
 {parts.join(sep="\n")}
 <g id="panel" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}" data-brackets="{bracket_labels}"></g>
 </svg>
@@ -816,6 +821,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     // The sort options are there to click.
     assert(page.contains(`data-sort="winrate">win rate</tspan>`));
     assert(page.contains(`data-sort="projected">projected</tspan>`));
+    assert(page.contains(`data-sort="change">change</tspan>`));
     // One cell for each pairing, and a heading for each archetype on both axes.
     assert(page.split(`class="cell"`).len() == 5);
     // The overall column: a cell for each archetype, and its own heading.
