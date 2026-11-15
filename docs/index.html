@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">221 files, 1919 items.</p>
+      <p class="summary">223 files, 1922 items.</p>
 
       <ul class="files">
 
@@ -3122,6 +3122,26 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-set_spread_insert.html">crates/aipl-codegen/src/lint/set_spread_insert.aipl</a>
+
+          <p class="file-summary">The <code>set_spread_insert</code> lint: <code>set seen = #{..seen, x};</code> — a set rebuilt from itself only to add to it. <code>set seen.insert(x);</code> is the addition spelled as one: it names the element added, and the set's other contents never come up.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-set_spread_insert.html#private">1 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-set_spread_insert.html#item-set_spread_insert"><code>set_spread_insert</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-set_spread_push.html">crates/aipl-codegen/src/lint/set_spread_push.aipl</a>
 
           <p class="file-summary">The <code>set_spread_push</code> lint: <code>set out = [..out, x];</code> — a binding rebuilt from itself only to append to it. <code>set out.push(x);</code> is the append spelled as one: it names the element added, and the array's other contents never come up.</p>
@@ -5010,6 +5030,24 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_inline_str.html#item-inline_str"><code>inline_str</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_insert.html">crates/aipl-mono/src/builtin_insert.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>insert</code> builtin. The loader names this function by the canonical name <code>__builtin_insert</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>set seen.insert(x);</code> resolves through the ordinary generic machinery — the in-file name <code>insert</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_insert.html#item-insert"><code>insert</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

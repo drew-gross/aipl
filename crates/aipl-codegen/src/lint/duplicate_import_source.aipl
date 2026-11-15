@@ -6,7 +6,7 @@
 import { collect_arms, equal as ==, push } from builtins;
 import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
 import { LintHit, hit, lint_hits } from "./lint_hit.aipl";
-import { has } from sets;
+import { has, insert } from sets;
 
 # A hit for each import of a source an earlier import already took names from,
 # in the order the imports are written.
@@ -15,7 +15,7 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     mut hits: LintHit[] = [];
     for (let Import(ImportDecl { source, source_span }) : items.collect_arms(Import)) {
         if (seen.has(source)) { set hits.push(hit(source.message(), source_span)); };
-        set seen = #{..seen, source};
+        set seen.insert(source);
     }
     hits
 }.test({

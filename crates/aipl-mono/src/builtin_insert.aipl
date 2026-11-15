@@ -1,0 +1,48 @@
+# The AIPL implementation of the `insert` builtin. The loader names this function by the
+# canonical name `__builtin_insert` (see `aipl_syntax::aipl_builtins`), so a user's
+# `set seen.insert(x);` resolves through the ordinary generic machinery — the in-file name
+# `insert` is only for this file's own tests, which read exactly like user code.
+
+import { equal as == } from builtins;
+import { has } from sets;
+
+# Add `element` to the set `self` names. A set that already holds it is left as it was.
+#
+# It is a `mut self` method, so it is written as a statement — `set seen.insert(source);` —
+# and writes the grown set back into the place it was given, a name or a field path off one.
+# It is `set seen = #{..seen, source};` said once: the element added is the only thing the line
+# names, and the set's other contents never come up. A set literal that spreads in another set
+# (`#{..seen, ..more}`) adds a whole set at a time, which this does not; `union` is that.
+#
+# An ordered set (`#>{T}`, `#<{T}`) is refused: the grown set is written back as an
+# unordered one, and the checker reports it does not fit the ordered binding.
+pub fn insert<T: any>(mut self: #{T}, element: T) {
+    // `set_spread_insert` flags this line, correctly: it is the longhand the lint exists to
+    // replace. It is also the *implementation* of the shorthand, so taking the advice would
+    // have `insert` call itself.
+    set self = #{..self, element}; #[allow]
+}.test({
+    mut seen = #{1, 2};
+    set seen.insert(3);
+    assert(seen == #{1, 2, 3}); // a new element
+
+    set seen.insert(2);
+    assert(seen == #{1, 2, 3}); // already held: unchanged
+
+    // Into an empty set, and of any element type a set can hold.
+    mut empty: #{i64} = #{};
+    set empty.insert(7);
+    assert(empty == #{7});
+    mut words = #{"a"};
+    set words.insert("b");
+    assert(words == #{"a", "b"});
+    mut marks = #{'x'};
+    set marks.insert('y');
+    assert(marks == #{'x', 'y'});
+
+    // Another binding of the same set does not see the insert.
+    let before = seen;
+    set seen.insert(9);
+    assert(before == #{1, 2, 3});
+    assert(seen.has(9));
+})

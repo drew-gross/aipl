@@ -3,6 +3,8 @@ lints:
   `++`/`+=` flavor matching (operator_pairs.aipl) pairs by the `wrapping_`/`saturating_` name prefix; the old Rust lint used the canonical-callee table. Differs only for an absurd alias like `wrapping_add as ++`; use the table if it ever matters
   char_set_literal: the unspellable-character branch is untested
   destructure advises (for a binding without an annotation, and a slot) "(<Type> { n }, rest)" with a placeholder; name the real type, and say to import it when the file lacks the import (as the builtin lints do), so `let r = f()?;` on an ExecResult tells you which import the destructure needs
+  sets: `insert` (a `mut self` AIPL builtin over `#{T}`) is refused for an ordered `#>{T}`/`#<{T}`: the mutating call writes back `#{T}` ("expected #>{u64}, got #{u64}"); the pinner's order inheritance does not apply to a mutating method's receiver
+  lint_hit.aipl's set_operations() repeats which builtins BUILTINS puts in the `sets` library; the AIPL lints cannot ask Rust, so the two lists agree by hand
 
 type checker:
   Expr::ty is still Option: the passes run on ast::Expr with optional stamps, not on typed::TExpr (typed.rs, erase/concretize are only exercised by tests). Porting every pre-/post-mono pass to TExpr would make a lost type unrepresentable

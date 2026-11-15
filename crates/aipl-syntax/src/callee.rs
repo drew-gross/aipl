@@ -280,6 +280,8 @@ pub enum Callee {
     Difference,
     /// `intersection(self: #{T}, other: #{T}) -> #{T}` — the elements both sets hold.
     Intersection,
+    /// `insert(mut self: #{T}, element: T)` — add `element` to the set `self` names.
+    Insert,
     Get,
     ContainsKey,
     RemoveKey,
@@ -637,6 +639,7 @@ impl Callee {
             Callee::SetMap => "__builtin_set_map",
             Callee::Difference => "__builtin_difference",
             Callee::Intersection => "__builtin_intersection",
+            Callee::Insert => "__builtin_insert",
             Callee::Get => "__builtin_get",
             Callee::ContainsKey => "__builtin_contains_key",
             Callee::RemoveKey => "__builtin_remove_key",

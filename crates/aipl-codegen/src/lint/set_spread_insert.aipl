@@ -1,0 +1,186 @@
+# The `set_spread_insert` lint: `set seen = #{..seen, x};` — a set rebuilt from itself only to add
+# to it. `set seen.insert(x);` is the addition spelled as one: it names the element added, and the
+# set's other contents never come up.
+#
+# It is the set sibling of `set_spread_push`, and the argument is the same. The rebuild spelling
+# says "build the larger set, then store it", which costs a fresh set of the combined size on every
+# addition; `insert` writes into `seen`'s own storage when nothing else holds it, and copies when
+# something does, so the two spellings agree on what any other binding sees. A field path works the
+# same way as a bare name (`set self.seen = #{..self.seen, x}` is `set self.seen.insert(x)`), which
+# is the whole set of targets: `insert` writes the grown set back into the place it was given, and
+# only a name or a field path off one is a place.
+#
+# Three shapes are left alone. The spread must be the **first** element and must be the target
+# itself — `#{x, ..seen}` is the same set but starts from `x`, and `#{..other, x}` starts from a
+# different set, and neither is something `insert` can spell. A spread in the tail adds a whole set
+# rather than one element (`#{..seen, ..more}`), which is `union`, so it is not advised here. And
+# with more than one added element the rewrite is one call per element, so it is offered only when
+# no element reads the target: `set seen = #{..seen, seen.len(), seen.len()};` adds the *same*
+# length twice, where the two inserts would see the set grow between them. A single element is
+# always safe — it is computed before the addition either way.
+#
+# The shape is all language syntax — a set literal with a spread in it needs no import — so the
+# lint fires whether or not `insert` is imported. The name is only for the advice, which says to
+# import it when it is missing.
+#
+# The hit points at the spread, which is a single line however the literal is broken.
+
+import {
+    any,
+    as_case,
+    collect_ok,
+    drop_first,
+    equal as ==,
+    first,
+    greater_than as >,
+    is_case,
+    is_empty,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    push,
+    to_str,
+} from builtins;
+import { Assign, Expr, SetLit, Spread, descendants } from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { Function } from "../item.aipl";
+import { Unordered } from "../ty.aipl";
+import { mentions_any } from "./field_uses.aipl";
+import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { is_same_place, root_name } from "./places.aipl";
+import { insert } from sets;
+
+# A hit for each `set` in the program that rebuilds a set from itself to add to it.
+pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
+    self.body.descendants()$rebuild().collect_ok()
+}.test({
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_function_unfilled_messages(
+            `import \{ {imports} } from sets; fn f(xs: #\{i64}, x: i64) -> #\{i64} \{ {body} }`,
+            set_spread_insert,
+        )
+    }
+    assert(messages("insert", "mut out = xs; set out = #{..out, x}; out")? == [
+        `this "set" rebuilds "out" from itself only to add to it — add in place: "set out.insert(x);"`,
+    ]);
+
+    // Several elements are one call each, in the name the file imports.
+    assert(messages("insert as add", "mut out = xs; set out = #{..out, x, 1}; out")? == [
+        `this "set" rebuilds "out" from itself only to add to it — add each in place: "set out.add(x); set out.add(1);"`,
+    ]);
+
+    // What the file lacks is named once.
+    assert(messages("has", "mut out = xs; set out = #{..out, x, 1}; out")? == [
+        """this "set" rebuilds "out" from itself only to add to it — add each in place: "set out.insert(x); set out.insert(1);", importing `insert` from sets""",
+    ]);
+    assert(messages("has", "mut out = xs; set out = #{..out, g(x)}; out")? == [
+        """this "set" rebuilds "out" from itself only to add to it — add in place: "set out.insert(<element>);", importing `insert` from sets""",
+    ]);
+
+    // The target may be a field path.
+    assert(messages("insert", "mut s = P { a: xs }; set s.a = #{..s.a, x}; s.a")? == [
+        `this "set" rebuilds "s.a" from itself only to add to it — add in place: "set s.a.insert(x);"`,
+    ]);
+
+    // Not the shape: the spread is not first, it is of another set, nothing is added, a whole set
+    // is added, or several elements read the target.
+    assert(messages("insert", "mut out = xs; set out = #{x, ..out}; out")? == []);
+    assert(messages("insert", "mut out = xs; set out = #{..xs, x}; out")? == []);
+    assert(messages("insert", "mut out = xs; set out = #{..out}; out")? == []);
+    assert(messages("insert", "mut out = xs; set out = #>{..out, x}; out")? == []);
+    assert(messages("insert", "mut out = xs; set out = #{..out, ..xs}; out")? == []);
+    assert(messages("insert", "mut out = xs; set out = #{..out, ..xs, x}; out")? == []);
+    assert(
+        messages("insert", "mut out = xs; set out = #{..out, out.len(), out.len()}; out")? == [],
+    );
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_function_unfilled_messages(
+        """
+            fn grow(mut seen: #{i64}) {
+                set seen = #{..seen, 1};
+                set seen = #{..seen, 2, 3};
+            }
+        """,
+        set_spread_insert,
+    )? == [
+        """this "set" rebuilds "seen" from itself only to add to it — add in place: "set seen.insert(1);", importing `insert` from sets""",
+        """this "set" rebuilds "seen" from itself only to add to it — add each in place: "set seen.insert(2); set seen.insert(3);", importing `insert` from sets""",
+    ]);
+    assert(lint_function_unfilled_messages(
+        """
+            fn stash(mut self: Bag, x: i64) {
+                set self.seen = #{..self.seen, x};
+            }
+        """,
+        set_spread_insert,
+    )? == [
+        """this "set" rebuilds "self.seen" from itself only to add to it — add in place: "set self.seen.insert(x);", importing `insert` from sets""",
+    ]);
+
+    // Not flagged: a rebuild that is not an addition of elements to the same set.
+    assert(
+        lint_function_unfilled_messages(
+            """
+                fn other(mut out: #{u64}, xs: #{u64}) {
+                    set out = #{0, ..out};
+                    set out = #{..xs, 9};
+                    set out = #{..out, ..xs};
+                    set out = #{..out, out.len(), out.len()};
+                }
+            """,
+            set_spread_insert,
+        )? == [],
+    );
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn rebuilt(mut self: #{i64}) {
+        set self = #{..self, 3}; #[allow]
+    }
+
+    // The rewrite the lint asks for, so the two spellings are checked side by side and
+    // proven to agree.
+    fn inserted(mut self: #{i64}) {
+        set self.insert(3);
+    }
+    mut a = #{1, 2};
+    mut b = #{1, 2};
+    set a.rebuilt();
+    set b.inserted();
+    assert(to_str(a == b) == "true");
+    assert(a == #{1, 2, 3});
+})
+
+# The hit for `self`, when it is a `set` of a place to a set literal that starts by spreading it.
+fn rebuild(self: Expr) -> UnfilledHit? {
+    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    let SetLit(elements, order) = value.kind.as_case(SetLit)?;
+    // `insert` writes back an unordered set, so an ordered literal is left as it is.
+    if (!order.is_case(Unordered)) { return none; };
+    let root = target.root_name()?;
+    let spread = elements.first()?;
+    let Spread(base) = spread.kind.as_case(Spread)?;
+    let added = elements.drop_first();
+    if (!base.is_same_place(target) || added.is_empty()) { return none; };
+    // A spread in the tail adds a whole set, which `insert` does not.
+    if (added.any(|element| element.kind.is_case(Spread))) { return none; };
+    if (added.len() > 1 && added.any(|element| element.mentions_any([root], none))) {
+        return none;
+    };
+    let place = target.source;
+
+    // The advice, a stretch of text at a time, each followed by the builtin it calls.
+    mut named: Named[] = [];
+    mut text = `this "set" rebuilds "{place}" from itself only to add to it — {if (added.len() == 1) {
+        "add in place"
+    } else {
+        "add each in place"
+    }}: "`;
+    for (let i, element : added) {
+        let separator = if (i == 0) { "" } else { " " };
+        set named.push(Named { text: `{text}{separator}set {place}.`, builtin: "insert" });
+        set text = `({element.quote("<element>")});`;
+    }
+    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
+}

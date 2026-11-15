@@ -41,6 +41,7 @@ import { return_loop_any_all } from "./return_loop_any_all.aipl";
 import { return_loop_find_if } from "./return_loop_find_if.aipl";
 import { return_loop_find_index } from "./return_loop_find_index.aipl";
 import { set_spread_field } from "./set_spread_field.aipl";
+import { set_spread_insert } from "./set_spread_insert.aipl";
 import { set_spread_push } from "./set_spread_push.aipl";
 import { slice_from_zero } from "./slice_from_zero.aipl";
 import { slice_to_len } from "./slice_to_len.aipl";
@@ -98,6 +99,7 @@ pub fn lint(program: Program) -> LintHit[] {
         ..program.on_functions(arm_block_value),
         ..program.on_functions(field_init_shorthand),
         ..program.on_functions(set_spread_field),
+        ..program.on_functions_filled(set_spread_insert),
         ..program.on_functions_filled(set_spread_push),
         ..step_by_one(program),
         ..compound_assign(program),

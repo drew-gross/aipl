@@ -1992,6 +1992,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/char_set_literal.aipl",
     "./lint/field_init_shorthand.aipl",
     "./lint/set_spread_field.aipl",
+    "./lint/set_spread_insert.aipl",
     "./lint/set_spread_push.aipl",
     "./lint/step_by_one.aipl",
     "./lint/compound_assign.aipl",

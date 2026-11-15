@@ -449,6 +449,7 @@ const BUILTINS: &[Builtin] = &[
         None,
         &[],
     ),
+    Builtin::aipl_in_library(Callee::Insert, "builtin_insert.aipl", SETS_LIBRARY, None, &[]),
     Builtin::declared(Callee::Get),
     Builtin::declared(Callee::ContainsKey),
     Builtin::declared(Callee::RemoveKey),

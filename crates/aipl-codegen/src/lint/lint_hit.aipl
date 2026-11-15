@@ -414,7 +414,17 @@ pub fn library_of(self: str) -> str {
 
 # The builtins of the `sets` library.
 fn set_operations() -> str[] {
-    ["has", "union", "to_set", "to_array", "set_map", "union_all", "difference", "intersection"]
+    [
+        "has",
+        "union",
+        "to_set",
+        "to_array",
+        "set_map",
+        "union_all",
+        "difference",
+        "intersection",
+        "insert",
+    ]
 }
 
 # `self` as backquoted names, read as a sentence: `a`, `a` and `b`, or `a`, `b` and `c`.
