@@ -108,4 +108,5 @@ and cards it must hold in the main deck).
 `archetypes.json` holds one config, `Standard2026Q4Worlds`. It is not from the original: it is
 `Standard2026Q4RC` with the archetypes of the Worlds field added, the two `Landfall` lists merged
 into one, and every archetype of two decks or fewer left out (the merged `Tablet Control` among
-them), so those decks are `Other`. Rerunning `tools/archetypes_to_json.py` rewrites the file without it.
+them), so those decks are `Other`, except `Tablet Control`, which is any deck with Jeskai
+Revelation and Tablet of Discovery. Rerunning `tools/archetypes_to_json.py` rewrites the file without it.

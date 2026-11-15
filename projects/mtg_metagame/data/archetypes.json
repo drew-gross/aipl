@@ -130,6 +130,16 @@
    ],
    "name": "Rakdos Phoenix",
    "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [
+    "Jeskai Revelation",
+    "Tablet of Discovery"
+   ],
+   "maindeck_cards": [],
+   "name": "Tablet Control",
+   "not_cards": []
   }
  ]
 }
