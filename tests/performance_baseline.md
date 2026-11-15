@@ -109,7 +109,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/step_by_one | 40662 | 5001127 | 738002 | 31548467 | 6431168 |
 | crates/aipl-codegen/src/lint/union_loop_union_all | 127110 | 12917286 | 755860 | 134288929 | 6517120 |
 | crates/aipl-codegen/src/lint/unused_binding | 40244 | 6864144 | 703320 | 19908502 | 6338824 |
-| crates/aipl-codegen/src/lint/unused_imports | 26716 | 3449167 | 738408 | 15943571 | 6401188 |
+| crates/aipl-codegen/src/lint/unused_imports | 26716 | 3449167 | 738408 | 15943603 | 6401312 |
 | crates/aipl-codegen/src/lint/value_or_compare | 32553 | 4138063 | 765615 | 22795424 | 6411556 |
 | crates/aipl-codegen/src/lint/with_value_or_self | 46185 | 5480328 | 806019 | 38604038 | 6419888 |
 | crates/aipl-codegen/src/lint/zip_with_pair_zip | 39751 | 4598795 | 737432 | 31398107 | 6401280 |

@@ -66,6 +66,7 @@ import {
 } from "../expr.aipl";
 import {
     Const,
+    FieldDecl,
     Fn,
     Import,
     ImportDecl,
@@ -118,7 +119,7 @@ pub fn unused_imports(Program { items }) -> LintHit[] {
                 ..f.body.names_in(),
                 ..f.test_body$names_in().value_or(#{}),
             },
-            Struct(s) => s.fields.map(|field| field_names(field.ty, field.default)).union_all(),
+            Struct(s) => s.fields$names().union_all(),
             Variant(v) => v.cases$payload
                 $map(|slot| field_names(slot.ty, slot.default))
                 $union_all()
@@ -215,6 +216,9 @@ fn unused_in(self: Import(decl), used: #{str}) -> LintHit[] {
 fn unused_message(name: str) -> str {
     `unused import "{name}": nothing in this file references it; drop it from the import list`
 }
+
+# The names a field's declared type and default mention.
+fn names(self: FieldDecl) -> #{str} { field_names(self.ty, self.default) }
 
 # The names a declared type and an optional default expression mention.
 fn field_names(ty: Ty, default: Expr?) -> #{str} {
