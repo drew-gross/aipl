@@ -5,20 +5,20 @@ A Magic: The Gathering metagame analyzer, ported from the Python
 one performs.
 
 ```sh
-$ ./aipl run -- cards standard_26Q2_rc_japan
-1441 Forest
-1441 Island
-916 Steam Vents
+$ ./aipl run -- cards metagame_worlds_32
+363 Forest
+207 Starting Town
+200 Plains
 …
 
-$ ./aipl run -- share standard_26Q2_rc_japan --archetypes Standard2026Q2RC
-Metagame Breakdown from standard_26Q2_rc_japan
+$ ./aipl run -- share metagame_worlds_32
+Metagame Breakdown from metagame_worlds_32
 Order by Metagame %
-+-------------------------+------------+-------+
-| Deck Name               | Metagame % | Count |
-+=========================+============+=======+
-| Prowess                 |      26.1% |    92 |
-| Landfall (Selesnya)     |      13.9% |    49 |
++-----------------------+------------+-------+
+| Deck Name             | Metagame % | Count |
++=======================+============+=======+
+| Landfall              |      21.1% |    27 |
+| Boros Pixie           |      18.8% |    24 |
 …
 ```
 
@@ -27,7 +27,7 @@ page (default `winrate_<metagame>.svg`) and prints where it went: a heat map wit
 (most decks first, `Other` last) and a column for each, coloured by the share of the row's
 matches it won against the column's, green for winning and red for losing. Open it in a browser:
 hovering a cell lights up its row and column and fills a panel at the top right: the pairing's record, win rate and share of all matches, and a table of how often it met in each round (see below). Click a cell to lock the panel on it while the mouse moves elsewhere; the Unlock button, a second click on the cell, or Escape releases it. A match counts toward
-every pairing of one deck's archetypes and the other's, from both sides. The first column is each archetype's overall win rate against every archetype, mirror matches included (one win and one loss each, which is what they do to an expected win rate at an event). A draw counts as half a win, and `-`
+the pairing of the two decks' archetypes, from both sides. The first column is each archetype's overall win rate against every archetype, mirror matches included (one win and one loss each, which is what they do to an expected win rate at an event). A draw counts as half a win, and `-`
 is a pairing with no match or an archetype against itself.
 
 The panel counts rounds back from the end of each tournament, so a nine-round event and a fifteen-round one line up at the top
@@ -92,13 +92,12 @@ ordering by anything but share, and the plot.
 
 ## Data
 
-`data/` holds the Python tool's metagame pickles as gzipped JSON, one file per
-tournament set (`metagame_<tournament ids>.json.gz`), converted by `tools/pkl_to_json.py`. Each
+`data/` holds the Worlds field, `metagame_worlds_32.json.gz`, the Python tool's metagame pickle
+as gzipped JSON, converted by `tools/pkl_to_json.py`. Earlier metagames are not kept. Each
 file has `tournament_ids`, `ranked_decklist_ids` and `decks`; a deck has its name,
 pilot, `maindeck`/`sideboard` (cards with name, count, type) and `match_history`
-(result, game record, round). `data/index.json` (plain, not gzipped) maps the descriptive names the
-original used (`standard_26Q2_rc_japan`) to the file holding them. Three of those
-names pointed at pickles that no longer exist and are left out.
+(result, game record, round). `data/index.json` (plain, not gzipped) maps descriptive names to the file holding
+them, and is empty.
 
 A deck is one archetype: a deck that matches identifiers of more than one name is an error naming
 them. Archetypes are not in the data: the original derives them from a canonicalization config, one
@@ -106,7 +105,7 @@ per format and season, which `tools/archetypes_to_json.py` dumps into `data/arch
 (a list of identifiers per config: cards a deck must hold, must not hold, or must hold one of,
 and cards it must hold in the main deck).
 
-`Standard2026Q4Worlds` is not from the original: it is `Standard2026Q4RC` plus the six archetypes
-the Worlds field (`metagame_worlds_32`) added, each identified by two main-deck cards, with `Landfall`
-and the two `Teblet Control` lists made exclusive of each other. Rerunning
-`tools/archetypes_to_json.py` rewrites the file without it.
+`archetypes.json` holds one config, `Standard2026Q4Worlds`. It is not from the original: it is
+`Standard2026Q4RC` with the archetypes of the Worlds field added, the two `Landfall` lists merged
+into one, and every archetype of two decks or fewer left out (the merged `Tablet Control` among
+them), so those decks are `Other`. Rerunning `tools/archetypes_to_json.py` rewrites the file without it.

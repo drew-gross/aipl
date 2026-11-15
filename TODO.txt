@@ -24,7 +24,8 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
-    do something better to deal with decks that match multiple deck identifiers
+    sub-archetypes
+    show archetype definition in winrate svg
     make a better templating language (in aipl maybe?) for making the svgs
     winrate:
       use finals/semis/quarters in by-round panel
