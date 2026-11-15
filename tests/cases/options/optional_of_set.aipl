@@ -3,7 +3,8 @@
 # is one heap pointer, so the optional stores it inline as it does an array, and the
 # leak gate holds the retains and drops to balance.
 
-import { equal as ==, len, print, to_array, union, value_or } from builtins;
+import { equal as ==, len, print, value_or } from builtins;
+import { to_array, union } from sets;
 
 struct Holder { name: str, tags: #{str}? }
 

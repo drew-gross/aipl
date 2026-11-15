@@ -18,13 +18,11 @@ import {
     map,
     print,
     saturating_remainder as %,
-    set_map,
-    to_array,
-    to_set,
     to_str,
     wrapping_mul as *,
     wrapping_sub as -,
 } from builtins;
+import { set_map, to_array, to_set } from sets;
 
 test({
     mut out = "";

@@ -72,6 +72,9 @@ pub struct Builtin {
 /// own.
 pub const MAIN_LIBRARY: &str = "builtins";
 
+/// The library of the set operations: `import { has, union } from sets;`.
+pub const SETS_LIBRARY: &str = "sets";
+
 /// The directory the AIPL sources live in, `aipl-mono/src/`: resolved at
 /// compile time but *read at run time*. `include_str!` would make every edit to
 /// one of these files a source change to this crate, rebuilding it, everything
@@ -112,6 +115,18 @@ impl Builtin {
             definition: Definition::Declared,
             exports: &[],
             library: MAIN_LIBRARY,
+            public_name: None,
+        }
+    }
+
+    /// Declared like [`Builtin::declared`], and importable from `library` rather than from the
+    /// main one.
+    const fn declared_in_library(callee: Callee, library: &'static str) -> Builtin {
+        Builtin {
+            callee,
+            definition: Definition::Declared,
+            exports: &[],
+            library,
             public_name: None,
         }
     }
@@ -391,9 +406,9 @@ const BUILTINS: &[Builtin] = &[
     Builtin::aipl(Callee::ValueOr, "builtin_value_or.aipl"),
     Builtin::aipl(Callee::ValueOrErr, "builtin_value_or_err.aipl"),
     Builtin::declared(Callee::Contains(SeqShape::Seq)),
-    Builtin::declared(Callee::Has),
-    Builtin::declared(Callee::ToArray),
-    Builtin::declared(Callee::ToSet),
+    Builtin::declared_in_library(Callee::Has, SETS_LIBRARY),
+    Builtin::declared_in_library(Callee::ToArray, SETS_LIBRARY),
+    Builtin::declared_in_library(Callee::ToSet, SETS_LIBRARY),
     Builtin::declared(Callee::ReadFileToString),
     Builtin::declared(Callee::WriteStringToFile),
     Builtin::declared(Callee::ListFiles),
@@ -423,9 +438,17 @@ const BUILTINS: &[Builtin] = &[
     Builtin::declared(Callee::NowNanos),
     Builtin::declared(Callee::MonotonicNow),
     Builtin::declared(Callee::ExecuteProgram),
-    Builtin::declared(Callee::Union),
-    Builtin::aipl(Callee::UnionAll, "builtin_union_all.aipl"),
-    Builtin::aipl(Callee::SetMap, "builtin_set_map.aipl"),
+    Builtin::declared_in_library(Callee::Union, SETS_LIBRARY),
+    Builtin::aipl_in_library(Callee::UnionAll, "builtin_union_all.aipl", SETS_LIBRARY, None, &[]),
+    Builtin::aipl_in_library(Callee::SetMap, "builtin_set_map.aipl", SETS_LIBRARY, None, &[]),
+    Builtin::aipl_in_library(Callee::Difference, "builtin_difference.aipl", SETS_LIBRARY, None, &[]),
+    Builtin::aipl_in_library(
+        Callee::Intersection,
+        "builtin_intersection.aipl",
+        SETS_LIBRARY,
+        None,
+        &[],
+    ),
     Builtin::declared(Callee::Get),
     Builtin::declared(Callee::ContainsKey),
     Builtin::declared(Callee::RemoveKey),

@@ -3,9 +3,10 @@
 # one path, in a single `import { .. }`; the better spelling merges the names
 # into the first.
 
-import { collect_arms, equal as ==, has, push } from builtins;
+import { collect_arms, equal as ==, push } from builtins;
 import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
 import { LintHit, hit, lint_hits } from "./lint_hit.aipl";
+import { has } from sets;
 
 # A hit for each import of a source an earlier import already took names from,
 # in the order the imports are written.

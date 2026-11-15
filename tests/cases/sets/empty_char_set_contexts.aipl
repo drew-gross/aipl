@@ -11,7 +11,8 @@
 # it — a position that only type-checks the literal and discards the resolved
 # type leaves codegen guessing. This covers each one.
 
-import { equal as ==, len, print, to_set, union, value_or } from builtins;
+import { equal as ==, len, print, value_or } from builtins;
+import { to_set, union } from sets;
 
 struct Holder { cs: #{char} }
 

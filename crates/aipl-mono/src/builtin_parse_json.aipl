@@ -35,7 +35,6 @@ import {
     map,
     map_err,
     measure,
-    to_set,
     value_or_err,
     wrapping_mul as *,
     wrapping_sub as -,
@@ -77,6 +76,7 @@ import {
 } from "../../aipl-codegen/src/lexer.aipl";
 import { parse as lower_with, parse_cst } from "../../aipl-codegen/src/parse.aipl";
 import { unescape } from "../../aipl-codegen/src/unescape.aipl";
+import { to_set } from sets;
 
 # The token kinds: three terminal classes that carry meaning, and one bare kind
 # for the punctuation the grammar matches by `Lit`.

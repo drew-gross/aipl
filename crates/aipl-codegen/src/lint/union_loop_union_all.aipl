@@ -61,10 +61,7 @@ import {
     not_equal as !=,
     push,
     sort,
-    to_set,
     to_str,
-    union,
-    union_all,
     value_or,
     wrapping_add as +,
 } from builtins;
@@ -81,6 +78,7 @@ import {
     on_functions_filled,
 } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
+import { to_set, union, union_all } from sets;
 
 # A hit for each set the program seeds empty and grows with a loop of `union`s.
 pub fn union_loop_union_all(program: Program) -> LintHit[] {
@@ -129,7 +127,7 @@ pub fn union_loop_union_all(program: Program) -> LintHit[] {
         "union",
         "mut out = #{}; for (let s : xs) { set out = out.union(g(s)); } out",
     )? == [
-        ```"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins```,
+        ```"out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out = xs.map(|s| ..).union_all();" and drop the loop, importing `map` from builtins and `union_all` from sets```,
     ]);
     assert(messages(
         "union, union_all as all_of",

@@ -23,11 +23,11 @@ import {
     push,
     reverse,
     sort,
-    to_array,
     to_str,
     value_or,
     wrapping_add as +,
 } from builtins;
+import { to_array } from sets;
 
 fn bytes(n: u64) -> u8[] {
     // The pushes are what is measured.

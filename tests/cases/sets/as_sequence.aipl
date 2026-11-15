@@ -14,11 +14,9 @@ import {
     greater_than as >,
     join,
     print,
-    set_map,
-    to_set,
     to_str,
-    union_all,
 } from builtins;
+import { set_map, to_set, union_all } from sets;
 
 test({
     mut out = "";

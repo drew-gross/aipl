@@ -28,7 +28,7 @@
 # validates the *result* against every token of every case file and example —
 # which is the real check on anything changed here.
 
-import { contains, to_set, value_or } from builtins;
+import { contains, value_or } from builtins;
 import {
     Caps,
     Entry,
@@ -49,6 +49,7 @@ import {
 } from "./highlight.aipl";
 import { IDENT_CONT, IDENT_START, S_PUNCT, S_STRING, aipl_rules } from "./lex_aipl.aipl";
 import { CharRun } from "./lexer.aipl";
+import { to_set } from sets;
 
 # One template literal as a region: the delimiter opens and closes it, and
 # inside are its escapes and the `{ .. }` interpolation that includes the whole

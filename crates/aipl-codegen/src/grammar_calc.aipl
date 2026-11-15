@@ -41,7 +41,6 @@ import {
     map_ok,
     saturating_divide as /,
     saturating_remainder as %,
-    to_set,
     to_str,
     value_or_err,
     wrapping_add as +,
@@ -73,6 +72,7 @@ import {
 } from "./grammar.aipl";
 import { Bare, CharRun, Int, LexResult, OneChar, TokenRule, lex } from "./lexer.aipl";
 import { parse, parse_cst } from "./parse.aipl";
+import { to_set } from sets;
 
 # Two token kinds: digit runs, and every one-character operator or bracket. The
 # grammar tells the operators apart by `Literal`, so their kind never has to.

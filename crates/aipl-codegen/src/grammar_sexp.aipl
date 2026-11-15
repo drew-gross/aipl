@@ -27,7 +27,7 @@
 # production, and a `Grammar` tying them together. Nothing else — the parse
 # itself is `parse.aipl`'s, unmodified.
 
-import { equal as ==, first, map_err, map_ok, to_set } from builtins;
+import { equal as ==, first, map_err, map_ok } from builtins;
 import { Cst, Parts, show, text, token_text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import { render_cst } from "./format.aipl";
@@ -50,6 +50,7 @@ import {
 import { Bare, CharRun, LexResult, Of, OneChar, ToEol, TokenRule, lex } from "./lexer.aipl";
 import { parse, parse_cst } from "./parse.aipl";
 import { Atom as AtomNode, List, Sexp, render_sexp } from "./sexp.aipl";
+import { to_set } from sets;
 
 # The token kinds. One terminal class carrying its text, and one bare kind for
 # the parentheses — the grammar matches those by `Lit`, so their kind never

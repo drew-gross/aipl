@@ -8,7 +8,8 @@
 # element out per element in, while a set result collapses two elements that map
 # to the same answer. `set_map` is the name under which that is expected.
 
-import { len, print, to_set, to_str } from builtins;
+import { len, print, to_str } from builtins;
+import { to_set } from sets;
 
 fn subject() !prints {
     let s: #{i64} = [3, 1, 2].to_set();
@@ -16,7 +17,7 @@ fn subject() !prints {
 }
 --- check --compile ---
 error: map has no set form, so it does not take #{i64} — use "set_map", which maps a set to a set. It is a separate name because the result can be *smaller* than the receiver, when two elements map to the same answer; `map` promises one element out per element in, and over a set it could not keep that promise
-  --> ./tests/cases/sets/err_map_on_set.aipl:15:11
+  --> ./tests/cases/sets/err_map_on_set.aipl:16:11
    |
-15 |     print(s$to_str().len().to_str());
+16 |     print(s$to_str().len().to_str());
    |           ^

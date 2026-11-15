@@ -2,7 +2,8 @@
 # elements, in the order written — `(a, b).to_array()` is `[a, b]`. It is what lets
 # a list of pairs be flattened: `pairs$to_array().join()`.
 
-import { equal as ==, join, len, print, to_array } from builtins;
+import { equal as ==, join, len, print } from builtins;
+import { to_array } from sets;
 
 struct Point { x: i64, y: i64 }
 

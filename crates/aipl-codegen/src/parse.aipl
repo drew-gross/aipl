@@ -74,10 +74,7 @@ import {
     repeat,
     sort,
     sort_by,
-    to_set,
     try_map,
-    union,
-    union_all,
     value_or,
     value_or_err,
     wrapping_add as +,
@@ -147,6 +144,7 @@ import {
     lex,
 } from "./lexer.aipl";
 import { line_at } from "./line_at.aipl";
+import { to_set, union, union_all } from sets;
 
 # The furthest failure seen so far: the token position nothing could be matched
 # at, and the deduped labels of everything that *was* expected there.

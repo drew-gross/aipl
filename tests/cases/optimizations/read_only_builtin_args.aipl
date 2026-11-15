@@ -8,7 +8,8 @@
 # its pushes and `merge`'s second parameter (`mut ys = b`) go in place —
 # `aipl_array_push_mut`, not the copying `aipl_array_push`, in the counts.
 
-import { equal as ==, extend, push, union } from builtins;
+import { equal as ==, extend, push } from builtins;
+import { union } from sets;
 
 fn merge(a: i64[], b: i64[]) -> i64[] {
     mut xs = a;

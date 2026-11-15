@@ -1,0 +1,57 @@
+# The AIPL implementation of the `difference` builtin. The loader names this
+# function by the canonical name `__builtin_difference` (see
+# `aipl_syntax::aipl_builtins`), so a user's `a.difference(b)` resolves through
+# the ordinary generic machinery — the in-file name `difference` is only for this
+# file's own tests, which read exactly like user code.
+
+import { equal as ==, logical_not as !, push } from builtins;
+import { has, to_array, to_set } from sets;
+
+# The elements of `self` that `other` does not hold, as a set. An empty `other`
+# gives `self` back, and a `self` that `other` holds entirely gives the empty set.
+#
+# Callable as a method (`imported.difference(used)`). Both operands are sets of any
+# order; the result is always unordered, because it is built by dropping elements
+# from a sequence. Ask for an order when you want one —
+# `a.to_array().filter(|x| !b.has(x)).to_set()` with the binding annotated `#<{T}` —
+# so the ordering is written down rather than inferred.
+#
+# See `intersection` for the elements both sets hold, and `union` for those of either.
+pub fn difference<T: any>(self: #{T}, other: #{T}) -> #{T} {
+    // `push_loop_pipeline` flags this loop and advises `filter`, which has no set
+    // form; the array is the intermediate and `to_set` makes the result a set.
+    mut kept: T[] = []; #[allow]
+    for (let x : self) {
+        if (!other.has(x)) { set kept.push(x); };
+    }
+    kept.to_set()
+}.test({
+    assert(#{1, 2, 3}.difference(#{2}) == #{1, 3}); // one element removed
+    assert(difference(#{1, 2}, #{2, 3}) == #{1}); // free-call form; `other` may hold more
+    assert(#{1, 2}.difference(#{3, 4}) == #{1, 2}); // disjoint: `self` back
+    assert(#{1, 2}.difference(#{1, 2}) == #{}); // everything held: empty
+    assert(#{1, 2}.difference(#{1, 2, 3}) == #{}); // `other` a superset
+
+    // Either operand empty.
+    let empty: #{i64} = #{};
+    assert(empty.difference(#{1}) == #{});
+    assert(#{1, 2}.difference(empty) == #{1, 2});
+    assert(empty.difference(empty) == #{});
+
+    // Any element type a set can hold.
+    assert(#{"a", "b"}.difference(#{"b"}) == #{"a"});
+    assert(#{'x', 'y'}.difference(#{'x'}) == #{'y'});
+    assert(#{true, false}.difference(#{true}) == #{false});
+
+    // Neither operand is changed.
+    let left = #{1, 2, 3};
+    let right = #{2};
+    assert(left.difference(right) == #{1, 3});
+    assert(left == #{1, 2, 3});
+    assert(right == #{2});
+
+    // An ordered operand is accepted; the result is unordered.
+    let ordered: #>{i64} = #>{5, 1, 3};
+    assert(ordered.difference(#{1}) == #{3, 5});
+    assert(ordered.to_array() == [5, 3, 1]);
+})

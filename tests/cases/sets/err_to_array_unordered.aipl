@@ -1,14 +1,15 @@
 # `to_array` reads the elements *in order*, and a `#{..}` promises none — the
 # order it happens to have is not one to write code against.
 
-import { print, to_array } from builtins;
+import { print } from builtins;
+import { to_array } from sets;
 
 fn subject() !prints {
     print(`{#{1, 2}.to_array()}`);
 }
 --- check --compile ---
 error: "to_array" needs an ordered set (`#>{..}` or `#<{..}`) — a #{i64} promises no order for its elements to come out in
- --> ./tests/cases/sets/err_to_array_unordered.aipl:7:13
+ --> ./tests/cases/sets/err_to_array_unordered.aipl:8:13
   |
-7 |     print(`{#{1, 2}.to_array()}`);
+8 |     print(`{#{1, 2}.to_array()}`);
   |             ^^^^^^^

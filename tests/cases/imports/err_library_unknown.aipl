@@ -9,7 +9,7 @@ fn main() -> i64 {
     }
 }
 --- check --compile ---
-error: there is no builtin library named "jason"; the libraries are builtins, json, tabulate
+error: there is no builtin library named "jason"; the libraries are builtins, sets, json, tabulate
  --> ./tests/cases/imports/err_library_unknown.aipl:3:23
   |
 3 | import { parse } from jason;

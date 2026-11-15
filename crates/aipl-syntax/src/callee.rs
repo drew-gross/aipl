@@ -275,6 +275,11 @@ pub enum Callee {
     /// array so the result's length is always the receiver's. `Map` has no set
     /// form: a set result would shorten whenever `f` collided two elements.
     SetMap,
+    /// `difference(self: #{T}, other: #{T}) -> #{T}` — the elements of `self` that `other`
+    /// does not hold.
+    Difference,
+    /// `intersection(self: #{T}, other: #{T}) -> #{T}` — the elements both sets hold.
+    Intersection,
     Get,
     ContainsKey,
     RemoveKey,
@@ -630,6 +635,8 @@ impl Callee {
             Callee::Union => "__builtin_union",
             Callee::UnionAll => "__builtin_union_all",
             Callee::SetMap => "__builtin_set_map",
+            Callee::Difference => "__builtin_difference",
+            Callee::Intersection => "__builtin_intersection",
             Callee::Get => "__builtin_get",
             Callee::ContainsKey => "__builtin_contains_key",
             Callee::RemoveKey => "__builtin_remove_key",

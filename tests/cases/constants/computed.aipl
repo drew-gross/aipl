@@ -10,17 +10,16 @@
 import {
     equal as ==,
     greater_than as >,
-    has,
     len,
     map,
     measure,
     print,
     push,
-    to_set,
     wrapping_add as +,
     wrapping_mul as *,
     wrapping_sub as -,
 } from builtins;
+import { has, to_set } from sets;
 
 struct Table { squares: i64[], label: str }
 

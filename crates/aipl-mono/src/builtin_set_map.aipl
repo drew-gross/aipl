@@ -18,10 +18,10 @@ import {
     len,
     push,
     saturating_remainder as %,
-    to_set,
     wrapping_add as +,
     wrapping_mul as *,
 } from builtins;
+import { to_set } from sets;
 
 # Every element of `self` through `f`, as a set.
 #

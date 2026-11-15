@@ -1,6 +1,7 @@
 # Set literals dedup at construction; `has`/`len` query them.
 
-import { equal as ==, has, is_empty, len, logical_not as ! } from builtins;
+import { equal as ==, is_empty, len, logical_not as ! } from builtins;
+import { has } from sets;
 
 fn build() -> #{i64} {
     #{1, 2, 3, 2, 1} // duplicates dropped -> {1, 2, 3}

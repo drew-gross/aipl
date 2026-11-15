@@ -3,7 +3,8 @@
 # other uses build a fresh set. (Split across small functions to keep each
 # one's codegen modest.)
 
-import { equal as ==, has, is_empty, len, union } from builtins;
+import { equal as ==, is_empty, len } from builtins;
+import { has, union } from sets;
 
 fn basic() -> #{i64} {
     let a = #{1, 2, 3};

@@ -2,16 +2,8 @@
 # heap pointer, which fits the optional slot. The `some` arm owns the set; `none`
 # falls back to an empty one. An ordered set keeps its order through the optional.
 
-import {
-    equal as ==,
-    has,
-    is_some,
-    len,
-    to_array,
-    union,
-    value_or,
-    wrapping_add as +,
-} from builtins;
+import { equal as ==, is_some, len, value_or, wrapping_add as + } from builtins;
+import { has, to_array, union } from sets;
 
 fn pick(b: bool) -> #{i64}? { if (b) { some(#{1, 2, 3}) } else { none } }
 

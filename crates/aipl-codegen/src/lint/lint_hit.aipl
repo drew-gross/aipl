@@ -62,8 +62,9 @@ pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
         |part| `{part.text}{spelled(part.builtin).value_or(part.builtin)}`,
     );
     let missing = self.named$builtin.filter(|builtin| !spelled(builtin).is_some()).distinct();
+    let libraries = missing$library_of().distinct();
     let hint = if (missing.is_nonempty()) {
-        `, importing {missing.map(|builtin| `\`{builtin}\``).join(sep=", ", final_sep=" and ", only_sep=" and ")} from builtins`
+        `, importing {libraries.map(|library| `{missing.filter(|builtin| builtin.library_of() == library).quoted_list()} from {library}`).join(sep=", ", final_sep=" and ", only_sep=" and ")}`
     } else {
         ""
     };
@@ -226,8 +227,8 @@ pub fn bound_to(self: Item[], local: str) -> str? {
 # The name an import from builtins exports under the local name `local`.
 fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> str[] {
     match (source) {
-        Builtins => names.filter(|n| n.local() == local)$name,
-        Path(..) | Library(..) => [],
+        Builtins | Library(..) => names.filter(|n| n.local() == local)$name,
+        Path(..) => [],
     }
 }
 
@@ -263,16 +264,16 @@ pub fn imported_locals(self: Item[]) -> str[] {
 # What an import from builtins brings, as the file spells each.
 fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
     match (source) {
-        Builtins => names$local(),
-        Path(..) | Library(..) => [],
+        Builtins | Library(..) => names$local(),
+        Path(..) => [],
     }
 }
 
 # What an import brings under `name`, when it is from builtins.
 fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
     match (source) {
-        Builtins => names.filter(|n| n.name == name)$local(),
-        Path(..) | Library(..) => [],
+        Builtins | Library(..) => names.filter(|n| n.name == name)$local(),
+        Path(..) => [],
     }
 }
 
@@ -399,3 +400,28 @@ pub fn lint_function_unfilled_messages(
     src: str,
     lint: (Function) -> UnfilledHit[],
 ) -> str[]!ParseFailure { ok(lint_function_unfilled_hits(src, lint)?$message) }
+
+# The library an import brings the builtin `name` from: `sets` for the set operations, the
+# main one for the rest. This mirrors the libraries `BUILTINS` assigns in
+# `aipl-syntax/src/builtin.rs`, which a lint cannot ask.
+pub fn library_of(self: str) -> str {
+    if (set_operations().contains(self)) { "sets" } else { "builtins" }
+}.test({
+    assert("union".library_of() == "sets");
+    assert("to_set".library_of() == "sets");
+    assert("len".library_of() == "builtins");
+})
+
+# The builtins of the `sets` library.
+fn set_operations() -> str[] {
+    ["has", "union", "to_set", "to_array", "set_map", "union_all", "difference", "intersection"]
+}
+
+# `self` as backquoted names, read as a sentence: `a`, `a` and `b`, or `a`, `b` and `c`.
+fn quoted_list(self: str[]) -> str {
+    self.map(|builtin| `\`{builtin}\``).join(sep=", ", final_sep=" and ", only_sep=" and ")
+}.test({
+    assert(["a"].quoted_list() == "`a`");
+    assert(["a", "b"].quoted_list() == "`a` and `b`");
+    assert(["a", "b", "c"].quoted_list() == "`a`, `b` and `c`");
+})

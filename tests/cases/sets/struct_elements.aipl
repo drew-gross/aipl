@@ -2,17 +2,8 @@
 # so two equal values are one element however they were built, and a payload that
 # differs makes a different one.
 
-import {
-    equal as ==,
-    has,
-    heap_str,
-    is_empty,
-    len,
-    logical_not as !,
-    print,
-    to_set,
-    union,
-} from builtins;
+import { equal as ==, heap_str, is_empty, len, logical_not as !, print } from builtins;
+import { has, to_set, union } from sets;
 
 struct Point { x: i64, y: i64 }
 

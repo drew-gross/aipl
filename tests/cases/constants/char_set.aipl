@@ -7,7 +7,8 @@
 # This is what a lexer wants. A class asked for per rule rebuilt itself once
 # per keyword; as a constant it is spliced into each use already built.
 
-import { equal as ==, has, len, logical_not as !, print, to_set, to_str } from builtins;
+import { equal as ==, len, logical_not as !, print, to_str } from builtins;
+import { has, to_set } from sets;
 
 pub let IDENT_START: #{char} = "abcdefghijklmnopqrstuvwxyz_".to_set();
 

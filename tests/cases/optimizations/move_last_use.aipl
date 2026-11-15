@@ -16,10 +16,10 @@ import {
     measure,
     print,
     push,
-    union,
     wrapping_add as +,
     wrapping_add_assign as +=,
 } from builtins;
+import { union } from sets;
 
 fn consume(xs: i64[]) -> u64 { xs.len() }
 

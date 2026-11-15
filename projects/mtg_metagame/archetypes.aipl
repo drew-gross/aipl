@@ -8,23 +8,20 @@ import {
     any,
     equal as ==,
     filter,
-    has,
     is_empty,
     join,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
     read_file_to_string,
-    to_array,
-    to_set,
     try_map,
-    union,
     value_or,
     value_or_err,
 } from builtins;
 import { keys, list_field, scalar_text, text_field } from "./json.aipl";
 import { Card, Deck } from "./metagame.aipl";
 import { Json, parse } from json;
+import { has, to_array, to_set, union } from sets;
 
 # What it takes for a deck to be an archetype, as its identifier in the original wrote it.
 # `cards` must all be in the main deck or the sideboard, none of `not_cards` may be, one of

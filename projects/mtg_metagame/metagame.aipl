@@ -15,7 +15,6 @@ import {
     float_div as /,
     get,
     greater_than as >,
-    has,
     less_than as <,
     logical_not as !,
     logical_or as ||,
@@ -24,7 +23,6 @@ import {
     push,
     to_dict,
     to_float,
-    to_set,
     to_str,
     try_map,
     value_or,
@@ -43,6 +41,7 @@ import {
     unsigned_field,
 } from "./json.aipl";
 import { Json, parse } from json;
+import { has, to_set } from sets;
 
 # How one match ended, from the point of view of the first deck in it.
 variant Result = Win | Loss | Draw

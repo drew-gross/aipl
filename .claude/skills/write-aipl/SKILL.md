@@ -63,10 +63,11 @@ less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!`
 
 ## Builtins (import by name from `builtins`)
 - **text/chars**: print put to_str split words trim pad trim_while starts_with ends_with contains is_digit to_digit is_space is_whitespace is_all_whitespace int_parse int_parse_unsigned inline_str heap_str rope_str
-- **arrays**: distinct (first-appearance order; `==`, so not floats) len is_empty is_nonempty first last push extend reserve reverse sort sort_by drop_first drop_last drop_n drop_last_n zip zip_with intersperse repeat range tuple_windows cartesian_product to_array
-- **query/fold**: map filter filter_map map_join map_reduce reduce left_fold right_fold find_if find_index find_map any all count count_if count_while join union_all collect_ok try_map split_map
+- **arrays**: distinct (first-appearance order; `==`, so not floats) len is_empty is_nonempty first last push extend reserve reverse sort sort_by drop_first drop_last drop_n drop_last_n zip zip_with intersperse repeat range tuple_windows cartesian_product
+- **query/fold**: map filter filter_map map_join map_reduce reduce left_fold right_fold find_if find_index find_map any all count count_if count_while join collect_ok try_map split_map
 - **optional/result**: value_or value_or_err is_some is_some_and is_err_and map_ok map_err
-- **sets/dicts**: to_set to_dict union has get contains_key insert_key remove_key set_map map_to_dict
+- **dicts**: to_dict get contains_key insert_key remove_key map_to_dict
+- **sets** (`import { .. } from sets;`, not `builtins`): to_set to_array union union_all has difference intersection set_map
 - **variants**: is_case as_case case_of case_name same_case collect_arms
 - **grids**: grid_of grid_from grid_get grid_try_set width height is_in_bounds_of
 - **io/terminal**: read_file_to_string write_string_to_file list_files read_line read_byte read_key execute_program clear_terminal move_to

@@ -13,7 +13,8 @@
 # (`aipl_set_union_mut`, behind an `aipl_arr_reserve` that copies a block
 # anyone else still holds) instead of building a fresh set.
 
-import { equal as ==, len, logical_or as ||, union } from builtins;
+import { equal as ==, len, logical_or as || } from builtins;
+import { union } from sets;
 
 struct First { kinds: #{i64} = #{}, texts: #{str} = #{}, nullable: bool = false }
 

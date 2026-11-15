@@ -1,6 +1,6 @@
 # And that type has to be one a set can hold.
 
-import { to_set } from builtins;
+import { to_set } from sets;
 
 fn subject() {
     let xs = [1, 2];

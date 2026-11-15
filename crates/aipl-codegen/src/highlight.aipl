@@ -43,7 +43,6 @@ import {
     extend,
     filter,
     first,
-    has,
     is_empty,
     is_nonempty,
     join,
@@ -52,11 +51,8 @@ import {
     logical_and as &&,
     map,
     push,
-    set_map,
     split,
-    to_set,
     to_str,
-    union,
     value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -78,6 +74,7 @@ import {
     TokenRule,
     UpToAny,
 } from "./lexer.aipl";
+import { has, set_map, to_set, union } from sets;
 
 // ---------- the TextMate model ----------
 

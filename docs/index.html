@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">219 files, 1913 items.</p>
+      <p class="summary">221 files, 1919 items.</p>
 
       <ul class="files">
 
@@ -2413,7 +2413,7 @@
           <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">7 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">9 private</a></span>
 
 
           <ul class="items">
@@ -2540,6 +2540,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_function_unfilled_messages"><code>lint_function_unfilled_messages</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-library_of"><code>library_of</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -3320,7 +3325,7 @@
           <p class="file-summary">The <code>unused_imports</code> lint: an imported name nothing in the file references. Legal — an unused import changes no behavior — but it misstates what the file depends on and outlives whatever once used it; the better spelling is to drop the name.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-unused_imports.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-unused_imports.html#private">3 private</a></span>
 
 
           <ul class="items">
@@ -4599,6 +4604,24 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_difference.html">crates/aipl-mono/src/builtin_difference.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>difference</code> builtin. The loader names this function by the canonical name <code>__builtin_difference</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>a.difference(b)</code> resolves through the ordinary generic machinery — the in-file name <code>difference</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_difference.html#item-difference"><code>difference</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-mono-src-builtin_distinct.html">crates/aipl-mono/src/builtin_distinct.aipl</a>
 
           <p class="file-summary">The AIPL implementation of the <code>distinct</code> builtin. The loader names this function by the canonical name <code>__builtin_distinct</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>xs.distinct()</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
@@ -5023,6 +5046,24 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_int_parse_unsigned.html#item-int_parse_unsigned"><code>int_parse_unsigned</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_intersection.html">crates/aipl-mono/src/builtin_intersection.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>intersection</code> builtin. The loader names this function by the canonical name <code>__builtin_intersection</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>a.intersection(b)</code> resolves through the ordinary generic machinery — the in-file name <code>intersection</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_intersection.html#item-intersection"><code>intersection</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

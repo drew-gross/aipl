@@ -3,7 +3,8 @@
 # plain `set` used to leave the binding typed by its placeholder, so a later
 # read rendered the set (or array) as empty while it held elements.
 
-import { equal as ==, print, push, union } from builtins;
+import { equal as ==, print, push } from builtins;
+import { union } from sets;
 
 test({
     mut out = "";

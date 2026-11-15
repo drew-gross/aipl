@@ -44,13 +44,13 @@ import {
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
-    to_set,
 } from builtins;
 import { Char, Expr, SetLit, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { to_set } from sets;
 
 # How many spelled-out elements it takes before the string form wins.
 fn minimum_elements() -> u64 { 3 }
@@ -79,7 +79,7 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
         """a char set of 3 elements spelled out — write `"abc".chars()`""",
     ]);
     assert(messages("len", "#{'a', 'b', 'c'}")? == [
-        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from builtins""",
+        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from sets""",
     ]);
 
     // The escapes a string takes.
@@ -112,9 +112,9 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
         """,
         char_set_literal,
     )? == [
-        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from builtins""",
-        """a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from builtins""",
-        """a char set of 5 elements spelled out — write `"\"\\'\n\t".to_set()`, importing `to_set` from builtins""",
+        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from sets""",
+        """a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from sets""",
+        """a char set of 5 elements spelled out — write `"\"\\'\n\t".to_set()`, importing `to_set` from sets""",
     ]);
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.

@@ -1,7 +1,8 @@
 # `to_array` on an ordered set of chars is the chars in the set's order. A char set is a
 # bitfield, not an array block, so the array is built from the bits rather than shared.
 
-import { equal as ==, len, map_to_dict, to_array, to_set, wrapping_increment as ++ } from builtins;
+import { equal as ==, len, map_to_dict, wrapping_increment as ++ } from builtins;
+import { to_array, to_set } from sets;
 
 fn ascending(text: str) -> char[] {
     let found: #<{char} = text.to_set();

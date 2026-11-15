@@ -49,7 +49,6 @@ import {
     equal as ==,
     filter,
     find_if,
-    has,
     is_empty,
     is_nonempty,
     join,
@@ -60,12 +59,7 @@ import {
     map,
     repeat,
     saturating_sub as -,
-    set_map,
-    to_array,
-    to_set,
     try_map,
-    union,
-    union_all,
     value_or,
     value_or_err,
     zip_with,
@@ -94,6 +88,7 @@ import {
     link,
     prod_names,
 } from "./grammar.aipl";
+import { has, set_map, to_array, to_set, union, union_all } from sets;
 
 // ---------- EBNF ----------
 

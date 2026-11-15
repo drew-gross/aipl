@@ -6,7 +6,8 @@
 # `#>{..a}` is descending even when `a` is not. A literal that is only a spread
 # is a copy of the operand in the literal's order.
 
-import { equal as ==, len, print, to_array, to_set } from builtins;
+import { equal as ==, len, print } from builtins;
+import { to_array, to_set } from sets;
 
 test({
     mut out = "";

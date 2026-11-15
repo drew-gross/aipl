@@ -25,7 +25,6 @@ import {
     filter,
     first,
     get,
-    has,
     int_parse,
     is_digit,
     is_empty,
@@ -46,7 +45,6 @@ import {
     starts_with,
     starts_with_at,
     to_dict,
-    to_set,
     value_or,
     value_or_err,
     wrapping_add as +,
@@ -60,6 +58,7 @@ import {
 // test borrows AIPL's own — the same `unescape` the real lexer uses — rather
 // than keeping a second copy in sync.
 import { unescape } from "./unescape.aipl";
+import { has, to_set } from sets;
 
 # Matched text together with where it was matched: the two halves every
 # consumer of a token needs, carried in one value so they cannot be separated.

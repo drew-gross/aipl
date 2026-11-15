@@ -9,7 +9,6 @@
 import {
     equal as ==,
     get,
-    has,
     is_empty,
     len,
     print,
@@ -17,6 +16,7 @@ import {
     to_str,
     wrapping_add_assign as +=,
 } from builtins;
+import { has } from sets;
 
 fn tag_sets() -> #{str}[] { [#{"a", "b"}, #{}, #{"c"}] }
 

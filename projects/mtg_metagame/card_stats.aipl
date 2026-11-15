@@ -5,9 +5,7 @@ import {
     get,
     join,
     push,
-    to_array,
     to_dict,
-    to_set,
     try_set,
     value_or,
     wrapping_add as +,
@@ -15,6 +13,7 @@ import {
 } from builtins;
 import { Counted, ranked } from "./counted.aipl";
 import { Card, Deck, all_cards } from "./metagame.aipl";
+import { to_array, to_set } from sets;
 
 # The copies of each card played in `decks`, most played first.
 pub fn card_counts(decks: Deck[]) -> Counted[] {

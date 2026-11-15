@@ -3,7 +3,7 @@
 # dump the item lowering's tests assert against. One of the files the AST is
 # declared across; see `ast.aipl`.
 
-import { Span, equal as ==, is_empty, join, map, split, to_set, union_all, value_or } from builtins;
+import { Span, equal as ==, is_empty, join, map, split, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
 import {
     Alias,
@@ -81,6 +81,7 @@ import {
     Without,
     show_ty,
 } from "./ty.aipl";
+import { to_set, union_all } from sets;
 
 # `name_span` is where the parameter's name is written in the `<..>` list.
 struct TypeParam { name: str, bound: Bound, default: Ty?, name_span: Span = 0..0 }

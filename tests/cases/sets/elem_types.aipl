@@ -6,7 +6,8 @@
 # per element type, and the char rows only say that beside the bool ones if both
 # are written the same way.
 
-import { equal as ==, has, len, logical_not as ! } from builtins;
+import { equal as ==, len, logical_not as ! } from builtins;
+import { has } from sets;
 
 fn bools() -> #{bool} {
     #{true, false, true, false} // -> {true, false}

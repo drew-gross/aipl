@@ -20,7 +20,6 @@ import {
     min,
     not_equal as !=,
     push,
-    to_array,
     value_or,
     zip_with,
 } from builtins;
@@ -39,6 +38,7 @@ import {
     show_order,
     show_ty,
 } from "./ty.aipl";
+import { to_array } from sets;
 
 # block) where its *value* is.
 #

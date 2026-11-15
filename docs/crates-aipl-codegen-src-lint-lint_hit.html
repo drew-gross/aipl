@@ -371,6 +371,20 @@
         </section>
 
 
+
+        <section class="item" id="item-library_of">
+          <h3>
+            <a class="anchor" href="#item-library_of">library_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn library_of(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The library an import brings the builtin <code>name</code> from: <code>sets</code> for the set operations, the main one for the rest. This mirrors the libraries <code>BUILTINS</code> assigns in <code>aipl-syntax/src/builtin.rs</code>, which a lint cannot ask.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -471,6 +485,34 @@
           <pre class="signature"><code>fn standing_in(self: Function, body: Expr) -&#62; Function</code></pre>
 
           <div class="doc"><p><code>self</code>, with <code>body</code> as its whole body: what a block is when it is checked. A block runs with every effect allowed, which no function can declare, so it stands in as one declaring <code>*</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-set_operations">
+          <h3>
+            <a class="anchor" href="#item-set_operations">set_operations</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn set_operations() -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The builtins of the <code>sets</code> library.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-quoted_list">
+          <h3>
+            <a class="anchor" href="#item-quoted_list">quoted_list</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn quoted_list(self: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> as backquoted names, read as a sentence: <code>a</code>, <code>a</code> and <code>b</code>, or <code>a</code>, <code>b</code> and <code>c</code>.</p></div>
 
 
         </section>

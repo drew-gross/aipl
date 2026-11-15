@@ -3,7 +3,8 @@
 # type, an annotation or a parameter of `#>{T}` / `#<{T}` gets an ordered set,
 # built in that order; with nothing to say, it is a plain `#{T}`.
 
-import { equal as ==, has, len, map, print, to_set, wrapping_mul as * } from builtins;
+import { equal as ==, len, map, print, wrapping_mul as * } from builtins;
+import { has, to_set } from sets;
 
 fn tightest_first(xs: i64[]) -> #>{i64} { xs.to_set() }
 

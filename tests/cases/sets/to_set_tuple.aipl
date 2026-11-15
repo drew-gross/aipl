@@ -2,7 +2,8 @@
 # elements, deduplicated, in the order the use site asks for (as for an array's).
 # It is what turns a list of pairs into the set of everything in them.
 
-import { equal as ==, has, len, print, to_set, union_all } from builtins;
+import { equal as ==, len, print } from builtins;
+import { has, to_set, union_all } from sets;
 
 fn pair_ends() -> #<{i64} { (7, 3).to_set() }
 

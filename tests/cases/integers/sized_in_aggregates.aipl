@@ -12,7 +12,6 @@ import {
     contains_key,
     equal as ==,
     get,
-    has,
     len,
     less_than as <,
     logical_not as !,
@@ -23,6 +22,7 @@ import {
     wrapping_add as +,
     wrapping_sub as -,
 } from builtins;
+import { has } from sets;
 
 struct P { w: u32, b: u8, big: u64 }
 

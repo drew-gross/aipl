@@ -25,7 +25,8 @@
 #
 # Introduced by `25f946d` (sets and dicts as array elements).
 
-import { equal as ==, len, print, to_str, union } from builtins;
+import { equal as ==, len, print, to_str } from builtins;
+import { union } from sets;
 
 test({
     mut out = "";

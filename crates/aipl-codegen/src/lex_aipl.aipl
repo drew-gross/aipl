@@ -11,7 +11,6 @@ import {
     map,
     split,
     starts_with,
-    to_set,
     value_or,
     value_or_err,
     wrapping_sub as -,
@@ -45,6 +44,7 @@ import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import { trim_prefix } from "./trim_prefix.aipl";
 import { unescape, unescape_braces } from "./unescape.aipl";
+import { to_set } from sets;
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
 // (`Name` its text, `IntLit` its value) or nothing. Every keyword and every

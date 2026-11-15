@@ -9,29 +9,22 @@
 # is a hard error here, so a missed dead import costs one stale line, while a
 # false hit costs a build that cannot be made to pass except by `#[allow]`.
 
-import {
-    collect_arms,
-    equal as ==,
-    filter,
-    has,
-    join,
-    logical_not as !,
-    map,
-    union_all,
-} from builtins;
+import { collect_arms, equal as ==, filter, join, map } from builtins;
 import { Import, ImportDecl, Program, item_names, local } from "../item.aipl";
 import { LintHit, hit, lint_hits, lint_messages } from "./lint_hit.aipl";
+import { difference, has, to_set, union_all } from sets;
 
 # A hit for each name `program` imports and nothing in it references.
 pub fn unused_imports(Program { items }) -> LintHit[] {
     // Every name the file mentions outside its own import lists: called and
     // referenced idents, constructed structs, match constructors, operator
-    // spellings, and every name appearing in a type — signatures, struct fields,
-    // variant payloads, and inline `let`/lambda annotations. Each item mentions
+    // spellings, and every name appearing in a type — signatures, struct fields, // variant payloads, and inline `let`/lambda annotations. Each item mentions
     // the type positions that belong to it rather than to any expression, and the
     // expressions it holds.
     let used = items$item_names().union_all();
-    items.collect_arms(Import)$unused_in(used).join()
+    let imports = items.collect_arms(Import);
+    let unused = imports$imported().union_all().difference(used);
+    imports$unused_in(unused).join()
 }.test({
     // Each unused name is reported, and a used one is not.
     assert(lint_messages(
@@ -104,11 +97,13 @@ pub fn unused_imports(Program { items }) -> LintHit[] {
     )? == [unused_message("other")]);
 })
 
-# A hit for each name `self` imports that is not in `used`.
-fn unused_in(self: Import(decl), used: #{str}) -> LintHit[] {
-    let ImportDecl { names, source as _, source_span as _ } = decl;
+# The names `self` brings into the file, as the file spells them.
+fn imported(self: Import(ImportDecl { names })) -> #{str} { names$local().to_set() }
+
+# A hit for each name `self` imports that is in `unused`.
+fn unused_in(self: Import(ImportDecl { names }), unused: #{str}) -> LintHit[] {
     names
-        .filter(|name| !used.has(name.local()))
+        .filter(|name| unused.has(name.local()))
         .map(|name| hit(unused_message(name.local()), name.span))
 }
 

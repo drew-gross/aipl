@@ -5,17 +5,8 @@
 # so iteration is the array walk and `to_array` is the same block seen as an
 # array. The element must be `ord`: an integer, char, or str (bytewise).
 
-import {
-    equal as ==,
-    has,
-    is_empty,
-    len,
-    print,
-    to_array,
-    to_str,
-    union,
-    wrapping_add as +,
-} from builtins;
+import { equal as ==, is_empty, len, print, to_str, wrapping_add as + } from builtins;
+import { has, to_array, union } from sets;
 
 test({
     mut out = "";
