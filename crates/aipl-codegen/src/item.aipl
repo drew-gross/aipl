@@ -3,24 +3,84 @@
 # dump the item lowering's tests assert against. One of the files the AST is
 # declared across; see `ast.aipl`.
 
-import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
+import { Span, equal as ==, is_empty, join, map, split, to_set, union_all, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
 import {
     Alias,
+    ArrayLit,
+    Assign,
     Binding,
+    Bool,
+    ByCase,
+    ByPattern,
     ByStruct,
+    ByTuple,
+    Call,
+    Char,
+    DictLit,
     Expr,
+    ExprKind,
+    Field,
     FieldInit,
+    FloatLit,
+    For,
+    ForPattern,
+    Ident,
+    If,
+    IfLet,
+    Index,
+    KwArg,
+    Lambda,
+    Let,
+    LetMut,
+    LetPattern,
+    Match,
     Name,
+    Neg,
+    Num,
     Read,
+    Return,
+    Seq,
+    SetLit,
+    Shim,
+    Slice,
+    Spread,
+    Str,
+    Try,
+    TupleLit,
+    TypeArgs,
+    While,
     WrittenNames,
+    expr,
+    ident,
     name_at,
     reads_off,
     show_expr,
+    subexprs,
 } from "./expr.aipl";
 import { SpanStr, span_str } from "./lexer.aipl";
+import { Pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
-import { Named, NamedCase, Primitive, Ty, Without, show_ty } from "./ty.aipl";
+import {
+    Any,
+    Array as TyArray,
+    Case,
+    Dict,
+    Fn as TyFn,
+    Generic,
+    Named,
+    NamedCase,
+    Optional,
+    Primitive,
+    Result,
+    Set as TySet,
+    Tuple as TyTuple,
+    Ty,
+    TypeVar,
+    Unit as TyUnit,
+    Without,
+    show_ty,
+} from "./ty.aipl";
 
 # `name_span` is where the parameter's name is written in the `<..>` list.
 struct TypeParam { name: str, bound: Bound, default: Ty?, name_span: Span = 0..0 }
@@ -312,5 +372,200 @@ fn show_import_source(self: ImportSource) -> str {
         Path(path) => `"{path}"`,
         Builtins => "builtins",
         Library(name) => name,
+    }
+}
+
+# The names a field's declared type and default mention.
+pub fn names(self: FieldDecl) -> #{str} { ty_and_default_names(self.ty, self.default) }
+
+# The names a declared type and an optional default expression mention.
+pub fn ty_and_default_names(ty: Ty, default: Expr?) -> #{str} {
+    #{..ty.ty_names(), ..default$names_in().value_or(#{})}
+}
+
+# The names `self` and every expression under it mention.
+pub fn names_in(self: Expr) -> #{str} {
+    #{..self.own_names(), ..self.subexprs()$names_in().union_all()}
+}.test({
+    assert(expr(Call("f", [ident("x")], false)).names_in() == #{"f", "x"});
+    assert(expr(Neg(ident("x"))).names_in() == #{"-", "x"});
+    assert(expr(LetPattern(
+        ByStruct("P", ["x"], ["x"], false),
+        ident("v"),
+        ident("x"),
+    )).names_in() == #{"P", "v", "x"});
+})
+
+# The names `e` itself mentions, not those of its sub-expressions.
+pub fn own_names(self: Expr) -> #{str} {
+    match (self.kind) {
+        Ident(name) | ExprKind.Construct(name, _) | Call(name, _, _) => #{name},
+        // Unary `-` is the one operator with no named builtin behind it, so it
+        // stays a node; every other operator use is a `Call` on its spelling.
+        Neg(..) => #{"-"},
+        // A shim's name and bindings all name functions.
+        Shim(effect, bindings, _) => #{effect, ..bindings$to_set().union_all()},
+        Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
+        Lambda(params, _) => #{
+            ..params$ty$optional_ty_names().union_all(),
+            ..params$binding$destructure_names().union_all(),
+        },
+        Match(_, arms) => arms$pattern$ctor_names().union_all(),
+        // `if (let P = e)` is one arm without the `match`; its pattern names a
+        // constructor just as an arm's does.
+        IfLet(arm, _, _) => arm.pattern.ctor_names(),
+        // A destructuring `let` or `for` names the struct or case it takes apart.
+        LetPattern(binding, _, _) | ForPattern(binding, _, _, _) => binding.destructure_names(),
+        Num(..)
+        | FloatLit(..)
+        | Bool(..)
+        | Str(..)
+        | Char(..)
+        | None
+        | Unit
+        | If(..)
+        | Field(..)
+        | Assign(..)
+        | For(..)
+        | While(..)
+        | ArrayLit(..)
+        | Spread(..)
+        | SetLit(..)
+        | DictLit(..)
+        | Index(..)
+        | Slice(..)
+        | Try(..)
+        | Seq(..)
+        | Return(..)
+        | TupleLit(..)
+        | KwArg(..)
+        | TypeArgs(..) => #{},
+    }
+}
+
+# The type or case a binding names: a plain name or a tuple names none.
+pub fn destructure_names(self: Binding) -> #{str} {
+    match (self) {
+        Name(..) | ByTuple(..) => #{},
+        ByCase(case_name, _) => path_names(case_name),
+        ByStruct(struct_name, _, _, _) => #{struct_name},
+        ByPattern(pattern) => pattern.ctor_names(),
+        Alias(_, inner) => inner.destructure_names(),
+    }
+}.test({
+    assert(Name("x").destructure_names() == #{});
+    assert(ByTuple(["a", "b"]).destructure_names() == #{});
+    assert(ByCase("V.A", ["x"]).destructure_names() == #{"V", "V.A"});
+    assert(ByStruct("P", ["x"], ["x"], false).destructure_names() == #{"P"});
+    assert(Alias("p", ByStruct("P", ["x"], ["x"], false)).destructure_names() == #{"P"});
+})
+
+# The constructors a pattern names, at any depth. A `V.A` path names the variant
+# as well as the case. Written with the variant's name because `Str` and `Char`
+# are also expression cases here.
+pub fn ctor_names(self: Pat) -> #{str} {
+    match (self) {
+        Pat.Ctor(name, _, _) => path_names(name),
+        Pat.Nested(name, args) => #{..path_names(name), ..args$ctor_names().union_all()},
+        Pat.Struct(name, _, _) => #{name},
+        Pat.ArrayNested(patterns) | Pat.Tuple(patterns) => patterns$ctor_names().union_all(),
+        Pat.Str(..)
+        | Pat.Char(..)
+        | Pat.Array(..)
+        | Pat.ArrayRest(..)
+        | Pat.Wildcard
+        | Pat.Int(..) => #{},
+    }
+}.test({
+    assert(Pat.Ctor("V.A", bindings=["x"]).ctor_names() == #{"V", "V.A"});
+    assert(Pat.Nested("some", [Pat.Struct("P", ["x"], ["x"])]).ctor_names() == #{"some", "P"});
+    assert(Pat.Wildcard.ctor_names() == #{});
+})
+
+# The names a constructor written `name` mentions: the name, and the variant too
+# when it is qualified.
+pub fn path_names(name: str) -> #{str} {
+    match (name.split(".")) {
+        [part, ..] => #{part, name},
+        _ => #{name},
+    }
+}.test({
+    assert(path_names("A") == #{"A"});
+    assert(path_names("V.A") == #{"V", "V.A"});
+})
+
+# The names an annotation mentions, none when it was not written.
+pub fn optional_ty_names(self: Ty?) -> #{str} { self$ty_names().value_or(#{}) }.test({
+    assert(some(Named("A")).optional_ty_names() == #{"A"});
+    let unwritten: Ty? = none;
+    assert(unwritten.optional_ty_names() == #{});
+})
+
+# Every name `self` mentions, so an import used only in a type position still
+# counts as used. Variants are spelled out rather than wildcarded so a new `Ty`
+# forces a decision here.
+pub fn ty_names(self: Ty) -> #{str} {
+    match (self) {
+        Named(name) => #{name},
+        // `Case<V>` mentions `V`, so importing a variant to name one of its cases
+        // counts as using the import.
+        Case(inner)
+        | Optional(inner)
+        | TyArray(inner)
+        | TySet(inner, _)
+        | Without(inner, _) => inner.ty_names(),
+        // A type parameter is bound by the signature, not imported.
+        TypeVar(..) | TyUnit | Primitive(..) | Any => #{},
+        Generic(base, args) => #{base, ..args$ty_names().union_all()},
+        Dict(a, b) | Result(a, b) => #{..a.ty_names(), ..b.ty_names()},
+        TyFn(params, ret) => #{..params$ty_names().union_all(), ..ret.ty_names()},
+        TyTuple(elements) => elements$ty_names().union_all(),
+    }
+}.test({
+    assert(Named("A").ty_names() == #{"A"});
+    assert(Optional(Generic("Box", [Named("A")])).ty_names() == #{"Box", "A"});
+    assert(Dict(Named("K"), Named("V")).ty_names() == #{"K", "V"});
+    assert(TypeVar("T").ty_names() == #{});
+})
+
+# The names a parameter mentions: its type, its default, and what its binding names.
+pub fn param_names(self: Param) -> #{str} {
+    #{..ty_and_default_names(self.ty, self.default), ..self.binding.destructure_names()}
+}.test({
+    let param = Param {
+        binding: ByStruct("P", ["x"], ["x"], false),
+        ty: Named("T"),
+        mutable: false,
+        arity: One,
+        default: none,
+        implicit_some: false,
+    };
+    assert(param.param_names() == #{"T", "P"});
+})
+
+# The names a payload slot of a variant case mentions: its type and its default.
+pub fn case_param_names(self: CaseParam) -> #{str} { ty_and_default_names(self.ty, self.default) }
+
+# The names a function mentions: in its signature, its body and its `.test` body.
+pub fn function_names(self: Function) -> #{str} {
+    #{
+        ..self.sig.params$param_names().union_all(),
+        ..self.sig.return_ty.optional_ty_names(),
+        ..self.body.names_in(),
+        ..self.test_body$names_in().value_or(#{}),
+    }
+}
+
+# The names an item mentions outside an import list. An import mentions none.
+pub fn item_names(self: Item) -> #{str} {
+    match (self) {
+        Fn(f) => f.function_names(),
+        Struct(s) => s.fields$names().union_all(),
+        Variant(v) => v.cases$payload.join()$case_param_names().union_all(),
+        // A constant's annotation may name an imported type; its value is a literal, so
+        // it names nothing.
+        Const(c) => #{..c.ty.optional_ty_names(), ..c.value.names_in()},
+        Refinement(r) => r.target.ty_names(),
+        Import(..) => #{},
     }
 }

@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-unused_imports">unused_imports</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unused_imports(__spat$1955: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn unused_imports(__spat$1040: Program) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each name <code>program</code> imports and nothing in it references.</p></div>
 
@@ -65,132 +65,6 @@
           <pre class="signature"><code>fn unused_message(name: str) -&#62; str</code></pre>
 
           <div class="doc"><p>What is said of the import <code>name</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-names">
-          <h3>
-            <a class="anchor" href="#item-names">names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn names(self: FieldDecl) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names a field's declared type and default mention.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-field_names">
-          <h3>
-            <a class="anchor" href="#item-field_names">field_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn field_names(ty: Ty, default: Expr?) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names a declared type and an optional default expression mention.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-names_in">
-          <h3>
-            <a class="anchor" href="#item-names_in">names_in</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn names_in(self: Expr) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names <code>self</code> and every expression under it mention.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-own_names">
-          <h3>
-            <a class="anchor" href="#item-own_names">own_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn own_names(self: Expr) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names <code>e</code> itself mentions, not those of its sub-expressions.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-destructure_names">
-          <h3>
-            <a class="anchor" href="#item-destructure_names">destructure_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn destructure_names(self: Binding) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The type or case a binding names: a plain name or a tuple names none.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-ctor_names">
-          <h3>
-            <a class="anchor" href="#item-ctor_names">ctor_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn ctor_names(self: Pat) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The constructors a pattern names, at any depth. A <code>V.A</code> path names the variant as well as the case. Written with the variant's name because <code>Str</code> and <code>Char</code> are also expression cases here.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-path_names">
-          <h3>
-            <a class="anchor" href="#item-path_names">path_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn path_names(name: str) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names a constructor written <code>name</code> mentions: the name, and the variant too when it is qualified.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-optional_ty_names">
-          <h3>
-            <a class="anchor" href="#item-optional_ty_names">optional_ty_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn optional_ty_names(self: Ty?) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>The names an annotation mentions, none when it was not written.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-ty_names">
-          <h3>
-            <a class="anchor" href="#item-ty_names">ty_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn ty_names(self: Ty) -&#62; #{str}</code></pre>
-
-          <div class="doc"><p>Every name <code>self</code> mentions, so an import used only in a type position still counts as used. Variants are spelled out rather than wildcarded so a new <code>Ty</code> forces a decision here.</p></div>
 
 
         </section>

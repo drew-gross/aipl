@@ -121,7 +121,6 @@ benchmark:
 
 misc cleanup:
   unused_imports should be rephrased as a set difference
-  move the name gathering functions from unused_imports.aipl to item.aipl and make sure all you might need are available
   so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
   in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
