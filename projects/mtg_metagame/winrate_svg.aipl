@@ -237,7 +237,9 @@ fn column_heading(attributes: str, left: u64, bottom: u64, rise: u64, text: str)
 # The styles of the page. A hovered cell sets `hot` on every cell and label sharing its row or
 # column, and those are deepened in colour, the hovered cell most of all.
 let STYLE = """
-    text { font-family: Verdana, sans-serif; font-size: 12px; fill: #222; }
+    text { font-family: Verdana, sans-serif; font-size: 12px; fill: #222; user-select: none; -webkit-user-select: none; }
+    #panel text, #hull text { user-select: text; -webkit-user-select: text; }
+    #hull text { cursor: text; }
     #title { text-anchor: middle; font-size: 17px; }
     #subtitle { text-anchor: middle; fill: #888; }
     .cell rect { stroke: #fff; stroke-width: 1; }
@@ -304,7 +306,7 @@ let STYLE = """
 let SCRIPT = """
     var root, panel, locked = null, removed = [], expanded = [], names = [], folded = [], sorting = "share";
     var rows_height = 0, panel_bottom = 0, hull, hull_diff = false, hull_bottom = 0;
-    var ROW = 18, NUMBERS = [200, 270, 355, 430], DECK_COLUMNS = [130, 235, 345, 430], deck_sorting = "win";
+    var ROW = 18, NUMBERS = [200, 270, 355, 430], DECK_COLUMNS = [158, 272, 392, 430], deck_sorting = "win";
     function init(evt) {
         root = evt.target;
         panel = document.getElementById("panel");
@@ -437,7 +439,7 @@ let SCRIPT = """
             var key = function(card) { var value = rate(card.any); return value === null ? -1 : value; };
             cards.filter(function(card) { return card.section === section; }).sort(function(a, b) { return key(b) - key(a); }).forEach(function(card) {
                 y += HULL_ROW;
-                hull_put(card.name, 0, y);
+                fit_text(hull_put(card.name, 0, y), HULL_NAME - 14);
                 hull_put(count(card.any.decks), hull_at(0), y, "num");
                 hull_put(show(card.any), hull_at(1), y, "num");
                 for (var copies = 4; copies >= 0; copies--) {
@@ -495,13 +497,28 @@ let SCRIPT = """
         fit_height();
         return node;
     }
-    // Text that is a link to `url`, opened in a new tab.
-    function put_link(text, url, x, y) {
+    // `node` cut short with an ellipsis until it is no wider than `limit`, its whole text on hover.
+    function fit_text(node, limit) {
+        var whole = node.textContent;
+        if (node.getComputedTextLength() <= limit) return node;
+        var cut = whole;
+        while (cut.length > 1 && node.getComputedTextLength() > limit) {
+            cut = cut.slice(0, -1);
+            node.textContent = cut + "\u2026";
+        }
+        var title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        title.textContent = whole;
+        node.appendChild(title);
+        return node;
+    }
+    // Text that is a link to `url`, opened in a new tab; `limit`, if given, is as wide as it may be.
+    function put_link(text, url, x, y, limit) {
         var anchor = document.createElementNS("http://www.w3.org/2000/svg", "a");
         anchor.setAttribute("href", url);
         anchor.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", url);
         anchor.setAttribute("target", "_blank");
         var node = put(text, x, y, "link");
+        if (limit) fit_text(node, limit);
         panel.removeChild(node);
         anchor.appendChild(node);
         panel.appendChild(anchor);
@@ -776,9 +793,11 @@ let SCRIPT = """
                     });
                     for (var entry of entries) {
                         y += ROW;
-                        if (entry.url) put_link(entry.pilot, entry.url, 0, y); else put(entry.pilot, 0, y);
-                        put(entry.list, DECK_COLUMNS[0], y, "summary");
-                        put(entry.event, DECK_COLUMNS[1], y, "summary");
+                        // Each column has the room up to the next, and a longer text is cut short.
+                        var room = [DECK_COLUMNS[0] - 10, DECK_COLUMNS[1] - DECK_COLUMNS[0] - 8, DECK_COLUMNS[2] - DECK_COLUMNS[1] - 50];
+                        if (entry.url) put_link(entry.pilot, entry.url, 0, y, room[0]); else fit_text(put(entry.pilot, 0, y), room[0]);
+                        fit_text(put(entry.list, DECK_COLUMNS[0], y, "summary"), room[1]);
+                        fit_text(put(entry.event, DECK_COLUMNS[1], y, "summary"), room[2]);
                         put(record_text(entry.record), DECK_COLUMNS[2], y, "number");
                         put(entry.rate < 0 ? "-" : percent(entry.rate) + "%", DECK_COLUMNS[3], y, "number");
                     }
