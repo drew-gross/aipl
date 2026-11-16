@@ -29,11 +29,13 @@ of the bracket instead of at round 1: finals, semifinals and quarterfinals first
 slot that is, and its record and win rate there. Metagames merging several tournaments are counted per tournament.
 
 Clicking an archetype's name (or its Overall cell) locks its panel and also draws its convex hull
-under the matrix, as the original's `convex_hull` command prints it: every card its decks played,
-by type and then the sideboard, with the number of decks that had any copy and their win rate (wins
-over wins and losses, a round whose games came to 0-0-0 not counted), and the same for exactly 4, 3,
-2, 1 and no copies, best first by the win rate for any copy. A button swaps the win rates for their
-change from the archetype's own (`--diff`).
+under the matrix, after the original's `convex_hull` command: every card its decks played, by type
+and then the sideboard. A card the decks disagree about has a row, `Tishana's Tidebinder (0-3)`
+(the fewest and most copies any deck played), then for each number of copies
+`copies (percent of decks playing that many): change in those decks' win rate from the archetype's
+baseline`, green when better and red when worse (win rates are wins over wins and losses, a round
+whose games came to 0-0-0 not counted). Cards every deck plays the same number of copies of are
+listed in one line per type. A legend at the top of the hull says the same.
 
 Hovering an archetype's name (or a sub-archetype's) shows the panel its Overall cell does, and clicking
 the name locks it there. That panel ends with the archetype's decks, each pilot a link to the
