@@ -37,7 +37,8 @@ slot that is, and its record and win rate there. Metagames merging several tourn
 
 Hovering an archetype's name (or a sub-archetype's) shows the panel its Overall cell does, and clicking
 the name locks it there. That panel ends with the archetype's decks, each pilot a link to the
-decklist.
+decklist, with its list name, event, record and win %, best first;
+while the panel is locked a click on a heading sorts by that column.
 
 An archetype with sub-archetypes has a ▸ before its name. Click it to expand the archetype: a row
 for each sub-archetype appears under it (`↳ Mono-G`), with its record against every archetype, and
@@ -103,7 +104,8 @@ ordering by anything but share, and the plot.
 ## Data
 
 `data/` holds the Worlds field, `metagame_worlds_32.json.gz`, the Python tool's metagame pickle
-as gzipped JSON, converted by `tools/pkl_to_json.py`. Earlier metagames are not kept. Each
+as gzipped JSON, converted by `tools/pkl_to_json.py`. Its decks' `tournament` is the event's name,
+`Worlds`, which the converter does not write (the pickle has the tournament's id, 471980). Earlier metagames are not kept. Each
 file has `tournament_ids`, `ranked_decklist_ids` and `decks`; a deck has its name,
 pilot, `url` (where its decklist can be read), `maindeck`/`sideboard` (cards with name, count, type) and `match_history`
 (result, game record, round). `data/index.json` (plain, not gzipped) maps descriptive names to the file holding
