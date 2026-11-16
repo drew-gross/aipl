@@ -1,8 +1,7 @@
-# The metagame share report: how much of a tournament field each archetype is. A deck
-# is one archetype, so the shares add up to the whole field.
+# How much of a tournament field each archetype is. A deck is one archetype, so the shares add up
+# to the whole field.
 
 import {
-    Left,
     count_if,
     distinct,
     equal as ==,
@@ -10,7 +9,6 @@ import {
     float_div as /,
     float_mul as *,
     is_case,
-    len,
     less_than as <,
     map,
     render,
@@ -20,7 +18,6 @@ import {
 import { Identifier, Meta, Other, archetype_of, label } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
 import { Card, Deck } from "./metagame.aipl";
-import { Column, tabulate } from tabulate;
 
 # The decks of each archetype, most decks first, then the decks that are none of `identifiers`
 # as one `Other` row at the end, whatever its count (and not at all when there are none).
@@ -110,36 +107,4 @@ pub fn percent(count: u64, total: u64) -> str {
     // Two significant digits however small.
     assert(percent(1, 200) == "0.50%");
     assert(percent(3, 2000) == "0.15%");
-})
-
-# The report on `decks`, loaded from the metagame `name`, as text of one line each.
-pub fn share_report(name: str, decks: Deck[], identifiers: Identifier[]) -> str!str {
-    let total = decks.len();
-    let rows = shares(decks, identifiers)?.map(|share| {
-        [share.name, percent(share.count, total), `{share.count}`]
-    });
-    let table = rows.tabulate([
-        Column { header: "Deck Name" },
-        Column { header: "Metagame %", side: Left },
-        Column { header: "Count", side: Left },
-    ]);
-    ok(`Metagame Breakdown from {name}\nOrder by Metagame %\n{table}`)
-}.test({
-    let landfall = Identifier { name: "Landfall", cards: ["Forest"] };
-    let decks = [
-        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
-        Deck { deck_id: "d", maindeck: [Card { name: "Swamp" }] },
-        Deck { deck_id: "d", maindeck: [Card { name: "Forest" }] },
-    ];
-    // Shares are of all the decks, and the `Other` decks are one row at the end.
-    assert(share_report("a_meta", decks, [landfall]) == ok("""
-        Metagame Breakdown from a_meta
-        Order by Metagame %
-        +-----------+------------+-------+
-        | Deck Name | Metagame % | Count |
-        +===========+============+=======+
-        | Landfall  |        67% |     2 |
-        | Other     |        33% |     1 |
-        +-----------+------------+-------+
-    """));
 })

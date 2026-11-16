@@ -1,0 +1,152 @@
+# The convex hull of an archetype, as the original's `convex_hull` command works it out: every card
+# any of its decks played, by the part of the deck it was in (its type for the main deck, and
+# `Sideboard`), and for each card how many of the decks had it, and how those did, overall and by
+# the number of copies of it: exactly 4, 3, 2, 1 or none.
+
+import {
+    distinct,
+    equal as ==,
+    filter,
+    find_if,
+    join,
+    less_than as <,
+    map,
+    push,
+    sort,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+import { Card, Deck, Record, add_records } from "./metagame.aipl";
+
+# The decks of a group, and their records added: how many there were, and how they did.
+struct Bucket { decks: u64, record: Record }
+
+# One card of the hull: the `section` it is listed under, its `name`, the decks that had any copy
+# of it, and the decks that had exactly `k` copies in `copies[k]` for k up to 4. A card of the main
+# deck is counted by its main-deck copies, and one of the sideboard by its sideboard copies.
+struct HullCard { section: str, name: str, any: Bucket, copies: Bucket[] }
+
+# The hull of an archetype: its cards, and the `baseline` record of all its decks.
+struct Hull { baseline: Record, cards: HullCard[] }
+
+# The name of the part of a deck that its cards are listed under when they are in the sideboard.
+let SIDEBOARD = "Sideboard";
+
+# How many copies `self` has of the card named `name`.
+fn copies_of(self: Card[], name: str) -> u64 {
+    self.find_if(|card| card.name == name)$count.value_or(0)
+}.test({
+    let cards = [Card { name: "Island", count: 4 }, Card { name: "Bolt", count: 2 }];
+    assert(cards.copies_of("Island") == 4);
+    assert(cards.copies_of("Duress") == 0);
+})
+
+# The decks of `copies` (how many copies of the card each deck had) that `wanted` accepts, with their
+# records, as listed in `records`.
+fn bucket_of(copies: u64[], records: Record[], wanted: (u64) -> bool) -> Bucket {
+    mut found = Bucket { decks: 0, record: Record {} };
+    for (let at, count : copies) {
+        if (wanted(count)) {
+            set found = Bucket {
+                decks: found.decks + 1,
+                record: add_records(found.record, records[at].value_or(Record {})),
+            };
+        };
+    }
+    found
+}.test({
+    let records = [Record { win: 2 }, Record { loss: 1 }, Record { win: 1, loss: 1 }];
+    let copies = [4, 0, 2];
+    assert(bucket_of(copies, records, |count| 0 < count) == Bucket {
+        decks: 2,
+        record: Record { win: 3, loss: 1 },
+    });
+    assert(bucket_of(copies, records, |count| count == 0) == Bucket {
+        decks: 1,
+        record: Record { loss: 1 },
+    });
+    assert(bucket_of(copies, records, |count| count == 3) == Bucket {
+        decks: 0,
+        record: Record {},
+    });
+})
+
+# The card `name`, listed under `section`, given how many copies each deck had and how each did.
+fn hull_card(section: str, name: str, copies: u64[], records: Record[]) -> HullCard {
+    section,
+    name,
+    any: bucket_of(copies, records, |count| 0 < count),
+    copies: [0, 1, 2, 3, 4].map(|wanted| bucket_of(copies, records, |count| count == wanted)),
+}.test({
+    let HullCard { any, copies } = hull_card(
+        "Land",
+        "Island",
+        [4, 0, 2, 7],
+        [Record { win: 1 }, Record {}, Record {}, Record {}],
+    );
+    // Seven copies are in `any` and in no count.
+    assert(any.decks == 3);
+    assert(copies$decks == [1, 0, 1, 0, 1]);
+})
+
+# The hull of `decks`: the main deck's cards by type in alphabetical order, then the sideboard's,
+# each part's cards in name order.
+pub fn hull_of(decks: Deck[]) -> Hull {
+    let records = decks$record;
+    mut cards: HullCard[] = [];
+    let types = decks.map(|deck| deck.maindeck$card_type).join().distinct().sort();
+    for (let type : types) {
+        let names = decks
+            .map(|deck| deck.maindeck.filter(|card| card.card_type == type)$name)
+            .join()
+            .distinct()
+            .sort();
+        for (let name : names) {
+            set cards.push(hull_card(type, name, decks$maindeck$copies_of(name), records));
+        }
+    }
+    let sideboard = decks.map(|deck| deck.sideboard$name).join().distinct().sort();
+    for (let name : sideboard) {
+        set cards.push(hull_card(SIDEBOARD, name, decks$sideboard$copies_of(name), records));
+    }
+    mut baseline = Record {};
+    for (let record : records) {
+        set baseline = add_records(baseline, record);
+    }
+    Hull { baseline, cards }
+}.test({
+    let island = Card { name: "Island", count: 4, card_type: "Land" };
+    let bolt = Card { name: "Bolt", count: 2, card_type: "Instant" };
+    let decks = [
+        Deck {
+            deck_id: "a",
+            maindeck: [island, bolt],
+            sideboard: [Card { name: "Negate", count: 2, card_type: "Sideboard" }],
+            record: Record { win: 3, loss: 1 },
+        },
+        Deck {
+            deck_id: "b",
+            maindeck: [Card { ..island, count: 3 }],
+            record: Record { win: 1, loss: 2 },
+        },
+    ];
+    let Hull { baseline, cards } = hull_of(decks);
+    assert(baseline == Record { win: 4, loss: 3 });
+    // Types in order, the sideboard last, and each card's decks and records.
+    assert(cards$section == ["Instant", "Land", "Sideboard"]);
+    assert(cards$name == ["Bolt", "Island", "Negate"]);
+    assert(cards$any$decks == [1, 2, 1]);
+    assert(cards[1]?.any.record == Record { win: 4, loss: 3 });
+    // Island: four copies in deck a, three in deck b.
+    assert(cards[1]?.copies$decks == [0, 0, 0, 1, 1]);
+    assert(cards[1]?.copies$record == [
+        Record {},
+        Record {},
+        Record {},
+        Record { win: 1, loss: 2 },
+        Record { win: 3, loss: 1 },
+    ]);
+    // Deck b has no Bolt: it is a deck with none of it, as the original counts one.
+    assert(cards[0]?.copies$decks == [1, 0, 1, 0, 0]);
+    assert(cards[2]?.copies$decks == [1, 0, 1, 0, 0]);
+})

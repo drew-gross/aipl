@@ -11,7 +11,6 @@ import {
     join,
     len,
     less_than as <,
-    logical_and as &&,
     not_equal as !=,
     print,
     read_file_to_string,
@@ -25,7 +24,6 @@ import { load_identifiers } from "./archetypes.aipl";
 import { card_counts } from "./card_stats.aipl";
 import { Counted } from "./counted.aipl";
 import { optional_text_field } from "./json.aipl";
-import { share_report } from "./meta_share.aipl";
 import { Metagame, load_metagame } from "./metagame.aipl";
 import { winrate_matrix } from "./winrate_matrix.aipl";
 import { winrate_svg } from "./winrate_svg.aipl";
@@ -33,11 +31,10 @@ import { Json, parse } from json;
 
 let USAGE = """
     usage: mtg_metagame cards <metagame>
-           mtg_metagame share <metagame> [--archetypes <config>]
            mtg_metagame winrate <metagame> [--archetypes <config>] [--output <file.svg>]
 """;
 
-# The archetype list `share` uses when `--archetypes` is not given.
+# The archetype list `winrate` uses when `--archetypes` is not given.
 let DEFAULT_ARCHETYPES = "Standard2026Q4Worlds";
 
 # The file in `data/` that `name` stands for: the file `index` maps it to, or
@@ -72,13 +69,13 @@ fn cards_listing(args: str[]) !read_files !execute_program -> str!str {
     ok(card_counts(decks)$card_line().join(sep="\n"))
 }
 
-# What `share` or `winrate` was asked: the metagame, the archetype list to classify its decks with,
-# and where `winrate` writes its page (`none` for the default, named after the metagame).
+# What `winrate` was asked: the metagame, the archetype list to classify its decks with, and where it
+# writes its page (`none` for the default, named after the metagame).
 struct DeckOptions { metagame: str, archetypes: str, output: str? }
 
-# The options of the command `command` in `args`: one metagame, `--archetypes <config>`, and for
-# `winrate` `--output <file>`, in any order.
-fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
+# The options of `winrate` in `args`: one metagame, `--archetypes <config>` and `--output <file>`, in
+# any order.
+fn parse_deck_options(args: str[]) -> DeckOptions!str {
     mut metagame = "";
     mut archetypes = DEFAULT_ARCHETYPES;
     mut output: str? = none;
@@ -88,7 +85,7 @@ fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
         if (arg == "--archetypes") {
             set i++;
             set archetypes = args[i].value_or_err("--archetypes needs the name of a list")?;
-        } else if (arg == "--output" && command == "winrate") {
+        } else if (arg == "--output") {
             set i++;
             set output = some(args[i].value_or_err("--output needs the name of a file")?);
         } else {
@@ -98,49 +95,37 @@ fn parse_deck_options(command: str, args: str[]) -> DeckOptions!str {
         };
         set i++;
     }
-    if (metagame == "") { return err(`{command} needs a metagame`); };
+    if (metagame == "") { return err("winrate needs a metagame"); };
     ok(DeckOptions { metagame, archetypes, output })
 }.test({
-    assert(parse_deck_options("share", ["m"]) == ok(DeckOptions {
+    assert(parse_deck_options(["m"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Standard2026Q4Worlds",
         output: none,
     }));
-    assert(parse_deck_options("share", ["--archetypes", "Modern2026Q3RC", "m"]) == ok(DeckOptions {
+    assert(parse_deck_options(["--archetypes", "Modern2026Q3RC", "m"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Modern2026Q3RC",
         output: none,
     }));
-    assert(parse_deck_options("winrate", ["m", "--output", "out.svg"]) == ok(DeckOptions {
+    assert(parse_deck_options(["m", "--output", "out.svg"]) == ok(DeckOptions {
         metagame: "m",
         archetypes: "Standard2026Q4Worlds",
         output: some("out.svg"),
     }));
-    assert(parse_deck_options("winrate", ["m", "--output"]) == err(
-        "--output needs the name of a file",
-    ));
-    assert(parse_deck_options("share", ["m", "--output", "x"]) == err(`unknown option "--output"`));
-    assert(parse_deck_options("share", []) == err("share needs a metagame"));
-    assert(parse_deck_options("winrate", []) == err("winrate needs a metagame"));
-    assert(parse_deck_options("share", ["m", "n"]) == err(`unexpected argument "n"`));
-    assert(parse_deck_options("share", ["m", "--jank"]) == err(`unknown option "--jank"`));
-    assert(parse_deck_options("share", ["m", "--archetypes"]) == err(
+    assert(parse_deck_options(["m", "--output"]) == err("--output needs the name of a file"));
+    assert(parse_deck_options([]) == err("winrate needs a metagame"));
+    assert(parse_deck_options(["m", "n"]) == err(`unexpected argument "n"`));
+    assert(parse_deck_options(["m", "--jank"]) == err(`unknown option "--jank"`));
+    assert(parse_deck_options(["m", "--archetypes"]) == err(
         "--archetypes needs the name of a list",
     ));
 })
 
-# The share report for the metagame named by `args`, one line each.
-fn share_listing(args: str[]) !read_files !execute_program -> str!str {
-    let DeckOptions { metagame, archetypes } = parse_deck_options("share", args)?;
-    let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
-    let Metagame { decks } = load_named(metagame)?;
-    share_report(metagame, decks, identifiers)
-}
-
 # Write the winrate matrix for the metagame named by `args` as an SVG page, to the file `--output`
 # names or `winrate_<metagame>.svg`, and say where it went.
 fn winrate_listing(args: str[]) !read_files !execute_program !write_files -> str!str {
-    let DeckOptions { metagame, archetypes, output } = parse_deck_options("winrate", args)?;
+    let DeckOptions { metagame, archetypes, output } = parse_deck_options(args)?;
     let identifiers = load_identifiers("data/archetypes.json", archetypes)?;
     let Metagame { decks, matches } = load_named(metagame)?;
     let path = output.value_or(`winrate_{metagame}.svg`);
@@ -155,14 +140,12 @@ fn run(args: str[]) !read_files !execute_program !write_files -> str!str {
     let rest = args.drop_first();
     match (command) {
         "cards" => cards_listing(rest),
-        "share" => share_listing(rest),
         "winrate" => winrate_listing(rest),
         _ => err(USAGE),
     }
 }
 
-# Run a command: `cards <metagame>` lists every card played, `share <metagame>` the share of
-# the field each archetype is, `winrate <metagame>` writes an SVG page of how each archetype does against each other. The metagame is a file in `data/` (without its `.json.gz`), or
+# Run a command: `cards <metagame>` lists every card played, `winrate <metagame>` writes an SVG page of how each archetype does against each other. The metagame is a file in `data/` (without its `.json.gz`), or
 # one of the names in `data/index.json`.
 fn main(args: str[]) !prints !read_files !execute_program !write_files -> i64 {
     match (run(args)) {

@@ -22,6 +22,7 @@ import {
     wrapping_mul as *,
     wrapping_sub as -,
 } from builtins;
+import { Bucket, Hull, HullCard } from "./hull.aipl";
 import { percent } from "./meta_share.aipl";
 import { Record, played } from "./metagame.aipl";
 import { Bracket, bracket_text } from "./rounds.aipl";
@@ -251,6 +252,14 @@ let STYLE = """
     .row-label.removed .checkbox path { display: none; }
     .row-label .checkbox:hover rect { stroke: #1a6fb5; }
     .row-label.sub .hit { fill: #fafafa; }
+    #hull text { font-size: 11px; }
+    #hull .num { text-anchor: end; }
+    #hull .head { font-weight: bold; fill: #444; }
+    #hull .title { font-size: 14px; font-weight: bold; }
+    #hull .note { fill: #666; }
+    #hull .button { fill: #1a6fb5; cursor: pointer; font-weight: bold; }
+    #hull .button:hover { text-decoration: underline; }
+    #hull line { stroke: #ccc; }
     #panel .link { fill: #1a6fb5; cursor: pointer; pointer-events: all; }
     #panel .sortable { pointer-events: all; cursor: pointer; }
     #panel .sortable:hover { fill: #1a6fb5; }
@@ -294,11 +303,12 @@ let STYLE = """
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
     var root, panel, locked = null, removed = [], expanded = [], names = [], folded = [], sorting = "share";
-    var rows_height = 0, panel_bottom = 0;
+    var rows_height = 0, panel_bottom = 0, hull, hull_diff = false, hull_bottom = 0;
     var ROW = 18, NUMBERS = [200, 270, 355, 430], DECK_COLUMNS = [130, 235, 345, 430], deck_sorting = "win";
     function init(evt) {
         root = evt.target;
         panel = document.getElementById("panel");
+        hull = document.getElementById("hull");
         for (var each of root.querySelectorAll(".row-label")) names[+each.getAttribute("data-row")] = each.getAttribute("data-name");
         var saved = /removed=([\d,]+)/.exec(location.hash);
         var parents = +panel.getAttribute("data-parents");
@@ -357,10 +367,87 @@ let SCRIPT = """
     }
     // The page is as tall as its visible rows need, and no shorter than the panel needs.
     function fit_height() {
-        var height = Math.max(+panel.getAttribute("data-height"), rows_height, +panel.getAttribute("data-top") + panel_bottom + +panel.getAttribute("data-margin"));
+        var height = Math.max(+panel.getAttribute("data-height"), rows_height + hull_bottom, +panel.getAttribute("data-top") + panel_bottom + +panel.getAttribute("data-margin"));
         root.setAttribute("height", height);
         root.setAttribute("viewBox", "0 0 " + root.getAttribute("width") + " " + height);
         document.getElementById("background").setAttribute("height", height);
+    }
+    // The convex hull of the archetype whose overall panel is locked, below the matrix: every card
+    // its decks played, by type and then the sideboard, with how many decks had any copy and how they
+    // did, and the same for exactly 4, 3, 2, 1 and no copies. Win rates are wins over wins and losses,
+    // draws left out, best first by the rate for any copy, or the change from the archetype's own.
+    var HULL_NAME = 210, HULL_STEP = 54, HULL_ROW = 16;
+    function hull_at(index) { return HULL_NAME + (index + 1) * HULL_STEP; }
+    function hull_put(text, x, y, classes) {
+        var node = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        node.setAttribute("x", x);
+        node.setAttribute("y", y);
+        node.setAttribute("class", classes || "");
+        node.textContent = text;
+        hull.appendChild(node);
+        hull_bottom = Math.max(hull_bottom, y + HULL_ROW);
+        return node;
+    }
+    function draw_hull() {
+        while (hull.firstChild) hull.removeChild(hull.firstChild);
+        hull_bottom = 0;
+        hull.setAttribute("transform", "translate(" + panel.getAttribute("data-margin") + "," + rows_height + ")");
+        if (!locked || !locked.classList.contains("overall")) { fit_height(); return; }
+        var row = locked.getAttribute("data-row");
+        var label = root.querySelector('.row-label[data-row="' + row + '"]');
+        var base = label.querySelector("desc.hull-baseline").getAttribute("data-record").split(",").map(Number);
+        var baseline = base[0] === 0 ? 0 : base[0] / (base[0] + base[1]);
+        var rate = function(bucket) {
+            var total = bucket.win + bucket.loss;
+            return total === 0 ? null : Math.round(bucket.win / total * 1000) / 1000;
+        };
+        var cards = Array.from(label.querySelectorAll("desc.hull")).map(function(each) {
+            var cells = each.getAttribute("data-cells").split(";").map(function(cell) {
+                var parts = cell.split(",").map(Number);
+                return { decks: parts[0], win: parts[1], loss: parts[2] };
+            });
+            return { section: each.getAttribute("data-section"), name: each.getAttribute("data-name").split(" // ")[0], any: cells[0], copies: cells.slice(1) };
+        });
+        var y = 20;
+        hull_put(names[row] + ": every card played in the archetype, " + label.querySelectorAll("desc.deck").length + " decks", 0, y, "title");
+        var toggle = hull_put(hull_diff ? "Show win rates" : "Show change from the baseline", hull_at(11), y, "num button");
+        toggle.setAttribute("data-hull-toggle", "1");
+        y += HULL_ROW + 2;
+        hull_put("Baseline win rate: " + percent(baseline * 100) + "%", 0, y, "note");
+        var count = function(value) { return value === 0 ? "" : String(value); };
+        var show = function(bucket) {
+            var value = rate(bucket);
+            if (value === null) return "";
+            if (hull_diff) value -= baseline;
+            if (Math.abs(value) < 0.0005) value = 0;
+            return (value < 0 ? "-" : "") + percent(Math.abs(value) * 100) + "%";
+        };
+        var sections = [];
+        cards.forEach(function(card) { if (sections.indexOf(card.section) < 0) sections.push(card.section); });
+        sections.forEach(function(section) {
+            y += HULL_ROW + 12;
+            hull_put(section, 0, y, "head");
+            var headings = ["Any#", "Any%"];
+            for (var copies = 4; copies >= 0; copies--) headings.push(copies + "#", copies + "WR%");
+            headings.forEach(function(heading, index) { hull_put(heading, hull_at(index), y, "num head"); });
+            y += 5;
+            var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", 0); line.setAttribute("x2", hull_at(11)); line.setAttribute("y1", y); line.setAttribute("y2", y);
+            hull.appendChild(line);
+            var key = function(card) { var value = rate(card.any); return value === null ? -1 : value; };
+            cards.filter(function(card) { return card.section === section; }).sort(function(a, b) { return key(b) - key(a); }).forEach(function(card) {
+                y += HULL_ROW;
+                hull_put(card.name, 0, y);
+                hull_put(count(card.any.decks), hull_at(0), y, "num");
+                hull_put(show(card.any), hull_at(1), y, "num");
+                for (var copies = 4; copies >= 0; copies--) {
+                    var bucket = card.copies[copies];
+                    hull_put(count(bucket.decks), hull_at(2 + (4 - copies) * 2), y, "num");
+                    hull_put(show(bucket), hull_at(3 + (4 - copies) * 2), y, "num");
+                }
+            });
+        });
+        fit_height();
     }
     function reset_panel() {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
@@ -564,6 +651,7 @@ let SCRIPT = """
             history.replaceState(null, "", kept.length ? "#" + kept.join("&") : location.pathname + location.search);
         } catch (error) {}
         if (locked) show(locked); else clear();
+        draw_hull();
     }
     function toggle(index) {
         var at = removed.indexOf(index);
@@ -705,6 +793,7 @@ let SCRIPT = """
         root.classList.add("locked-view");
         light(cell.getAttribute("data-row"), cell.getAttribute("data-column"));
         show(cell);
+        draw_hull();
     }
     function unlock() {
         if (locked) locked.classList.remove("locked");
@@ -712,6 +801,7 @@ let SCRIPT = """
         root.classList.remove("locked-view");
         light(null, null);
         clear();
+        draw_hull();
     }
     window.addEventListener("mouseover", function(e) {
         var cell = pointed(e.target);
@@ -736,6 +826,7 @@ let SCRIPT = """
             refresh();
             return;
         }
+        if (e.target.getAttribute && e.target.getAttribute("data-hull-toggle")) { hull_diff = !hull_diff; draw_hull(); return; }
         var deck_sort = e.target.getAttribute && e.target.getAttribute("data-deck-sort");
         if (deck_sort) {
             deck_sorting = deck_sort;
@@ -787,9 +878,40 @@ let HEADING_GAP: u64 = 4;
 
 let GAP: u64 = 10;
 
+# How many decks `self` has, and how many wins and losses they had, as the page reads them.
+fn bucket_text(self: Bucket) -> str { `{self.decks},{self.record.win},{self.record.loss}` }.test({
+    assert(
+        Bucket { decks: 3, record: Record { win: 5, loss: 2, draw: 1 } }.bucket_text() == "3,5,2",
+    );
+})
+
+# A card of a hull as an element a row's label carries, for the page to draw the hull from: its
+# section and name, and the buckets for any number of copies and then for exactly 0 to 4.
+fn hull_card_markup(self: HullCard) -> str {
+    let buckets = [self.any, ..self.copies]$bucket_text().join(sep=";");
+    `<desc class="hull" data-section="{self.section.xml_escape()}" data-name="{self.name.xml_escape()}" data-cells="{buckets}"/>`
+}.test({
+    let none_played = Bucket { decks: 0, record: Record {} };
+    let card = HullCard {
+        section: "Land",
+        name: "Fire & Ice",
+        any: Bucket { decks: 1, record: Record { win: 2 } },
+        copies: [
+            none_played,
+            Bucket { decks: 1, record: Record { win: 2 } },
+            none_played,
+            none_played,
+            none_played,
+        ],
+    };
+    assert(
+        card.hull_card_markup() == `<desc class="hull" data-section="Land" data-name="Fire &amp; Ice" data-cells="1,2,0;0,0,0;1,2,0;0,0,0;0,0,0;0,0,0"/>`,
+    );
+})
+
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall, sub_archetypes, decklists } = self;
+    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall, sub_archetypes, decklists, hulls } = self;
     let summaries = counts.map(|count| deck_summary(count, decks));
 
     // The rows of the page: each archetype, then every sub-archetype, which the page shows under its
@@ -803,6 +925,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     let row_definitions = [..definitions, ..sub_archetypes$definition];
     let row_summaries = [..summaries, ..sub_archetypes.map(|sub| deck_summary(sub.count, decks))];
     let row_decks = [..decklists, ..sub_archetypes$decks];
+    let row_hulls = [..hulls, ..sub_archetypes$hull];
     let row_totals = [..overall, ..sub_archetypes$overall];
     let row_cells = [..rows, ..sub_archetypes$cells];
     mut longest = PROJECTED.len();
@@ -874,6 +997,11 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
                 |deck| `<desc class="deck" data-url="{deck.url.xml_escape()}" data-name="{deck.name.xml_escape()}" data-event="{deck.event.xml_escape()}" data-record="{deck.record.win},{deck.record.loss},{deck.record.draw}">{deck.pilot.xml_escape()}</desc>`,
             )
             .join();
+        let Hull { baseline, cards } = row_hulls[row].value_or(Hull {
+            baseline: Record {},
+            cards: [],
+        });
+        let hull_markup = `<desc class="hull-baseline" data-record="{baseline.win},{baseline.loss},{baseline.draw}"/>{cards$hull_card_markup().join()}`;
         let line = y + CELL / 2 - 17;
         let expander = if (sub_archetypes.any(|each| each.parent == row)) {
             `<text class="expander" data-expand="{row}" x="6" y="{line}">▸</text>`
@@ -886,7 +1014,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             ""
         };
         set parts.push(
-            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{listed}{expander}{checkbox}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
+            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{listed}{hull_markup}{expander}{checkbox}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
@@ -932,6 +1060,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 <text id="subtitle" x="{middle}" y="44">The row's archetype against the column's; a draw counts as half a win</text>
 <text id="sorts" x="{MARGIN}" y="44">Sort by <tspan class="sort" data-sort="share">meta share</tspan> · <tspan class="sort" data-sort="winrate">win rate</tspan> · <tspan class="sort" data-sort="projected">projected</tspan> · <tspan class="sort" data-sort="change">change</tspan></text>
 {parts.join(sep="\n")}
+<g id="hull"></g>
 <g id="panel" data-parents="{parent_count}" data-grid-top="{grid_top}" data-height="{height}" data-margin="{MARGIN}" data-left="{panel_left}" data-top="{TITLE_HEIGHT}" data-slots="{shown_slots}" data-brackets="{bracket_labels}"></g>
 </svg>
 `

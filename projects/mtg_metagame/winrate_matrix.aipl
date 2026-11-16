@@ -35,6 +35,7 @@ import {
     sub_archetype_of,
 } from "./archetypes.aipl";
 import { Counted, ranked } from "./counted.aipl";
+import { Hull, hull_of } from "./hull.aipl";
 import { shares } from "./meta_share.aipl";
 import {
     Card,
@@ -332,6 +333,7 @@ struct Matrix {
     overall: Cell[],
     sub_archetypes: SubArchetype[] = [],
     decklists: DeckLink[][] = [],
+    hulls: Hull[] = [],
 }
 
 # A deck the page links to: who played it, what its list was called, the event it was played at, where
@@ -349,6 +351,7 @@ struct SubArchetype {
     cells: Cell?[],
     overall: Cell,
     decks: DeckLink[] = [],
+    hull: Hull = Hull { baseline: Record {}, cards: [] },
 }
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
@@ -372,6 +375,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
                 url: deck.url,
                 record: deck.record,
             },
+            deck,
         ))
     })?;
     let placements = listed$0;
@@ -384,6 +388,9 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             .map(|sub| Counted { name: sub, count: subs.count_if(|each| each == sub) })
             .ranked();
         for (let sub : counted) {
+            let members = listed.filter(|each| each.0.archetype == archetype && each.0.sub == some(
+                sub.name,
+            ));
             let mine = seen.filter(|each| each.player == archetype && each.player_sub == some(
                 sub.name,
             ));
@@ -395,9 +402,8 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
                     $definition()
                     .join(sep=" | "),
                 count: sub.count,
-                decks: listed.filter(|each| each.0.archetype == archetype && each.0.sub == some(
-                    sub.name,
-                ))$1,
+                decks: members$1,
+                hull: hull_of(members$2),
                 cells: names.map(|opponent| {
                     some(
                         mine.filter(|each| each.opponent == opponent).cell_of(slot_count, brackets),
@@ -438,6 +444,9 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         ),
         sub_archetypes,
         decklists: names.map(|archetype| { listed.filter(|each| each.0.archetype == archetype)$1 }),
+        hulls: names.map(|archetype| {
+            hull_of(listed.filter(|each| each.0.archetype == archetype)$2)
+        }),
     })
 }.test({
     let forest = Identifier { name: "Forest", cards: ["Forest"] };
@@ -472,6 +481,8 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             ],
             [DeckLink { pilot: "", name: "", event: "", url: "", record: Record {} }],
         ],
+        // The hulls are `hull.aipl`'s to test; here each archetype has its own decks'.
+        hulls: [hull_of([decks[0]?, decks[2]?]), hull_of([decks[1]?])],
         counts: [2, 1],
         total: 3,
         slots: ["Finals", "Semifinals", "Quarterfinals", "Last round", "2nd last round"],

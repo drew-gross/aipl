@@ -11,15 +11,8 @@ $ ./aipl run -- cards metagame_worlds_32
 200 Plains
 …
 
-$ ./aipl run -- share metagame_worlds_32
-Metagame Breakdown from metagame_worlds_32
-Order by Metagame %
-+-----------------------+------------+-------+
-| Deck Name             | Metagame % | Count |
-+=======================+============+=======+
-| Landfall              |      21.1% |    27 |
-| Boros Pixie           |      18.8% |    24 |
-…
+$ ./aipl run -- winrate metagame_worlds_32
+wrote winrate_metagame_worlds_32.svg
 ```
 
 `winrate <metagame> [--archetypes <config>] [--output <file.svg>]` writes the winrate matrix as an SVG
@@ -34,6 +27,13 @@ The panel counts rounds back from the end of each tournament, so a nine-round ev
 of the bracket instead of at round 1: finals, semifinals and quarterfinals first, then the last round of the main event, the
 2nd last, and so on. Each row says how many times the pairing met in that slot, what share of the metagame's matches in the
 slot that is, and its record and win rate there. Metagames merging several tournaments are counted per tournament.
+
+Clicking an archetype's name (or its Overall cell) locks its panel and also draws its convex hull
+under the matrix, as the original's `convex_hull` command prints it: every card its decks played,
+by type and then the sideboard, with the number of decks that had any copy and their win rate (wins
+over wins and losses, a round whose games came to 0-0-0 not counted), and the same for exactly 4, 3,
+2, 1 and no copies, best first by the win rate for any copy. A button swaps the win rates for their
+change from the archetype's own (`--diff`).
 
 Hovering an archetype's name (or a sub-archetype's) shows the panel its Overall cell does, and clicking
 the name locks it there. That panel ends with the archetype's decks, each pilot a link to the
@@ -63,10 +63,8 @@ numbered rounds of the main event have one; a match whose second deck has no his
 deck's side only.
 
 `cards` lists every card played in a metagame, most copies first (main decks and
-sideboards together; equal counts in name order). `share` classifies each deck into
-archetypes and prints how much of the field each is. A deck counts in every archetype it
-matches, so the percentages can add up to more than 100; the decks that match none are
-one `Other` row, last whatever its size. The metagame is a file in
+sideboards together; equal counts in name order). `winrate` classifies each deck into
+one archetype; the decks that match none are one `Other` row, last whatever its size. The metagame is a file in
 `data/` without its `.json.gz`, or one of the names in `data/index.json`; `--archetypes` names
 a list in `data/archetypes.json` (default `Standard2026Q4Worlds`). Run it from this directory.
 
@@ -74,12 +72,13 @@ a list in `data/archetypes.json` (default `Standard2026Q4Worlds`). Run it from t
 
 | file | what it is |
 |---|---|
-| `main.aipl` | the command line: `cards`, `share` and `winrate` |
+| `main.aipl` | the command line: `cards` and `winrate` |
 | `metagame.aipl` | `Metagame` (its decks and the matches they played, each once), `Deck`, `Card`, `Match`, `Record`; decoding them from JSON; `load_metagame` |
 | `counted.aipl` | `Counted` (a name and a count) and `ranked`, the order the listings share |
 | `card_stats.aipl` | `card_counts`: copies played per card |
 | `archetypes.aipl` | the classifier: `Identifier`, `archetypes_of`, `load_identifiers` |
-| `meta_share.aipl` | `shares`, the percentage, `share_report` (the table itself is the `tabulate` library) |
+| `meta_share.aipl` | `shares` (the decks of each archetype) and the percentage |
+| `hull.aipl` | the convex hull of a set of decks: every card they played, with how the decks with each number of copies did |
 | `winrate_matrix.aipl` | `observations` (each match per archetype pairing), `winrate_matrix` |
 | `rounds.aipl` | `slot_of`: where a match's round falls counted back from the end of its tournament, `slot_label`, and the `Bracket` (record going in) of a match |
 | `winrate_svg.aipl` | `winrate_svg`: the matrix as an SVG page |
@@ -90,14 +89,14 @@ reads binary files or decompresses yet.
 
 ## Status
 
-Loading, the card listing and the metagame share report work. A record's win rate is a float,
-the fraction of its matches won, a draw counting as half a win. The winrate matrix works. Not yet: the win rate and confidence interval columns in `share`,
-ordering by anything but share, and the plot.
+Loading, the card listing and the winrate page work. A record's win rate is a float,
+the fraction of its matches won, a draw counting as half a win. Not yet: confidence intervals and the shopping list of the original's `convex_hull`.
 
 ## Plan, following the Python original
 
 - `data_structures.py` → decks, match history, metagame (loading data)
-- `meta_share.py` → archetype share (done), win rate and Wilson confidence interval
+- `meta_share.py` → archetype share (done, on the winrate page), win rate and Wilson confidence interval
+- `convex_hull.py` → the panel under the winrate matrix (done, but for `--shopping_list`)
 - `matchup_effectiveness.py`, `metagame_matrix.py` → matchup tables
 - scrapers (melee, spicerack, mtgo) → data import, replacing pickles with a text format
 
@@ -122,7 +121,7 @@ decks that archetype claimed, and a deck matching more than one of an archetype'
 is an error, as for archetypes. A deck of the archetype that none claims is its `Other`. An
 identifier may also list `not_maindeck_cards`, which it must not hold in the main deck (the
 sideboard does not count). `Landfall` has two, `Selesnya` (Plains in the main deck) and `Mono-G`
-(none there). Sub-archetypes show on the winrate page only, not in `share`.
+(none there). Sub-archetypes show on the winrate page.
 
 `archetypes.json` holds one config, `Standard2026Q4Worlds`. It is not from the original: it is
 `Standard2026Q4RC` with the archetypes of the Worlds field added, the two `Landfall` lists merged
