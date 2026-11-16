@@ -4,20 +4,20 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 986 str -> str?
-; entry strip_test_sections 1041 str -> str
-; entry split_test_sections 1040 str -> __tuple$str$str
-; entry source_loc 1031 str __builtin_Span -> str
+; entry parse_test_section_header 987 str -> str?
+; entry strip_test_sections 1042 str -> str
+; entry split_test_sections 1041 str -> __tuple$str$str
+; entry source_loc 1032 str __builtin_Span -> str
 ; entry caret_block 137 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 262 str #{str:str} -> unit!Error
-; entry normalize_output 946 str -> str
-; entry int_fits 557 i64 str -> bool
-; entry is_operator_name 558 str -> bool
-; entry aipl_token_scopes 609 str -> __m19__ScopeSpan[]!__m19__LexError
+; entry normalize_output 947 str -> str
+; entry int_fits 558 i64 str -> bool
+; entry is_operator_name 559 str -> bool
+; entry aipl_token_scopes 610 str -> __m19__ScopeSpan[]!__m19__LexError
 ; entry find_files 263 str str -> str[]!Error
 ; entry companion_files 139 str -> __m25__Companion[]!str
-; entry parse_spec 979 str -> __m26__Spec!str
-; entry parse_and_partial_load 977 str -> __m110__PartialLoad!__m27__ParseFailure
+; entry parse_spec 980 str -> __m26__Spec!str
+; entry parse_and_partial_load 978 str -> __m110__PartialLoad!__m27__ParseFailure
 ; entry fn_role 276 str -> __m44__FnRole
 ; entry test_fn_name 267 str -> str
 ; entry format_source 301 str u64 -> str!__m113__FmtError
@@ -177,8 +177,8 @@
 ; data 27 __str_6e7530daf3bb121c 1b00000000000000ffffffffffffff7f61207368696d2070726f7669646572277320617267756d656e7473
 ; data 28 __str_7bdfebf1e20cf6ad 5000000000000000ffffffffffffff7f607368696d2072616e646f6d60206861732070726f76696465727320607365656465645f776974685f696e742873656564296020616e6420607365656465645f776974685f636c6f636b2829603b2060
 ; data 29 __str_7e0f1e34bd4fe7c3 1700000000000000ffffffffffffff7f20617267756d656e74287329206973206e656974686572
-; data 30 __str_8dde7515e51c07d8 1800000000000000ffffffffffffff7f5f5f72616e646f6d5f736565645f66726f6d5f636c6f636b
-; data 31 __str_c44235be558a323c 2000000000000000ffffffffffffff7f61207368696d2070726f7669646572206d617463686564206e6f20746f6b656e
+; data 30 __str_c44235be558a323c 2000000000000000ffffffffffffff7f61207368696d2070726f7669646572206d617463686564206e6f20746f6b656e
+; data 31 __str_8dde7515e51c07d8 1800000000000000ffffffffffffff7f5f5f72616e646f6d5f736565645f66726f6d5f636c6f636b
 ; data 32 __str_c26d51310c9d8287 3f00000000000000ffffffffffffff7f602e2e6020737072656164206973206f6e6c7920616c6c6f77656420696e20616e206172726179206f7220736574206c69746572616c2c206e6f7420696e20
 ; data 33 __str_b2364c953b7cd1ab 2200000000000000ffffffffffffff7f616e20617267756d656e74206d617463686564206e6f20616c7465726e6174697665
 ; data 34 __str_bac8eb68a62662fc 1e00000000000000ffffffffffffff7f61206b6579776f726420617267756d656e7420686173206e6f206e616d65
@@ -497,4 +497,4 @@
 ; data 347 __tostr_lit_100 66616c7365
 
 ; __m115____test$all$is_nine
-; source-fingerprint 10750812153046325789
+; source-fingerprint 1188140415023241982

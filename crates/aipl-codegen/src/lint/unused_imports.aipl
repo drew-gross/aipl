@@ -95,6 +95,15 @@ pub fn unused_imports(Program { items }) -> LintHit[] {
         """,
         unused_imports,
     )? == [unused_message("other")]);
+
+    // A shim provider calls the import it is written with.
+    assert(lint_messages(
+        """
+            import { seeded_with_int, seeded_with_clock } from builtins;
+            fn f() { shim random seeded_with_int(1) { 2 }; }
+        """,
+        unused_imports,
+    )? == [unused_message("seeded_with_clock")]);
 })
 
 # The names `self` brings into the file, as the file spells them.
