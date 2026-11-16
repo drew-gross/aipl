@@ -77,6 +77,9 @@ struct Deck {
     tournament: str = "",
     // Where the decklist can be read, as its source gave it; empty when it did not.
     url: str = "",
+    // How its matches came out at the tournament, byes and matches against decks the metagame does
+    // not have included.
+    record: Record = Record {},
     maindeck: Card[] = [],
     sideboard: Card[] = [],
 }
@@ -250,6 +253,25 @@ fn decode_match(self: Json, owner: str, tournament: str, before: Record) -> (Res
     assert(decode_match(bye, "3", "t", before) == ok((Win, no_match)));
 })
 
+# The record of the deck `self`: one for each result in its match history.
+fn history_record(self: Json) -> Record!str {
+    mut total = Record {};
+    for (let round : self.list_field("match_history")?) {
+        set total = add_records(total, round.text_field("result")?.decode_result()?.as_record());
+    }
+    ok(total)
+}.test({
+    let json = parse("""
+        {"match_history":[{"result":"win"},{"result":"win","opponent_deck_id":null},{"result":"loss"},
+         {"result":"draw"}]}
+    """)?;
+    assert(history_record(json) == ok(Record { win: 2, loss: 1, draw: 1 }));
+    assert(history_record(parse("""{"match_history":[]}""")?) == ok(Record {}));
+    assert(history_record(parse("""{"match_history":[{"result":"won"}]}""")?) == err(
+        `unknown match result "won"`,
+    ));
+})
+
 # A deck, with its cards.
 fn decode_deck(self: Json) -> Deck!str {
     ok(Deck {
@@ -258,6 +280,7 @@ fn decode_deck(self: Json) -> Deck!str {
         pilot: self.optional_text_field("pilot").value_or(""),
         tournament: self.optional_text_field("tournament").value_or(""),
         url: self.optional_text_field("url").value_or(""),
+        record: self.history_record()?,
         maindeck: self.list_field("maindeck")?.try_map(decode_card)?,
         sideboard: self.list_field("sideboard")?.try_map(decode_card)?,
     })
@@ -265,7 +288,7 @@ fn decode_deck(self: Json) -> Deck!str {
     let json = parse("""
         {"deck_id":"d1","name":null,"pilot":"Ana","tournament":5,"url":"https://x/d1",
          "maindeck":[{"name":"Island","count":4,"card_type":"Land"}],
-         "sideboard":[],"match_history":[]}
+         "sideboard":[],"match_history":[{"result":"win"},{"result":"loss"},{"result":"win"}]}
     """)?;
     assert(decode_deck(json) == ok(Deck {
         deck_id: "d1",
@@ -273,6 +296,7 @@ fn decode_deck(self: Json) -> Deck!str {
         pilot: "Ana",
         tournament: "5",
         url: "https://x/d1",
+        record: Record { win: 2, loss: 1 },
         maindeck: [Card { name: "Island", count: 4, card_type: "Land" }],
         sideboard: [],
     }));

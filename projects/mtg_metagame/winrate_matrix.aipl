@@ -334,8 +334,9 @@ struct Matrix {
     decklists: DeckLink[][] = [],
 }
 
-# A deck the page links to: who played it, what its list was called, and where to read it.
-struct DeckLink { pilot: str, name: str, url: str }
+# A deck the page links to: who played it, what its list was called, the event it was played at, where
+# to read it, and how its matches came out.
+struct DeckLink { pilot: str, name: str, event: str, url: str, record: Record }
 
 # How one sub-archetype did: of the archetype `parent` (an index into the matrix's `names`) it is
 # named `name`, said in a line by `definition`, and has `count` decks. `cells` has the cell against
@@ -362,7 +363,16 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     // Every deck with where it sits and where its list is, to group by archetype and sub-archetype.
     let listed = decks.try_map(|deck| {
         let placement = deck.placement_of(identifiers)?;
-        ok((placement, DeckLink { pilot: deck.pilot, name: deck.name, url: deck.url }))
+        ok((
+            placement,
+            DeckLink {
+                pilot: deck.pilot,
+                name: deck.name,
+                event: deck.tournament,
+                url: deck.url,
+                record: deck.record,
+            },
+        ))
     })?;
     let placements = listed$0;
     // Each archetype's sub-archetypes, most decks first, in the order of the archetypes.
@@ -456,8 +466,11 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
         names: ["Forest", "Other"],
         definitions: ["Forest", ""],
         decklists: [
-            [DeckLink { pilot: "", name: "", url: "" }, DeckLink { pilot: "", name: "", url: "" }],
-            [DeckLink { pilot: "", name: "", url: "" }],
+            [
+                DeckLink { pilot: "", name: "", event: "", url: "", record: Record {} },
+                DeckLink { pilot: "", name: "", event: "", url: "", record: Record {} },
+            ],
+            [DeckLink { pilot: "", name: "", event: "", url: "", record: Record {} }],
         ],
         counts: [2, 1],
         total: 3,
