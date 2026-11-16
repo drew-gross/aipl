@@ -25,7 +25,7 @@ import {
 import { percent } from "./meta_share.aipl";
 import { Record, played } from "./metagame.aipl";
 import { Bracket, bracket_text } from "./rounds.aipl";
-import { Cell, Matrix, SubArchetype, rate_text, share_text } from "./winrate_matrix.aipl";
+import { Cell, DeckLink, Matrix, SubArchetype, rate_text, share_text } from "./winrate_matrix.aipl";
 
 # The size of a cell, and the space around the matrix, in pixels.
 let CELL: u64 = 64;
@@ -251,6 +251,8 @@ let STYLE = """
     .row-label.removed .checkbox path { display: none; }
     .row-label .checkbox:hover rect { stroke: #1a6fb5; }
     .row-label.sub .hit { fill: #fafafa; }
+    #panel .link { fill: #1a6fb5; cursor: pointer; pointer-events: all; }
+    #panel .link:hover { text-decoration: underline; }
     .row-label.sub { cursor: default; }
     .cell.hot rect { filter: saturate(1.3) brightness(0.94); }
     .cell { cursor: pointer; }
@@ -289,6 +291,7 @@ let STYLE = """
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
     var root, panel, locked = null, removed = [], expanded = [], names = [], folded = [], sorting = "share";
+    var rows_height = 0, panel_bottom = 0;
     var ROW = 18, NUMBERS = [200, 270, 355, 430];
     function init(evt) {
         root = evt.target;
@@ -345,12 +348,20 @@ let SCRIPT = """
             each.setAttribute("transform", dx || dy ? "translate(" + dx + "," + dy + ")" : "");
         }
         for (var mark of root.querySelectorAll(".expander")) mark.textContent = expanded.indexOf(+mark.getAttribute("data-expand")) >= 0 ? "\u25be" : "\u25b8";
-        // The page is as tall as its visible rows need, and no shorter than the panel needs.
-        var height = Math.max(+panel.getAttribute("data-height"), +panel.getAttribute("data-grid-top") + rows * size + +panel.getAttribute("data-margin"));
+        rows_height = +panel.getAttribute("data-grid-top") + rows * size + +panel.getAttribute("data-margin");
+        fit_height();
+        for (var option of root.querySelectorAll(".sort")) option.classList.toggle("active", option.getAttribute("data-sort") === sorting);
+    }
+    // The page is as tall as its visible rows need, and no shorter than the panel needs.
+    function fit_height() {
+        var height = Math.max(+panel.getAttribute("data-height"), rows_height, +panel.getAttribute("data-top") + panel_bottom + +panel.getAttribute("data-margin"));
         root.setAttribute("height", height);
         root.setAttribute("viewBox", "0 0 " + root.getAttribute("width") + " " + height);
         document.getElementById("background").setAttribute("height", height);
-        for (var option of root.querySelectorAll(".sort")) option.classList.toggle("active", option.getAttribute("data-sort") === sorting);
+    }
+    function reset_panel() {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        panel_bottom = 0;
     }
     function ancestor(node, test) {
         while (node && !(node.classList && test(node))) node = node.parentNode;
@@ -358,6 +369,18 @@ let SCRIPT = """
     }
     function cell_of(node) {
         return ancestor(node, function(n) { return n.classList.contains("cell"); });
+    }
+    // The overall cell of the row `label` is the name of.
+    function overall_of(label) {
+        return root.querySelector('.cell.overall[data-row="' + label.getAttribute("data-row") + '"]');
+    }
+    // What the pointer is over that the panel can show: a cell, or a row's name, which shows what
+    // the row's overall cell does.
+    function pointed(node) {
+        var cell = cell_of(node);
+        if (cell) return cell;
+        var label = label_of(node);
+        return label && label.hasAttribute("data-row") ? overall_of(label) : null;
     }
     function label_of(node) {
         return ancestor(node, function(n) {
@@ -378,7 +401,20 @@ let SCRIPT = """
         if (classes) node.setAttribute("class", classes);
         node.textContent = text;
         panel.appendChild(node);
+        panel_bottom = Math.max(panel_bottom, y + ROW);
+        fit_height();
         return node;
+    }
+    // Text that is a link to `url`, opened in a new tab.
+    function put_link(text, url, x, y) {
+        var anchor = document.createElementNS("http://www.w3.org/2000/svg", "a");
+        anchor.setAttribute("href", url);
+        anchor.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", url);
+        anchor.setAttribute("target", "_blank");
+        var node = put(text, x, y, "link");
+        panel.removeChild(node);
+        anchor.appendChild(node);
+        panel.appendChild(anchor);
     }
     function put_wrapped(text, y, classes) {
         var node = put("", 0, y, classes), line = "";
@@ -532,7 +568,7 @@ let SCRIPT = """
         refresh();
     }
     function clear() {
-        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        reset_panel();
         panel.setAttribute("transform", "translate(" + panel.getAttribute("data-left") + "," + panel.getAttribute("data-top") + ")");
         var y = put_wrapped("Hover a cell for how the pairing did in each round, or click one to lock it. Untick an archetype to remove it from the metagame and see everyone else's projected win rate.", 14, "head");
         if (removed.length) {
@@ -547,7 +583,7 @@ let SCRIPT = """
         }
     }
     function show_projection(cell) {
-        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        reset_panel();
         var index = +cell.getAttribute("data-row"), y = 14;
         put(names[index] + " projected", 0, y, "heading");
         if (cell === locked) button("Unlock", "unlock", y);
@@ -580,7 +616,7 @@ let SCRIPT = """
     }
     function show(cell) {
         if (cell.classList.contains("projected")) { show_projection(cell); return; }
-        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        reset_panel();
         var y = 14;
         put(cell.getAttribute("data-title"), 0, y, "heading");
         if (cell === locked) button("Unlock", "unlock", y);
@@ -620,6 +656,22 @@ let SCRIPT = """
                 put(fields[2], NUMBERS[3], y, "number " + classes);
             });
         }
+        // The overall panel also lists the row's decks, each a link to its decklist when it has one.
+        if (cell.classList.contains("overall")) {
+            var label = root.querySelector('.row-label[data-row="' + cell.getAttribute("data-row") + '"]');
+            var listed = label ? label.querySelectorAll("desc.deck") : [];
+            if (listed.length) {
+                y += 30;
+                if (fold("Decklists (" + listed.length + ")", "decks", y)) {
+                    for (var deck of listed) {
+                        y += ROW;
+                        var url = deck.getAttribute("data-url"), pilot = deck.textContent || "(no pilot)";
+                        if (url) put_link(pilot, url, 0, y); else put(pilot, 0, y);
+                        if (deck.getAttribute("data-name")) put(deck.getAttribute("data-name"), NUMBERS[1], y, "summary");
+                    }
+                }
+            }
+        }
     }
     function lock(cell) {
         unlock();
@@ -637,13 +689,13 @@ let SCRIPT = """
         clear();
     }
     window.addEventListener("mouseover", function(e) {
-        var cell = cell_of(e.target);
+        var cell = pointed(e.target);
         if (!cell || locked) return;
         light(cell.getAttribute("data-row"), cell.getAttribute("data-column"));
         show(cell);
     });
     window.addEventListener("mouseout", function(e) {
-        if (!cell_of(e.target) || locked) return;
+        if (!pointed(e.target) || locked) return;
         light(null, null);
         clear();
     });
@@ -670,8 +722,13 @@ let SCRIPT = """
         if (action === "restore") { removed = []; refresh(); return; }
         if (action === "unlock") { unlock(); return; }
         var label = label_of(e.target);
-        // A row is taken out of the metagame by its checkbox; a column heading does it too.
-        if (label && label.hasAttribute("data-row")) return;
+        // A row is taken out of the metagame by its checkbox; a column heading does it too. A row's
+        // name stands for its overall cell: clicking it locks the panel on that.
+        if (label && label.hasAttribute("data-row")) {
+            var overall = overall_of(label);
+            if (overall === locked) unlock(); else lock(overall);
+            return;
+        }
         if (label) {
             toggle(+(label.hasAttribute("data-row") ? label.getAttribute("data-row") : label.getAttribute("data-column")));
             return;
@@ -701,7 +758,7 @@ let GAP: u64 = 10;
 
 # The page for `self`, of the metagame `name`.
 pub fn winrate_svg(self: Matrix, name: str) -> str {
-    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall, sub_archetypes } = self;
+    let Matrix { names, definitions, counts, total as decks, slots, slot_matches, matches, brackets, rows, overall, sub_archetypes, decklists } = self;
     let summaries = counts.map(|count| deck_summary(count, decks));
 
     // The rows of the page: each archetype, then every sub-archetype, which the page shows under its
@@ -714,6 +771,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     ];
     let row_definitions = [..definitions, ..sub_archetypes$definition];
     let row_summaries = [..summaries, ..sub_archetypes.map(|sub| deck_summary(sub.count, decks))];
+    let row_decks = [..decklists, ..sub_archetypes$decks];
     let row_totals = [..overall, ..sub_archetypes$overall];
     let row_cells = [..rows, ..sub_archetypes$cells];
     mut longest = PROJECTED.len();
@@ -779,6 +837,12 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
 
         // An archetype has a checkbox, ticked while it is in the metagame, and an arrow when it has
         // sub-archetypes to show.
+        let listed = row_decks[row]
+            .value_or([])
+            .map(
+                |deck| `<desc class="deck" data-url="{deck.url.xml_escape()}" data-name="{deck.name.xml_escape()}">{deck.pilot.xml_escape()}</desc>`,
+            )
+            .join();
         let line = y + CELL / 2 - 17;
         let expander = if (sub_archetypes.any(|each| each.parent == row)) {
             `<text class="expander" data-expand="{row}" x="6" y="{line}">▸</text>`
@@ -791,7 +855,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
             ""
         };
         set parts.push(
-            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{expander}{checkbox}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
+            `<g class="label row-label{if (row < parent_count) { "" } else { " sub" }}"{hidden} data-row="{row}" data-name="{row_name.xml_escape()}"><rect class="hit" x="2" y="{y}" width="{overall_left - 6}" height="{CELL}"/>{listed}{expander}{checkbox}<text x="{overall_left - 8}" y="{y + CELL / 2 - 17}">{row_labels[row].value_or("").xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 - 1}">{definition.xml_escape()}</text><text class="detail" x="{overall_left - 8}" y="{y + CELL / 2 + 15}">{summary}</text></g>`,
         );
         let overall_info = `{row_name} overall: {total.record.rate_text()} ({total.record.record_text()})`.xml_escape();
         let overall_panel = panel_attributes(
@@ -920,6 +984,22 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     assert(page.contains(`data-record="1,0,0"`));
     assert(page.contains(`data-name="B &amp; C"`));
     assert(page.split(`class="label row-label"`).len() == 3);
+
+    // A row label carries its decks, for the panel to list with a link to each.
+    let listed = winrate_svg(
+        Matrix {
+            ..matrix,
+            decklists: [
+                [DeckLink { pilot: "Ana & Bo", name: "Deck", url: "https://x/d?a=1&b=2" }],
+                [],
+            ],
+        },
+        "m",
+    );
+    assert(listed.contains(
+        `<desc class="deck" data-url="https://x/d?a=1&amp;b=2" data-name="Deck">Ana &amp; Bo</desc>`,
+    ));
+    assert(listed.split(`<desc class="deck"`).len() == 2);
 
     // Nothing is expandable without sub-archetypes, and every archetype has a checkbox.
     assert(!page.contains(`class="expander"`));

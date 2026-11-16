@@ -29,7 +29,7 @@ def deck(d):
         "name": d.name,
         "pilot": d.pilot,
         "pilot_id": getattr(d, "pilot_id", None),
-        "url": getattr(d, "_url", None),
+        "url": d.url,
         "tournament": d.tournament,
         "maindeck": [card(c) for c in d.maindeck.values()],
         "sideboard": [card(c) for c in d.sideboard.values()],

@@ -35,6 +35,10 @@ of the bracket instead of at round 1: finals, semifinals and quarterfinals first
 2nd last, and so on. Each row says how many times the pairing met in that slot, what share of the metagame's matches in the
 slot that is, and its record and win rate there. Metagames merging several tournaments are counted per tournament.
 
+Hovering an archetype's name (or a sub-archetype's) shows the panel its Overall cell does, and clicking
+the name locks it there. That panel ends with the archetype's decks, each pilot a link to the
+decklist.
+
 An archetype with sub-archetypes has a ▸ before its name. Click it to expand the archetype: a row
 for each sub-archetype appears under it (`↳ Mono-G`), with its record against every archetype, and
 its own overall and projected cells, so removing an archetype projects them too. Click the ▾ to fold
@@ -101,7 +105,7 @@ ordering by anything but share, and the plot.
 `data/` holds the Worlds field, `metagame_worlds_32.json.gz`, the Python tool's metagame pickle
 as gzipped JSON, converted by `tools/pkl_to_json.py`. Earlier metagames are not kept. Each
 file has `tournament_ids`, `ranked_decklist_ids` and `decks`; a deck has its name,
-pilot, `maindeck`/`sideboard` (cards with name, count, type) and `match_history`
+pilot, `url` (where its decklist can be read), `maindeck`/`sideboard` (cards with name, count, type) and `match_history`
 (result, game record, round). `data/index.json` (plain, not gzipped) maps descriptive names to the file holding
 them, and is empty.
 

@@ -331,7 +331,11 @@ struct Matrix {
     rows: Cell?[][],
     overall: Cell[],
     sub_archetypes: SubArchetype[] = [],
+    decklists: DeckLink[][] = [],
 }
+
+# A deck the page links to: who played it, what its list was called, and where to read it.
+struct DeckLink { pilot: str, name: str, url: str }
 
 # How one sub-archetype did: of the archetype `parent` (an index into the matrix's `names`) it is
 # named `name`, said in a line by `definition`, and has `count` decks. `cells` has the cell against
@@ -343,6 +347,7 @@ struct SubArchetype {
     count: u64,
     cells: Cell?[],
     overall: Cell,
+    decks: DeckLink[] = [],
 }
 
 # The matrix of `matches` between `decks`, by the archetypes `identifiers` give them.
@@ -354,7 +359,12 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     let seen = observations(decks, matches, identifiers, last_rounds)?;
     let placed = matches$slot_of(last_rounds);
     let brackets = seen$bracket.collect_ok().distinct().sort_by(is_above);
-    let placements = decks.try_map(|deck| deck.placement_of(identifiers))?;
+    // Every deck with where it sits and where its list is, to group by archetype and sub-archetype.
+    let listed = decks.try_map(|deck| {
+        let placement = deck.placement_of(identifiers)?;
+        ok((placement, DeckLink { pilot: deck.pilot, name: deck.name, url: deck.url }))
+    })?;
+    let placements = listed$0;
     // Each archetype's sub-archetypes, most decks first, in the order of the archetypes.
     mut sub_archetypes: SubArchetype[] = [];
     for (let parent, archetype : names) {
@@ -375,6 +385,9 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
                     $definition()
                     .join(sep=" | "),
                 count: sub.count,
+                decks: listed.filter(|each| each.0.archetype == archetype && each.0.sub == some(
+                    sub.name,
+                ))$1,
                 cells: names.map(|opponent| {
                     some(
                         mine.filter(|each| each.opponent == opponent).cell_of(slot_count, brackets),
@@ -414,6 +427,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
             |player| seen.filter(|each| each.player == player).cell_of(slot_count, brackets),
         ),
         sub_archetypes,
+        decklists: names.map(|archetype| { listed.filter(|each| each.0.archetype == archetype)$1 }),
     })
 }.test({
     let forest = Identifier { name: "Forest", cards: ["Forest"] };
@@ -441,6 +455,10 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     assert(winrate_matrix(decks, matches, [forest]) == ok(Matrix {
         names: ["Forest", "Other"],
         definitions: ["Forest", ""],
+        decklists: [
+            [DeckLink { pilot: "", name: "", url: "" }, DeckLink { pilot: "", name: "", url: "" }],
+            [DeckLink { pilot: "", name: "", url: "" }],
+        ],
         counts: [2, 1],
         total: 3,
         slots: ["Finals", "Semifinals", "Quarterfinals", "Last round", "2nd last round"],
@@ -509,6 +527,7 @@ pub fn winrate_matrix(decks: Deck[], matches: Match[], identifiers: Identifier[]
     assert(subs$name == ["Plains", "Other"]);
     assert(subs$parent == [0, 0]);
     assert(subs$count == [2, 1]);
+    assert(subs$decks$len() == [2, 1]);
     assert(subs$definition == ["Plains", ""]);
     assert(subs$overall$record == [Record { win: 1 }, Record {}]);
     // Against the archetype `Other` (column 1) the Plains decks won once; against Forest, never met.

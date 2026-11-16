@@ -75,6 +75,8 @@ struct Deck {
     name: str = "",
     pilot: str = "",
     tournament: str = "",
+    // Where the decklist can be read, as its source gave it; empty when it did not.
+    url: str = "",
     maindeck: Card[] = [],
     sideboard: Card[] = [],
 }
@@ -255,12 +257,13 @@ fn decode_deck(self: Json) -> Deck!str {
         name: self.optional_text_field("name").value_or(""),
         pilot: self.optional_text_field("pilot").value_or(""),
         tournament: self.optional_text_field("tournament").value_or(""),
+        url: self.optional_text_field("url").value_or(""),
         maindeck: self.list_field("maindeck")?.try_map(decode_card)?,
         sideboard: self.list_field("sideboard")?.try_map(decode_card)?,
     })
 }.test({
     let json = parse("""
-        {"deck_id":"d1","name":null,"pilot":"Ana","tournament":5,
+        {"deck_id":"d1","name":null,"pilot":"Ana","tournament":5,"url":"https://x/d1",
          "maindeck":[{"name":"Island","count":4,"card_type":"Land"}],
          "sideboard":[],"match_history":[]}
     """)?;
@@ -269,6 +272,7 @@ fn decode_deck(self: Json) -> Deck!str {
         name: "",
         pilot: "Ana",
         tournament: "5",
+        url: "https://x/d1",
         maindeck: [Card { name: "Island", count: 4, card_type: "Land" }],
         sideboard: [],
     }));
