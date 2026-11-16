@@ -285,6 +285,11 @@ variant ExprKind =
     # `for (let (a, b) : xs) { .. }` and its struct and case twins, with the
     # optional index binder. Lowered by `desugar.aipl` like `LetPattern`.
     | ForPattern(binding: Binding, iterable: Expr, body: Expr, index: str? = none)
+    # `shim random seeded_with_int(n) { .. }`: the provider the author named, its
+    # arguments and the body. Written syntax, kept as it was written so the lints see
+    # the name; `desugar.aipl` lowers it to the shim of the runtime's generator seeded
+    # as the provider says, and nothing downstream of it ever sees the node.
+    | ProviderShim(provider: str, args: Expr[], body: Expr)
     # An IEEE 754 literal, as written (`1.5`, `-2e-3`). It stays text because its width
     # is the checker's to decide, from the position it sits in, and a literal has to be
     # rounded once, to the width it lands at.
@@ -376,6 +381,7 @@ pub fn show_expr(self: Expr) -> str {
             `Kw({name}, {value.show_expr()})`
         },
         LetPattern(binding, value, body) => `LetPattern({binding.show_binding()}, {value.show_expr()}, {body.show_expr()})`,
+        ProviderShim(provider, args, body) => `ProviderShim({provider}, [{show_exprs(args)}], {body.show_expr()})`,
         ForPattern(binding, iterable, body, index) => match (index) {
             some(i) => `ForPattern([{i}], {binding.show_binding()}, {iterable.show_expr()}, {body.show_expr()})`,
             none => `ForPattern({binding.show_binding()}, {iterable.show_expr()}, {body.show_expr()})`,
@@ -639,6 +645,7 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
         KwArg(name, value, forwarded) => KwArg(name, f(value), forwarded),
         TypeArgs(x, types) => TypeArgs(f(x), types),
         LetPattern(pattern, value, body) => LetPattern(pattern, f(value), f(body)),
+        ProviderShim(provider, args, body) => ProviderShim(provider, each_mapped(args, f), f(body)),
         ForPattern(pattern, iterable, body, index) => ForPattern(
             pattern,
             f(iterable),
@@ -732,6 +739,7 @@ pub fn subexprs(self: Expr) -> Expr[] {
     match (self.kind) {
         Num(..) | FloatLit(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => [],
         Call(_, args, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
+        ProviderShim(_, args, body) => [..args, body],
         Neg(x)
         | Field(x, _)
         | Try(x)

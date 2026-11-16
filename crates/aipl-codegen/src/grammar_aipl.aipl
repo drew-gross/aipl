@@ -165,7 +165,7 @@ import {
     token_leaves,
     token_span,
 } from "./cst.aipl";
-import { desugar, desugared } from "./desugar.aipl";
+import { desugar, desugared, random_shim } from "./desugar.aipl";
 import { Doc, print } from "./doc.aipl";
 import {
     Alias,
@@ -201,6 +201,7 @@ import {
     Neg,
     None,
     Num,
+    ProviderShim,
     Return,
     Seq,
     Shim,
@@ -1884,10 +1885,13 @@ fn provider_head(src: str, node: Parts, sp: Span) -> ShimHead!ParseError {
 # whose operations need state that a function cannot hold. `random` is the one: it
 # is the block form below over the provider the name calls —
 #
+# The parse keeps it as written (`ProviderShim`), so the lints see the provider the
+# author named; `desugar.aipl` lowers it —
+#
 #     shim random seeded_with_int(n) { body }
-#       => shim random { seeded_with_int(n) } { body }
+#       => shim random { random_u64 = __random_next } { __random_seed(n); body }
 #     shim random seeded_with_clock() { body }
-#       => shim random { seeded_with_clock() } { body }
+#       => shim random { random_u64 = __random_next } { __random_seed_from_clock(); body }
 #
 fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     let span = provider_head(src, node, sp)?.span;
@@ -1895,11 +1899,8 @@ fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!Pars
     let body = kid_expr(kids, 1, sp)?;
     match (node.own_texts(src)) {
         [_, _, provider, ..] => match ((provider, args.len())) {
-            // The provider is called, as the block form calls it, so the name it was
-            // imported by is a use of that import.
-            ("seeded_with_int", 1) | ("seeded_with_clock", 0) => ok(provider_shim(
-                at(Call(provider, args, false), span),
-                body,
+            ("seeded_with_int", 1) | ("seeded_with_clock", 0) => ok(at(
+                ProviderShim(provider, args, body),
                 span,
             )),
             _ => err(ParseError {
@@ -1922,12 +1923,8 @@ fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!Pars
 #          }
 fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     let at_head = provider_head(src, node, sp)?.span;
-    ok(provider_shim(kid_expr(kids, 0, sp)?, kid_expr(kids, 1, sp)?, at_head))
-}
-
-# `shim random` over `provider`, any expression of type `RandomProvider`: the
-# shim of the runtime's generator, seeded from what the provider holds.
-fn provider_shim(provider: Expr, body: Expr, at_head: Span) -> Expr {
+    let provider = kid_expr(kids, 0, sp)?;
+    let body = kid_expr(kids, 1, sp)?;
     let arm = MatchArm {
         pattern: PatCtor("some", bindings=["seed$provider"]),
         body: at(Call("__random_seed", [at(Ident("seed$provider"), at_head)], false), at_head),
@@ -1941,13 +1938,7 @@ fn provider_shim(provider: Expr, body: Expr, at_head: Span) -> Expr {
         ),
         at_head,
     );
-    random_shim(seeding, body, at_head)
-}
-
-# The shim a `random` provider stands for: `random_u64` is the runtime's
-# generator, and `seeding` runs before the body.
-fn random_shim(seeding: Expr, body: Expr, head: Span) -> Expr {
-    at(Shim("random", [("random_u64", "__random_next")], at(Seq(seeding, body), body.span)), head)
+    ok(random_shim(seeding, body, at_head))
 }
 
 # `if (..) { .. }` and `if (let p = e) { .. }`, with or without an `else`. Both
@@ -4868,11 +4859,16 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     ));
 
     // A provider lowers to the shim it stands for, seeding as its body's first step.
-    assert(expr_dump("shim random seeded_with_int(7) { g() }").contains(
-        "Shim(random, [random_u64 = __random_next], Seq(IfLet(",
-    ));
-    assert(expr_dump("shim random seeded_with_int(7) { g() }").contains("seeded_with_int(7)"));
-    assert(expr_dump("shim random seeded_with_clock() { g() }").contains("seeded_with_clock()"));
+    assert(
+        expr_dump(
+            "shim random seeded_with_int(7) { g() }",
+        ) == "Shim(random, [random_u64 = __random_next], Seq(__random_seed(7), g()))",
+    );
+    assert(
+        expr_dump(
+            "shim random seeded_with_clock() { g() }",
+        ) == "Shim(random, [random_u64 = __random_next], Seq(__random_seed_from_clock(), g()))",
+    );
     assert(expr_dump("shim random { p() } { g() }").contains("__random_seed_from_clock()"));
     assert(expr_dump("shim prints { p() } { g() }").starts_with(
         `error: effect "!prints" has no providers`,

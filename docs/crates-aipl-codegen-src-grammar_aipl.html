@@ -832,7 +832,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$73579: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$73610: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -862,11 +862,11 @@
           </h3>
           <pre class="signature"><code>fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p><code>shim &lt;effect&gt; &lt;provider&gt;(args) { body }</code>, lowered to the shim it stands for.</p><p>A provider is a named way to fill in every operation of an effect, for effects whose operations need state that a function cannot hold. <code>random</code> is the one: <code>random_u64</code> is bound to the runtime's generator, and the first thing the body does is seed it —</p><pre><code>shim random seeded_with_int(n) { body }
+          <div class="doc"><p><code>shim &lt;effect&gt; &lt;provider&gt;(args) { body }</code>, lowered to the shim it stands for.</p><p>A provider is a named way to fill in every operation of an effect, for effects whose operations need state that a function cannot hold. <code>random</code> is the one: it is the block form below over the provider the name calls —</p><p>The parse keeps it as written (<code>ProviderShim</code>), so the lints see the provider the author named; <code>desugar.aipl</code> lowers it —</p><pre><code>shim random seeded_with_int(n) { body }
   =&gt; shim random { random_u64 = __random_next } { __random_seed(n); body }
 shim random seeded_with_clock() { body }
   =&gt; shim random { random_u64 = __random_next } { __random_seed_from_clock(); body }
-</code></pre><p>The seed is read inside the shim's body, so the clock a <code>seeded_with_clock</code> reads is an ordinary <code>now_nanos</code> call: the enclosing function declares <code>!clock</code> for it, and a <code>shim clock</code> around the whole thing makes the seed repeatable.</p></div>
+</code></pre></div>
 
 
         </section>
@@ -886,20 +886,6 @@ shim random seeded_with_clock() { body }
          body
      }
 </code></pre></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-random_shim">
-          <h3>
-            <a class="anchor" href="#item-random_shim">random_shim</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn random_shim(seeding: Expr, body: Expr, head: Span) -&#62; Expr</code></pre>
-
-          <div class="doc"><p>The shim a <code>random</code> provider stands for: <code>random_u64</code> is the runtime's generator, and <code>seeding</code> runs before the body.</p></div>
 
 
         </section>
@@ -1489,7 +1475,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$114273: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$113670: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1769,7 +1755,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$129589: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$128986: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -2567,7 +2553,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$172507: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$171904: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

@@ -36,6 +36,20 @@
 
 
 
+        <section class="item" id="item-random_shim">
+          <h3>
+            <a class="anchor" href="#item-random_shim">random_shim</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn random_shim(seeding: Expr, body: Expr, head: Span) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>The shim a <code>random</code> provider stands for: <code>random_u64</code> is the runtime's generator, and <code>seeding</code> runs before the body.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-desugared">
           <h3>
             <a class="anchor" href="#item-desugared">desugared</a>
@@ -384,7 +398,7 @@
             <a class="anchor" href="#item-bind_one_param">bind_one_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_one_param(__spat$23609: Param, body: Expr) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn bind_one_param(__spat$24311: Param, body: Expr) -&#62; Expr</code></pre>
 
           <div class="doc"><p>A destructured parameter's bindings in front of <code>body</code>: the case's payload, or the struct's fields, read off the parameter itself. Folded from the right by the caller so they come out in source order.</p></div>
 

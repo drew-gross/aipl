@@ -38,6 +38,7 @@ import {
     ByPattern,
     ByStruct,
     ByTuple,
+    Call,
     Expr,
     Field,
     For,
@@ -52,7 +53,9 @@ import {
     Match,
     MatchArm,
     Name,
+    ProviderShim,
     Seq,
+    Shim,
     WrittenName,
     WrittenNames,
     WrittenStruct,
@@ -140,6 +143,12 @@ fn desugared_function(self: Function) -> Function {
     }
 }
 
+# The shim a `random` provider stands for: `random_u64` is the runtime's
+# generator, and `seeding` runs before the body.
+pub fn random_shim(seeding: Expr, body: Expr, head: Span) -> Expr {
+    at(Shim("random", [("random_u64", "__random_next")], at(Seq(seeding, body), body.span)), head)
+}
+
 # `self` and every expression under it, the destructuring forms lowered.
 pub fn desugared(self: Expr) -> Expr {
     let inner = self.with_struct_patterns_lifted().map_subexprs(desugared);
@@ -156,6 +165,17 @@ pub fn desugared(self: Expr) -> Expr {
             body,
             index,
             inner.written.value_or(WrittenNames {}),
+        ),
+        ProviderShim(provider, args, body) => random_shim(
+            at(
+                match (provider) {
+                    "seeded_with_int" => Call("__random_seed", args, false),
+                    _ => Call("__random_seed_from_clock", [], false),
+                },
+                inner.span,
+            ),
+            body,
+            inner.span,
         ),
         // A lambda's destructured parameters are bound off the parameter itself, in
         // front of its body, as a function's are.

@@ -401,6 +401,13 @@
 
             </li>
 
+            <li id="item-ProviderShim"><code>ProviderShim(provider: str, args: Expr[], body: Expr)</code>
+
+              <div class="doc"><p><code>shim random seeded_with_int(n) { .. }</code>: the provider the author named, its arguments and the body. Written syntax, kept as it was written so the lints see the name; <code>desugar.aipl</code> lowers it to the shim of the runtime's generator seeded as the provider says, and nothing downstream of it ever sees the node.</p></div>
+
+
+            </li>
+
             <li id="item-FloatLit"><code>FloatLit(str)</code>
 
               <div class="doc"><p>An IEEE 754 literal, as written (<code>1.5</code>, <code>-2e-3</code>). It stays text because its width is the checker's to decide, from the position it sits in, and a literal has to be rounded once, to the width it lands at.</p></div>
