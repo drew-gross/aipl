@@ -7,16 +7,16 @@
 #
 # What has moved so far:
 #
+# - `lint` and `squelch`: the lints, and the `#[allow]` markers that keep what they
+#   flag. They read the program as parsed, so a `.test` block is still an attribute
+#   of its function, a type parameter is still a name, and no destructuring has been
+#   lowered. The hits that survive ride beside the program, for the Rust driver to
+#   report.
 # - `hoist_test_fns`: a `.test` or `.benchmark` attribute becomes ordinary
 #   top-level functions.
 # - `promote_type_vars`: a declaration's own type parameters become type
 #   variables.
-# - `lint` and `squelch`: the lints, and the `#[allow]` markers that keep what they
-#   flag. The hits that survive ride beside the program, for the Rust driver to
-#   report.
-# - `desugar`: the destructuring forms are lowered. It comes after `lint` so the
-#   lints read what the author wrote, with no temporaries the parser would have
-#   bound.
+# - `desugar`: the destructuring forms are lowered.
 #
 # The formatter parses with `aipl_parse_file` and not this, because it lays out
 # the program the author wrote, attributes and all.
@@ -44,10 +44,9 @@ struct PartialLoad { program: Program, lints: LintHit[], type_uses: Span[] = [] 
 # nothing from any other.
 pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let ParsedFile { program, allows, type_uses } = aipl_parse_surface_file(src)?;
-    let loaded = program.hoist_test_fns().promote_type_vars();
     ok(PartialLoad {
-        program: loaded.desugar(),
-        lints: squelch(src, allows, lint(loaded)),
+        program: program.hoist_test_fns().promote_type_vars().desugar(),
+        lints: squelch(src, allows, lint(program)),
         type_uses,
     })
 }.test({

@@ -1,6 +1,5 @@
 lints:
   lints should read the surface tree, as written; today only destructuring (desugar.aipl) and provider shims are kept surface. Move each remaining parse-time lowering into desugar.aipl with a surface ExprKind case (add at the END of the variant): closure shims ($shimfn$ let+lambda; drops the `$` filters in unused_binding/destructure), templates (__aipl_concat/__template_interp chain; interpolation.aipl, interp_to_str.aipl match the name), `$` map, struct spread, assign-path/compound-assign (`set p.xs.push(x)`), for-index counter, then ranges (`Span` construct; map_constant_repeat matches ends_with("Span")) and operators (Call on spelling; operator_pairs.aipl, eta_lambda/field_init_shorthand/fn_body_type_stutter special-case `__builtin_`)
-  run lints before hoist_test_fns/promote_type_vars so a .test block is an attribute of its function again (on_functions rebuilds that; no __test$ names)
   derive type_uses from the surface AST once types carry spans there, and drop the CST side-channel in aipl_parse_surface_file
   `++`/`+=` flavor matching (operator_pairs.aipl) pairs by the `wrapping_`/`saturating_` name prefix; the old Rust lint used the canonical-callee table. Differs only for an absurd alias like `wrapping_add as ++`; use the table if it ever matters
   char_set_literal: the unspellable-character branch is untested

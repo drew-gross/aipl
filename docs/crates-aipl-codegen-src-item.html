@@ -647,7 +647,7 @@
           </h3>
           <pre class="signature"><code>pub fn function_names(self: Function) -&#62; #{str}</code></pre>
 
-          <div class="doc"><p>The names a function mentions: in its signature, its body and its <code>.test</code> body.</p></div>
+          <div class="doc"><p>The names a function mentions: in its signature, its body, its <code>.test</code> body and <code>.benchmark</code> block, and the helpers declared in either.</p></div>
 
 
         </section>
@@ -879,6 +879,20 @@
           <pre class="signature"><code>fn show_import_source(self: ImportSource) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-benchmark_names">
+          <h3>
+            <a class="anchor" href="#item-benchmark_names">benchmark_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn benchmark_names(self: BenchmarkBlock) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a <code>.benchmark</code> block mentions: in the block and in its helpers.</p></div>
 
 
         </section>

@@ -550,14 +550,22 @@ pub fn param_names(self: Param) -> #{str} {
 # The names a payload slot of a variant case mentions: its type and its default.
 pub fn case_param_names(self: CaseParam) -> #{str} { ty_and_default_names(self.ty, self.default) }
 
-# The names a function mentions: in its signature, its body and its `.test` body.
+# The names a function mentions: in its signature, its body, its `.test` body and
+# `.benchmark` block, and the helpers declared in either.
 pub fn function_names(self: Function) -> #{str} {
     #{
         ..self.sig.params$param_names().union_all(),
         ..self.sig.return_ty.optional_ty_names(),
         ..self.body.names_in(),
         ..self.test_body$names_in().value_or(#{}),
+        ..self.test_fns$function_names().union_all(),
+        ..self.benchmark$benchmark_names().value_or(#{}),
     }
+}
+
+# The names a `.benchmark` block mentions: in the block and in its helpers.
+fn benchmark_names(self: BenchmarkBlock) -> #{str} {
+    #{..self.body.names_in(), ..self.fns$function_names().union_all()}
 }
 
 # The names an item mentions outside an import list. An import mentions none.
