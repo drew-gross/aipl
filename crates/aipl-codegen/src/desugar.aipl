@@ -17,6 +17,7 @@ import {
     contains,
     equal as ==,
     extend,
+    first,
     greater_than as >,
     is_empty,
     len,
@@ -40,6 +41,7 @@ import {
     ByTuple,
     Call,
     Expr,
+    ExprKind,
     Field,
     For,
     ForPattern,
@@ -59,14 +61,12 @@ import {
     WrittenName,
     WrittenNames,
     WrittenStruct,
-    at,
     binder_span,
     expr,
     ident,
     join_spans,
-    map_subexprs,
+    mapped,
     name_at,
-    named_at,
     show_expr,
     struct_written,
 } from "./expr.aipl";
@@ -93,9 +93,11 @@ import {
     ArrayRest,
     Ctor,
     Ctor as PatCtor,
+    ElementKind,
     Int,
     Nested,
     Pat,
+    PatElement,
     Tuple,
     Wildcard,
     is_binder_name,
@@ -143,59 +145,31 @@ fn desugared_function(self: Function) -> Function {
     }
 }
 
-# The shim a `random` provider stands for: `random_u64` is the runtime's
-# generator, and `seeding` runs before the body.
-pub fn random_shim(seeding: Expr, body: Expr, head: Span) -> Expr {
-    at(Shim("random", [("random_u64", "__random_next")], at(Seq(seeding, body), body.span)), head)
-}
-
 # `self` and every expression under it, the destructuring forms lowered.
-pub fn desugared(self: Expr) -> Expr {
-    let inner = self.with_struct_patterns_lifted().map_subexprs(desugared);
-    match (inner.kind) {
+pub fn desugared(self: Expr) -> CoreExpr {
+    let kind = self.kind;
+    let written = self.written.value_or(WrittenNames {});
+    match (kind) {
         LetPattern(binding, value, body) => let_pattern(
             binding,
-            value,
-            body,
-            inner.written.value_or(WrittenNames {}),
+            value.desugared(),
+            body.desugared(),
+            written,
         ),
         ForPattern(binding, iterable, body, index) => for_pattern(
             binding,
-            iterable,
-            body,
+            iterable.desugared(),
+            body.desugared(),
             index,
-            inner.written.value_or(WrittenNames {}),
+            written,
         ),
         ProviderShim(provider, args, body) => random_shim(
-            at(
-                match (provider) {
-                    "seeded_with_int" => Call("__random_seed", args, false),
-                    _ => Call("__random_seed_from_clock", [], false),
-                },
-                inner.span,
-            ),
-            body,
-            inner.span,
+            provider,
+            args$desugared(),
+            body.desugared(),
+            self.span,
         ),
-        // A lambda's destructured parameters are bound off the parameter itself, in
-        // front of its body, as a function's are.
-        Lambda(params, body) => Expr {
-            ..inner,
-            kind: Lambda(
-                params.map(|p| LambdaParam { ..p, binding: Name(p.binding.name_at(p.span)) }),
-                params.right_fold(
-                    body,
-                    |p: LambdaParam, result: Expr| bind_param_pattern(
-                        p.binding.name_at(p.span),
-                        p.binding,
-                        p.span,
-                        result,
-                        p.written.value_or(WrittenNames {}),
-                    ),
-                ),
-            ),
-        },
-        _ => inner,
+        _ => core_with_kind(self, mapped(kind, desugared)).with_binders_lowered(),
     }
 }.test({
     // A tuple pattern binds a slot at a time, off a temporary named for the value.
@@ -282,15 +256,81 @@ pub fn desugared(self: Expr) -> Expr {
     assert(ident("x").desugared() == ident("x"));
 })
 
-# `self` with the struct patterns inside its arms' patterns replaced by binders
-# the arm's body reads the fields off.
-fn with_struct_patterns_lifted(self: Expr) -> Expr {
-    let kind = match (self.kind) {
-        Match(scrutinee, arms) => Match(scrutinee, arms$lifted_arm()),
-        IfLet(arm, scrutinee, otherwise) => IfLet(arm.lifted_arm(), scrutinee, otherwise),
-        _ => self.kind,
+# `self`, a node whose children are already lowered, with the binders its patterns write
+# lowered too: the struct patterns inside an arm's pattern become binders the arm's body
+# reads the fields off, and a lambda's destructured parameters are bound off the parameter
+# itself, in front of its body, as a function's are.
+fn with_binders_lowered(self: CoreExpr) -> CoreExpr {
+    let kind = self.kind;
+    match (kind) {
+        Match(scrutinee, arms) => core_with_kind(self, Match(scrutinee, arms$lifted_arm())),
+        IfLet(arm, scrutinee, otherwise) => core_with_kind(
+            self,
+            IfLet(arm.lifted_arm(), scrutinee, otherwise),
+        ),
+        Lambda(params, body) => core_with_kind(
+            self,
+            Lambda(
+                params.map(|p: LambdaParam| LambdaParam {
+                    ..p,
+                    binding: Name(p.binding.name_at(p.span)),
+                }),
+                params.right_fold(
+                    body,
+                    |p: LambdaParam, result: CoreExpr| bind_param_pattern(
+                        p.binding.name_at(p.span),
+                        p.binding,
+                        p.span,
+                        result,
+                        p.written.value_or(WrittenNames {}),
+                    ),
+                ),
+            ),
+        ),
+        _ => self,
+    }
+}
+
+# `base` with another kind: its spans and source stay.
+fn core_with_kind(
+    Expr { span, value_span, name_span, source, written },
+    kind: CoreKind,
+) -> CoreExpr { Expr { kind, span, value_span, name_span, source, written } }
+
+# The shim a `random` provider stands for: `random_u64` is the runtime's generator, and
+# the seeding runs before the body. `seeded_with_int(n)` seeds with `n`,
+# `seeded_with_clock()` from the clock, and `seeded_with_provider(p)` from a value that
+# holds the seed to start from, `none` for the clock.
+fn random_shim(provider: str, args: CoreExpr[], body: CoreExpr, head: Span) -> CoreExpr {
+    let clock = core_at(Call("__random_seed_from_clock", [], false), head);
+    let seeding = match (provider) {
+        "seeded_with_int" => core_at(Call("__random_seed", args, false), head),
+        "seeded_with_provider" => match (args.first()) {
+            some(value) => core_at(
+                IfLet(
+                    MatchArm {
+                        pattern: PatCtor("some", bindings=["seed$provider"]),
+                        body: core_at(
+                            Call("__random_seed", [core_at(Ident("seed$provider"), head)], false),
+                            head,
+                        ),
+                        span: head,
+                        written: none,
+                    },
+                    core_at(Field(value, "seed"), head),
+                    clock,
+                ),
+                head,
+            ),
+            // Not `map`: what a closure builds is not held to the clean type here.
+            none => clock, #[allow]
+        },
+        _ => clock,
     };
-    Expr { ..self, kind }
+    core_at(
+        Shim("random", [("random_u64", "__random_next")], core_at(Seq(seeding, body), body.span)),
+        head,
+    )
 }
 
 # A struct pattern nested in another pattern — `[Point { x, y }]` — always
@@ -298,19 +338,19 @@ fn with_struct_patterns_lifted(self: Expr) -> Expr {
 # the struct pattern stood, and its body starts by reading the fields off it, the
 # way `let Point { x, y } = temporary;` would. Temporaries are named for where the
 # arm's pattern starts and the struct pattern's place in it.
-fn lifted_arm(self: MatchArm) -> MatchArm {
+fn lifted_arm(self: CoreMatchArm) -> CoreMatchArm {
     let written = self.written.value_or(WrittenNames {});
     let Lifted { pattern, structs } = self.pattern.lifted(self.span.start, 0, written);
     let span = self.span;
     let body = structs.right_fold(
         self.body,
-        |found: Found, rest: Expr| {
+        |found: Found, rest: CoreExpr| {
             let Found { binder, struct_name, fields, names, temporary, spelled } = found.bound_only();
             destructure_struct(
                 struct_name,
                 fields,
                 names,
-                at(Ident(binder), span),
+                core_at(Ident(binder), span),
                 span,
                 rest,
                 false,
@@ -412,21 +452,64 @@ fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -> Lifte
     LiftedAll { patterns, structs }
 }
 
+# The tree every pass after this one is handed: an expression with none of the surface forms
+# `desugared` lowers anywhere in it. The refinements are stacked through names, since a
+# `without` clause takes one exclusion.
+variant NoLetPatternExpr = Expr without LetPattern throughout
+
+variant NoForPatternExpr = NoLetPatternExpr without ForPattern throughout
+
+variant CoreExpr = NoForPatternExpr without ProviderShim throughout
+
+variant NoLetPatternKind = ExprKind without LetPattern throughout
+
+variant NoForPatternKind = NoLetPatternKind without ForPattern throughout
+
+variant CoreKind = NoForPatternKind without ProviderShim throughout
+
+variant NoLetPatternArm = MatchArm without LetPattern throughout
+
+variant NoForPatternArm = NoLetPatternArm without ForPattern throughout
+
+variant CoreMatchArm = NoForPatternArm without ProviderShim throughout
+
+# `at`, for a kind that holds no surface form, so what it builds holds none either.
+fn core_at(kind: CoreKind, span: Span) -> CoreExpr {
+    Expr { kind, span, value_span: 0..0, name_span: 0..0, source: "" }
+}
+
+# `named_at`, for an expression that holds no surface form.
+fn core_named_at(self: CoreExpr, name_span: Span) -> CoreExpr {
+    Expr {
+        kind: self.kind,
+        span: self.span,
+        value_span: self.value_span,
+        name_span,
+        source: self.source,
+        written: self.written,
+    }
+}
+
 # `let <pattern> = value; body`. The temporary is named for where the value
 # starts, and holds the value so it is evaluated once.
-fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames) -> Expr {
+fn let_pattern(
+    binding: Binding,
+    value: CoreExpr,
+    body: CoreExpr,
+    written: WrittenNames,
+) -> CoreExpr {
     let span = value.span;
     match (binding) {
-        Name(name) => at(Let(name, none, value, body), join_spans(span, body.span)),
+        Name(name) => core_at(Let(name, none, value, body), join_spans(span, body.span)),
         ByTuple(names) => {
             let tmp = `__tpat${span.start}`;
             let inner = bind_fields(names, tmp, span, body, tuple_slot_names(names), written);
-            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
+            core_at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
         ByCase(case_name, names) => {
             let tmp = `__cpat${span.start}`;
             let inner = bind_arm(case_name, names, tmp, span, body, written);
-            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
+            core_at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
         ByStruct(struct_name, fields, names, mutable) => destructure_struct(
             struct_name,
@@ -442,7 +525,7 @@ fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames)
         ByPattern(pattern) => {
             let tmp = `__cpat${span.start}`;
             let inner = bind_pattern(pattern, tmp, span, body, written);
-            at(Let(tmp, none, value, inner), join_spans(span, inner.span))
+            core_at(Let(tmp, none, value, inner), join_spans(span, inner.span))
         },
         // The value is the name, and the inner binding reads its parts off it. A struct
         // annotates the name itself, which is what holds the value to the struct written.
@@ -460,7 +543,7 @@ fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames)
             ),
             _ => {
                 let rest = bind_off(inner, name, span, body, written);
-                at(Let(name, none, value, rest), join_spans(span, rest.span))
+                core_at(Let(name, none, value, rest), join_spans(span, rest.span))
             },
         },
     }
@@ -473,29 +556,35 @@ fn let_pattern(binding: Binding, value: Expr, body: Expr, written: WrittenNames)
 # temporary: the counter and the pattern compose as each does alone.
 fn for_pattern(
     binding: Binding,
-    iterable: Expr,
-    body: Expr,
+    iterable: CoreExpr,
+    body: CoreExpr,
     index: str?,
     written: WrittenNames,
-) -> Expr {
+) -> CoreExpr {
     let span = iterable.span;
     // A plain name is the loop variable itself, and so is an alias's.
     if (let Name(name) = binding) {
-        return at(For(name, iterable, body, index=index), join_spans(span, body.span));
+        return core_at(For(name, iterable, body, index=index), join_spans(span, body.span));
     };
     if (let Alias(name, inner) = binding) {
         let rest = bind_off(inner, name, span, body, written);
-        return at(For(name, iterable, rest, index=index), join_spans(span, rest.span));
+        return core_at(For(name, iterable, rest, index=index), join_spans(span, rest.span));
     };
     let tmp = `__fpat${span.start}`;
     let inner = bind_off(binding, tmp, span, body, written);
-    at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
+    core_at(For(tmp, iterable, inner, index=index), join_spans(span, inner.span))
 }
 
 # The names `binding` binds, read off the variable `tmp` in front of `body`. A
 # struct is read through a binding annotated with its type, which is what checks the
 # pattern names the right one.
-fn bind_off(binding: Binding, tmp: str, span: Span, body: Expr, written: WrittenNames) -> Expr {
+fn bind_off(
+    binding: Binding,
+    tmp: str,
+    span: Span,
+    body: CoreExpr,
+    written: WrittenNames,
+) -> CoreExpr {
     match (binding) {
         Name(..) => body,
         ByTuple(names) => bind_fields(names, tmp, span, body, tuple_slot_names(names), written),
@@ -504,7 +593,7 @@ fn bind_off(binding: Binding, tmp: str, span: Span, body: Expr, written: Written
             struct_name,
             fields,
             names,
-            at(Ident(tmp), span),
+            core_at(Ident(tmp), span),
             span,
             body,
             mutable,
@@ -514,7 +603,7 @@ fn bind_off(binding: Binding, tmp: str, span: Span, body: Expr, written: Written
         ByPattern(pattern) => bind_pattern(pattern, tmp, span, body, written),
         Alias(name, inner) => {
             let rest = bind_off(inner, name, span, body, written);
-            at(Let(name, none, at(Ident(tmp), span), rest), join_spans(span, rest.span))
+            core_at(Let(name, none, core_at(Ident(tmp), span), rest), join_spans(span, rest.span))
         },
     }
 }
@@ -530,10 +619,10 @@ fn bind_fields(
     names: str[],
     tmp: str,
     span: Span,
-    rest: Expr,
+    rest: CoreExpr,
     fields: str[],
     written: WrittenNames,
-) -> Expr {
+) -> CoreExpr {
     let spelled = WrittenStruct {
         fields: [],
         binders: names.map(|name| WrittenName { text: name, span: written.binder_span(name) }),
@@ -545,26 +634,27 @@ fn bind_fields_mut(
     names: str[],
     tmp: str,
     span: Span,
-    rest: Expr,
+    rest: CoreExpr,
     fields: str[],
     mutable: bool,
     spelled: WrittenStruct,
-) -> Expr {
+) -> CoreExpr {
     mut result = rest;
     mut i = names.len();
     while (i > 0) {
         set i--;
         let field_at = spelled.fields[i]$span.value_or(0..0);
         let binder_at = spelled.binders[i]$span.value_or(0..0);
-        let field = at(Field(at(Ident(tmp), span), fields[i].value_or("")), span).named_at(
-            field_at,
-        );
+        let field = core_at(
+            Field(core_at(Ident(tmp), span), fields[i].value_or("")),
+            span,
+        ).core_named_at(field_at);
         let inner_span = join_spans(span, result.span);
         let name = names[i].value_or("");
         set result = if (mutable) {
-            at(LetMut(name, none, field, result), inner_span).named_at(binder_at)
+            core_at(LetMut(name, none, field, result), inner_span).core_named_at(binder_at)
         } else {
-            at(Let(name, none, field, result), inner_span).named_at(binder_at)
+            core_at(Let(name, none, field, result), inner_span).core_named_at(binder_at)
         };
     }
     result
@@ -582,14 +672,20 @@ fn bind_arm(
     names: str[],
     tmp: str,
     span: Span,
-    rest: Expr,
+    rest: CoreExpr,
     written: WrittenNames,
-) -> Expr { bind_pattern(PatCtor(case_name, bindings=names), tmp, span, rest, written) }
+) -> CoreExpr { bind_pattern(PatCtor(case_name, bindings=names), tmp, span, rest, written) }
 
 # The same for any pattern: a `match` of `pattern` per name it binds, with the
 # other names left unbound. Struct patterns inside it become binders and reads in
 # front of the arm's body, as in any other arm.
-fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr, written: WrittenNames) -> Expr {
+fn bind_pattern(
+    pattern: Pat,
+    tmp: str,
+    span: Span,
+    rest: CoreExpr,
+    written: WrittenNames,
+) -> CoreExpr {
     let names = pattern.pat_bindings();
     mut result = rest;
     mut i = names.len();
@@ -598,15 +694,15 @@ fn bind_pattern(pattern: Pat, tmp: str, span: Span, rest: Expr, written: Written
         let name = names[i].value_or("");
         let arm = MatchArm {
             pattern: pattern.keeping(name),
-            body: at(Ident(name), span),
+            body: core_at(Ident(name), span),
             span,
             written: some(written),
         }.lifted_arm();
-        let read = at(Match(at(Ident(tmp), span), [arm]), span);
-        set result = at(
+        let read = core_at(Match(core_at(Ident(tmp), span), [arm]), span);
+        set result = core_at(
             Let(name, none, read, result),
             join_spans(span, result.span),
-        ).named_at(written.binder_span(name));
+        ).core_named_at(written.binder_span(name));
     }
     result
 }
@@ -645,8 +741,12 @@ fn keeping(self: Pat, name: str) -> Pat {
 }
 
 # An array pattern's element, `_` unless it is the binder `name`.
-fn keeping_ident(self: Expr, name: str) -> Expr {
-    if (let Ident(bound) = self.kind) { if (bound != name) { return at(Ident("_"), self.span); }; };
+fn keeping_ident(self: PatElement, name: str) -> PatElement {
+    if (let Binder(bound) = self.kind) {
+        if (bound != name) {
+            return PatElement { kind: ElementKind.Binder("_"), span: self.span };
+        };
+    };
     self
 }
 
@@ -660,22 +760,22 @@ fn destructure_struct(
     struct_name: str,
     fields: str[],
     names: str[],
-    value: Expr,
+    value: CoreExpr,
     span: Span,
-    acc: Expr,
+    acc: CoreExpr,
     mutable: bool,
     tmp: str,
     spelled: WrittenStruct,
-) -> Expr {
+) -> CoreExpr {
     let inner = bind_fields_mut(names, tmp, span, acc, fields, mutable, spelled);
     let outer_span = join_spans(span, inner.span);
-    at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
+    core_at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
 }
 
 # A destructured parameter's bindings in front of `body`: the case's payload, or
 # the struct's fields, read off the parameter itself. Folded from the right by the
 # caller so they come out in source order.
-fn bind_one_param(Param { binding, name_span, written }, body: Expr) -> Expr {
+fn bind_one_param(Param { binding, name_span, written }, body: CoreExpr) -> CoreExpr {
     let name = binding.name_at(name_span);
     bind_param_pattern(name, binding, name_span, body, written.value_or(WrittenNames {}))
 }
@@ -686,9 +786,9 @@ fn bind_param_pattern(
     parameter: str,
     pattern: Binding,
     span: Span,
-    body: Expr,
+    body: CoreExpr,
     written: WrittenNames,
-) -> Expr {
+) -> CoreExpr {
     match (pattern) {
         Name(..) => body,
         ByCase(case_name, names) => bind_arm(case_name, names, parameter, span, body, written),
@@ -715,7 +815,10 @@ fn bind_param_pattern(
             bind_param_pattern(parameter, inner, span, body, written)
         } else {
             let rest = bind_param_pattern(name, inner, span, body, written);
-            at(Let(name, none, at(Ident(parameter), span), rest), join_spans(span, rest.span))
+            core_at(
+                Let(name, none, core_at(Ident(parameter), span), rest),
+                join_spans(span, rest.span),
+            )
         },
     }
 }

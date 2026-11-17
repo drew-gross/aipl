@@ -22,6 +22,58 @@
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-PatElement">
+          <h3>
+            <a class="anchor" href="#item-PatElement">PatElement</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct PatElement</code></pre>
+
+          <div class="doc"><p>One element of a simple array pattern, and where it was written: a binder name (<code>_</code> included) or a literal. It holds no expression, so a pattern cannot hold a node of the expression tree; the Rust side reads each as the identifier or literal expression codegen compiles.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ElementKind">
+          <h3>
+            <a class="anchor" href="#item-ElementKind">ElementKind</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ElementKind</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+          <ul class="cases">
+
+            <li id="item-Binder"><code>Binder(str)</code>
+
+
+            </li>
+
+            <li id="item-Text"><code>Text(str)</code>
+
+
+            </li>
+
+            <li id="item-Letter"><code>Letter(char)</code>
+
+
+            </li>
+
+            <li id="item-Number"><code>Number(i64)</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
         <section class="item" id="item-Pat">
           <h3>
             <a class="anchor" href="#item-Pat">Pat</a>
@@ -77,14 +129,14 @@
 
             </li>
 
-            <li id="item-Array"><code>Array(Expr[])</code>
+            <li id="item-Array"><code>Array(PatElement[])</code>
 
-              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm, every element of which is a plain binder name or a literal. The elements are <em>expressions</em> rather than patterns because that is the shape codegen compiles directly, and because an expression carries the span a diagnostic about one element wants.</p></div>
+              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm, every element of which is a plain binder name or a literal. The elements are not patterns because that is the shape codegen compiles directly, and each carries the span a diagnostic about it wants.</p></div>
 
 
             </li>
 
-            <li id="item-ArrayRest"><code>ArrayRest(Expr[])</code>
+            <li id="item-ArrayRest"><code>ArrayRest(PatElement[])</code>
 
               <div class="doc"><p>The same, of an array of <em>at least</em> that many elements, written with a trailing <code>..</code> — <code>[first, ..]</code>. The elements are the first ones; the rest are not looked at. Only the plain elements <code>Array</code> takes are allowed, so it is compiled the way <code>Array</code> is, with a length test of <code>&gt;=</code> in place of <code>==</code>.</p></div>
 
@@ -335,7 +387,7 @@
             <a class="anchor" href="#item-is_ident">is_ident</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_ident(self: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_ident(self: PatElement) -&#62; bool</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -349,7 +401,49 @@
             <a class="anchor" href="#item-ident_name">ident_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn ident_name(self: Expr) -&#62; str</code></pre>
+          <pre class="signature"><code>fn ident_name(self: PatElement) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-element">
+          <h3>
+            <a class="anchor" href="#item-element">element</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn element(kind: ElementKind) -&#62; PatElement</code></pre>
+
+          <div class="doc"><p>An element at no particular place, for tests.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_element">
+          <h3>
+            <a class="anchor" href="#item-show_element">show_element</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_element(self: PatElement) -&#62; str</code></pre>
+
+          <div class="doc"><p>An element as it is written: a name, <code>_</code>, or a tagged literal.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_elements">
+          <h3>
+            <a class="anchor" href="#item-show_elements">show_elements</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_elements(self: PatElement[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

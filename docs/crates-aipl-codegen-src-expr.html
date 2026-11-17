@@ -403,7 +403,7 @@
 
             <li id="item-ProviderShim"><code>ProviderShim(provider: str, args: Expr[], body: Expr)</code>
 
-              <div class="doc"><p><code>shim random seeded_with_int(n) { .. }</code>: the provider the author named, its arguments and the body. Written syntax, kept as it was written so the lints see the name; <code>desugar.aipl</code> lowers it to the shim of the runtime's generator seeded as the provider says, and nothing downstream of it ever sees the node.</p></div>
+              <div class="doc"><p><code>shim random seeded_with_int(n) { .. }</code>: the provider the author named, its arguments and the body. Written syntax, kept as it was written so the lints see the name; <code>desugar.aipl</code> lowers it to the shim of the runtime's generator seeded as the provider says, and nothing downstream of it ever sees the node. The block form <code>shim random { p } { .. }</code> is the provider <code>seeded_with_provider</code> applied to <code>p</code>.</p></div>
 
 
             </li>
@@ -599,6 +599,20 @@
 
 
 
+        <section class="item" id="item-mapped">
+          <h3>
+            <a class="anchor" href="#item-mapped">mapped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn mapped(kind: ExprKind without X, f: (Expr) -&#62; Expr without X throughout) -&#62; ExprKind without X throughout</code></pre>
+
+          <div class="doc"><p><code>kind</code> with <code>f</code> applied to each of its direct sub-expressions, and nothing else changed: not the names, types and patterns it carries, and not the sub-expressions' own children — a pass that wants to reach those recurses through <code>f</code>. The sub-expressions are the same ones Rust's <code>each_subexpr</code> walks: a <code>Shim</code>'s bindings name functions and a pattern binds names, so only a shim's body and an arm's body nest expressions.</p><p>What <code>f</code> leaves out of every expression it returns, the result leaves out: a case <code>kind</code> is not, <code>f</code> keeps out of the parts, and the parts are all there is to a node. So a pass that has dealt with some cases at the node itself gets a node with none of them in it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-map_subexprs">
           <h3>
             <a class="anchor" href="#item-map_subexprs">map_subexprs</a>
@@ -606,7 +620,7 @@
           </h3>
           <pre class="signature"><code>pub fn map_subexprs(self: Expr, f: (Expr) -&#62; Expr) -&#62; Expr</code></pre>
 
-          <div class="doc"><p><code>self</code> with <code>f</code> applied to each of its direct sub-expressions, and nothing else changed: not <code>self</code>'s own kind payload (names, types, patterns), not its spans, and not the sub-expressions' own children — a pass that wants to reach those recurses through <code>f</code>. The sub-expressions are the same ones Rust's <code>each_subexpr</code> walks: a <code>Shim</code>'s bindings name functions and a pattern binds names, so only a shim's body and an arm's body nest expressions.</p></div>
+          <div class="doc"><p><code>self</code> with <code>f</code> applied to each of its direct sub-expressions, and nothing else changed: not <code>self</code>'s own kind payload (names, types, patterns), not its spans, and not the sub-expressions' own children — see <code>mapped</code>.</p></div>
 
 
         </section>
@@ -908,76 +922,6 @@
           <pre class="signature"><code>fn show_binding(self: Binding) -&#62; str</code></pre>
 
           <div class="doc"><p><code>f</code> applied to each of <code>xs</code>. A binding as one line, for the dump: <code>x</code>, <code>(a, b)</code>, <code>Case(a, b)</code>, <code>T { x as a, y }</code> (and <code>mut T { .. }</code>). A field bound under its own name prints bare.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-each_mapped">
-          <h3>
-            <a class="anchor" href="#item-each_mapped">each_mapped</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn each_mapped(xs: Expr[], f: (Expr) -&#62; Expr) -&#62; Expr[]</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-optional_mapped">
-          <h3>
-            <a class="anchor" href="#item-optional_mapped">optional_mapped</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn optional_mapped(x: Expr?, f: (Expr) -&#62; Expr) -&#62; Expr?</code></pre>
-
-          <div class="doc"><p><code>f</code> applied to <code>x</code> when it is present.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-inits_mapped">
-          <h3>
-            <a class="anchor" href="#item-inits_mapped">inits_mapped</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn inits_mapped(inits: FieldInit[], f: (Expr) -&#62; Expr) -&#62; FieldInit[]</code></pre>
-
-          <div class="doc"><p><code>f</code> applied to the value of each field initializer.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-arms_mapped">
-          <h3>
-            <a class="anchor" href="#item-arms_mapped">arms_mapped</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn arms_mapped(arms: MatchArm[], f: (Expr) -&#62; Expr) -&#62; MatchArm[]</code></pre>
-
-          <div class="doc"><p><code>f</code> applied to the body of each arm.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-pairs_mapped">
-          <h3>
-            <a class="anchor" href="#item-pairs_mapped">pairs_mapped</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn pairs_mapped(pairs: (Expr, Expr)[], f: (Expr) -&#62; Expr) -&#62; (Expr, Expr)[]</code></pre>
-
-          <div class="doc"><p>Both halves of each entry of a dict literal mapped by <code>f</code>. (<code>pairs.map(|p| (f(p.0), f(p.1)))</code> panics the compiler: &quot;Synthetic-type members cannot be unit&quot;.)</p></div>
 
 
         </section>

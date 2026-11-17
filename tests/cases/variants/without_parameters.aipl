@@ -1,0 +1,67 @@
+# A function may be generic over a set of cases: `<X: cases>` names them, `Kind without X`
+# leaves them out of one node, and `Node without X throughout` leaves them out of everything.
+# The cases are settled by the arguments, so one `mapped` serves the plain tree (nothing left
+# out) and the tree with `Stub` gone, and says in its result what it was given.
+
+import { equal as ==, max, wrapping_add as + } from builtins;
+
+variant Kind = Num(i64) | Stub | Pair(Node, Node)
+
+struct Node { kind: Kind, label: str }
+
+// The same shape with its children mapped by `f`. What `f` leaves out of each child, the
+// result leaves out of the node: a `Num` is not a `Stub` and a `Pair` holds what `f` made.
+fn mapped<X: cases>(
+    kind: Kind without X,
+    f: (Node) -> Node without X throughout,
+) -> Kind without X throughout {
+    match (kind) {
+        Num(n) => Num(n),
+        Stub => Stub,
+        Pair(a, b) => Pair(f(a), f(b)),
+    }
+}.test({
+    // Nothing left out: any `f` will do.
+    let tree = Node {
+        kind: Pair(Node { kind: Stub, label: "a" }, Node { kind: Num(1), label: "b" }),
+        label: "t",
+    };
+    assert(mapped(tree.kind, |n: Node| Node { kind: n.kind, label: `{n.label}!` }) == Pair(
+        Node { kind: Stub, label: "a!" },
+        Node { kind: Num(1), label: "b!" },
+    ));
+})
+
+// A tree with every `Stub` replaced: the node itself is dealt with by the match, its children
+// by `mapped`, and the result says no `Stub` is left anywhere.
+fn unstubbed(n: Node) -> Node without Stub throughout {
+    let kind = n.kind;
+    match (kind) {
+        Stub => Node { kind: Num(0), label: n.label },
+        _ => Node { kind: mapped(kind, unstubbed), label: n.label },
+    }
+}.test({
+    let tree = Node {
+        kind: Pair(Node { kind: Stub, label: "a" }, Node { kind: Num(1), label: "b" }),
+        label: "t",
+    };
+    assert(unstubbed(tree) == Node {
+        kind: Pair(Node { kind: Num(0), label: "a" }, Node { kind: Num(1), label: "b" }),
+        label: "t",
+    });
+})
+
+// And what it returns goes where a tree without `Stub` is wanted.
+fn depth(n: Node without Stub throughout) -> i64 {
+    match (n.kind) {
+        Num(..) => 0,
+        Pair(a, b) => 1 + max(depth(a), depth(b)),
+    }
+}.test({
+    assert(
+        depth(unstubbed(Node {
+            kind: Pair(Node { kind: Stub, label: "a" }, Node { kind: Num(1), label: "b" }),
+            label: "t",
+        })) == 1,
+    );
+})

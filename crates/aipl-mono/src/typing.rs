@@ -468,6 +468,16 @@ impl TypeValidator<'_> {
             // instantiation.
             Type::Without(base, exclusion) => {
                 self.check_ty(base, type_params, ctx)?;
+                // A refinement parameter (`without X`, with `X` declared `<X: cases>`) names
+                // whatever cases a call gives it.
+                if let Exclusion::NamedCase(n) | Exclusion::Throughout(n) = exclusion {
+                    if type_params
+                        .iter()
+                        .any(|p| p.strip_prefix('$') == Some(n.as_str()))
+                    {
+                        return Ok(());
+                    }
+                }
                 match (exclusion, aipl_syntax::unrefined(base)) {
                     (Exclusion::EmptyArray, Type::Array(_) | Type::TypeVar(_)) => Ok(()),
                     (Exclusion::EmptyArray, other) => Err(Error::msg(format!(
@@ -1278,6 +1288,60 @@ impl DeclTables<'_> {
     /// `V without C throughout` reaches through, and where it stops.
     pub(crate) fn named_reaches_case(&self, name: &str, case: &str) -> bool {
         self.named_reaches(name, case, &mut HashSet::new())
+    }
+
+    /// Whether a value of the type `name` can hold a value of the variant `target`: it is that
+    /// variant, or a struct or variant whose fields or payloads can. What a refinement parameter's
+    /// cases are reached through, since which cases it names is not known.
+    pub(crate) fn named_reaches_variant(&self, name: &str, target: &str) -> bool {
+        self.reaches_variant(&Type::Named(name.to_string()), target, &mut HashSet::new())
+    }
+
+    fn reaches_variant(&self, t: &Type, target: &str, seen: &mut HashSet<String>) -> bool {
+        match t {
+            Type::Named(n) if n == target => true,
+            Type::Named(n) => {
+                if !seen.insert(n.clone()) {
+                    return false;
+                }
+                let mut parts: Vec<&Type> = Vec::new();
+                if let Some(cases) = self.variants.get(n) {
+                    parts.extend(cases.iter().flat_map(|(_, payload)| payload.iter()));
+                } else if let Some(fields) = self.structs.get(n) {
+                    parts.extend(fields.iter().map(|(_, t, _)| t));
+                }
+                parts
+                    .into_iter()
+                    .any(|p| self.reaches_variant(p, target, seen))
+            }
+            Type::Generic(n, args) => {
+                let mut parts: Vec<&Type> = args.iter().collect();
+                if let Some(v) = self.generic_variants.get(n) {
+                    parts.extend(v.cases.iter().flat_map(|c| c.payload.iter().map(|p| &p.ty)));
+                } else if let Some(s) = self.generic_structs.get(n) {
+                    parts.extend(s.fields.iter().map(|f| &f.ty));
+                }
+                parts
+                    .into_iter()
+                    .any(|p| self.reaches_variant(p, target, seen))
+            }
+            Type::Case(i)
+            | Type::Optional(i)
+            | Type::Array(i)
+            | Type::Set(i, _)
+            | Type::Without(i, _) => self.reaches_variant(i, target, seen),
+            Type::Dict(a, b) | Type::Result(a, b) => {
+                self.reaches_variant(a, target, seen) || self.reaches_variant(b, target, seen)
+            }
+            Type::Tuple(es) => es.iter().any(|e| self.reaches_variant(e, target, seen)),
+            Type::Unit
+            | Type::Primitive(_)
+            | Type::TypeVar(_)
+            | Type::Any
+            | Type::Unknown
+            | Type::ConcatStr
+            | Type::Fn(..) => false,
+        }
     }
 
     /// [`DeclTables::named_reaches_case`] for a written type, through whatever it wraps.

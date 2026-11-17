@@ -686,6 +686,7 @@ mod tests {
             is_pub: false,
             sig: Signature {
                 type_vars: Vec::new(),
+                case_params: Vec::new(),
                 params: Vec::new(),
                 effects: Vec::new(),
                 return_ty: None,

@@ -150,11 +150,17 @@ fn const_decl(v: &FfiValue) -> R<ast::ConstDecl> {
 
 fn function(v: &FfiValue) -> R<ast::Function> {
     let sig = field(v, "sig")?;
+    // A refinement parameter (`<X: cases>`) is not a type variable: it is kept apart.
+    let (case_vars, type_vars): (Vec<_>, Vec<_>) = each(field(sig, "type_vars")?, type_param)?
+        .into_iter()
+        .partition(|p| p.bound == ast::Bound::Cases);
+    let case_params: Vec<String> = case_vars.into_iter().map(|p| p.name).collect();
     Ok(ast::Function {
         name: span_str(field(v, "name")?)?,
         is_pub: flag(field(v, "is_pub")?)?,
         sig: ast::Signature {
-            type_vars: each(field(sig, "type_vars")?, type_param)?,
+            type_vars,
+            case_params,
             params: each(field(sig, "params")?, param)?,
             effects: each(field(sig, "effects")?, text)?,
             return_ty: maybe(field(sig, "return_ty")?, ty)?,
@@ -217,6 +223,7 @@ fn bound(v: &FfiValue) -> R<ast::Bound> {
         "Ord" => ast::Bound::Ord,
         "Int" => ast::Bound::Int,
         "Variant" => ast::Bound::Variant,
+        "Cases" => ast::Bound::Cases,
         other => return Err(unknown("Bound", other)),
     })
 }
@@ -382,8 +389,8 @@ fn pattern(v: &FfiValue) -> R<ast::Pattern> {
         },
         "Str" => ast::Pattern::Str(text(at(payload, 0, case)?)?),
         "Char" => ast::Pattern::Char(byte(at(payload, 0, case)?)?),
-        "Array" => ast::Pattern::Array(each(at(payload, 0, case)?, expr)?),
-        "ArrayRest" => ast::Pattern::ArrayRest(each(at(payload, 0, case)?, expr)?),
+        "Array" => ast::Pattern::Array(each(at(payload, 0, case)?, pattern_element)?),
+        "ArrayRest" => ast::Pattern::ArrayRest(each(at(payload, 0, case)?, pattern_element)?),
         "ArrayNested" => ast::Pattern::ArrayNested(each(at(payload, 0, case)?, pattern)?),
         "Wildcard" => ast::Pattern::Wildcard,
         "Tuple" => ast::Pattern::Tuple(each(at(payload, 0, case)?, pattern)?),
@@ -482,6 +489,20 @@ fn expr(v: &FfiValue) -> R<ast::Expr> {
         }
         None => built,
     })
+}
+
+/// An element of a simple array pattern: a binder or a literal, and where it was written,
+/// read as the identifier or literal expression codegen compiles.
+fn pattern_element(v: &FfiValue) -> R<ast::Expr> {
+    let (case, payload) = variant(field(v, "kind")?)?;
+    let kind = match case {
+        "Binder" => ast::ExprKind::Ident(text(at(payload, 0, case)?)?),
+        "Text" => ast::ExprKind::Str(text(at(payload, 0, case)?)?),
+        "Letter" => ast::ExprKind::Char(byte(at(payload, 0, case)?)?),
+        "Number" => ast::ExprKind::Num(int(at(payload, 0, case)?)?),
+        other => return Err(unknown("ElementKind", other)),
+    };
+    Ok(ast::Expr::new(kind, span(field(v, "span")?)?))
 }
 
 fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {

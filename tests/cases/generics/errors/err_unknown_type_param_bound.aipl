@@ -2,7 +2,7 @@
 
 fn f<T: whatever>(x: T) -> T { x }
 --- check --compile ---
-error: unknown type parameter bound "whatever"; expected "any" or "ord"
+error: unknown type parameter bound "whatever"; expected "any", "ord", "int" or "cases"
  --> ./tests/cases/generics/errors/err_unknown_type_param_bound.aipl:3:9
   |
 3 | fn f<T: whatever>(x: T) -> T { x }

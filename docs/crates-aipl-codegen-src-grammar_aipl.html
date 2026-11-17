@@ -832,7 +832,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$73805: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$73825: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -880,12 +880,7 @@ shim random seeded_with_clock() { body }
           </h3>
           <pre class="signature"><code>fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p><code>shim random { provider } { body }</code>: the first block is any expression of type <code>RandomProvider</code>, so which provider to use can be decided at run time. A provider holds the seed to start from, <code>none</code> for the clock, and the seeding reads it:</p><pre><code>shim random { p } { body }
-  =&gt; shim random { random_u64 = __random_next } {
-         if (let some(seed) = p.seed) { __random_seed(seed) } else { __random_seed_from_clock() };
-         body
-     }
-</code></pre></div>
+          <div class="doc"><p><code>shim random { provider } { body }</code>: the first block is any expression of type <code>RandomProvider</code>, so which provider to use can be decided at run time. It is the provider <code>seeded_with_provider</code>, applied to that expression: <code>desugar.aipl</code> lowers it like the other providers.</p></div>
 
 
         </section>
@@ -1475,7 +1470,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$113865: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$113301: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1666,14 +1661,14 @@ if (let some(..) = target[__iset$N]) {
 
 
 
-        <section class="item" id="item-plain_elem_expr">
+        <section class="item" id="item-plain_element">
           <h3>
-            <a class="anchor" href="#item-plain_elem_expr">plain_elem_expr</a>
+            <a class="anchor" href="#item-plain_element">plain_element</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn plain_elem_expr(self: Pat, span: Span) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn plain_element(self: Pat, span: Span) -&#62; PatElement</code></pre>
 
-          <div class="doc"><p>A plain element as the expression the simple <code>Array</code> form holds, spanned where it was written. Total over what <code>is_plain_elem</code> admits; anything else has already taken the nested path.</p></div>
+          <div class="doc"><p>A plain element as the simple <code>Array</code> form holds it, spanned where it was written. Total over what <code>is_plain_elem</code> admits; anything else has already taken the nested path.</p></div>
 
 
         </section>
@@ -1755,7 +1750,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$129181: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$128693: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -2553,7 +2548,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$172099: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$171627: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

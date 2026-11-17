@@ -2,6 +2,7 @@
 # declared across; see `ast.aipl`.
 
 import {
+    Span,
     all,
     contains,
     equal as ==,
@@ -15,7 +16,14 @@ import {
     not_equal as !=,
     zip_with,
 } from builtins;
-import { Expr, Ident, ident, num, show_exprs } from "./expr.aipl";
+
+# One element of a simple array pattern, and where it was written: a binder name (`_`
+# included) or a literal. It holds no expression, so a pattern cannot hold a node of the
+# expression tree; the Rust side reads each as the identifier or literal expression
+# codegen compiles.
+struct PatElement { kind: ElementKind, span: Span }
+
+variant ElementKind = Binder(str) | Text(str) | Letter(char) | Number(i64)
 
 # `aipl_syntax::ast::Pattern`, less its `Bind` case. Its `Ctor` case is a
 # struct variant there and a named payload here, which is as close as the two
@@ -47,15 +55,15 @@ variant Pat =
     # A char literal pattern (`'c' => ..`), against a `char` scrutinee.
     | Char(char)
     # The destructuring `[a, b] => ..` arm, every element of which is a plain
-    # binder name or a literal. The elements are *expressions* rather than
-    # patterns because that is the shape codegen compiles directly, and because
-    # an expression carries the span a diagnostic about one element wants.
-    | Array(Expr[])
+    # binder name or a literal. The elements are not patterns because that is the
+    # shape codegen compiles directly, and each carries the span a diagnostic about
+    # it wants.
+    | Array(PatElement[])
     # The same, of an array of *at least* that many elements, written with a
     # trailing `..` — `[first, ..]`. The elements are the first ones; the rest are
     # not looked at. Only the plain elements `Array` takes are allowed, so it is
     # compiled the way `Array` is, with a length test of `>=` in place of `==`.
-    | ArrayRest(Expr[])
+    | ArrayRest(PatElement[])
     # The same arm where at least one element is a real sub-pattern —
     # `[n, Tok("?"), _, ty]`, `[some(v), none]`. The counterpart of `Array`
     # exactly as `Nested` is of `Ctor`, and chosen by the same kind of test:
@@ -135,8 +143,12 @@ pub fn show_pat(self: Pat) -> str {
         Wildcard => "_",
         Str(s) => `Str({s})`,
         Char(c) => `Char({c})`,
-        Array(elems) => `[{show_exprs(elems)}]`,
-        ArrayRest(elems) => if (elems.is_empty()) { "[..]" } else { `[{show_exprs(elems)}, ..]` },
+        Array(elems) => `[{show_elements(elems)}]`,
+        ArrayRest(elems) => if (elems.is_empty()) {
+            "[..]"
+        } else {
+            `[{show_elements(elems)}, ..]`
+        },
         ArrayNested(ps) => `[{show_pats(ps)}]`,
         Ctor(name, bindings, ignore_payload) => if (ignore_payload) {
             `{name}(..)`
@@ -157,8 +169,13 @@ pub fn show_pat(self: Pat) -> str {
     assert(Ctor("Circle", ignore_payload=true).show_pat() == "Circle(..)");
     assert(Str("hi").show_pat() == "Str(hi)");
     assert(Char('x').show_pat() == "Char(x)");
-    assert(Array([num(1), ident("x")]).show_pat() == "[1, x]");
-    assert(ArrayRest([ident("x")]).show_pat() == "[x, ..]");
+    assert(
+        Array([
+            element(ElementKind.Number(1)),
+            element(ElementKind.Binder("x")),
+        ]).show_pat() == "[1, x]",
+    );
+    assert(ArrayRest([element(ElementKind.Binder("x"))]).show_pat() == "[x, ..]");
     assert(ArrayRest([]).show_pat() == "[..]");
     assert(Tuple([Int(1), Nested("some", [Int(1)])]).show_pat() == "(1, some(1))");
     assert(Nested("Pair", [Ctor("lo"), Wildcard]).show_pat() == "Pair(lo, _)");
@@ -197,8 +214,15 @@ pub fn pat_bindings(self: Pat) -> str[] {
     assert(Wildcard.pat_bindings() == none_bound);
     assert(Str("s").pat_bindings() == none_bound);
     // A literal element of an array pattern is matched, not bound.
-    assert(Array([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
-    assert(ArrayRest([ident("a"), num(1)]).pat_bindings() == ["a"]);
+    assert(Array([
+        element(ElementKind.Binder("a")),
+        element(ElementKind.Number(1)),
+        element(ElementKind.Binder("b")),
+    ]).pat_bindings() == ["a", "b"]);
+    assert(ArrayRest([
+        element(ElementKind.Binder("a")),
+        element(ElementKind.Number(1)),
+    ]).pat_bindings() == ["a"]);
     // Nested: every binder, depth first, left to right; a case name is not one.
     assert(Tuple([Ctor("lo"), Nested("some", [Ctor("hi")])]).pat_bindings() == ["lo", "hi"]);
     assert(Nested("Pair", [Ctor("Nil"), Int(1)]).pat_bindings() == none_bound);
@@ -223,15 +247,30 @@ fn nested_bindings(self: Pat) -> str[] {
 # written in argument or return position needs somewhere to be annotated.
 fn no_names() -> str[] { [] }
 
-fn is_ident(self: Expr) -> bool {
-    if (let Ident(..) = self.kind) { return true; };
+fn is_ident(self: PatElement) -> bool {
+    if (let Binder(..) = self.kind) { return true; };
     false
 }
 
-fn ident_name(self: Expr) -> str {
-    if (let Ident(name) = self.kind) { return name; };
+fn ident_name(self: PatElement) -> str {
+    if (let Binder(name) = self.kind) { return name; };
     ""
 }
+
+# An element at no particular place, for tests.
+fn element(kind: ElementKind) -> PatElement { kind, span: 0..0 }
+
+# An element as it is written: a name, `_`, or a tagged literal.
+fn show_element(self: PatElement) -> str {
+    match (self.kind) {
+        Binder(name) => name,
+        Text(s) => `Str({s})`,
+        Letter(c) => `Char({c})`,
+        Number(n) => `{n}`,
+    }
+}
+
+fn show_elements(self: PatElement[]) -> str { self$show_element().join(sep=", ") }
 
 # How a pattern is named in the "alternatives must bind the same names"
 # diagnostic: the constructor for a constructor pattern, and a description for
@@ -253,7 +292,7 @@ pub fn pat_label(self: Pat) -> str {
     assert(Ctor("some", bindings=["v"]).pat_label() == `"some"`);
     assert(Wildcard.pat_label() == `"_"`);
     assert(Str("s").pat_label() == "a string pattern");
-    assert(Array([ident("a")]).pat_label() == "an array pattern");
+    assert(Array([element(ElementKind.Binder("a"))]).pat_label() == "an array pattern");
     assert(Char('c').pat_label() == "a char pattern");
     assert(Ctor("none").pat_label() == `"none"`);
 })

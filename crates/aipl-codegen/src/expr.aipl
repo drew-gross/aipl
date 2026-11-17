@@ -288,7 +288,9 @@ variant ExprKind =
     # `shim random seeded_with_int(n) { .. }`: the provider the author named, its
     # arguments and the body. Written syntax, kept as it was written so the lints see
     # the name; `desugar.aipl` lowers it to the shim of the runtime's generator seeded
-    # as the provider says, and nothing downstream of it ever sees the node.
+    # as the provider says, and nothing downstream of it ever sees the node. The block
+    # form `shim random { p } { .. }` is the provider `seeded_with_provider` applied to
+    # `p`.
     | ProviderShim(provider: str, args: Expr[], body: Expr)
     # An IEEE 754 literal, as written (`1.5`, `-2e-3`). It stays text because its width
     # is the checker's to decide, from the position it sits in, and a literal has to be
@@ -553,71 +555,48 @@ fn show_binding(self: Binding) -> str {
     assert(ByStruct("P", ["x"], ["x"], true).show_binding() == "mut P { x }");
 })
 
-fn each_mapped(xs: Expr[], f: (Expr) -> Expr) -> Expr[] {
-    mut mapped: Expr[] = []; #[allow]
-    for (let x : xs) {
-        set mapped.push(f(x));
-    }
-    mapped
-}
-
-# `f` applied to `x` when it is present.
-fn optional_mapped(x: Expr?, f: (Expr) -> Expr) -> Expr? {
-    if (let some(e) = x) { some(f(e)) } else { none }
-}
-
-# `f` applied to the value of each field initializer.
-fn inits_mapped(inits: FieldInit[], f: (Expr) -> Expr) -> FieldInit[] {
-    mut mapped: FieldInit[] = []; #[allow]
-    for (let i : inits) {
-        set mapped.push(FieldInit { ..i, value: f(i.value) });
-    }
-    mapped
-}
-
-# `f` applied to the body of each arm.
-fn arms_mapped(arms: MatchArm[], f: (Expr) -> Expr) -> MatchArm[] {
-    mut mapped: MatchArm[] = []; #[allow]
-    for (let a : arms) {
-        set mapped.push(MatchArm { ..a, body: f(a.body) });
-    }
-    mapped
-}
-
-# Both halves of each entry of a dict literal mapped by `f`. (`pairs.map(|p|
-# (f(p.0), f(p.1)))` panics the compiler: "Synthetic-type members cannot be
-# unit".)
-fn pairs_mapped(pairs: (Expr, Expr)[], f: (Expr) -> Expr) -> (Expr, Expr)[] {
-    mut mapped: (Expr, Expr)[] = []; #[allow]
-    for (let p : pairs) {
-        set mapped.push((f(p.0), f(p.1)));
-    }
-    mapped
-}
-
 # `Neg(e)`: the node `map_subexprs`'s tests map with, easy to see in a dump.
 fn wrap(e: Expr) -> Expr { expr(Neg(e)) }
 
-# `self` with `f` applied to each of its direct sub-expressions, and nothing
-# else changed: not `self`'s own kind payload (names, types, patterns), not its
-# spans, and not the sub-expressions' own children — a pass that wants to reach
-# those recurses through `f`. The sub-expressions are the same ones Rust's
-# `each_subexpr` walks: a `Shim`'s bindings name functions and a pattern binds
-# names, so only a shim's body and an arm's body nest expressions.
-pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
-    let kind = match (self.kind) {
-        Num(..)
-        | FloatLit(..)
-        | Bool(..)
-        | Str(..)
-        | Char(..)
-        | Ident(..)
-        | None
-        | Unit => self.kind,
-        Call(name, args, method_style) => Call(name, each_mapped(args, f), method_style),
+# `kind` with `f` applied to each of its direct sub-expressions, and nothing else
+# changed: not the names, types and patterns it carries, and not the sub-expressions' own
+# children — a pass that wants to reach those recurses through `f`. The sub-expressions are
+# the same ones Rust's `each_subexpr` walks: a `Shim`'s bindings name functions and a
+# pattern binds names, so only a shim's body and an arm's body nest expressions.
+#
+# What `f` leaves out of every expression it returns, the result leaves out: a case `kind`
+# is not, `f` keeps out of the parts, and the parts are all there is to a node. So a pass
+# that has dealt with some cases at the node itself gets a node with none of them in it.
+pub fn mapped<X: cases>(
+    kind: ExprKind without X,
+    f: (Expr) -> Expr without X throughout,
+) -> ExprKind without X throughout {
+    // What a closure builds is typed as written, without the refinement it is held to
+    // here, so the arms that rebuild a list fill it with a loop whose elements are declared
+    // with it.
+    match (kind) {
+        Num(n) => Num(n),
+        FloatLit(text) => FloatLit(text),
+        Bool(b) => Bool(b),
+        Str(s) => Str(s),
+        Char(c) => Char(c),
+        Ident(name) => Ident(name),
+        None => None,
+        Unit => Unit,
+        Call(name, args, method_style) => Call(name, args.map(f), method_style),
         Neg(x) => Neg(f(x)),
         If(cond, then_branch, else_branch) => If(f(cond), f(then_branch), f(else_branch)),
-        Construct(name, inits) => Construct(name, inits_mapped(inits, f)),
+        Construct(name, written) => {
+            mut inits: (FieldInit without X throughout)[] = []; #[allow]
+            for (let i : written) {
+                set inits.push(FieldInit {
+                    name: i.name,
+                    value: f(i.value),
+                    name_span: i.name_span,
+                });
+            }
+            Construct(name, inits)
+        },
         Field(x, name) => Field(f(x), name),
         Let(name, ty, value, body) => Let(name, ty, f(value), f(body)),
         LetMut(name, ty, value, body) => LetMut(name, ty, f(value), f(body)),
@@ -625,35 +604,66 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
         For(name, iterable, body, index) => For(name, f(iterable), f(body), index=index),
         While(cond, body) => While(f(cond), f(body)),
         Shim(effect, bindings, body) => Shim(effect, bindings, f(body)),
-        Match(scrutinee, arms) => Match(f(scrutinee), arms_mapped(arms, f)),
+        Match(scrutinee, written) => {
+            mut arms: (MatchArm without X throughout)[] = []; #[allow]
+            for (let a : written) {
+                set arms.push(MatchArm {
+                    pattern: a.pattern,
+                    body: f(a.body),
+                    span: a.span,
+                    written: a.written,
+                });
+            }
+            Match(f(scrutinee), arms)
+        },
         IfLet(arm, scrutinee, else_branch) => IfLet(
-            MatchArm { ..arm, body: f(arm.body) },
+            MatchArm {
+                pattern: arm.pattern,
+                body: f(arm.body),
+                span: arm.span,
+                written: arm.written,
+            },
             f(scrutinee),
             f(else_branch),
         ),
-        ArrayLit(elements) => ArrayLit(each_mapped(elements, f)),
+        ArrayLit(elements) => ArrayLit(elements.map(f)),
         Spread(x) => Spread(f(x)),
-        SetLit(elements, order) => SetLit(each_mapped(elements, f), order),
-        DictLit(pairs) => DictLit(pairs_mapped(pairs, f)),
+        SetLit(elements, order) => SetLit(elements.map(f), order),
+        DictLit(pairs) => DictLit(pairs.map(|p: (Expr, Expr)| (f(p.0), f(p.1)))),
         Index(obj, index) => Index(f(obj), f(index)),
-        Slice(obj, start, end) => Slice(f(obj), optional_mapped(start, f), optional_mapped(end, f)),
+        Slice(obj, start, end) => Slice(
+            f(obj),
+            if (let some(e) = start) { some(f(e)) } else { none },
+            if (let some(e) = end) { some(f(e)) } else { none },
+        ),
         Try(x) => Try(f(x)),
         Seq(first, rest) => Seq(f(first), f(rest)),
         Return(x) => Return(f(x)),
         Lambda(params, body) => Lambda(params, f(body)),
-        TupleLit(elements) => TupleLit(each_mapped(elements, f)),
+        TupleLit(elements) => TupleLit(elements.map(f)),
         KwArg(name, value, forwarded) => KwArg(name, f(value), forwarded),
         TypeArgs(x, types) => TypeArgs(f(x), types),
         LetPattern(pattern, value, body) => LetPattern(pattern, f(value), f(body)),
-        ProviderShim(provider, args, body) => ProviderShim(provider, each_mapped(args, f), f(body)),
+        ProviderShim(provider, args, body) => ProviderShim(provider, args.map(f), f(body)),
         ForPattern(pattern, iterable, body, index) => ForPattern(
             pattern,
             f(iterable),
             f(body),
             index=index,
         ),
-    };
-    Expr { ..self, kind }
+    }
+}.test({
+    // The same shape, each child wrapped.
+    assert(mapped(Neg(ident("a")), wrap) == Neg(wrap(ident("a"))));
+    assert(mapped(Num(1), wrap) == Num(1));
+})
+
+# `self` with `f` applied to each of its direct sub-expressions, and nothing else changed:
+# not `self`'s own kind payload (names, types, patterns), not its spans, and not the
+# sub-expressions' own children — see `mapped`.
+pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
+    ..self,
+    kind: mapped(self.kind, f),
 }.test({
     // A leaf has nothing to map.
     assert(ident("x").map_subexprs(wrap).show_expr() == "x");

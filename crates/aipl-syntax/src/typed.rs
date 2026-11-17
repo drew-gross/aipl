@@ -1110,6 +1110,7 @@ impl<T: TyRepr> TSignature<T> {
     pub fn erase(&self) -> Signature {
         Signature {
             type_vars: self.type_vars.iter().map(TTypeParam::erase).collect(),
+            case_params: Vec::new(),
             params: self.params.iter().map(TParam::erase).collect(),
             effects: self.effects.clone(),
             return_ty: self.return_ty.as_ref().map(TyRepr::to_type),

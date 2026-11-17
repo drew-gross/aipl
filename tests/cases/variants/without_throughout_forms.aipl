@@ -9,6 +9,10 @@ variant Shape = Dot | Blank | Circle(i64) | Group(Shape[])
 
 variant Solid = Shape without Dot throughout
 
+struct Labeled { shape: Shape, name: str }
+
+variant SolidLabeled = Labeled without Dot throughout
+
 fn count(self: Solid) -> i64 {
     match (self) {
         Blank => 0,
@@ -68,4 +72,23 @@ fn gather(parts: Solid[]) -> Solid {
     Group(out)
 }.test({
     assert(count(gather([Circle(1), Blank, Circle(2)])) == 2);
+})
+
+// An arm may hand on the refined value it matched, not only build a new one.
+fn same(s: Solid) -> Solid {
+    match (s) {
+        Blank => Blank,
+        Circle(..) | Group(..) => s,
+    }
+}.test({
+    assert(count(same(Circle(1))) == 1);
+    assert(count(same(Blank)) == 0);
+})
+
+// What a `let` pattern reads off a refined struct is refined too.
+fn shape_count(labeled: SolidLabeled) -> i64 {
+    let Labeled { shape } = labeled;
+    count(shape)
+}.test({
+    assert(shape_count(Labeled { shape: Circle(1), name: "c" }) == 1);
 })

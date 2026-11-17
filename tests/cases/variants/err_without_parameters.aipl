@@ -1,0 +1,81 @@
+variant Kind = Num(i64) | Stub | Pair(Node, Node)
+
+struct Node { kind: Kind, label: str }
+
+// An arm builds a case the parameter may name.
+fn builds_stub<X: cases>(kind: Kind without X) -> Kind without X throughout {
+    match (kind) {
+        Num(..) => Stub,
+        Stub => Stub,
+        Pair(a, b) => Pair(a, b),
+    }
+}
+
+// A child is handed on as it came, not as `f` made it.
+fn keeps_child<X: cases>(
+    kind: Kind without X,
+    f: (Node) -> Node without X throughout,
+) -> Kind without X throughout {
+    match (kind) {
+        Num(n) => Num(n),
+        Stub => Stub,
+        Pair(a, b) => Pair(a, f(b)),
+    }
+}
+
+fn identity<X: cases>(
+    kind: Kind without X,
+    f: (Node) -> Node without X throughout,
+) -> Kind without X throughout {
+    match (kind) {
+        Num(n) => Num(n),
+        Stub => Stub,
+        Pair(a, b) => Pair(f(a), f(b)),
+    }
+}
+
+// Nothing is known about this node's own case, so nothing is left out of the result.
+fn unaware(Node { kind, label }, f: (Node) -> Node) -> Node without Stub throughout {
+    Node { kind: identity(kind, f), label }
+}
+
+// `f` does not leave `Stub` out of what it returns.
+fn loose(Node { kind, label }, f: (Node) -> Node) -> Node without Stub throughout {
+    match (kind) {
+        Stub => Node { kind: Num(0), label },
+        _ => Node { kind: identity(kind, f), label },
+    }
+}
+
+// A parameter that names no variant to take its cases from.
+fn nowhere<X: cases>(n: Node) -> Node { n }
+--- check --compile ---
+error: fn "builds_stub": body returns Kind, but the declared return type is Kind without X throughout: nothing shows it is not X throughout
+ --> ./tests/cases/variants/err_without_parameters.aipl:8:20
+  |
+8 |         Num(..) => Stub,
+  |                    ^^^^
+
+error: fn "keeps_child": body returns Kind, but the declared return type is Kind without X throughout: nothing shows it is not X throughout
+  --> ./tests/cases/variants/err_without_parameters.aipl:22:23
+   |
+22 |         Pair(a, b) => Pair(a, f(b)),
+   |                       ^^^^^^^^^^^^^
+
+error: fn "unaware": body returns Node, but the declared return type is Node without Stub throughout: nothing shows it is not Stub throughout
+  --> ./tests/cases/variants/err_without_parameters.aipl:39:5
+   |
+39 |     Node { kind: identity(kind, f), label }
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fn "identity" arg 1: expected (Node) -> Node without Stub throughout, got (Node) -> Node
+  --> ./tests/cases/variants/err_without_parameters.aipl:46:42
+   |
+46 |         _ => Node { kind: identity(kind, f), label },
+   |                                          ^
+
+error: refinement parameter "X" has to be written as `T without X` somewhere in the signature, so the cases it stands for belong to a named type
+  --> ./tests/cases/variants/err_without_parameters.aipl:51:4
+   |
+51 | fn nowhere<X: cases>(n: Node) -> Node { n }
+   |    ^^^^^^^

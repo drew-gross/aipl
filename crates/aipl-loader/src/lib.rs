@@ -1221,6 +1221,7 @@ fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
             is_pub: false,
             sig: aipl_syntax::ast::Signature {
                 type_vars: Vec::new(),
+                case_params: Vec::new(),
                 params: Vec::new(),
                 effects: Vec::new(),
                 return_ty: c.ty.clone(),
@@ -1522,6 +1523,7 @@ fn rewrite_item(
                 // Generic type-var names are local type variables, not global
                 // items — leave them untouched when rewriting signature types.
                 type_vars: f.sig.type_vars.clone(),
+                case_params: f.sig.case_params.clone(),
                 params: {
                     // A keyword parameter's default is spliced into *call
                     // sites* (possibly in other files), so its global

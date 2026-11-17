@@ -578,6 +578,9 @@ pub mod ast {
         Ord,
         Int,
         Variant,
+        /// A set of case names, written `<X: cases>`: not a type but a refinement, the cases
+        /// a `without X` clause leaves out. Inferred from the exclusions of the arguments.
+        Cases,
     }
 
     impl Bound {
@@ -589,6 +592,7 @@ pub mod ast {
                 "ord" => Some(Bound::Ord),
                 "int" => Some(Bound::Int),
                 "variant" => Some(Bound::Variant),
+                "cases" => Some(Bound::Cases),
                 _ => None,
             }
         }
@@ -600,6 +604,7 @@ pub mod ast {
                 Bound::Ord => "ord",
                 Bound::Int => "int",
                 Bound::Variant => "variant",
+                Bound::Cases => "cases",
             }
         }
 
@@ -614,6 +619,8 @@ pub mod ast {
         pub fn accepts(&self, ty: &Type, is_variant: &dyn Fn(&str) -> bool) -> bool {
             match self {
                 Bound::Any => true,
+                // A refinement parameter is not a type, so no type satisfies it.
+                Bound::Cases => false,
                 Bound::Ord => matches!(
                     ty,
                     Type::Primitive(p)
@@ -671,6 +678,9 @@ pub mod ast {
         /// variables in `params`/`return_ty` and are resolved by
         /// monomorphization.
         pub type_vars: Vec<TypeParam>,
+        /// The refinement parameters (`<X: cases>`): sets of case names a `without X` clause
+        /// in the signature leaves out. Not types, so they are not in `type_vars`.
+        pub case_params: Vec<String>,
         pub params: Vec<Param>,
         /// Effects declared in the signature, e.g. `!prints`. Callers of this
         /// function must declare at least these effects themselves.
@@ -3735,6 +3745,7 @@ pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
             is_pub: true,
             sig: ast::Signature {
                 type_vars: decl.sig.type_vars.clone(),
+                case_params: decl.sig.case_params.clone(),
                 params: vec![ast::Param {
                     name_span: Default::default(),
                     name: "self".to_string(),

@@ -114,6 +114,9 @@ struct Table {
     /// The instance names [`Table::resolve`] has spelled for a generic application, with the
     /// application each one is.
     instances: std::cell::RefCell<Instances>,
+    /// The refinement parameters of the calls under way, by the `$X#n` name each goes by: the
+    /// case names it stands for, once a call has said.
+    case_slots: HashMap<String, Option<Vec<String>>>,
 }
 
 /// What the pinner calls the type variable of the n-th anonymous `any` of a function: this followed by n.
@@ -235,10 +238,55 @@ impl Table {
         let mut out = Vec::new();
         let mut cur = self.chase(t);
         while let It::Without(inner, x) = cur {
-            out.push(x);
+            out.extend(self.expand(&x));
             cur = self.chase(&inner);
         }
         out
+    }
+
+    /// `x`, or the exclusions a call's refinement parameter stands for once it is settled.
+    fn expand(&self, x: &aipl_syntax::ast::Exclusion) -> Vec<aipl_syntax::ast::Exclusion> {
+        use aipl_syntax::ast::Exclusion;
+        let (Exclusion::NamedCase(n) | Exclusion::Throughout(n)) = x else {
+            return vec![x.clone()];
+        };
+        match self.case_slots.get(n) {
+            Some(Some(members)) => members
+                .iter()
+                .map(|m| match x {
+                    Exclusion::Throughout(_) => Exclusion::Throughout(m.clone()),
+                    _ => Exclusion::NamedCase(m.clone()),
+                })
+                .collect(),
+            _ => vec![x.clone()],
+        }
+    }
+
+    /// Settle the refinement parameters of a call that `wanted` mentions and nothing has settled
+    /// yet, to the cases `given` excludes.
+    fn bind_open_slots(&mut self, given: &It, wanted: &It) {
+        use aipl_syntax::ast::Exclusion;
+        let have = self.exclusions(given);
+        let mut cur = self.chase(wanted);
+        while let It::Without(inner, x) = cur {
+            if let Exclusion::NamedCase(n) | Exclusion::Throughout(n) = &x {
+                if matches!(self.case_slots.get(n), Some(None)) {
+                    let deep = matches!(x, Exclusion::Throughout(_));
+                    let mut members: Vec<String> = Vec::new();
+                    for h in &have {
+                        let name = match (h, deep) {
+                            (Exclusion::Throughout(c), _) | (Exclusion::NamedCase(c), false) => c,
+                            _ => continue,
+                        };
+                        if !members.contains(name) {
+                            members.push(name.clone());
+                        }
+                    }
+                    self.case_slots.insert(n.clone(), Some(members));
+                }
+            }
+            cur = self.chase(&inner);
+        }
     }
 
     fn occurs(&self, v: usize, t: &It) -> bool {
@@ -441,6 +489,10 @@ impl<'a> From<&'a String> for Site<'a> {
 impl Site<'_> {
     /// What is wrong when `given` meets `wanted` here; `hint` is appended.
     fn mismatch(&self, given: &str, wanted: &str, hint: &str) -> String {
+        spelled_as_written(&self.mismatch_marked(given, wanted, hint))
+    }
+
+    fn mismatch_marked(&self, given: &str, wanted: &str, hint: &str) -> String {
         match self {
             Site::Result(f) => format!(
                 "fn {f:?}: body returns {given}, but the declared return type is {wanted}{hint}"
@@ -532,6 +584,39 @@ fn excluded_by(given: &[aipl_syntax::ast::Exclusion], x: &aipl_syntax::ast::Excl
         || matches!(x, Exclusion::NamedCase(c) if given.contains(&Exclusion::Throughout(c.clone())))
 }
 
+/// `text` with the names the checker gave refinement parameters (`$X`, `$X#3`) as they are
+/// written (`X`).
+fn spelled_as_written(text: &str) -> String {
+    let mut out = String::new();
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        // A `$` inside a name (`any$1`) is another mangling and stays.
+        let inside = out
+            .chars()
+            .last()
+            .is_some_and(|p| p.is_alphanumeric() || p == '_');
+        if c != '$' || inside {
+            out.push(c);
+            continue;
+        }
+        while let Some(&n) = chars.peek() {
+            if n.is_alphanumeric() || n == '_' {
+                out.push(n);
+                chars.next();
+            } else {
+                break;
+            }
+        }
+        if chars.peek() == Some(&'#') {
+            chars.next();
+            while chars.peek().is_some_and(|d| d.is_ascii_digit()) {
+                chars.next();
+            }
+        }
+    }
+    out
+}
+
 /// `span`, unless it is the placeholder for a name written nowhere.
 fn written(span: &Span) -> Option<Span> {
     (span.start < span.end).then(|| span.clone())
@@ -588,6 +673,15 @@ struct Pinner<'a> {
     pattern_names: (aipl_syntax::ast::WrittenNames, HashMap<String, usize>),
     /// Errors in statements the walk went on past: see [`Pinner::recover`].
     errors: Vec<Error>,
+    /// The name a refinement parameter of the signature being lowered goes by in an exclusion:
+    /// `$X` for this function's own (it equals only itself), a fresh `$X#n` for a callee's, which
+    /// the call settles.
+    case_names: HashMap<String, String>,
+    /// The variant whose cases each such name stands for some of.
+    domains: HashMap<String, String>,
+    /// `(case, parameter)` pairs known inside the code being typed: a value that matched `case`
+    /// and is a `T without parameter` shows that `parameter` does not hold `case`.
+    assumed: std::cell::RefCell<Vec<(String, String)>>,
 }
 
 /// A generic call's type arguments, held until the whole body has been typed.
@@ -983,6 +1077,9 @@ fn pinner_for<'a>(
         narrows: Vec::new(),
         resolutions: Vec::new(),
         pattern_names: Default::default(),
+        case_names: HashMap::new(),
+        domains: HashMap::new(),
+        assumed: Default::default(),
     }
 }
 
@@ -1107,6 +1204,14 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
         }
     }
     let none = HashMap::new();
+    let domains = match case_domains(&f.sig) {
+        Ok(d) => d,
+        Err(m) => return reject(m, &f.name.span),
+    };
+    for (name, variant) in domains {
+        p.case_names.insert(name.clone(), format!("${name}"));
+        p.domains.insert(format!("${name}"), variant);
+    }
     let mut param_tys = Vec::new();
     for param in &f.sig.params {
         let ty = p.lower(&param.ty, &none, &f.name.span)?;
@@ -1126,7 +1231,13 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     };
     check_type_param_defaults(&p, f)?;
     check_method_declaration(f)?;
-    let type_var_names: Vec<String> = f.sig.type_vars.iter().map(|t| t.name.clone()).collect();
+    let type_var_names: Vec<String> = f
+        .sig
+        .type_vars
+        .iter()
+        .map(|t| t.name.clone())
+        .chain(f.sig.case_params.iter().map(|c| format!("${c}")))
+        .collect();
     let fn_ctx = format!("fn {:?}", display(&f.name.text));
     for param in &f.sig.params {
         decls.validate(&param.ty, &type_var_names, &fn_ctx, &f.name.span)?;
@@ -1328,7 +1439,12 @@ impl Pinner<'_> {
     /// declared default or, if only a result position could have named it, is ambiguous; every
     /// type argument meets its bound; a generic struct's arguments are all determined.
     fn settle(&mut self) -> Res<()> {
-        let names: Vec<String> = self.rigid.iter().cloned().collect();
+        let names: Vec<String> = self
+            .rigid
+            .iter()
+            .cloned()
+            .chain(self.case_names.keys().map(|c| format!("${c}")))
+            .collect();
         let ctx = format!("fn {:?}", display(&self.fn_name));
         for (ty, span) in std::mem::take(&mut self.validations) {
             let written = self.refined_type(&ty);
@@ -1542,7 +1658,19 @@ impl Pinner<'_> {
                 ps.iter().map(|p| go(self, p)).collect::<Res<Vec<_>>>()?,
                 Box::new(go(self, r)?),
             ),
-            Type::Without(t, x) => It::Without(Box::new(go(self, t)?), x.clone()),
+            Type::Without(t, x) => {
+                use aipl_syntax::ast::Exclusion;
+                let x = match x {
+                    Exclusion::NamedCase(n) if self.case_names.contains_key(n) => {
+                        Exclusion::NamedCase(self.case_names[n].clone())
+                    }
+                    Exclusion::Throughout(n) if self.case_names.contains_key(n) => {
+                        Exclusion::Throughout(self.case_names[n].clone())
+                    }
+                    other => other.clone(),
+                };
+                It::Without(Box::new(go(self, t)?), x)
+            }
             Type::Tuple(_) | Type::Unknown => {
                 return gap(format!("a placeholder type in a declaration: {t:?}"), span)
             }
@@ -1559,6 +1687,7 @@ impl Pinner<'_> {
         site: impl Into<Site<'s>>,
     ) -> Res<()> {
         let site = site.into();
+        self.table.bind_open_slots(&e.ty, expected);
         let given = self.table.exclusions(&e.ty);
         let shown = |x: &aipl_syntax::ast::Exclusion, p: &Self| p.shows(e, x);
         let unshown: Vec<_> = self
@@ -1608,8 +1737,18 @@ impl Pinner<'_> {
             | TExprKind::LetMut(_, _, tail)
             | TExprKind::Assign(_, _, tail) => self.shows(tail, x),
             TExprKind::If(_, a, b) => self.shows(a, x) && self.shows(b, x),
-            TExprKind::IfLet(arm, _, other) => self.shows(&arm.body, x) && self.shows(other, x),
-            TExprKind::Match(_, arms) => arms.iter().all(|a| self.shows(&a.body, x)),
+            TExprKind::IfLet(arm, scrutinee, other) => {
+                let notes = self.note_matched(&scrutinee.ty, typed_pattern_case(&arm.pattern));
+                let arm_shows = self.shows(&arm.body, x);
+                self.forget(notes);
+                arm_shows && self.shows(other, x)
+            }
+            TExprKind::Match(scrutinee, arms) => arms.iter().all(|a| {
+                let notes = self.note_matched(&scrutinee.ty, typed_pattern_case(&a.pattern));
+                let arm_shows = self.shows(&a.body, x);
+                self.forget(notes);
+                arm_shows
+            }),
             TExprKind::Return(_) => true,
             TExprKind::ArrayLit(items) => match x {
                 Exclusion::EmptyArray => !items.is_empty(),
@@ -1617,9 +1756,16 @@ impl Pinner<'_> {
                 Exclusion::NamedCase(_) => false,
             },
             _ => match x {
-                Exclusion::NamedCase(d) => self.constructed_case(e).is_some_and(|c| c != *d),
-                Exclusion::Throughout(c) => self.shows_throughout(e, c),
-                Exclusion::EmptyArray => false,
+                Exclusion::NamedCase(d) => {
+                    excluded_by(&self.table.exclusions(&e.ty), x)
+                        || self
+                            .constructed_case(e)
+                            .is_some_and(|c| self.case_differs(&c, d))
+                }
+                Exclusion::Throughout(c) => {
+                    self.type_is_clean_of(&e.ty, c) || self.shows_throughout(e, c)
+                }
+                Exclusion::EmptyArray => excluded_by(&self.table.exclusions(&e.ty), x),
             },
         }
     }
@@ -1641,13 +1787,28 @@ impl Pinner<'_> {
             | TExprKind::Assign(_, _, tail) => first(&[tail]),
             TExprKind::If(_, a, b) => first(&[a, b]),
             TExprKind::IfLet(arm, _, other) => first(&[&arm.body, other]),
-            TExprKind::Match(_, arms) => {
-                let bodies: Vec<_> = arms.iter().map(|a| &a.body).collect();
-                first(&bodies)
-            }
+            TExprKind::Match(scrutinee, arms) => arms.iter().find_map(|a| {
+                let notes = self.note_matched(&scrutinee.ty, typed_pattern_case(&a.pattern));
+                let found = (!self.shows(&a.body, x)).then(|| self.unshown_at(&a.body, x));
+                self.forget(notes);
+                found
+            }),
             _ => None,
         };
         found.unwrap_or(e)
+    }
+
+    /// Whether a value built as case `built` is not a case `c`: a different name, or, where `c`
+    /// is a refinement parameter, a case the code being typed has matched a `T without c` as.
+    fn case_differs(&self, built: &str, c: &str) -> bool {
+        if self.domains.contains_key(c) {
+            self.assumed
+                .borrow()
+                .iter()
+                .any(|(k, p)| k == built && p == c)
+        } else {
+            built != c
+        }
     }
 
     /// Whether what `e` is shows it holds no case `c` anywhere: a constructor of another case,
@@ -1655,12 +1816,15 @@ impl Pinner<'_> {
     fn shows_throughout(&self, e: &TExpr<It>, c: &str) -> bool {
         match &e.kind {
             TExprKind::Call { args, .. } => {
-                self.constructed_case(e).is_some_and(|case| case != c)
+                self.constructed_case(e)
+                    .is_some_and(|case| self.case_differs(&case, c))
                     && args.iter().all(|a| self.clean_of(a, c))
             }
             TExprKind::Construct(_, inits) => inits.iter().all(|i| self.clean_of(&i.value, c)),
             // A case with no payload.
-            TExprKind::Ident(_) => self.constructed_case(e).is_some_and(|case| case != c),
+            TExprKind::Ident(_) => self
+                .constructed_case(e)
+                .is_some_and(|case| self.case_differs(&case, c)),
             TExprKind::None | TExprKind::Unit => true,
             _ => false,
         }
@@ -1688,23 +1852,36 @@ impl Pinner<'_> {
             It::Dict(a, b) | It::Res(a, b) => {
                 self.type_is_clean_of(&a, c) && self.type_is_clean_of(&b, c)
             }
+            // An application (a tuple of refined parts) is clean when its own declaration holds
+            // none and every argument is.
+            It::Gen(n, args) => {
+                !self.name_reaches(&n, c) && args.iter().all(|a| self.type_is_clean_of(a, c))
+            }
             _ => false,
         }
     }
 
     /// Whether a value of type `t` can hold a case `c`. A type nothing has fixed holds none.
     fn holds_case(&self, t: &It, c: &str) -> bool {
-        let tables = self.decls.tables();
         match self.table.shallow(t) {
-            It::Named(n) => tables.named_reaches_case(&n, c),
+            It::Named(n) => self.name_reaches(&n, c),
             It::Gen(n, args) => {
-                tables.named_reaches_case(&n, c) || args.iter().any(|a| self.holds_case(a, c))
+                self.name_reaches(&n, c) || args.iter().any(|a| self.holds_case(a, c))
             }
             It::Case(i) | It::Opt(i) | It::Arr(i) | It::Set(i, _) => self.holds_case(&i, c),
             It::Dict(a, b) | It::Res(a, b) => self.holds_case(&a, c) || self.holds_case(&b, c),
             It::Unit | It::Prim(_) | It::Rigid(_) | It::Fn(..) | It::Var(_) | It::Without(..) => {
                 false
             }
+        }
+    }
+
+    /// Whether the declared type `n` can hold a case `c`, by its own fields or payloads.
+    fn name_reaches(&self, n: &str, c: &str) -> bool {
+        let tables = self.decls.tables();
+        match self.domains.get(c) {
+            Some(variant) => tables.named_reaches_variant(n, variant),
+            None => tables.named_reaches_case(n, c),
         }
     }
 
@@ -1825,6 +2002,7 @@ impl Pinner<'_> {
     /// Whether two types are interchangeable here, binding variables as it goes.
     fn agree(&mut self, a: &It, e: &It) -> Result<(), String> {
         // A refined value goes where its base does; the reverse needs every exclusion shown.
+        self.table.bind_open_slots(a, e);
         // A type nothing has fixed yet (the element of `[]`) takes the refinement it meets.
         let open = matches!(self.table.chase(a), It::Var(_));
         let (given, wanted) = (self.table.exclusions(a), self.table.exclusions(e));
@@ -2104,7 +2282,12 @@ impl Pinner<'_> {
                 let mutable = matches!(e.kind, ExprKind::LetMut(..));
                 let bound = (|| match ann {
                     Some(t) => {
-                        let names: Vec<String> = self.rigid.iter().cloned().collect();
+                        let names: Vec<String> = self
+                            .rigid
+                            .iter()
+                            .cloned()
+                            .chain(self.case_names.keys().map(|c| format!("${c}")))
+                            .collect();
                         self.decls.validate(
                             t,
                             &names,
@@ -2114,6 +2297,15 @@ impl Pinner<'_> {
                         let t = self.lower(t, &HashMap::new(), &e.span)?;
                         let v = self.value_arg(v, &t)?;
                         self.coerce_expr(&v, &t, &v.span, Site::Binding(name))?;
+                        // The temporary a destructuring reads its parts off is the value
+                        // itself, so it keeps the refinement the value has.
+                        let t = if name.starts_with(aipl_syntax::DESTRUCTURE_BASE_PREFIX)
+                            && !self.table.exclusions(&v.ty).is_empty()
+                        {
+                            v.ty.clone()
+                        } else {
+                            t
+                        };
                         Ok((v, t))
                     }
                     None => {
@@ -2572,7 +2764,10 @@ impl Pinner<'_> {
                         (n, t, binder)
                     })
                     .collect();
-                let (saved, body) = self.scoped(binds, |p| p.expr_at(&arm.body, pos))?;
+                let assumed = self.note_matched(&scrut.ty, pattern_case(&arm.pattern));
+                let scoped = self.scoped(binds, |p| p.expr_at(&arm.body, pos));
+                self.forget(assumed);
+                let (saved, body) = scoped?;
                 self.restore(saved);
                 let otherwise = self.expr_at(else_src, pos)?;
                 if pos == Pos::Value {
@@ -2681,7 +2876,10 @@ impl Pinner<'_> {
                             }
                         }
                     }
-                    let (saved, body) = self.scoped(binds, |p| p.expr_at(&arm.body, pos))?;
+                    let assumed = self.note_matched(&scrut.ty, pattern_case(&arm.pattern));
+                    let scoped = self.scoped(binds, |p| p.expr_at(&arm.body, pos));
+                    self.forget(assumed);
+                    let (saved, body) = scoped?;
                     self.restore(saved);
                     if !aipl_syntax::diverges(&arm.body) {
                         self.agree(&body.ty, &result).or_else(|m| {
@@ -3015,6 +3213,23 @@ impl Pinner<'_> {
                     .or_else(|m| reject(format!("the type argument does not fit ({m})"), span))?;
             }
         }
+        // Each refinement parameter is a name of its own at this call, settled by the arguments.
+        let saved_names = if sig.case_params.is_empty() {
+            None
+        } else {
+            let domains = match case_domains(sig) {
+                Ok(d) => d,
+                Err(m) => return reject(m, span),
+            };
+            let mut names = HashMap::new();
+            for (param, variant) in domains {
+                let slot = format!("${param}#{}", self.table.case_slots.len());
+                self.table.case_slots.insert(slot.clone(), None);
+                self.domains.insert(slot.clone(), variant);
+                names.insert(param, slot);
+            }
+            Some(std::mem::replace(&mut self.case_names, names))
+        };
         let before = std::mem::replace(&mut self.instantiating, true);
         self.anonymous_vars.clear();
         let lowered = (|| {
@@ -3033,6 +3248,9 @@ impl Pinner<'_> {
             Ok((ptys, ret))
         })();
         self.instantiating = before;
+        if let Some(names) = saved_names {
+            self.case_names = names;
+        }
         let (ptys, ret) = lowered?;
         type_args.extend(std::mem::take(&mut self.anonymous_vars));
         Ok((ptys, ret, type_args))
@@ -3132,10 +3350,15 @@ impl Pinner<'_> {
         let boxed = |t: &It| Box::new(self.refined_type(t));
         let raw = self.table.chase(t);
         match raw {
-            It::Without(inner, x) => Type::Without(boxed(&inner), x),
+            It::Without(inner, x) => self
+                .table
+                .expand(&x)
+                .into_iter()
+                .fold(*boxed(&inner), |t, x| Type::Without(Box::new(t), x)),
             It::Opt(t) => Type::Optional(boxed(&t)),
             It::Arr(t) => Type::Array(boxed(&t)),
             It::Case(t) => Type::Case(boxed(&t)),
+            It::Fn(ps, r) => Type::Fn(ps.iter().map(|p| self.refined_type(p)).collect(), boxed(&r)),
             It::Res(a, b) => Type::Result(boxed(&a), boxed(&b)),
             It::Dict(k, v) => Type::Dict(boxed(&k), boxed(&v)),
             It::Gen(base, args) if base.starts_with(crate::typing::TUPLE_TEMPLATE) => {
@@ -3195,6 +3418,37 @@ impl Pinner<'_> {
             }
         }
         out
+    }
+
+    /// Note, for an arm of a match on `scrutinee`, that the scrutinee matched the case `case`
+    /// names: a refinement parameter the scrutinee lacks is therefore not that case, since a
+    /// value that was could not have got here. Returns how many notes it made, for
+    /// [`Pinner::forget`].
+    fn note_matched(&self, scrutinee: &It, case: Option<&str>) -> usize {
+        let Some(case) = case else { return 0 };
+        let bare = case.split('@').next().unwrap_or(case).to_string();
+        let params: Vec<String> = self
+            .table
+            .exclusions(scrutinee)
+            .into_iter()
+            .filter_map(|x| match x {
+                aipl_syntax::ast::Exclusion::NamedCase(p)
+                | aipl_syntax::ast::Exclusion::Throughout(p) => Some(p),
+                aipl_syntax::ast::Exclusion::EmptyArray => None,
+            })
+            .filter(|p| self.domains.contains_key(p))
+            .collect();
+        let mut assumed = self.assumed.borrow_mut();
+        for p in &params {
+            assumed.push((bare.clone(), p.clone()));
+        }
+        params.len()
+    }
+
+    fn forget(&self, notes: usize) {
+        let mut assumed = self.assumed.borrow_mut();
+        let keep = assumed.len() - notes;
+        assumed.truncate(keep);
     }
 
     /// A pattern may not name a case the scrutinee has been refined to lack.
@@ -4068,8 +4322,11 @@ impl Pinner<'_> {
             if elems.len() != targs.len() {
                 return Err("tuples of different sizes".into());
             }
+            // The instance is the tuple of the plain types; what its elements are refined to
+            // is the application's own.
             for (got, want) in elems.iter().zip(targs) {
-                self.agree(got, want)?;
+                let (got, want) = (self.table.shallow(got), self.table.shallow(want));
+                self.agree(&got, &want)?;
             }
             return Ok(());
         }
@@ -5110,6 +5367,71 @@ fn check_literals(e: &TExpr<Ty>, site: &Span) -> Res<()> {
         }
     });
     result
+}
+
+/// The case a source pattern names, if it names one.
+fn pattern_case(p: &Pattern) -> Option<&str> {
+    match p {
+        Pattern::Ctor { name, .. } | Pattern::Nested { name, .. } => Some(name),
+        _ => None,
+    }
+}
+
+/// The case a typed pattern names, if it names one.
+fn typed_pattern_case(p: &TPattern<It>) -> Option<&str> {
+    match p {
+        TPattern::Ctor { name, .. } | TPattern::Nested { name, .. } => Some(name),
+        _ => None,
+    }
+}
+
+/// The variant each refinement parameter of `sig` takes its cases from: the base of a
+/// `T without X` written in the signature, which has to be a named type.
+fn case_domains(sig: &aipl_syntax::ast::Signature) -> Result<HashMap<String, String>, String> {
+    fn walk(t: &Type, params: &[String], out: &mut HashMap<String, String>) {
+        match t {
+            Type::Without(base, aipl_syntax::ast::Exclusion::NamedCase(n))
+                if params.contains(n) =>
+            {
+                if let Type::Named(v) = aipl_syntax::unrefined(base) {
+                    out.entry(n.clone()).or_insert_with(|| v.clone());
+                }
+                walk(base, params, out);
+            }
+            Type::Without(i, _)
+            | Type::Case(i)
+            | Type::Optional(i)
+            | Type::Array(i)
+            | Type::Set(i, _) => walk(i, params, out),
+            Type::Dict(a, b) | Type::Result(a, b) => {
+                walk(a, params, out);
+                walk(b, params, out);
+            }
+            Type::Generic(_, args) | Type::Tuple(args) => {
+                args.iter().for_each(|a| walk(a, params, out))
+            }
+            Type::Fn(ps, r) => {
+                ps.iter().for_each(|p| walk(p, params, out));
+                walk(r, params, out);
+            }
+            _ => {}
+        }
+    }
+    let mut out = HashMap::new();
+    for p in &sig.params {
+        walk(&p.ty, &sig.case_params, &mut out);
+    }
+    if let Some(r) = &sig.return_ty {
+        walk(r, &sig.case_params, &mut out);
+    }
+    for name in &sig.case_params {
+        if !out.contains_key(name) {
+            return Err(format!(
+                "refinement parameter {name:?} has to be written as `T without {name}` somewhere in the signature, so the cases it stands for belong to a named type"
+            ));
+        }
+    }
+    Ok(out)
 }
 
 /// `t` as found inside a value that lacks the case `case` throughout: every part of it that can

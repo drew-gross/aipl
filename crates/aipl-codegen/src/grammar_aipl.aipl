@@ -165,7 +165,7 @@ import {
     token_leaves,
     token_span,
 } from "./cst.aipl";
-import { desugar, desugared, random_shim } from "./desugar.aipl";
+import { desugar, desugared } from "./desugar.aipl";
 import { Doc, print } from "./doc.aipl";
 import {
     Alias,
@@ -340,8 +340,10 @@ import {
     ArrayRest as PatArrayRest,
     Char as PatChar,
     Ctor as PatCtor,
+    ElementKind,
     Int as PatInt,
     Pat,
+    PatElement,
     Str as PatStr,
     Struct as PatStruct,
     Tuple as PatTuple,
@@ -1919,32 +1921,14 @@ fn provider_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!Pars
 }
 
 # `shim random { provider } { body }`: the first block is any expression of type
-# `RandomProvider`, so which provider to use can be decided at run time. A provider
-# holds the seed to start from, `none` for the clock, and the seeding reads it:
-#
-#     shim random { p } { body }
-#       => shim random { random_u64 = __random_next } {
-#              if (let some(seed) = p.seed) { __random_seed(seed) } else { __random_seed_from_clock() };
-#              body
-#          }
+# `RandomProvider`, so which provider to use can be decided at run time. It is the
+# provider `seeded_with_provider`, applied to that expression: `desugar.aipl` lowers it
+# like the other providers.
 fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     let at_head = provider_head(src, node, sp)?.span;
     let provider = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
-    let arm = MatchArm {
-        pattern: PatCtor("some", bindings=["seed$provider"]),
-        body: at(Call("__random_seed", [at(Ident("seed$provider"), at_head)], false), at_head),
-        span: at_head,
-    };
-    let seeding = at(
-        IfLet(
-            arm,
-            at(Field(provider, "seed"), at_head),
-            at(Call("__random_seed_from_clock", [], false), at_head),
-        ),
-        at_head,
-    );
-    ok(random_shim(seeding, body, at_head))
+    ok(at(ProviderShim("seeded_with_provider", [provider], body), at_head))
 }
 
 # `if (..) { .. }` and `if (let p = e) { .. }`, with or without an `else`. Both
@@ -3048,12 +3032,12 @@ fn array_pattern(elems: Pat[], subs: Cst[], rest: bool, span: Span) -> Pat!Parse
         };
         return ok(PatArrayNested(elems));
     };
-    mut exprs: Expr[] = [];
+    mut elements: PatElement[] = [];
     for (let i, p : elems) {
-        set exprs.push(plain_elem_expr(p, sub_span(subs, i, 0..0)));
+        set elements.push(plain_element(p, sub_span(subs, i, 0..0)));
     }
-    if (rest) { return ok(PatArrayRest(exprs)); };
-    ok(PatArray(exprs))
+    if (rest) { return ok(PatArrayRest(elements)); };
+    ok(PatArray(elements))
 }
 
 fn is_rest(v: Ast) -> bool { if (let ARest(..) = v) { true } else { false } }
@@ -3070,21 +3054,24 @@ fn is_plain_elem(self: Pat) -> bool {
     }
 }
 
-# A plain element as the expression the simple `Array` form holds, spanned where
-# it was written. Total over what `is_plain_elem` admits; anything else has
-# already taken the nested path.
-fn plain_elem_expr(self: Pat, span: Span) -> Expr {
-    match (self) {
-        Ctor(name, _, _) => at(Ident(name), span),
-        Wildcard => at(Ident("_"), span),
-        Str(s) => at(Str(s), span),
-        Char(c) => at(Char(c), span),
-        Int(n) => at(Num(n), span),
-        Array(..) | ArrayRest(..) | ArrayNested(..) | Tuple(..) | Nested(..) | Struct(..) => at(
-            Ident("_"),
-            span,
-        ),
-    }
+# A plain element as the simple `Array` form holds it, spanned where it was written.
+# Total over what `is_plain_elem` admits; anything else has already taken the nested
+# path.
+fn plain_element(self: Pat, span: Span) -> PatElement {
+    let kind = match (self) {
+        Ctor(name, _, _) => ElementKind.Binder(name),
+        Wildcard => ElementKind.Binder("_"),
+        Str(s) => ElementKind.Text(s),
+        Char(c) => ElementKind.Letter(c),
+        Int(n) => ElementKind.Number(n),
+        Array(..)
+        | ArrayRest(..)
+        | ArrayNested(..)
+        | Tuple(..)
+        | Nested(..)
+        | Struct(..) => ElementKind.Binder("_"),
+    };
+    PatElement { kind, span }
 }
 
 # An arm's span is its *pattern's*, so a diagnostic points at what selected the
@@ -3638,7 +3625,7 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         },
         [name, ":", bound_name, ..] => {
             let bound = bound_from_name(bound_name).value_or_err(ParseError {
-                message: `unknown type parameter bound "{bound_name}"; expected "any" or "ord"`,
+                message: `unknown type parameter bound "{bound_name}"; expected "any", "ord", "int" or "cases"`,
                 span: node.tokens[2].value_or(node.tok_span()),
             })?;
             ok(ATypeParam(TypeParam { name, bound, default, name_span }))
@@ -5401,7 +5388,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(
         program_dump(
             "fn f<T: eq>(a: T) { }",
-        ) == `error: unknown type parameter bound "eq"; expected "any" or "ord"`,
+        ) == `error: unknown type parameter bound "eq"; expected "any", "ord", "int" or "cases"`,
     );
 
     // The parameter shapes. What is stored is the type the *body* sees: a

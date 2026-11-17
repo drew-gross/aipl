@@ -1773,6 +1773,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
                     is_pub: true,
                     sig: AstSignature {
                         type_vars: Vec::new(),
+                        case_params: Vec::new(),
                         params: Vec::new(),
                         effects: all_effects(),
                         return_ty: None,
@@ -1813,6 +1814,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
         is_pub: true,
         sig: AstSignature {
             type_vars: Vec::new(),
+            case_params: Vec::new(),
             params: Vec::new(),
             effects: all_effects(),
             return_ty: Some(Type::Primitive(Primitive::I64)),
