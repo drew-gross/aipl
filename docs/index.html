@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">223 files, 1945 items.</p>
+      <p class="summary">223 files, 1955 items.</p>
 
       <ul class="files">
 
@@ -1105,6 +1105,11 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-grammar_aipl.html#item-LoweredFile"><code>LoweredFile</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-grammar_aipl.html#item-ParseFailure"><code>ParseFailure</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
@@ -1389,7 +1394,7 @@
           <p class="file-summary">The rewrites that turn a function's <code>.test</code> and <code>.benchmark</code> attributes into ordinary top-level functions, so that everything after the parse — the loader's rewrites included, which is how they recognize test code — sees only functions.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-hoist_test_fns.html#private">7 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-hoist_test_fns.html#private">8 private</a></span>
 
 
           <ul class="items">
@@ -1459,7 +1464,7 @@
           <p class="file-summary">The items and declarations of AIPL's syntax tree — functions, structs, variants, imports, and the program that holds them — with the source-like dump the item lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-item.html#private">16 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-item.html#private">18 private</a></span>
 
 
           <ul class="items">
@@ -1525,6 +1530,11 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-item.html#item-Attributes"><code>Attributes</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-item.html#item-BenchmarkBlock"><code>BenchmarkBlock</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
@@ -1565,13 +1575,33 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-item.html#item-SuperItem"><code>SuperItem</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-item.html#item-WrittenItem"><code>WrittenItem</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-item.html#item-Item"><code>Item</code></a>
               <span class="kind kind-variant">variant</span>
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-item.html#item-Program"><code>Program</code></a>
+              <a href="crates-aipl-codegen-src-item.html#item-SuperProgram"><code>SuperProgram</code></a>
               <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-item.html#item-WrittenProgram"><code>WrittenProgram</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-item.html#item-Program"><code>Program</code></a>
+              <span class="kind kind-variant">variant</span>
             </li>
 
             <li>
@@ -2463,7 +2493,7 @@
           <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">9 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">8 private</a></span>
 
 
           <ul class="items">
@@ -3942,7 +3972,7 @@
           <p class="file-summary">Filling in each expression's <code>source</code>: the text its span covers.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-source_text.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-source_text.html#private">5 private</a></span>
 
 
           <ul class="items">

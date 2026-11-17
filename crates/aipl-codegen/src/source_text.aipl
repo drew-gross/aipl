@@ -10,30 +10,31 @@
 import { collect_arms, equal as ==, map } from builtins;
 import { Call, Expr, Ident, at, map_subexprs, subexprs } from "./expr.aipl";
 import {
+    Attributes,
     BenchmarkBlock,
     CaseParam,
     Const,
     ConstDecl,
     FieldDecl,
-    Fn,
     Function,
-    Item,
     Param,
-    Program,
     Signature,
     Struct,
     StructDecl,
+    SuperProgram,
     Variant,
     VariantCase,
     VariantDecl,
+    WrittenFn,
+    WrittenItem,
+    WrittenProgram,
 } from "./item.aipl";
 import { SpanStr } from "./lexer.aipl";
 
 # `self` with `source` set, in every expression it holds, to the text of `text`
 # that the expression's span covers.
-pub fn with_source_text(self: Program, text: str) -> Program {
-    ..self,
-    items: self.items$sourced_item(text),
+pub fn with_source_text(self: WrittenProgram, text: str) -> WrittenProgram {
+    SuperProgram { items: self.items$sourced_item(text), doc: self.doc }
 }.test({
     // Each expression holds what was written for it, children included.
     let text = "fn f() { g(a) }";
@@ -47,17 +48,22 @@ pub fn with_source_text(self: Program, text: str) -> Program {
         is_pub: false,
         sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
         body: call,
-        test_body: none,
         doc: none,
     };
-    let program = Program { items: [Fn(function)], doc: none };
-    fn body_source(self: Fn(Function { body })) -> str { body.source }
-    assert(program.with_source_text(text).items.collect_arms(Fn)$body_source() == ["g(a)"]);
+    fn body_source(self: WrittenFn(Function { body }, _)) -> str { body.source }
+    let SuperProgram { items } = SuperProgram {
+        items: [WrittenFn(function, Attributes { test_body: none })],
+        doc: none,
+    }.with_source_text(text);
+    assert(items.collect_arms(WrittenFn)$body_source() == ["g(a)"]);
 })
 
-fn sourced_item(self: Item, text: str) -> Item {
+fn sourced_item(self: WrittenItem, text: str) -> WrittenItem {
     match (self) {
-        Fn(f) => Fn(f.sourced_function(text)),
+        WrittenFn(f, attributes) => WrittenFn(
+            f.sourced_function(text),
+            attributes.sourced_attributes(text),
+        ),
         Struct(s) => Struct(StructDecl {
             ..s,
             fields: s.fields.map(|f| FieldDecl { ..f, default: f.default$sourced(text) }),
@@ -73,8 +79,7 @@ fn sourced_case(self: VariantCase, text: str) -> VariantCase {
     payload: self.payload.map(|slot| CaseParam { ..slot, default: slot.default$sourced(text) }),
 }
 
-# A function, with its `.test` block and `.benchmark` block and the helpers
-# declared in either.
+# A function.
 fn sourced_function(self: Function, text: str) -> Function {
     ..self,
     sig: Signature {
@@ -82,6 +87,10 @@ fn sourced_function(self: Function, text: str) -> Function {
         params: self.sig.params.map(|p| Param { ..p, default: p.default$sourced(text) }),
     },
     body: self.body.sourced(text),
+}
+
+# A function's `.test` block and `.benchmark` block and the helpers declared in either.
+fn sourced_attributes(self: Attributes, text: str) -> Attributes {
     test_body: self.test_body$sourced(text),
     test_fns: self.test_fns$sourced_function(text),
     benchmark: self.benchmark.map(|block| BenchmarkBlock {

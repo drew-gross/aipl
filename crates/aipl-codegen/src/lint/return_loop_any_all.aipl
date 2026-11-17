@@ -51,7 +51,7 @@ import {
 } from builtins;
 import { Bool, Call, Return, Seq } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     imported_as,
@@ -63,7 +63,7 @@ import { is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
 
 # A hit for each loop in the program that reports whether some or every element passes a
 # test.
-pub fn return_loop_any_all(program: Program) -> LintHit[] {
+pub fn return_loop_any_all(program: WrittenProgram) -> LintHit[] {
     let negation = program.items.imported_as("logical_not") == some("!");
     program.on_functions_filled(|Function { body }| {
         body

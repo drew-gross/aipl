@@ -29,7 +29,7 @@ import {
 } from builtins;
 import { Call, Expr, Field, Ident, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     imported_as,
@@ -40,7 +40,7 @@ import {
 } from "./lint_hit.aipl";
 
 # A hit for each `with(..)` the program falls back from to the array it replaces in.
-pub fn with_value_or_self(program: Program) -> LintHit[] {
+pub fn with_value_or_self(program: WrittenProgram) -> LintHit[] {
     let some(with_name) = program.items.imported_as("with") else { return []; };
     let some(value_or) = program.items.imported_as("value_or") else { return []; };
     program.on_functions_filled(|Function { body }| {

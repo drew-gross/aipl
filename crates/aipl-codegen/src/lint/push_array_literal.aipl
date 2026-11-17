@@ -40,13 +40,13 @@ import {
 } from builtins;
 import { ArrayLit, Expr, Ident, LetMut, Spread, collect_expr_cases } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { Pushed, pushed } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { LintHit, hit, imported_as, lint_messages, on_functions, quote } from "./lint_hit.aipl";
 
 # A hit for each array the program binds `mut`, pushes onto and returns.
-pub fn push_array_literal(program: Program) -> LintHit[] {
+pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     let some(push) = program.items.imported_as("push") else { return []; };
     program.on_functions(|Function { body }| {
         body.collect_expr_cases(LetMut)$literal(push).collect_ok()

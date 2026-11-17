@@ -37,7 +37,7 @@ import {
 } from builtins;
 import { Assign, Call, Expr, Num, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { LintHit, hit, lint_messages, on_functions, spans_its_text } from "./lint_hit.aipl";
 import { Pairing, paired } from "./operator_pairs.aipl";
 import { is_same_place } from "./places.aipl";
@@ -48,7 +48,7 @@ import { step_for } from "./step_by_one.aipl";
 struct Compound { operator: str, spelling: str, missing: str? }
 
 # A hit for each long-hand accumulate in the program.
-pub fn compound_assign(program: Program) -> LintHit[] {
+pub fn compound_assign(program: WrittenProgram) -> LintHit[] {
     let items = program.items;
     let compounds = [("+", "+="), ("-", "-="), ("*", "*="), ("/", "/=")]
         .map(

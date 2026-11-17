@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-eta_lambda">eta_lambda</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn eta_lambda(program: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn eta_lambda(program: WrittenProgram) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each lambda in the program that adds nothing to what it forwards to.</p></div>
 
@@ -62,7 +62,7 @@
             <a class="anchor" href="#item-methods_in_view">methods_in_view</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn methods_in_view(self: Item[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn methods_in_view(self: WrittenItem[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The names a call can use as a <code>$</code> step: a function of this file whose first parameter is named <code>self</code>, which is what method-call syntax is defined by, and a lowercase builtin the file imports. A function from another file is not here — its parameters are not in view when a file is linted.</p></div>
 
@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-method_name">method_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn method_name(self: Fn) -&#62; str?</code></pre>
+          <pre class="signature"><code>fn method_name(self: WrittenFn) -&#62; str?</code></pre>
 
           <div class="doc"><p>The name of the function <code>self</code>, when it takes a <code>self</code>.</p></div>
 

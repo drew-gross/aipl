@@ -36,20 +36,21 @@ import {
     num,
 } from "./expr.aipl";
 import {
+    Attributes,
     CaseParam as CaseParamNode,
     ConstDecl,
     FieldDecl as FieldDeclNode,
     Function as FunctionNode,
     ImportDecl,
     ImportName as ImportNameNode,
-    Item as ItemNode,
     Param as ParamNode,
-    Program as ProgramNode,
     RefinementDecl,
     StructDecl,
     TypeParam as TypeParamNode,
     VariantCase as VariantCaseNode,
     VariantDecl,
+    WrittenItem as ItemNode,
+    WrittenProgram as ProgramNode,
 } from "./item.aipl";
 import { FnAttr, ParsedBody, Stmt as StmtNode, TestBlock as TestBlockNode } from "./parsed.aipl";
 import { Pat as PatNode } from "./pat.aipl";
@@ -101,7 +102,7 @@ variant Ast =
     | DetachedDoc(str, Span, ItemNode)
     | Import(ImportDecl)
     | ImportName(ImportNameNode)
-    | Function(FunctionNode)
+    | Function(FunctionNode, Attributes)
     | TypeParams(TypeParamNode[])
     | TypeParam(TypeParamNode)
     | Param(ParamNode)

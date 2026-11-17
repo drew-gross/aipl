@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/parse_and_partial_load.aipl</code></h1>
 
-      <div class="module-doc"><p>A source file parsed and loaded as far as the loader has been ported to AIPL.</p><p><code>aipl_parse_file</code> is only the parse. The loader then does more to a file than parse it, and each part of that which has moved into AIPL is a step here, so this function is what is left to burn down: a step moves in from the Rust loader, and when the last one has, the loader is this.</p><p>What has moved so far:</p><ul><li><code>lint</code> and <code>squelch</code>: the lints, and the <code>#[allow]</code> markers that keep what they</li></ul><p>flag. They read the program as parsed, so a <code>.test</code> block is still an attribute of its function, a type parameter is still a name, and no destructuring has been lowered. The hits that survive ride beside the program, for the Rust driver to report.</p><ul><li><code>hoist_test_fns</code>: a <code>.test</code> or <code>.benchmark</code> attribute becomes ordinary</li></ul><p>top-level functions.</p><ul><li><code>promote_type_vars</code>: a declaration's own type parameters become type</li></ul><p>variables.</p><ul><li><code>desugar</code>: the destructuring forms are lowered.</li></ul><p>The formatter parses with <code>aipl_parse_file</code> and not this, because it lays out the program the author wrote, attributes and all.</p></div>
+      <div class="module-doc"><p>A source file parsed and loaded as far as the loader has been ported to AIPL.</p><p><code>aipl_parse_surface_file</code> is only the parse. The loader then does more to a file than parse it, and each part of that which has moved into AIPL is a step here, so this function is what is left to burn down: a step moves in from the Rust loader, and when the last one has, the loader is this.</p><p>What has moved so far:</p><ul><li><code>lint</code> and <code>squelch</code>: the lints, and the <code>#[allow]</code> markers that keep what they</li></ul><p>flag. They read the program as parsed, so a <code>.test</code> block is still an attribute of its function, a type parameter is still a name, and no destructuring has been lowered. The hits that survive ride beside the program, for the Rust driver to report.</p><ul><li><code>hoist_test_fns</code>: a <code>.test</code> or <code>.benchmark</code> attribute becomes ordinary</li></ul><p>top-level functions.</p><ul><li><code>promote_type_vars</code>: a declaration's own type parameters become type</li></ul><p>variables.</p><ul><li><code>desugar</code>: the destructuring forms are lowered.</li></ul><p>The formatter lays a file out from its tokens, and parses it only to refuse one that does not parse.</p></div>
 
 
 
@@ -43,7 +43,7 @@
           </h3>
           <pre class="signature"><code>pub fn parse_and_partial_load(src: str) -&#62; PartialLoad!ParseFailure</code></pre>
 
-          <div class="doc"><p><code>aipl_parse_file</code>, then the steps of loading that happen per file and need nothing from any other.</p></div>
+          <div class="doc"><p><code>aipl_parse_surface_file</code>, then the steps of loading that happen per file and need nothing from any other.</p></div>
 
 
         </section>

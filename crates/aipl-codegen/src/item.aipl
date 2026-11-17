@@ -169,16 +169,8 @@ pub fn arity_marker(self: Arity) -> str {
 
 struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
 
-# `test_fns` are the functions declared inside the `.test` block — helpers
-# private to the test, never `pub`. The parser hands them over here and
-# `hoist_test_fns` moves them to top-level items under a name only the test can
-# reach, so nothing past it sees the nesting.
-#
-# `benchmark` is the function's `.benchmark({ .. })` attribute, if it has
-# one. The Rust AST has no such field: the bridge turns the attribute into a
-# function of its own before anything else sees the program (see `ffi_ast.rs`),
-# the way the `.test` helpers are hoisted, so this is the parser's account of
-# what was written and nothing downstream of the bridge reads it.
+# A function with nothing attached: what hoisting leaves, and every helper declared inside
+# a block. Its `.test` and `.benchmark` attributes, as written, are an [`Attributes`].
 #
 # `shorthand_body` records that `body` was written as the `{ field: value }`
 # shorthand rather than a literal naming its type; the two parse to the same
@@ -189,11 +181,15 @@ struct Function {
     sig: Signature,
     body: Expr,
     shorthand_body: bool = false,
-    test_body: Expr?,
-    test_fns: Function[] = [],
-    benchmark: BenchmarkBlock? = none,
     doc: str?,
 }
+
+# What a function carries as written: its `.test({ .. })` block, the functions declared
+# inside it — helpers private to the test, never `pub` — and its `.benchmark({ .. })`
+# attribute. The helpers are plain `Function`s, so a block cannot hold another. The
+# parser hands them over here and `hoist_test_fns` moves each to a top-level function
+# under a name only the test can reach.
+struct Attributes { test_body: Expr?, test_fns: Function[] = [], benchmark: BenchmarkBlock? = none }
 
 # One `.benchmark({ .. })` attribute: its block, the functions declared inside
 # the block (helpers private to it, as in a `.test` block), and the span of the
@@ -224,13 +220,24 @@ struct RefinementDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], target
 # a constant's two rules point at — ALL_CAPS, and a literal value.
 struct ConstDecl { name: SpanStr, is_pub: bool, ty: Ty?, value: Expr, doc: str? }
 
-variant Item =
-    | Fn(Function)
+# A top-level item, at either stage. It is used directly only by what works at both;
+# everything else takes the refinement for its stage. The cases are named apart from every
+# other variant's because a refinement leaves out a case by name, anywhere it can be.
+variant SuperItem =
+    | WrittenFn(Function, Attributes)
+    | LoweredFn(Function)
     | Struct(StructDecl)
     | Variant(VariantDecl)
     | Refinement(RefinementDecl)
     | Import(ImportDecl)
     | Const(ConstDecl)
+
+# An item as the parser writes it: a function carries its attributes.
+variant WrittenItem = SuperItem without LoweredFn
+
+# An item once the attributes are functions of their own: what hoisting produces and
+# every pass after it reads.
+variant Item = SuperItem without WrittenFn
 
 # `aipl_syntax::ast::Program`, less its `sources` map: a single parsed file has
 # none, and the loader fills one in when it flattens several files together.
@@ -239,7 +246,14 @@ variant Item =
 # blank line detaches from whatever follows, so it documents no declaration.
 # `none` for a file that opens with anything else, and for every program a pass
 # builds or the loader flattens, neither of which is one file.
-struct Program { items: Item[], doc: str? }
+struct SuperProgram { items: SuperItem[], doc: str? }
+
+# A program as the parser writes it: every function carries its attributes.
+variant WrittenProgram = SuperProgram without LoweredFn throughout
+
+# A program once the attributes are functions of their own, which is what every pass after
+# hoisting reads.
+variant Program = SuperProgram without WrittenFn throughout
 
 # A parsed function body, before the return type is in scope to name the struct
 # the shorthand constructs. Parser-local: by the time a `Function` is built the
@@ -262,11 +276,12 @@ struct FnAttr { body: Expr, span: Span }
 # tests assert against. Near the source it came from rather than structural,
 # because an item's shape is its declaration and a dump that hid that would be
 # harder to read than the thing it describes.
-pub fn show_program(self: Program) -> str { self.items$show_item().join(sep="\n") }
+pub fn show_program(self: SuperProgram) -> str { self.items$show_item().join(sep="\n") }
 
-pub fn show_item(self: Item) -> str {
+pub fn show_item(self: SuperItem) -> str {
     match (self) {
-        Fn(f) => show_fn(f),
+        WrittenFn(f, attributes) => `{show_fn(f)}{show_attributes(attributes)}`,
+        LoweredFn(f) => show_fn(f),
         Struct(s) => `{show_doc(s.doc)}struct {s.name.text}{show_type_params(s.type_vars)}({s.fields$show_field_decl().join(sep=", ")})`,
         Variant(v) => `{show_doc(v.doc)}variant {v.name.text}{show_type_params(v.type_vars)}({v.cases$show_case().join(sep=" | ")})`,
         Refinement(r) => `{show_doc(r.doc)}variant {r.name.text}{show_type_params(r.type_vars)} = {r.target.show_ty()}`,
@@ -308,10 +323,14 @@ fn show_fn(self: Function) -> str {
     let sig = self.sig;
     let ret = sig.return_ty.map(|t| ` -> {t.show_ty()}`).value_or("");
     let effects = sig.effects$effect_marker().join();
+    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params$show_param().join(sep=", ")}){effects}{ret} = {self.body.show_expr()}`
+}
+
+# The attributes after the function they hang from: ` .test(block helper..) .benchmark(..)`.
+fn show_attributes(self: Attributes) -> str {
     let helpers = self.test_fns.map(|h| ` {h.show_fn()}`).join();
     let test = self.test_body.map(|b| ` .test({b.show_expr()}{helpers})`).value_or("");
-    let benchmark = self.benchmark$show_benchmark().value_or("");
-    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params$show_param().join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}{benchmark}`
+    `{test}{self.benchmark$show_benchmark().value_or("")}`
 }
 
 fn show_benchmark(self: BenchmarkBlock) -> str {
@@ -550,13 +569,19 @@ pub fn param_names(self: Param) -> #{str} {
 # The names a payload slot of a variant case mentions: its type and its default.
 pub fn case_param_names(self: CaseParam) -> #{str} { ty_and_default_names(self.ty, self.default) }
 
-# The names a function mentions: in its signature, its body, its `.test` body and
-# `.benchmark` block, and the helpers declared in either.
+# The names a function mentions: in its signature and its body.
 pub fn function_names(self: Function) -> #{str} {
     #{
         ..self.sig.params$param_names().union_all(),
         ..self.sig.return_ty.optional_ty_names(),
         ..self.body.names_in(),
+    }
+}
+
+# The names a function's attributes mention: its `.test` body and `.benchmark` block, and the
+# helpers declared in either.
+fn attribute_names(self: Attributes) -> #{str} {
+    #{
         ..self.test_body$names_in().value_or(#{}),
         ..self.test_fns$function_names().union_all(),
         ..self.benchmark$benchmark_names().value_or(#{}),
@@ -569,9 +594,10 @@ fn benchmark_names(self: BenchmarkBlock) -> #{str} {
 }
 
 # The names an item mentions outside an import list. An import mentions none.
-pub fn item_names(self: Item) -> #{str} {
+pub fn item_names(self: SuperItem) -> #{str} {
     match (self) {
-        Fn(f) => f.function_names(),
+        WrittenFn(f, attributes) => #{..f.function_names(), ..attributes.attribute_names()},
+        LoweredFn(f) => f.function_names(),
         Struct(s) => s.fields$names().union_all(),
         Variant(v) => v.cases$payload.join()$case_param_names().union_all(),
         // A constant's annotation may name an imported type; its value is a literal, so

@@ -128,7 +128,7 @@ fn program(v: &FfiValue) -> R<ast::Program> {
 fn item(v: &FfiValue) -> R<ast::Item> {
     let (case, payload) = variant(v)?;
     Ok(match case {
-        "Fn" => ast::Item::Fn(function(at(payload, 0, case)?)?),
+        "LoweredFn" => ast::Item::Fn(function(at(payload, 0, case)?)?),
         "Struct" => ast::Item::Struct(struct_decl(at(payload, 0, case)?)?),
         "Variant" => ast::Item::Variant(variant_decl(at(payload, 0, case)?)?),
         "Refinement" => ast::Item::Refinement(refinement_decl(at(payload, 0, case)?)?),

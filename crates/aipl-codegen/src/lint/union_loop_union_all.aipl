@@ -67,7 +67,7 @@ import {
 } from builtins;
 import { Assign, Call, Expr, Ident, SetLit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { Set, Unordered, type_text } from "../ty.aipl";
 import { SeededLoop, is_liftable, pipeline_hit, seeded_loops } from "./accumulation.aipl";
 import {
@@ -81,7 +81,7 @@ import { lone_statement } from "./loop_shape.aipl";
 import { to_set, union, union_all } from sets;
 
 # A hit for each set the program seeds empty and grows with a loop of `union`s.
-pub fn union_loop_union_all(program: Program) -> LintHit[] {
+pub fn union_loop_union_all(program: WrittenProgram) -> LintHit[] {
     let some(union) = program.items.imported_as("union") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body.seeded_loops()$unioned(union).collect_ok()

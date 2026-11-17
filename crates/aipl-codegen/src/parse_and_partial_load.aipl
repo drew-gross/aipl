@@ -1,6 +1,6 @@
 # A source file parsed and loaded as far as the loader has been ported to AIPL.
 #
-# `aipl_parse_file` is only the parse. The loader then does more to a file than
+# `aipl_parse_surface_file` is only the parse. The loader then does more to a file than
 # parse it, and each part of that which has moved into AIPL is a step here, so
 # this function is what is left to burn down: a step moves in from the Rust
 # loader, and when the last one has, the loader is this.
@@ -18,8 +18,8 @@
 #   variables.
 # - `desugar`: the destructuring forms are lowered.
 #
-# The formatter parses with `aipl_parse_file` and not this, because it lays out
-# the program the author wrote, attributes and all.
+# The formatter lays a file out from its tokens, and parses it only to refuse one that does
+# not parse.
 
 import { Span, contains, equal as ==, len, logical_not as ! } from builtins;
 import { desugar } from "./desugar.aipl";
@@ -30,7 +30,7 @@ import {
     aipl_parse_surface_file,
 } from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
-import { Fn, Item, Program, show_program } from "./item.aipl";
+import { Item, LoweredFn, Program, show_program } from "./item.aipl";
 import { lint } from "./lint/lint.aipl";
 import { LintHit } from "./lint/lint_hit.aipl";
 import { squelch } from "./lint/squelch.aipl";
@@ -40,7 +40,7 @@ import { promote_type_vars } from "./promote_type_vars.aipl";
 # has: the hits no `#[allow]` squelches, and the markers that squelch nothing.
 struct PartialLoad { program: Program, lints: LintHit[], type_uses: Span[] = [] }
 
-# `aipl_parse_file`, then the steps of loading that happen per file and need
+# `aipl_parse_surface_file`, then the steps of loading that happen per file and need
 # nothing from any other.
 pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let ParsedFile { program, allows, type_uses } = aipl_parse_surface_file(src)?;
@@ -129,7 +129,7 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
 // A function's name, and the empty string for any other item.
 fn item_name(self: Item) -> str {
     match (self) {
-        Fn(f) => f.name.text,
+        LoweredFn(f) => f.name.text,
         Struct(..) | Variant(..) | Refinement(..) | Import(..) | Const(..) => "",
     }
 }

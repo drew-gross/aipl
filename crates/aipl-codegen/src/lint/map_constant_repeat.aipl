@@ -55,7 +55,7 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     Named,
@@ -67,7 +67,7 @@ import {
 } from "./lint_hit.aipl";
 
 # A hit for each `map` over a function that ignores its argument.
-pub fn map_constant_repeat(program: Program) -> LintHit[] {
+pub fn map_constant_repeat(program: WrittenProgram) -> LintHit[] {
     let some(map_name) = program.items.imported_as("map") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body

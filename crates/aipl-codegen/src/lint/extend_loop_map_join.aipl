@@ -21,12 +21,12 @@
 
 import { equal as ==, extend, filter, join, map, to_str } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
 import { LintHit, imported_as, lint_messages, on_functions_filled } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `extend`s.
-pub fn extend_loop_map_join(program: Program) -> LintHit[] {
+pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     let some(extend) = program.items.imported_as("extend") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body

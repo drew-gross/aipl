@@ -33,7 +33,7 @@ import {
 } from builtins;
 import { Call, Expr, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     UnfilledHit,
@@ -50,7 +50,7 @@ import { is_zero } from "./slice_bounds.aipl";
 struct Names { equal: bool, logical_not: bool, nonempty: str?, len: str? }
 
 # A hit for each emptiness test in the program that is asked the long way.
-pub fn is_empty_longhand(program: Program) -> LintHit[] {
+pub fn is_empty_longhand(program: WrittenProgram) -> LintHit[] {
     let items = program.items;
     let names = Names {
         equal: items.bound_to("==") == some("equal"),

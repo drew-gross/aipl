@@ -13,7 +13,7 @@
 
 import { collect_ok, equal as ==, map, not_equal as != } from builtins;
 import { Call } from "../expr.aipl";
-import { Program } from "../item.aipl";
+import { WrittenProgram } from "../item.aipl";
 import { interpolated_values } from "./interpolation.aipl";
 import {
     LintHit,
@@ -25,7 +25,7 @@ import {
 } from "./lint_hit.aipl";
 
 # A hit for each `to_str` call that is the whole of an interpolation.
-pub fn interp_to_str(program: Program) -> LintHit[] {
+pub fn interp_to_str(program: WrittenProgram) -> LintHit[] {
     let some(to_str) = program.items.imported_as("to_str") else { return []; };
     program.on_functions(
         |function| function.body

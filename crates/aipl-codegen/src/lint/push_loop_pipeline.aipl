@@ -29,12 +29,12 @@
 
 import { equal as ==, filter, map } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
 import { LintHit, imported_as, lint_messages, on_functions_filled } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `push`es.
-pub fn push_loop_pipeline(program: Program) -> LintHit[] {
+pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     let some(push) = program.items.imported_as("push") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body

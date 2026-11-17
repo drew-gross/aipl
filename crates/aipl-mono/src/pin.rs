@@ -1450,7 +1450,8 @@ impl Pinner<'_> {
                     }
                     continue;
                 }
-                let ty = self.refined_type(var);
+                // A bound is about the type, not what it is refined to.
+                let ty = aipl_syntax::unrefined(&self.refined_type(var)).clone();
                 let need = rec.bounds[i];
                 let ok = match &ty {
                     Type::TypeVar(v) => {
@@ -1675,6 +1676,36 @@ impl Pinner<'_> {
                 at,
             );
         }
+        // A value that is one of several (a block's tail, the branches of an `if`, the arms of a
+        // `match`) meets a refinement inside its type through each of them.
+        if !matches!(self.table.chase(expected), It::Without(..))
+            && self.mentions_refinement(expected)
+        {
+            if let Some(parts) = Self::result_positions(e) {
+                for part in parts {
+                    self.coerce_expr(part, expected, &part.span, site)?;
+                }
+                let plain = self.unrefined(expected);
+                return self.coerce(&e.ty, &plain, span, site);
+            }
+        }
+        // The payload of an `ok`, `err` or `some` is held to the refinement its slot asks for, by
+        // what it is; the wrapper itself is compared without the refinements inside it.
+        if let TExprKind::Call { callee, args, .. } = &e.kind {
+            let slot = match (callee, self.table.shallow(expected)) {
+                (Callee::Some, It::Opt(inner)) => Some(inner),
+                (Callee::Ok, It::Res(ok, _)) => Some(ok),
+                (Callee::Err, It::Res(_, err)) => Some(err),
+                _ => None,
+            };
+            if let (Some(slot), [arg]) = (slot, args.as_slice()) {
+                if self.mentions_refinement(expected) {
+                    self.coerce_expr(arg, &slot, &arg.span, site)?;
+                    let plain = self.unrefined(expected);
+                    return self.coerce(&e.ty, &plain, span, site);
+                }
+            }
+        }
         // What was shown is not part of the type the value has; compare the bases.
         let base = self.table.shallow(expected);
         // Each element of a literal is shown to meet the refinement its slot asks for.
@@ -1687,6 +1718,53 @@ impl Pinner<'_> {
             }
         }
         self.coerce(&e.ty, &base, span, site)
+    }
+
+    /// The expressions a value of `e` comes from, when it is a block, an `if` or a `match`: the
+    /// forms `shows` reaches through.
+    fn result_positions(e: &TExpr<It>) -> Option<Vec<&TExpr<It>>> {
+        Some(match &e.kind {
+            TExprKind::Seq(_, tail)
+            | TExprKind::Let(_, _, tail)
+            | TExprKind::LetMut(_, _, tail)
+            | TExprKind::Assign(_, _, tail) => vec![tail],
+            TExprKind::If(_, a, b) => vec![a, b],
+            TExprKind::IfLet(arm, _, other) => vec![&arm.body, other],
+            TExprKind::Match(_, arms) => arms.iter().map(|a| &a.body).collect(),
+            _ => return None,
+        })
+    }
+
+    /// Whether `t` is refined anywhere inside it.
+    fn mentions_refinement(&self, t: &It) -> bool {
+        match self.table.chase(t) {
+            It::Without(..) => true,
+            It::Opt(i) | It::Arr(i) | It::Case(i) | It::Set(i, _) => self.mentions_refinement(&i),
+            It::Dict(a, b) | It::Res(a, b) => {
+                self.mentions_refinement(&a) || self.mentions_refinement(&b)
+            }
+            It::Gen(_, args) => args.iter().any(|a| self.mentions_refinement(a)),
+            It::Fn(ps, r) => {
+                ps.iter().any(|p| self.mentions_refinement(p)) || self.mentions_refinement(&r)
+            }
+            _ => false,
+        }
+    }
+
+    /// `t` without any of the refinements in it.
+    fn unrefined(&self, t: &It) -> It {
+        let go = |i: &It| Box::new(self.unrefined(i));
+        match self.table.chase(t) {
+            It::Without(inner, _) => self.unrefined(&inner),
+            It::Opt(i) => It::Opt(go(&i)),
+            It::Arr(i) => It::Arr(go(&i)),
+            It::Case(i) => It::Case(go(&i)),
+            It::Set(i, o) => It::Set(go(&i), o),
+            It::Dict(a, b) => It::Dict(go(&a), go(&b)),
+            It::Res(a, b) => It::Res(go(&a), go(&b)),
+            It::Gen(n, args) => It::Gen(n, args.iter().map(|a| self.unrefined(a)).collect()),
+            other => other,
+        }
     }
 
     /// Whether what `e` is shows it is not the excluded value `x`: a non-empty array literal is not
@@ -1807,8 +1885,19 @@ impl Pinner<'_> {
             return true;
         }
         let wanted = aipl_syntax::ast::Exclusion::Throughout(c.to_string());
-        if self.table.exclusions(t).contains(&wanted) {
+        let given = self.table.exclusions(t);
+        if given.contains(&wanted) {
             return true;
+        }
+        // A variant that is not the case, and whose payloads cannot hold it, holds none.
+        if !self.domains.contains_key(c)
+            && given.contains(&aipl_syntax::ast::Exclusion::NamedCase(c.to_string()))
+        {
+            if let It::Named(n) | It::Gen(n, _) = self.table.shallow(t) {
+                if !self.decls.tables().payloads_reach_case(&n, c) {
+                    return true;
+                }
+            }
         }
         match self.table.shallow(t) {
             It::Opt(i) | It::Arr(i) | It::Case(i) | It::Set(i, _) => self.type_is_clean_of(&i, c),
@@ -1993,7 +2082,10 @@ impl Pinner<'_> {
             }
             // A constructor named as a value stands for its case: a function building `V`, or (for a
             // case without a payload) a `V`.
-            (It::Fn(_, ret), It::Case(v)) | (It::Case(v), It::Fn(_, ret)) => self.agree(ret, v),
+            (It::Fn(_, ret), It::Case(v)) | (It::Case(v), It::Fn(_, ret)) => {
+                let (ret, v) = (self.table.shallow(ret), self.table.shallow(v));
+                self.agree(&ret, &v)
+            }
             (It::Named(_), It::Case(v)) | (It::Case(v), It::Named(_))
                 if {
                     let inner = self.table.shallow(v);
@@ -2001,14 +2093,18 @@ impl Pinner<'_> {
                 } =>
             {
                 let other = if matches!(a, It::Case(_)) { &e } else { &a };
-                self.agree(v, other)
+                let v = self.table.shallow(v);
+                self.agree(&v, other)
             }
             // A `Case<V>` is its tag, an integer.
             (It::Case(_), It::Prim(Primitive::I64 | Primitive::U64))
             | (It::Prim(Primitive::I64 | Primitive::U64), It::Case(_)) => Ok(()),
-            (It::Opt(x), It::Opt(y)) | (It::Arr(x), It::Arr(y)) | (It::Case(x), It::Case(y)) => {
-                self.agree(x, y)
+            // A case is a tag, so what its variant is refined to is no part of it.
+            (It::Case(x), It::Case(y)) => {
+                let (x, y) = (self.table.shallow(x), self.table.shallow(y));
+                self.agree(&x, &y)
             }
+            (It::Opt(x), It::Opt(y)) | (It::Arr(x), It::Arr(y)) => self.agree(x, y),
             (It::Set(x, ox), It::Set(y, oy)) => {
                 // A parameter that promises no order takes a set that promises one.
                 let given = self.table.order(*ox);
@@ -5176,6 +5272,8 @@ impl Pinner<'_> {
                 other => other,
             };
             if let It::Case(variant) = self.table.shallow(expected) {
+                // The case is a tag: what its variant is refined to is no part of it.
+                let (built, variant) = (self.table.shallow(&built), self.table.shallow(&variant));
                 self.agree(&built, &variant)
                     .map_err(|m| Failure::Rejected(Error::at(m, arg.span.clone())))?;
             }

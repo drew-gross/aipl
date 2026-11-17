@@ -29,14 +29,14 @@ import {
 } from builtins;
 import { Bool, Call, Char, Expr, Num, Str, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { LintHit, bound_to, hit, imported_as, lint_messages, on_functions } from "./lint_hit.aipl";
 
 # What the file's imports make of the comparisons and `value_or` this lint reads.
 struct Names { equal: bool, not_equal: bool, value_or: str }
 
 # A hit for each optional in the program that is filled with a literal only to be compared with another.
-pub fn value_or_compare(program: Program) -> LintHit[] {
+pub fn value_or_compare(program: WrittenProgram) -> LintHit[] {
     let items = program.items;
     let some(value_or) = items.imported_as("value_or") else { return []; };
     let names = Names {

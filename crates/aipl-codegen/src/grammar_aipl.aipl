@@ -254,19 +254,19 @@ import {
     TryMk,
     prod_names,
 } from "./grammar.aipl";
+import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import {
+    Attributes,
     BenchmarkBlock,
     Builtins,
     CaseParam,
     Const as ItemConst,
     ConstDecl,
     FieldDecl,
-    Fn as ItemFn,
     Function,
     Import as ItemImport,
     ImportDecl,
     ImportName,
-    Item,
     Library,
     One,
     OneOrMore,
@@ -278,10 +278,14 @@ import {
     Signature,
     Struct as ItemStruct,
     StructDecl,
+    SuperProgram,
     TypeParam,
     Variant as ItemVariant,
     VariantCase,
     VariantDecl,
+    WrittenFn as ItemFn,
+    WrittenItem,
+    WrittenProgram,
     ZeroOrMore,
     show_program,
 } from "./item.aipl";
@@ -3272,7 +3276,7 @@ fn as_name(v: Ast, span: Span) -> str!ParseError {
     err(wrong_kind("a name", v, span))
 }
 
-fn as_item(v: Ast, span: Span) -> Item!ParseError {
+fn as_item(v: Ast, span: Span) -> WrittenItem!ParseError {
     if (let AItem(it) = v) { return ok(it); };
     err(wrong_kind("an item", v, span))
 }
@@ -3324,7 +3328,7 @@ fn as_case_param(v: Ast, span: Span) -> CaseParam!ParseError {
 # flattens several files together.
 fn lower_program(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    mut items: Item[] = [];
+    mut items: WrittenItem[] = [];
     mut doc: str? = none;
     for (let i, k : kids) {
         if (let ADetachedDoc(text, at, it) = k) {
@@ -3340,34 +3344,40 @@ fn lower_program(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             set items.push(as_item(k, sp)?);
         };
     }
-    ok(AProgram(Program { items: items.number_unattached_blocks(), doc }))
+    ok(AProgram(SuperProgram { items: items.number_unattached_blocks(), doc }))
 }
 
 # The items with each top-level `test({ .. })` block, and each top-level `benchmark({ .. })`
 # block, named by its order among its own kind, from 1, so a block's name is stable under
 # edits elsewhere in the file.
-fn number_unattached_blocks(self: Item[]) -> Item[] {
+fn number_unattached_blocks(self: WrittenItem[]) -> WrittenItem[] {
     mut tests: u64 = 0;
     mut benchmarks: u64 = 0;
-    mut out: Item[] = [];
+    mut out: WrittenItem[] = [];
     for (let it : self) {
-        if (let ItemFn(f) = it) {
+        if (let ItemFn(f, attributes) = it) {
             if (f.name.text.is_unattached_test()) {
                 set tests++;
-                set out.push(ItemFn(Function {
-                    ..f,
-                    name: SpanStr { text: unattached_test_name(tests), span: f.name.span },
-                }));
+                set out.push(ItemFn(
+                    Function {
+                        ..f,
+                        name: SpanStr { text: unattached_test_name(tests), span: f.name.span },
+                    },
+                    attributes,
+                ));
             } else {
                 if (f.name.text.is_unattached_benchmark()) {
                     set benchmarks++;
-                    set out.push(ItemFn(Function {
-                        ..f,
-                        name: SpanStr {
-                            text: unattached_benchmark_name(benchmarks),
-                            span: f.name.span,
+                    set out.push(ItemFn(
+                        Function {
+                            ..f,
+                            name: SpanStr {
+                                text: unattached_benchmark_name(benchmarks),
+                                span: f.name.span,
+                            },
                         },
-                    }));
+                        attributes,
+                    ));
                 } else {
                     set out.push(it);
                 };
@@ -3407,16 +3417,16 @@ fn lower_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # declares nothing, so a block adjacent to one documents nothing — and the fix
 # is the blank line that would make it the file's own documentation, which is
 # what the message says.
-fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -> Item!ParseError {
+fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -> WrittenItem!ParseError {
     let docs = doc_block(lines.map(|t| src[t]));
-    if (let AFunction(f) = decl) {
+    if (let AFunction(f, attributes) = decl) {
         if ((f.name.text.is_unattached_test() || f.name.text.is_unattached_benchmark()) && docs.is_some()) {
             return err(ParseError {
                 message: "a `test` or `benchmark` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about it",
                 span: sp,
             });
         };
-        return ok(ItemFn(Function { ..f, doc: docs }));
+        return ok(ItemFn(Function { ..f, doc: docs }, attributes));
     };
     if (let AStruct(st) = decl) { return ok(ItemStruct(StructDecl { ..st, doc: docs })); };
     if (let AVariant(v) = decl) { return ok(ItemVariant(VariantDecl { ..v, doc: docs })); };
@@ -3930,7 +3940,7 @@ fn lower_test_block(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 fn lower_test_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     if (kids.is_empty()) { return ok(ATestBlock(TestBlock { fns: [], body: none })); };
-    if (let AFunction(f) = kid(kids, 0, sp)?) {
+    if (let AFunction(f, attributes) = kid(kids, 0, sp)?) {
         // The refusals point at the declaration — the first child node.
         let fn_span = node.children.first()$child_span().value_or(sp);
         if (f.is_pub) {
@@ -3939,13 +3949,13 @@ fn lower_test_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 span: fn_span,
             });
         };
-        if (f.test_body.is_some()) {
+        if (attributes.test_body.is_some()) {
             return err(ParseError {
                 message: `a function inside a \`.test\` block cannot carry a \`.test\` of its own: "{f.name.text}" is test code already`,
                 span: fn_span,
             });
         };
-        if (f.benchmark.is_some()) {
+        if (attributes.benchmark.is_some()) {
             return err(ParseError {
                 message: `a function inside a \`.test\` block cannot carry a \`.benchmark\` of its own: "{f.name.text}" is test code already`,
                 span: fn_span,
@@ -3993,17 +4003,21 @@ fn lower_test_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // Named by `lower_program`, which knows the order. The span is the `test` token's:
     // the node's own runs from the end of the previous item.
     let at = node.tokens[0].value_or(sp);
-    ok(AFunction(Function {
-        name: SpanStr { text: unattached_test_name(0), span: at },
-        is_pub: false,
-        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
-        body: at(Unit, sp),
-        shorthand_body: false,
-        test_body: some(body.value_or(at(Unit, 0..0))),
-        test_fns: fns,
-        benchmark: none,
-        doc: none,
-    }))
+    ok(AFunction(
+        Function {
+            name: SpanStr { text: unattached_test_name(0), span: at },
+            is_pub: false,
+            sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+            body: at(Unit, sp),
+            shorthand_body: false,
+            doc: none,
+        },
+        Attributes {
+            test_body: some(body.value_or(at(Unit, 0..0))),
+            test_fns: fns,
+            benchmark: none,
+        },
+    ))
 }
 
 # `benchmark_item` — a top-level `benchmark({ .. })`. Lowered to a function with a name
@@ -4013,17 +4027,21 @@ fn lower_benchmark_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
     let at = node.tokens[0].value_or(sp);
-    ok(AFunction(Function {
-        name: SpanStr { text: unattached_benchmark_name(0), span: at },
-        is_pub: false,
-        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
-        body: at(Unit, sp),
-        shorthand_body: false,
-        test_body: none,
-        test_fns: [],
-        benchmark: some(BenchmarkBlock { body: body.value_or(at(Unit, 0..0)), fns, span: at }),
-        doc: none,
-    }))
+    ok(AFunction(
+        Function {
+            name: SpanStr { text: unattached_benchmark_name(0), span: at },
+            is_pub: false,
+            sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+            body: at(Unit, sp),
+            shorthand_body: false,
+            doc: none,
+        },
+        Attributes {
+            test_body: none,
+            test_fns: [],
+            benchmark: some(BenchmarkBlock { body: body.value_or(at(Unit, 0..0)), fns, span: at }),
+        },
+    ))
 }
 
 fn unknown_attr(name: str) -> str {
@@ -4225,19 +4243,19 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         };
     }
     let resolved = resolve_body(name.text, body, return_ty)?;
-    ok(AFunction(Function {
-        name,
-        is_pub,
-        sig: Signature { type_vars, params, effects, return_ty },
-        body: resolved,
-        shorthand_body: body.is_case(PConstruct),
-        test_body,
-        test_fns,
-        benchmark,
-        // Documentation comes from the `# ..` lines in front of the
-        // declaration, which `item` holds; this never sees them.
-        doc: none,
-    }))
+    ok(AFunction(
+        Function {
+            name,
+            is_pub,
+            sig: Signature { type_vars, params, effects, return_ty },
+            body: resolved,
+            shorthand_body: body.is_case(PConstruct),
+            // Documentation comes from the `# ..` lines in front of the
+            // declaration, which `item` holds; this never sees them.
+            doc: none,
+        },
+        Attributes { test_body, test_fns, benchmark },
+    ))
 }
 
 // ---------- entry points ----------
@@ -5223,10 +5241,9 @@ pub fn lower_aipl_block_surface(src: str) -> Expr!ParseError {
 pub fn lower_aipl_program(src: str) -> Program!ParseError {
     let text = aipl_source(src);
     ok(
-        as_program(
-            parse(text, lex_lossless(text)?, aipl_grammar(), "program")?,
-            0..text.len(),
-        )?.desugar(),
+        as_program(parse(text, lex_lossless(text)?, aipl_grammar(), "program")?, 0..text.len())?
+            .hoist_test_fns()
+            .desugar(),
     )
 }.test({
     // A lowered program as text, one item per line, or the refusal that stopped it.
@@ -5234,6 +5251,14 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         match (lower_aipl_program(src)) {
             ok(pr) => pr.show_program(),
             err(e) => `error: {e.message}`,
+        }
+    }
+
+    // A program as written, attributes and all, or the refusal that stopped it.
+    fn written_dump(src: str) -> str {
+        match (aipl_parse_surface_file(src)) {
+            ok(file) => file.program.show_program(),
+            err(failure) => `error: {failure.errors$message.join(sep="; ")}`,
         }
     }
 
@@ -5262,7 +5287,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         program_dump("fn f() !prints !reads { g(); }") == "fn f() !prints !reads = Seq(g(), ())",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ assert(f() == 1); })",
         ) == "fn f() -> i64 = 1 .test(Seq(assert(==(f(), 1)), ()))",
     );
@@ -5270,12 +5295,12 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     // A top-level `test({ .. })` is a function made for it, named by its order among the
     // file's, whose `.test` body is the block; helpers declared inside ride along.
     assert(
-        program_dump(
+        written_dump(
             "test({ assert(1 == 1); })",
         ) == "fn __test_block_1() = () .test(Seq(assert(==(1, 1)), ()))",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() {}\n\n  test({ fn g() {} g(); })",
         ) == "fn f() = ()\nfn __test_block_1() = () .test(Seq(g(), ()) fn g() = ())",
     );
@@ -5283,28 +5308,28 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     // A top-level `benchmark({ .. })` is a function made for it carrying the block as its
     // `.benchmark`, numbered among the file's own kind.
     assert(
-        program_dump(
+        written_dump(
             "benchmark({ assert(1 == 1); })",
         ) == "fn __benchmark_block_1() = () .benchmark(Seq(assert(==(1, 1)), ()))",
     );
     assert(
-        program_dump(
+        written_dump(
             "test({ }) benchmark({ }) test({ }) benchmark({ })",
         ) == "fn __test_block_1() = () .test(())\nfn __benchmark_block_1() = () .benchmark(())\nfn __test_block_2() = () .test(())\nfn __benchmark_block_2() = () .benchmark(())",
     );
     // `.performance` was renamed `.benchmark`, and says so.
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.performance({ 2 })",
         ) == "error: `.performance` is now `.benchmark`",
     );
     assert(
-        program_dump(
+        written_dump(
             "test({ }) fn f() {} test({ })",
         ) == "fn __test_block_1() = () .test(())\nfn f() = ()\nfn __test_block_2() = () .test(())",
     );
     assert(
-        program_dump(
+        written_dump(
             "# note\ntest({ })",
         ) == "error: a `test` or `benchmark` block documents nothing, so a `# ..` block directly above it has nothing to attach to — use `//` for a note about it",
     );
@@ -5313,22 +5338,22 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     // in the block they sit; the chain is what the statements around them make.
     // A `pub` helper, or one with its own `.test`, is refused.
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ fn g() -> i64 { 1 } assert(f() == g()); fn h() { } })",
         ) == "fn f() -> i64 = 1 .test(Seq(assert(==(f(), g())), ()) fn g() -> i64 = 1 fn h() = ())",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ pub fn g() -> i64 { 1 } })",
         ) == """error: a function inside a `.test` block cannot be `pub`: "g" exists only for that test""",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ fn g() { } fn g() { } })",
         ) == """error: duplicate function "g" in this `.test` block""",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ fn g() -> i64 { 1 }.test({ }) })",
         ) == """error: a function inside a `.test` block cannot carry a `.test` of its own: "g" is test code already""",
     );
@@ -5337,37 +5362,37 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     // takes helpers like a `.test` block does, and the two coexist in either
     // order. Helpers are refused the same things a `.test` block refuses them.
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.benchmark({ assert(f() == 1); })",
         ) == "fn f() -> i64 = 1 .benchmark(Seq(assert(==(f(), 1)), ()))",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.benchmark({ fn g() -> i64 { 1 } assert(f() == g()); })",
         ) == "fn f() -> i64 = 1 .benchmark(Seq(assert(==(f(), g())), ()) fn g() -> i64 = 1)",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ 1 }).benchmark({ 2 })",
         ) == "fn f() -> i64 = 1 .test(1) .benchmark(2)",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.benchmark({ 2 }).test({ 1 })",
         ) == "fn f() -> i64 = 1 .test(1) .benchmark(2)",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.benchmark({ pub fn g() -> i64 { 1 } })",
         ) == """error: a function inside a `.test` block cannot be `pub`: "g" exists only for that test""",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.benchmark({ fn g() { } fn g() { } })",
         ) == """error: duplicate function "g" in this `.benchmark` block""",
     );
     assert(
-        program_dump(
+        written_dump(
             "fn f() -> i64 { 1 }.test({ fn g() -> i64 { 1 }.benchmark({ }) })",
         ) == """error: a function inside a `.test` block cannot carry a `.benchmark` of its own: "g" is test code already""",
     );
@@ -5651,7 +5676,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     """);
 })
 
-fn as_program(v: Ast, span: Span) -> Program!ParseError {
+fn as_program(v: Ast, span: Span) -> WrittenProgram!ParseError {
     if (let AProgram(pr) = v) { return ok(pr); };
     err(wrong_kind("a program", v, span))
 }
@@ -5710,7 +5735,11 @@ pub fn aipl_program(src: str) -> Program!ParseError { lower_aipl_program(src) }.
 # production ever sees one, and the loader's lint pass still needs them to drop
 # a hit squelched on the same line. They ride out on the return value rather
 # than through a sink the caller has to arm first.
-struct ParsedFile { program: Program, allows: Span[], type_uses: Span[] = [] }
+struct ParsedFile { program: WrittenProgram, allows: Span[], type_uses: Span[] = [] }
+
+# A file parsed and lowered: its attributes are functions of their own and its destructuring
+# forms are bound.
+struct LoweredFile { program: Program, allows: Span[], type_uses: Span[] = [] }
 
 # Why a source file has no program: every syntax error in it, in source order — the
 # ones the grammar recovered from (a missing `;` after a statement, say; see
@@ -5745,9 +5774,9 @@ let PREPARED_GRAMMAR: Prepared<AiplTok, Ast>!ParseError = prepare(aipl_grammar()
 #
 # A tree that recovered from a missing token is a tree of broken input, and is
 # never lowered: the errors come back instead.
-pub fn aipl_parse_file(src: str) -> ParsedFile!ParseFailure {
+pub fn aipl_parse_file(src: str) -> LoweredFile!ParseFailure {
     let ParsedFile { program, allows, type_uses } = aipl_parse_surface_file(src)?;
-    ok(ParsedFile { program: program.desugar(), allows, type_uses })
+    ok(LoweredFile { program: program.hoist_test_fns().desugar(), allows, type_uses })
 }
 
 # `aipl_parse_file`, stopping before the destructuring forms are lowered: the
@@ -5770,7 +5799,7 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     let program = as_program(ast, 0..text.len()).map_err(failure)?.with_source_text(text);
     ok(ParsedFile { program, allows, type_uses: tree.type_leaves(prod_names(GRAMMAR), false) })
 }.test({
-    let ParsedFile { program, allows, type_uses } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
+    let LoweredFile { program, allows, type_uses } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
     assert(type_uses == []);
 
     // The tokens written inside a type annotation, and only those.

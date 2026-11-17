@@ -17,10 +17,10 @@ import {
     CaseParam,
     Const,
     FieldDecl,
-    Fn,
     Function,
     Import,
     Item,
+    LoweredFn,
     Param,
     Program,
     Refinement,
@@ -28,6 +28,7 @@ import {
     Signature,
     Struct,
     StructDecl,
+    SuperProgram,
     Variant,
     VariantCase,
     VariantDecl,
@@ -38,8 +39,7 @@ import { promoted } from "./ty.aipl";
 # `self` with the type parameters each declaration declares made `TypeVar`s
 # throughout it. A `const` declares none, and an import holds no type.
 pub fn promote_type_vars(self: Program) -> Program {
-    ..self,
-    items: self.items$promote_item(),
+    SuperProgram { items: self.items$promote_item(), doc: self.doc }
 }.test({
     let parsed = aipl_parse_file("""
         struct Box<T> { value: T, label: str }
@@ -59,7 +59,7 @@ pub fn promote_type_vars(self: Program) -> Program {
 
 fn promote_item(self: Item) -> Item {
     match (self) {
-        Fn(f) => Fn(f.promoted_function()),
+        LoweredFn(f) => LoweredFn(f.promoted_function()),
         Struct(s) => Struct(s.promoted_struct()),
         Variant(v) => Variant(v.promoted_variant()),
         Refinement(r) => Refinement(RefinementDecl {
@@ -81,7 +81,6 @@ fn promoted_function(self: Function) -> Function {
             return_ty: self.sig.return_ty$promoted(vars),
         },
         body: self.body.promoted_annotations(vars),
-        test_body: self.test_body$promoted_annotations(vars),
     }
 }
 

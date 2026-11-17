@@ -5,7 +5,7 @@
 # a line in `lint`; the hits come back in the order the lints are listed.
 
 import { equal as == } from builtins;
-import { Program } from "../item.aipl";
+import { SuperProgram, WrittenProgram } from "../item.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
@@ -58,7 +58,7 @@ import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 #
 # A lint is either a function of the whole program or of one function, and
 # `on_functions` is what runs the second kind over every body that is code.
-pub fn lint(program: Program) -> LintHit[] {
+pub fn lint(program: WrittenProgram) -> LintHit[] {
     [
         ..unused_imports(program),
         ..duplicate_import_source(program),
@@ -108,6 +108,5 @@ pub fn lint(program: Program) -> LintHit[] {
         ..is_empty_longhand(program),
     ]
 }.test({
-    let program = Program { items: [], doc: none };
-    assert(lint(program) == []);
+    assert(lint(SuperProgram { items: [], doc: none }) == []);
 })

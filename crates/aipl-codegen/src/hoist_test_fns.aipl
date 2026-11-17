@@ -21,7 +21,7 @@
 # helper's name is not tracked, the same way a call's name resolves in the
 # loader.
 
-import { equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
+import { Span, equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
 import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
 import {
     Benchmark,
@@ -31,69 +31,80 @@ import {
     test_fn_name,
     test_helper_name,
 } from "./fn_names.aipl";
-import { BenchmarkBlock, Fn, Function, Item, Program, Signature } from "./item.aipl";
+import {
+    Attributes,
+    Function,
+    Item,
+    LoweredFn,
+    Program,
+    Signature,
+    SuperProgram,
+    WrittenFn,
+    WrittenItem,
+    WrittenProgram,
+} from "./item.aipl";
 import { SpanStr } from "./lexer.aipl";
 
 # `program` with every `.test` block and its helpers, and every `.benchmark` block, moved out
 # to top-level functions of their own.
-pub fn hoist_test_fns(self: Program) -> Program { ..self, items: self.items$hoisted_items().join() }
+pub fn hoist_test_fns(self: WrittenProgram) -> Program {
+    SuperProgram { items: self.items$hoisted_items().join(), doc: self.doc }
+}
 
-fn hoisted_items(self: Item) -> Item[] {
+fn hoisted_items(self: WrittenItem) -> Item[] {
     match (self) {
-        Fn(f) => f.function_items(),
+        WrittenFn(f, attributes) => f.function_items(attributes)$lowered(),
         _ => [self],
     }
 }
 
+fn lowered(self: Function) -> Item { LoweredFn(self) }
+
 # `f`, then its helpers, then the function standing for its `.benchmark` block and that
 # block's helpers, each followed by the function its own `.test` block is.
-fn function_items(self: Function) -> Item[] {
-    let own = Function { ..self, benchmark: none }.hoisted();
-    let stand_in = self.benchmark
-        .map(|block| self.benchmark_function(block).hoisted())
+fn function_items(self: Function, Attributes { test_body, test_fns, benchmark }) -> Function[] {
+    let stand_in = benchmark
+        .map(|block| self.benchmark_function(block.span).hoisted(some(block.body), block.fns))
         .value_or([]);
-    [..own, ..stand_in]$with_test_function().join().map(Fn)
+    [..self.hoisted(test_body, test_fns), ..stand_in]
 }
 
-# The function standing for `self`'s `.benchmark` block. Named at the
-# attribute, which is where a diagnostic about the function itself points.
-fn benchmark_function(self: Function, BenchmarkBlock { body, fns, span }) -> Function {
+# The function standing for a `.benchmark` block on `self`, with an empty body: the block
+# itself is its `.test` body. Named at the attribute, which is where a diagnostic about the
+# function itself points.
+fn benchmark_function(self: Function, span: Span) -> Function {
     name: SpanStr { text: benchmark_fn_name(self.name.text), span },
     is_pub: false,
     sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
     body: at(Unit, span),
-    test_body: some(body),
-    test_fns: fns,
-    benchmark: none,
     doc: none,
 }
 
-# `self` followed by the functions declared in its `.test` block, renamed. A
-# function with no helpers is itself.
-fn hoisted(self: Function) -> Function[] {
-    if (self.test_fns.is_empty()) { return [self]; };
-    let renames = self.test_fns
+# `self` followed by the functions declared in its `.test` block, renamed, each with the
+# function its own block is. A function with no helpers is itself.
+fn hoisted(self: Function, test_body: Expr?, test_fns: Function[]) -> Function[] {
+    if (test_fns.is_empty()) { return self.with_test_function(test_body); };
+    let renames = test_fns
         .map(|h| (h.name.text, test_helper_name(self.name.text, h.name.text)))
         .to_dict();
-    let owner = Function { ..self, test_body: self.test_body$rename_uses(renames), test_fns: [] };
 
     // The hoisted name is one this pass invented, so it keeps the span of the
     // name the author *did* write — the helper's own, which is where a
     // diagnostic about it should point.
-    let helpers = self.test_fns.map(|h| Function {
+    let helpers = test_fns.map(|h| Function {
         ..h,
         name: SpanStr { ..h.name, text: h.name.text.renamed(renames) },
         body: h.body.rename_uses(renames),
     });
-    [owner, ..helpers]
+    [..self.with_test_function(test_body$rename_uses(renames)), ..helpers]
 }
 
 # `self`, and the function its `.test` block is: `__test$<self>`, public, with no
 # parameters and the block as its body, which declares `measure` when it is a `.benchmark`
-# block and no effect otherwise. The function is `self` less the block, and not there at all
-# for a top-level `test({ .. })`, whose carrier has nothing else to say.
-fn with_test_function(self: Function) -> Function[] {
-    let some(block) = self.test_body else { return [self]; };
+# block and no effect otherwise. For a top-level `test({ .. })`, whose carrier has nothing
+# else to say, it is only that function.
+fn with_test_function(self: Function, test_body: Expr?) -> Function[] {
+    let some(block) = test_body else { return [self]; };
     let effects = match (fn_role(self.name.text)) {
         Benchmark(..) => ["measure"],
         _ => [],
@@ -103,16 +114,9 @@ fn with_test_function(self: Function) -> Function[] {
         is_pub: true,
         sig: Signature { type_vars: [], params: [], effects, return_ty: none },
         body: block,
-        test_body: none,
-        test_fns: [],
-        benchmark: none,
         doc: none,
     };
-    if (self.name.text.is_unattached_test()) {
-        [test]
-    } else {
-        [Function { ..self, test_body: none }, test]
-    }
+    if (self.name.text.is_unattached_test()) { [test] } else { [self, test] }
 }
 
 # What `name` is renamed to by `renames`, or `name` itself.

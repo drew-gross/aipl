@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-with_source_text">with_source_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn with_source_text(self: Program, text: str) -&#62; Program</code></pre>
+          <pre class="signature"><code>pub fn with_source_text(self: WrittenProgram, text: str) -&#62; WrittenProgram</code></pre>
 
           <div class="doc"><p><code>self</code> with <code>source</code> set, in every expression it holds, to the text of <code>text</code> that the expression's span covers.</p></div>
 
@@ -48,7 +48,7 @@
             <a class="anchor" href="#item-sourced_item">sourced_item</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn sourced_item(self: Item, text: str) -&#62; Item</code></pre>
+          <pre class="signature"><code>fn sourced_item(self: WrittenItem, text: str) -&#62; WrittenItem</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -78,7 +78,21 @@
           </h3>
           <pre class="signature"><code>fn sourced_function(self: Function, text: str) -&#62; Function</code></pre>
 
-          <div class="doc"><p>A function, with its <code>.test</code> block and <code>.benchmark</code> block and the helpers declared in either.</p></div>
+          <div class="doc"><p>A function.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-sourced_attributes">
+          <h3>
+            <a class="anchor" href="#item-sourced_attributes">sourced_attributes</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn sourced_attributes(self: Attributes, text: str) -&#62; Attributes</code></pre>
+
+          <div class="doc"><p>A function's <code>.test</code> block and <code>.benchmark</code> block and the helpers declared in either.</p></div>
 
 
         </section>

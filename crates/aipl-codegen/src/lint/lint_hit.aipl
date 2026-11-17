@@ -27,7 +27,18 @@ import {
 } from builtins;
 import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { Fn, Function, Import, ImportDecl, Item, Program, Signature, local } from "../item.aipl";
+import {
+    Attributes,
+    Function,
+    Import,
+    ImportDecl,
+    Signature,
+    SuperProgram,
+    WrittenFn,
+    WrittenItem,
+    WrittenProgram,
+    local,
+} from "../item.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -114,7 +125,7 @@ pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
 })
 
 # `self` filled in for the file whose items are `items`.
-pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
+pub fn filled(self: UnfilledHit[], items: WrittenItem[]) -> LintHit[] {
     self$filled_with(|name| items.imported_as(name))
 }.test({
     let items = aipl_parse_surface_file("import { is_case as isa } from builtins;")?.program.items;
@@ -125,22 +136,24 @@ pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
 
 # What `lint` reports for the program `src` parses to. The one way the lints'
 # `.test` blocks run a lint over source text: pass the lint function itself.
-pub fn lint_hits(src: str, lint: (Program) -> LintHit[]) -> LintHit[]!ParseFailure {
+pub fn lint_hits(src: str, lint: (WrittenProgram) -> LintHit[]) -> LintHit[]!ParseFailure {
     ok(lint(aipl_parse_surface_file(src)?.program))
 }.test({
-    assert(lint_hits("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == [
+    assert(lint_hits("fn f() { }", |program: WrittenProgram| { [hit("found", 0..1)] })? == [
         hit("found", 0..1),
     ]);
-    assert(lint_hits("fn (", |program: Program| { [] }).is_err_and(
+    assert(lint_hits("fn (", |program: WrittenProgram| { [] }).is_err_and(
         |failure| failure.errors.is_nonempty(),
     ));
 })
 
 # [`lint_hits`], keeping only the messages.
-pub fn lint_messages(src: str, lint: (Program) -> LintHit[]) -> str[]!ParseFailure {
+pub fn lint_messages(src: str, lint: (WrittenProgram) -> LintHit[]) -> str[]!ParseFailure {
     ok(lint_hits(src, lint)?$message)
 }.test({
-    assert(lint_messages("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == ["found"]);
+    assert(lint_messages("fn f() { }", |program: WrittenProgram| { [hit("found", 0..1)] })? == [
+        "found",
+    ]);
 })
 
 # Whether `self`'s span covers exactly the text that spells it, so the source can be
@@ -194,7 +207,7 @@ pub fn quote(self: Expr, placeholder: str) -> str {
 # The name a file's `items` import builtin `name` under, if it does: the spelling a
 # lint's advice should use. `none` when the file does not import it, which is when
 # the advice has to say so.
-pub fn imported_as(self: Item[], name: str) -> str? {
+pub fn imported_as(self: WrittenItem[], name: str) -> str? {
     self.collect_arms(Import)$builtin_locals(name).join().first()
 }.test({
     let program = aipl_parse_surface_file(
@@ -212,7 +225,7 @@ pub fn imported_as(self: Item[], name: str) -> str? {
 # The builtin a file's `items` import under the local name `local`, as builtins
 # exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
 # when that name is not bound by an import from builtins — unbound, or one of the file's own.
-pub fn bound_to(self: Item[], local: str) -> str? {
+pub fn bound_to(self: WrittenItem[], local: str) -> str? {
     self.collect_arms(Import)$builtin_bound_to(local).join().first()
 }.test({
     let items = aipl_parse_surface_file(
@@ -252,7 +265,7 @@ pub fn text_before(self: Expr, container: Expr) -> str {
 })
 
 # Every name a file's `items` import from builtins, as the file spells it.
-pub fn imported_locals(self: Item[]) -> str[] {
+pub fn imported_locals(self: WrittenItem[]) -> str[] {
     self.collect_arms(Import)$builtin_names().join()
 }.test({
     let items = aipl_parse_surface_file(
@@ -277,7 +290,7 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
     }
 }
 
-# Lints come in two kinds. A *program* lint is a function of the whole `Program`
+# Lints come in two kinds. A *program* lint is a function of the whole `WrittenProgram`
 # (`unused_imports`, which compares the imports with every name the file
 # mentions). A *function* lint is a function of one `Function`, and [`on_functions`]
 # is what runs it over a program, so no function lint decides for itself which
@@ -287,7 +300,7 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
 # block it carries, the `.benchmark` block it carries, and the helpers declared
 # in a `.test` block. A block is checked as a function of its own when tests run, so
 # it is handed over as one — no parameters, no return type, the block as its body.
-pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
+pub fn on_functions(self: WrittenProgram, lint: (Function) -> LintHit[]) -> LintHit[] {
     self.code_bodies()$lint().join()
 }.test({
     // Each function, once.
@@ -319,7 +332,7 @@ pub fn on_functions(self: Program, lint: (Function) -> LintHit[]) -> LintHit[] {
 })
 
 # [`on_functions`] for a lint that reports at most one hit for a function.
-pub fn on_functions_once(self: Program, lint: (Function) -> LintHit?) -> LintHit[] {
+pub fn on_functions_once(self: WrittenProgram, lint: (Function) -> LintHit?) -> LintHit[] {
     self.code_bodies()$lint().collect_ok()
 }.test({
     assert(lint_function_once_hits(
@@ -333,27 +346,26 @@ pub fn on_functions_once(self: Program, lint: (Function) -> LintHit?) -> LintHit
 })
 
 # [`on_functions`] for a lint whose hits are [`UnfilledHit`]s.
-pub fn on_functions_unfilled(self: Program, lint: (Function) -> UnfilledHit[]) -> UnfilledHit[] {
-    self.code_bodies()$lint().join()
-}
+pub fn on_functions_unfilled(
+    self: WrittenProgram,
+    lint: (Function) -> UnfilledHit[],
+) -> UnfilledHit[] { self.code_bodies()$lint().join() }
 
 # [`on_functions_unfilled`], each hit filled in for the program's own imports.
-pub fn on_functions_filled(self: Program, lint: (Function) -> UnfilledHit[]) -> LintHit[] {
+pub fn on_functions_filled(self: WrittenProgram, lint: (Function) -> UnfilledHit[]) -> LintHit[] {
     self.on_functions_unfilled(lint).filled(self.items)
 }
 
 # Every body of the program that is code to check, each as a function.
-fn code_bodies(self: Program { items }) -> Function[] {
-    items.collect_arms(Fn)$declared()$bodies().join()
+fn code_bodies(self: SuperProgram { items }) -> Function[] {
+    items.collect_arms(WrittenFn)$bodies().join()
 }
 
-fn declared(self: Fn(function)) -> Function { function }
-
 # `self`, and a function standing for each other body it holds.
-fn bodies(self: Function) -> Function[] {
-    let test = self.test_body.map(|body| [self.standing_in(body)]).value_or([]);
-    let benchmark = self.benchmark.map(|block| [self.standing_in(block.body)]).value_or([]);
-    [self, ..test, ..benchmark, ..self.test_fns]
+fn bodies(self: WrittenFn(function, Attributes { test_body, test_fns, benchmark })) -> Function[] {
+    let test = test_body.map(|body| [function.standing_in(body)]).value_or([]);
+    let stand_in = benchmark.map(|block| [function.standing_in(block.body)]).value_or([]);
+    [function, ..test, ..stand_in, ..test_fns]
 }
 
 # `self`, with `body` as its whole body: what a block is when it is checked. A block
@@ -364,20 +376,17 @@ fn standing_in(self: Function, body: Expr) -> Function {
     sig: Signature { type_vars: [], params: [], effects: ["*"], return_ty: none },
     body,
     shorthand_body: false,
-    test_body: none,
-    test_fns: [],
-    benchmark: none,
 }
 
 # What the function lint `lint` reports for the program `src` parses to.
 pub fn lint_function_hits(src: str, lint: (Function) -> LintHit[]) -> LintHit[]!ParseFailure {
-    lint_hits(src, |program: Program| { program.on_functions(lint) })
+    lint_hits(src, |program: WrittenProgram| { program.on_functions(lint) })
 }
 
 # What the lint `lint`, which reports at most one hit for a function, reports for the program
 # `src` parses to.
 pub fn lint_function_once_hits(src: str, lint: (Function) -> LintHit?) -> LintHit[]!ParseFailure {
-    lint_hits(src, |program: Program| { program.on_functions_once(lint) })
+    lint_hits(src, |program: WrittenProgram| { program.on_functions_once(lint) })
 }
 
 # [`lint_function_hits`], keeping only the messages.

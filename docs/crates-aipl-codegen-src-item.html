@@ -221,7 +221,21 @@
           </h3>
           <pre class="signature"><code>struct Function</code></pre>
 
-          <div class="doc"><p><code>test_fns</code> are the functions declared inside the <code>.test</code> block — helpers private to the test, never <code>pub</code>. The parser hands them over here and <code>hoist_test_fns</code> moves them to top-level items under a name only the test can reach, so nothing past it sees the nesting.</p><p><code>benchmark</code> is the function's <code>.benchmark({ .. })</code> attribute, if it has one. The Rust AST has no such field: the bridge turns the attribute into a function of its own before anything else sees the program (see <code>ffi_ast.rs</code>), the way the <code>.test</code> helpers are hoisted, so this is the parser's account of what was written and nothing downstream of the bridge reads it.</p><p><code>shorthand_body</code> records that <code>body</code> was written as the <code>{ field: value }</code> shorthand rather than a literal naming its type; the two parse to the same <code>Construct</code>.</p></div>
+          <div class="doc"><p>A function with nothing attached: what hoisting leaves, and every helper declared inside a block. Its <code>.test</code> and <code>.benchmark</code> attributes, as written, are an [<code>Attributes</code>].</p><p><code>shorthand_body</code> records that <code>body</code> was written as the <code>{ field: value }</code> shorthand rather than a literal naming its type; the two parse to the same <code>Construct</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Attributes">
+          <h3>
+            <a class="anchor" href="#item-Attributes">Attributes</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Attributes</code></pre>
+
+          <div class="doc"><p>What a function carries as written: its <code>.test({ .. })</code> block, the functions declared inside it — helpers private to the test, never <code>pub</code> — and its <code>.benchmark({ .. })</code> attribute. The helpers are plain <code>Function</code>s, so a block cannot hold another. The parser hands them over here and <code>hoist_test_fns</code> moves each to a top-level function under a name only the test can reach.</p></div>
 
 
         </section>
@@ -340,19 +354,24 @@
 
 
 
-        <section class="item" id="item-Item">
+        <section class="item" id="item-SuperItem">
           <h3>
-            <a class="anchor" href="#item-Item">Item</a>
+            <a class="anchor" href="#item-SuperItem">SuperItem</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant Item</code></pre>
+          <pre class="signature"><code>variant SuperItem</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>A top-level item, at either stage. It is used directly only by what works at both; everything else takes the refinement for its stage. The cases are named apart from every other variant's because a refinement leaves out a case by name, anywhere it can be.</p></div>
 
 
           <ul class="cases">
 
-            <li id="item-Fn"><code>Fn(Function)</code>
+            <li id="item-WrittenFn"><code>WrittenFn(Function, Attributes)</code>
+
+
+            </li>
+
+            <li id="item-LoweredFn"><code>LoweredFn(Function)</code>
 
 
             </li>
@@ -388,14 +407,70 @@
 
 
 
+        <section class="item" id="item-WrittenItem">
+          <h3>
+            <a class="anchor" href="#item-WrittenItem">WrittenItem</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant WrittenItem = SuperItem without LoweredFn</code></pre>
+
+          <div class="doc"><p>An item as the parser writes it: a function carries its attributes.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Item">
+          <h3>
+            <a class="anchor" href="#item-Item">Item</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Item = SuperItem without WrittenFn</code></pre>
+
+          <div class="doc"><p>An item once the attributes are functions of their own: what hoisting produces and every pass after it reads.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-SuperProgram">
+          <h3>
+            <a class="anchor" href="#item-SuperProgram">SuperProgram</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct SuperProgram</code></pre>
+
+          <div class="doc"><p><code>aipl_syntax::ast::Program</code>, less its <code>sources</code> map: a single parsed file has none, and the loader fills one in when it flattens several files together.</p><p><code>doc</code> is the file's own documentation — the <code># ..</code> block at the top that a blank line detaches from whatever follows, so it documents no declaration. <code>none</code> for a file that opens with anything else, and for every program a pass builds or the loader flattens, neither of which is one file.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-WrittenProgram">
+          <h3>
+            <a class="anchor" href="#item-WrittenProgram">WrittenProgram</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant WrittenProgram = SuperProgram without LoweredFn throughout</code></pre>
+
+          <div class="doc"><p>A program as the parser writes it: every function carries its attributes.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Program">
           <h3>
             <a class="anchor" href="#item-Program">Program</a>
-            <span class="kind kind-struct">struct</span>
+            <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>struct Program</code></pre>
+          <pre class="signature"><code>variant Program = SuperProgram without WrittenFn throughout</code></pre>
 
-          <div class="doc"><p><code>aipl_syntax::ast::Program</code>, less its <code>sources</code> map: a single parsed file has none, and the loader fills one in when it flattens several files together.</p><p><code>doc</code> is the file's own documentation — the <code># ..</code> block at the top that a blank line detaches from whatever follows, so it documents no declaration. <code>none</code> for a file that opens with anything else, and for every program a pass builds or the loader flattens, neither of which is one file.</p></div>
+          <div class="doc"><p>A program once the attributes are functions of their own, which is what every pass after hoisting reads.</p></div>
 
 
         </section>
@@ -463,7 +538,7 @@
             <a class="anchor" href="#item-show_program">show_program</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_program(self: Program) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_program(self: SuperProgram) -&#62; str</code></pre>
 
           <div class="doc"><p>A whole program as text, one item per line — the oracle the item lowering's tests assert against. Near the source it came from rather than structural, because an item's shape is its declaration and a dump that hid that would be harder to read than the thing it describes.</p></div>
 
@@ -477,7 +552,7 @@
             <a class="anchor" href="#item-show_item">show_item</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_item(self: Item) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_item(self: SuperItem) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -647,7 +722,7 @@
           </h3>
           <pre class="signature"><code>pub fn function_names(self: Function) -&#62; #{str}</code></pre>
 
-          <div class="doc"><p>The names a function mentions: in its signature, its body, its <code>.test</code> body and <code>.benchmark</code> block, and the helpers declared in either.</p></div>
+          <div class="doc"><p>The names a function mentions: in its signature and its body.</p></div>
 
 
         </section>
@@ -659,7 +734,7 @@
             <a class="anchor" href="#item-item_names">item_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn item_names(self: Item) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>pub fn item_names(self: SuperItem) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The names an item mentions outside an import list. An import mentions none.</p></div>
 
@@ -683,6 +758,20 @@
           <pre class="signature"><code>fn show_fn(self: Function) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_attributes">
+          <h3>
+            <a class="anchor" href="#item-show_attributes">show_attributes</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_attributes(self: Attributes) -&#62; str</code></pre>
+
+          <div class="doc"><p>The attributes after the function they hang from: <code> .test(block helper..) .benchmark(..)</code>.</p></div>
 
 
         </section>
@@ -879,6 +968,20 @@
           <pre class="signature"><code>fn show_import_source(self: ImportSource) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-attribute_names">
+          <h3>
+            <a class="anchor" href="#item-attribute_names">attribute_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn attribute_names(self: Attributes) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names a function's attributes mention: its <code>.test</code> body and <code>.benchmark</code> block, and the helpers declared in either.</p></div>
 
 
         </section>

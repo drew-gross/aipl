@@ -100,26 +100,39 @@ finds every use.
 
 ### Round C: the stage in the types
 
-- [ ] AIPL `Function` loses `test_body`, `test_fns`, `benchmark`; `Attributes { test_body,
-      test_fns, benchmark }` carries them; `variant SuperItem` as above, `Fn` kept as the
-      lowered case's name so downstream arms do not change.
-- [ ] `struct Program<I>`; `WrittenItem` and `Item` aliases; the parser returns
-      `Program<WrittenItem>`.
-- [ ] `hoist_test_fns` takes and returns the two stages; its non-function arm is the narrowing
-      `_` that gives `Item`.
-- [ ] Lints take `Program<WrittenItem>`: `code_bodies` matches `WrittenFn` only (drops the
-      attribute-less special case in `bodies`); `item_names`/`function_names` take `SuperItem`.
-- [ ] `promote_type_vars`, `desugar`, `desugared_item` and the decoder take `Program<Item>`;
-      the decoder's `Fn` case is the only function case.
-- Watch: anything that builds a `Function` (the parser, `standing_in`, `benchmark_function`,
-  `hoisted`) loses fields; the written-stage formatter output must not change.
+Done as built, which differs from the sketch in three ways: `Program` is not generic (a
+refinement does not survive a generic struct's instance: `mangle_type` drops it, so
+`Program<WrittenItem>` and `Program<Item>` would be one struct), the lowered case is
+`LoweredFn` (a refinement leaves a case out by name, anywhere it can be, and `Fn` is also a
+case of `Ty` and others), and the program types are `throughout` refinements of one struct.
+
+- [x] `Function` loses `test_body`, `test_fns`, `benchmark`; `Attributes { test_body, test_fns,
+      benchmark }` carries them, and its helpers are plain `Function`s.
+- [x] `variant SuperItem = WrittenFn(Function, Attributes) | LoweredFn(Function) | Struct ..`;
+      `WrittenItem = SuperItem without LoweredFn`, `Item = SuperItem without WrittenFn`;
+      `struct SuperProgram`, `WrittenProgram = SuperProgram without LoweredFn throughout`,
+      `Program = SuperProgram without WrittenFn throughout`.
+- [x] The parser builds `WrittenFn` (`ast.aipl`'s `Function` node carries the attributes);
+      `hoist_test_fns: WrittenProgram -> Program`; `promote_type_vars`, `desugar` take and
+      return `Program`; `with_source_text` takes and returns `WrittenProgram`.
+- [x] The lints take `WrittenProgram`/`WrittenItem[]`, and `code_bodies` matches `WrittenFn`
+      only. `aipl_parse_file` is the lowered parse (`LoweredFile`); `aipl_parse_surface_file`
+      the written one.
+- [x] Checker: a refinement inside `ok`/`err`/`some`, through blocks, `if`s and `match`es; a
+      `Case<V>` ignores its variant's refinement; a bound ignores the refinement of the type
+      it is checked on; a shallow exclusion is as good as `throughout` where nothing the
+      variant carries can hold the case.
+- Bootstrap: the decoder reads `Fn` as well as `LoweredFn` for one round; remove `Fn` once
+  the artifact is promoted.
 
 ### Round D: tidy
 
-- [ ] Delete what the types made dead: the `WrittenFn` handling in passes that only see `Item`.
-- [ ] Update the comments that describe the stages (`parse_and_partial_load.aipl`'s header,
-      `item.aipl`'s `Function` docs, `ExprKind`'s) and the docs site if it mentions the order.
-- [ ] Remove the `without` items this finishes from `CLAUDE_TODO.txt`.
+- [x] The transitional `Fn` in the decoder is gone; `LoweredFn` is the only function case.
+- [x] The comments describing the stages are current (`parse_and_partial_load.aipl`'s header,
+      `item.aipl`, `ffi_ast.rs`).
+- [x] The finished item is out of `CLAUDE_TODO.txt`.
+- No `WrittenFn` arm is carried by a pass that sees only `Item`: the narrowing made them
+  unwritable.
 
 ## Open questions
 

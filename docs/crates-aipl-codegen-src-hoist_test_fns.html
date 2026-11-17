@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-hoist_test_fns">hoist_test_fns</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn hoist_test_fns(self: Program) -&#62; Program</code></pre>
+          <pre class="signature"><code>pub fn hoist_test_fns(self: WrittenProgram) -&#62; Program</code></pre>
 
           <div class="doc"><p><code>program</code> with every <code>.test</code> block and its helpers, and every <code>.benchmark</code> block, moved out to top-level functions of their own.</p></div>
 
@@ -48,7 +48,21 @@
             <a class="anchor" href="#item-hoisted_items">hoisted_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hoisted_items(self: Item) -&#62; Item[]</code></pre>
+          <pre class="signature"><code>fn hoisted_items(self: WrittenItem) -&#62; Item[]</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lowered">
+          <h3>
+            <a class="anchor" href="#item-lowered">lowered</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lowered(self: Function) -&#62; Item</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -62,7 +76,7 @@
             <a class="anchor" href="#item-function_items">function_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn function_items(self: Function) -&#62; Item[]</code></pre>
+          <pre class="signature"><code>fn function_items(self: Function, __spat$2761: Attributes) -&#62; Function[]</code></pre>
 
           <div class="doc"><p><code>f</code>, then its helpers, then the function standing for its <code>.benchmark</code> block and that block's helpers, each followed by the function its own <code>.test</code> block is.</p></div>
 
@@ -76,9 +90,9 @@
             <a class="anchor" href="#item-benchmark_function">benchmark_function</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn benchmark_function(self: Function, __spat$2960: BenchmarkBlock) -&#62; Function</code></pre>
+          <pre class="signature"><code>fn benchmark_function(self: Function, span: Span) -&#62; Function</code></pre>
 
-          <div class="doc"><p>The function standing for <code>self</code>'s <code>.benchmark</code> block. Named at the attribute, which is where a diagnostic about the function itself points.</p></div>
+          <div class="doc"><p>The function standing for a <code>.benchmark</code> block on <code>self</code>, with an empty body: the block itself is its <code>.test</code> body. Named at the attribute, which is where a diagnostic about the function itself points.</p></div>
 
 
         </section>
@@ -90,9 +104,9 @@
             <a class="anchor" href="#item-hoisted">hoisted</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hoisted(self: Function) -&#62; Function[]</code></pre>
+          <pre class="signature"><code>fn hoisted(self: Function, test_body: Expr?, test_fns: Function[]) -&#62; Function[]</code></pre>
 
-          <div class="doc"><p><code>self</code> followed by the functions declared in its <code>.test</code> block, renamed. A function with no helpers is itself.</p></div>
+          <div class="doc"><p><code>self</code> followed by the functions declared in its <code>.test</code> block, renamed, each with the function its own block is. A function with no helpers is itself.</p></div>
 
 
         </section>
@@ -104,9 +118,9 @@
             <a class="anchor" href="#item-with_test_function">with_test_function</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn with_test_function(self: Function) -&#62; Function[]</code></pre>
+          <pre class="signature"><code>fn with_test_function(self: Function, test_body: Expr?) -&#62; Function[]</code></pre>
 
-          <div class="doc"><p><code>self</code>, and the function its <code>.test</code> block is: <code>__test$&lt;self&gt;</code>, public, with no parameters and the block as its body, which declares <code>measure</code> when it is a <code>.benchmark</code> block and no effect otherwise. The function is <code>self</code> less the block, and not there at all for a top-level <code>test({ .. })</code>, whose carrier has nothing else to say.</p></div>
+          <div class="doc"><p><code>self</code>, and the function its <code>.test</code> block is: <code>__test$&lt;self&gt;</code>, public, with no parameters and the block as its body, which declares <code>measure</code> when it is a <code>.benchmark</code> block and no effect otherwise. For a top-level <code>test({ .. })</code>, whose carrier has nothing else to say, it is only that function.</p></div>
 
 
         </section>

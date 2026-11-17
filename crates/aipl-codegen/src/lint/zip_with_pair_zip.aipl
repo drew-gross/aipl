@@ -24,7 +24,7 @@ import {
 } from builtins;
 import { Call, Expr, Ident, Lambda, TupleLit, descendants, synthesized_name } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     Named,
@@ -36,7 +36,7 @@ import {
 } from "./lint_hit.aipl";
 
 # A hit for each `zip_with` whose function only pairs its two arguments.
-pub fn zip_with_pair_zip(program: Program) -> LintHit[] {
+pub fn zip_with_pair_zip(program: WrittenProgram) -> LintHit[] {
     let some(zip_with_name) = program.items.imported_as("zip_with") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body

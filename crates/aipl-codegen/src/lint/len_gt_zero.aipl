@@ -33,7 +33,7 @@ import {
 } from builtins;
 import { Call, Expr, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     UnfilledHit,
@@ -50,7 +50,7 @@ import { is_zero } from "./slice_bounds.aipl";
 struct Names { less_than: bool, greater_than: bool, logical_not: bool, len: str?, empty: str? }
 
 # A hit for each length compared against zero, or negated emptiness test, in the program.
-pub fn len_gt_zero(program: Program) -> LintHit[] {
+pub fn len_gt_zero(program: WrittenProgram) -> LintHit[] {
     let items = program.items;
     let names = Names {
         less_than: items.bound_to("<") == some("less_than"),

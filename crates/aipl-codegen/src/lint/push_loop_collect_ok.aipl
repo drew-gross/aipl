@@ -35,7 +35,7 @@ import {
 } from builtins;
 import { ArrayLit, Ident, IfLet, Unit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { SeededLoop, is_liftable, pipeline_hit, pushed, seeded_loops } from "./accumulation.aipl";
 import {
     LintHit,
@@ -49,7 +49,7 @@ import { names_case, payload_binders } from "./option_match.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop that pushes the
 # answers that exist.
-pub fn push_loop_collect_ok(program: Program) -> LintHit[] {
+pub fn push_loop_collect_ok(program: WrittenProgram) -> LintHit[] {
     let some(push) = program.items.imported_as("push") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body.seeded_loops()$collected(push).collect_ok()

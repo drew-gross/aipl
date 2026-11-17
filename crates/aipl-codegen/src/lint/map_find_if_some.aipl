@@ -28,7 +28,7 @@ import {
 } from builtins;
 import { Call, Expr, Ident, Lambda, descendants, synthesized_name } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import {
     LintHit,
     imported_as,
@@ -38,7 +38,7 @@ import {
 } from "./lint_hit.aipl";
 
 # A hit for each `map(..).find_if(is_some)` chain in the program.
-pub fn map_find_if_some(program: Program) -> LintHit[] {
+pub fn map_find_if_some(program: WrittenProgram) -> LintHit[] {
     let some(map_name) = program.items.imported_as("map") else { return []; };
     let some(find_if) = program.items.imported_as("find_if") else { return []; };
     let some(is_some) = program.items.imported_as("is_some") else { return []; };

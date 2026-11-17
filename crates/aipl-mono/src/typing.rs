@@ -1292,6 +1292,27 @@ impl DeclTables<'_> {
         self.named_reaches(name, case, &mut HashSet::new())
     }
 
+    /// Whether anything carried by the cases of the variant `name` can hold a case `case`: its
+    /// payloads, and not the cases themselves. A value of `name` that is not `case` itself holds
+    /// no `case` exactly when this is false.
+    pub(crate) fn payloads_reach_case(&self, name: &str, case: &str) -> bool {
+        let mut seen = HashSet::new();
+        seen.insert(name.to_string());
+        if let Some(cases) = self.variants.get(name) {
+            return cases
+                .iter()
+                .any(|(_, payload)| payload.iter().any(|t| self.reaches(t, case, &mut seen)));
+        }
+        if let Some(v) = self.generic_variants.get(name) {
+            return v.cases.iter().any(|c| {
+                c.payload
+                    .iter()
+                    .any(|p| self.reaches(&p.ty, case, &mut seen))
+            });
+        }
+        true
+    }
+
     /// Whether a value of the type `name` can hold a value of the variant `target`: it is that
     /// variant, or a struct or variant whose fields or payloads can. What a refinement parameter's
     /// cases are reached through, since which cases it names is not known.

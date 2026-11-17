@@ -111,7 +111,7 @@
             <a class="anchor" href="#item-filled">filled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn filled(self: UnfilledHit[], items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn filled(self: UnfilledHit[], items: WrittenItem[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p><code>self</code> filled in for the file whose items are <code>items</code>.</p></div>
 
@@ -125,7 +125,7 @@
             <a class="anchor" href="#item-lint_hits">lint_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (Program) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (WrittenProgram) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What <code>lint</code> reports for the program <code>src</code> parses to. The one way the lints' <code>.test</code> blocks run a lint over source text: pass the lint function itself.</p></div>
 
@@ -139,7 +139,7 @@
             <a class="anchor" href="#item-lint_messages">lint_messages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (Program) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (WrittenProgram) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_hits</code>], keeping only the messages.</p></div>
 
@@ -181,7 +181,7 @@
             <a class="anchor" href="#item-imported_as">imported_as</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn imported_as(self: Item[], name: str) -&#62; str?</code></pre>
+          <pre class="signature"><code>pub fn imported_as(self: WrittenItem[], name: str) -&#62; str?</code></pre>
 
           <div class="doc"><p>The name a file's <code>items</code> import builtin <code>name</code> under, if it does: the spelling a lint's advice should use. <code>none</code> when the file does not import it, which is when the advice has to say so.</p></div>
 
@@ -195,7 +195,7 @@
             <a class="anchor" href="#item-bound_to">bound_to</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn bound_to(self: Item[], local: str) -&#62; str?</code></pre>
+          <pre class="signature"><code>pub fn bound_to(self: WrittenItem[], local: str) -&#62; str?</code></pre>
 
           <div class="doc"><p>The builtin a file's <code>items</code> import under the local name <code>local</code>, as builtins exports it (<code>wrapping_add</code> for <code>import { wrapping_add as + } from builtins;</code>), or <code>none</code> when that name is not bound by an import from builtins — unbound, or one of the file's own.</p></div>
 
@@ -237,7 +237,7 @@
             <a class="anchor" href="#item-imported_locals">imported_locals</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn imported_locals(self: Item[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn imported_locals(self: WrittenItem[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p>Every name a file's <code>items</code> import from builtins, as the file spells it.</p></div>
 
@@ -251,9 +251,9 @@
             <a class="anchor" href="#item-on_functions">on_functions</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions(self: Program, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn on_functions(self: WrittenProgram, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>on_functions</code>] is what runs it over a program, so no function lint decides for itself which bodies to look at.</p><p>Every body that is code to check is a function here: each function, the <code>.test</code> block it carries, the <code>.benchmark</code> block it carries, and the helpers declared in a <code>.test</code> block. A block is checked as a function of its own when tests run, so it is handed over as one — no parameters, no return type, the block as its body.</p></div>
+          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>WrittenProgram</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>on_functions</code>] is what runs it over a program, so no function lint decides for itself which bodies to look at.</p><p>Every body that is code to check is a function here: each function, the <code>.test</code> block it carries, the <code>.benchmark</code> block it carries, and the helpers declared in a <code>.test</code> block. A block is checked as a function of its own when tests run, so it is handed over as one — no parameters, no return type, the block as its body.</p></div>
 
 
         </section>
@@ -265,7 +265,7 @@
             <a class="anchor" href="#item-on_functions_once">on_functions_once</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions_once(self: Program, lint: (Function) -&#62; LintHit?) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn on_functions_once(self: WrittenProgram, lint: (Function) -&#62; LintHit?) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>[<code>on_functions</code>] for a lint that reports at most one hit for a function.</p></div>
 
@@ -279,7 +279,7 @@
             <a class="anchor" href="#item-on_functions_unfilled">on_functions_unfilled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions_unfilled(self: Program, lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn on_functions_unfilled(self: WrittenProgram, lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>[<code>on_functions</code>] for a lint whose hits are [<code>UnfilledHit</code>]s.</p></div>
 
@@ -293,7 +293,7 @@
             <a class="anchor" href="#item-on_functions_filled">on_functions_filled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions_filled(self: Program, lint: (Function) -&#62; UnfilledHit[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn on_functions_filled(self: WrittenProgram, lint: (Function) -&#62; UnfilledHit[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>[<code>on_functions_unfilled</code>], each hit filled in for the program's own imports.</p></div>
 
@@ -440,23 +440,9 @@
             <a class="anchor" href="#item-code_bodies">code_bodies</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn code_bodies(self: Program) -&#62; Function[]</code></pre>
+          <pre class="signature"><code>fn code_bodies(self: SuperProgram) -&#62; Function[]</code></pre>
 
           <div class="doc"><p>Every body of the program that is code to check, each as a function.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-declared">
-          <h3>
-            <a class="anchor" href="#item-declared">declared</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn declared(self: Fn) -&#62; Function</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -468,7 +454,7 @@
             <a class="anchor" href="#item-bodies">bodies</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bodies(self: Function) -&#62; Function[]</code></pre>
+          <pre class="signature"><code>fn bodies(self: WrittenFn) -&#62; Function[]</code></pre>
 
           <div class="doc"><p><code>self</code>, and a function standing for each other body it holds.</p></div>
 

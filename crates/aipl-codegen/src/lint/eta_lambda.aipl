@@ -61,7 +61,7 @@ import {
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
-import { Fn, Function, Item, Program } from "../item.aipl";
+import { Function, WrittenFn, WrittenItem, WrittenProgram } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import {
     LintHit,
@@ -74,7 +74,7 @@ import {
 } from "./lint_hit.aipl";
 
 # A hit for each lambda in the program that adds nothing to what it forwards to.
-pub fn eta_lambda(program: Program) -> LintHit[] {
+pub fn eta_lambda(program: WrittenProgram) -> LintHit[] {
     let map_name = program.items.imported_as("map");
     let methods = program.items.methods_in_view();
     program.on_functions(|Function { body }| body.lambda_hits(map_name, methods))
@@ -145,8 +145,8 @@ pub fn eta_lambda(program: Program) -> LintHit[] {
 # named `self`, which is what method-call syntax is defined by, and a lowercase builtin the
 # file imports. A function from another file is not here — its parameters are not in view
 # when a file is linted.
-fn methods_in_view(self: Item[]) -> str[] {
-    let own = self.collect_arms(Fn)$method_name().collect_ok();
+fn methods_in_view(self: WrittenItem[]) -> str[] {
+    let own = self.collect_arms(WrittenFn)$method_name().collect_ok();
     let imported = self
         .imported_locals()
         .filter(|name| name[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyz_".contains(c)));
@@ -154,7 +154,7 @@ fn methods_in_view(self: Item[]) -> str[] {
 }
 
 # The name of the function `self`, when it takes a `self`.
-fn method_name(self: Fn(Function { sig, name })) -> str? {
+fn method_name(self: WrittenFn(Function { sig, name }, _)) -> str? {
     if (sig.params
         .first()
         .is_some_and(|parameter| parameter.binding.name_at(parameter.name_span) == "self")) {

@@ -302,6 +302,20 @@
 
 
 
+        <section class="item" id="item-LoweredFile">
+          <h3>
+            <a class="anchor" href="#item-LoweredFile">LoweredFile</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LoweredFile</code></pre>
+
+          <div class="doc"><p>A file parsed and lowered: its attributes are functions of their own and its destructuring forms are bound.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-ParseFailure">
           <h3>
             <a class="anchor" href="#item-ParseFailure">ParseFailure</a>
@@ -321,7 +335,7 @@
             <a class="anchor" href="#item-aipl_parse_file">aipl_parse_file</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; LoweredFile!ParseFailure</code></pre>
 
           <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is what follows a parse but is no part of one: <code>parse_and_partial_load</code> hoists test functions and promotes type variables, and the loader bakes the locations of <code>assert</code> and <code>trace</code>.</p><p>A tree that recovered from a missing token is a tree of broken input, and is never lowered: the errors come back instead.</p></div>
 
@@ -832,7 +846,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$73825: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$73949: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1470,7 +1484,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$113301: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$113425: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1750,7 +1764,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$128693: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$128817: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -1862,7 +1876,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-as_item">as_item</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn as_item(v: Ast, span: Span) -&#62; Item!ParseError</code></pre>
+          <pre class="signature"><code>fn as_item(v: Ast, span: Span) -&#62; WrittenItem!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1988,7 +2002,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-number_unattached_blocks">number_unattached_blocks</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn number_unattached_blocks(self: Item[]) -&#62; Item[]</code></pre>
+          <pre class="signature"><code>fn number_unattached_blocks(self: WrittenItem[]) -&#62; WrittenItem[]</code></pre>
 
           <div class="doc"><p>The items with each top-level <code>test({ .. })</code> block, and each top-level <code>benchmark({ .. })</code> block, named by its order among its own kind, from 1, so a block's name is stable under edits elsewhere in the file.</p></div>
 
@@ -2016,7 +2030,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-lower_decl">lower_decl</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -&#62; Item!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -&#62; WrittenItem!ParseError</code></pre>
 
           <div class="doc"><p>The declaration under an <code>item</code>, carrying the <code># ..</code> lines written directly above it. Every kind but an <code>import</code> has somewhere to put them; an <code>import</code> declares nothing, so a block adjacent to one documents nothing — and the fix is the blank line that would make it the file's own documentation, which is what the message says.</p></div>
 
@@ -2548,7 +2562,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$171627: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$172228: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2604,7 +2618,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-as_program">as_program</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn as_program(v: Ast, span: Span) -&#62; Program!ParseError</code></pre>
+          <pre class="signature"><code>fn as_program(v: Ast, span: Span) -&#62; WrittenProgram!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

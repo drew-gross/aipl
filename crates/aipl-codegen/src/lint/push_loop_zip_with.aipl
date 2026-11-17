@@ -41,7 +41,7 @@ import {
 } from builtins;
 import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Program } from "../item.aipl";
+import { Function, WrittenProgram } from "../item.aipl";
 import { Ctor } from "../pat.aipl";
 import {
     SeededLoop,
@@ -62,7 +62,7 @@ import { lone_statement } from "./loop_shape.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop pairing two arrays by
 # position.
-pub fn push_loop_zip_with(program: Program) -> LintHit[] {
+pub fn push_loop_zip_with(program: WrittenProgram) -> LintHit[] {
     let some(push) = program.items.imported_as("push") else { return []; };
     program.on_functions_filled(|Function { body }| {
         body.indexed_seeded_loops()$zip_hit(push).collect_ok()
