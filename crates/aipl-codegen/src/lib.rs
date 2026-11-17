@@ -1700,13 +1700,11 @@ enum TestKind {
     Benchmark,
 }
 
-/// Build the program the `check` command JIT-runs. Keeps every original item
-/// (with any `.test` body stripped so `run`/`build` semantics are unchanged),
-/// adds a `__test$<fn>` function per tested function (body = the test block,
-/// no effects declared, so a test shims any it uses), and a `__test_main`
-/// driver that, for each test, calls `__test_begin(name)` / the test /
-/// `__test_end()`, then yields `__test_summary()` as its i64 exit code.
-/// `Compilation::new(&that).run_0("__test_main")` runs the suite.
+/// Build the program the `check` command JIT-runs: the loaded program less the functions made of
+/// `.benchmark` blocks, and a `__test_main` driver that, for each `__test$<fn>` function (the
+/// loader made one of every `.test` block; it declares no effects, so a test shims any it uses),
+/// calls `__test_begin(name)` / the test / `__test_end()`, then yields `__test_summary()` as its
+/// i64 exit code. `Compilation::new(&that).run_0("__test_main")` runs the suite.
 ///
 /// A `.benchmark` block is not among them; see [`build_benchmark_program`].
 pub fn build_test_program(program: &Program) -> Program {
@@ -1715,7 +1713,7 @@ pub fn build_test_program(program: &Program) -> Program {
 
 /// The counterpart of [`build_test_program`] for the program's `.benchmark`
 /// blocks, or `None` when it has none. Same shape — `__test$<fn>` per block, a
-/// `__test_main` driver — but every synthesized function declares the `!measure`
+/// `__test_main` driver — but every block's function declares the `!measure`
 /// effect and no other, so a block can call `measure` and cannot print, read a
 /// file or reach the clock. (That is the whole of "effects are not supported in a
 /// `.benchmark` block yet": the checker's ordinary effect discipline, applied
@@ -1725,8 +1723,8 @@ pub fn build_test_program(program: &Program) -> Program {
 /// block asserts on exist only there.
 pub fn build_benchmark_program(program: &Program) -> Option<Program> {
     let has_benchmark = program.items.iter().any(|item| {
-        matches!(item, Item::Fn(f)
-            if f.test_body.is_some() && aipl_syntax::benchmark_source_name(&f.name).is_some())
+        matches!(item, Item::Fn(f) if aipl_syntax::test_body_source_name(&f.name)
+            .is_some_and(|source| aipl_syntax::benchmark_source_name(source).is_some()))
     });
     has_benchmark.then(|| synthesize_driver(program, TestKind::Benchmark))
 }
@@ -1752,50 +1750,33 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
     let mut tests: Vec<(String, String)> = Vec::new(); // (reported name, test fn name)
     for item in &program.items {
         match item {
-            Item::Fn(f) if f.test_body.is_some() => {
-                let is_benchmark = aipl_syntax::benchmark_source_name(&f.name).is_some();
-                let unattached = aipl_syntax::unattached_test_ordinal(&f.name);
-                // Every function loses its test body here, run or not, so the
-                // program carries only what `run` and `build` would compile. A
-                // top-level `test({ .. })` has no function behind it, so only
-                // its block is kept.
-                if unattached.is_none() {
-                    let mut orig = f.clone();
-                    orig.test_body = None;
-                    items.push(Item::Fn(orig));
-                }
+            Item::Fn(f) => {
+                let Some(source) = aipl_syntax::test_body_source_name(&f.name) else {
+                    items.push(item.clone());
+                    continue;
+                };
+                // A `.benchmark` block is run apart from the `.test` blocks, by a driver of its own.
+                let is_benchmark = aipl_syntax::benchmark_source_name(source).is_some();
                 if is_benchmark != (kind == TestKind::Benchmark) {
                     continue;
                 }
-                let test_fn = aipl_syntax::test_fn_name(&f.name);
-                items.push(Item::Fn(AstFn {
-                    name: f.name.renamed(test_fn.clone()),
-                    is_pub: true,
-                    sig: AstSignature {
-                        type_vars: Vec::new(),
-                        case_params: Vec::new(),
-                        params: Vec::new(),
-                        effects: all_effects(),
-                        return_ty: None,
-                    },
-                    body: f.test_body.clone().expect("test body present"),
-                    test_body: None,
-                    test_fns: Vec::new(),
-                    doc: None,
-                }));
+                items.push(item.clone());
                 // A `.benchmark` block is reported as `f.benchmark`, after the
                 // attribute that holds it, not as the function standing in for it;
                 // a top-level `benchmark({ .. })` has no function, so it is `benchmark
                 // block N`, N counting the file's.
-                let reported = match (aipl_syntax::benchmark_source_name(&f.name), unattached) {
+                let reported = match (
+                    aipl_syntax::benchmark_source_name(source),
+                    aipl_syntax::unattached_test_ordinal(source),
+                ) {
                     (Some(owner), _) => match aipl_syntax::unattached_benchmark_ordinal(owner) {
                         Some(n) => format!("benchmark block {n}"),
                         None => format!("{owner}.benchmark"),
                     },
                     (None, Some(n)) => format!("{STANDALONE_TEST_LABEL}{n}"),
-                    (None, None) => f.name.text.clone(),
+                    (None, None) => source.to_string(),
                 };
-                tests.push((reported, test_fn));
+                tests.push((reported, f.name.text.clone()));
             }
             other => items.push(other.clone()),
         }

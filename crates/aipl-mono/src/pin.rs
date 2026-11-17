@@ -803,17 +803,7 @@ pub fn pin_behind(program: &Program, declarations: usize) -> Pinned {
         }
         match item {
             Item::Fn(f) => match pin_function(&decls, f) {
-                Ok(mut t) => {
-                    if let Some(block) = &f.test_body {
-                        match pin_test_body(&decls, f, block) {
-                            Ok(body) => t.test_body = Some(body),
-                            Err(es) => failures.extend(
-                                es.into_iter().map(|e| (format!("{}.test", f.name.text), e)),
-                            ),
-                        }
-                    }
-                    items.push(TItem::Fn(t));
-                }
+                Ok(t) => items.push(TItem::Fn(t)),
                 Err(es) => failures.extend(es.into_iter().map(|e| (f.name.text.clone(), e))),
             },
             Item::Struct(s) if s.type_vars.iter().any(|tp| tp.default.is_some()) => {
@@ -1081,32 +1071,6 @@ fn pinner_for<'a>(
         domains: HashMap::new(),
         assumed: Default::default(),
     }
-}
-
-/// An attached `.test` or `.benchmark` block, typed as the function the test driver makes of it:
-/// no parameters, no type variables, no effects of its own (a benchmark has `measure`), and a
-/// unit result.
-fn pin_test_body(decls: &Decls, f: &Function, block: &Expr) -> Result<TExpr<Ty>, Vec<Failure>> {
-    let effects = if aipl_syntax::benchmark_source_name(&f.name.text).is_some() {
-        vec!["measure".to_string()]
-    } else {
-        Vec::new()
-    };
-    let mut p = pinner_for(decls, &f.name.text, &[], &effects);
-    p.in_test = true;
-    let result = (|| {
-        let body = p.expr(block)?;
-        p.coerce_expr(
-            &body,
-            &It::Unit,
-            block.value_span(),
-            "the function's result",
-        )?;
-        p.settle()?;
-        p.stop_if_recovered(&block.span)?;
-        p.finish(body, &block.span)
-    })();
-    with_recovered(p.errors, result)
 }
 
 /// A struct field's or variant payload slot's default, typed against the slot. `earlier` holds the

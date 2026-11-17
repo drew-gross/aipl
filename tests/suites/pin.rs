@@ -43,8 +43,9 @@ fn scaled(n: i64, by: i64 = 2) -> i64 {
     let mut seen = (false, false, false, false);
     for item in &pinned.program.items {
         match item {
+            // The test block is a function of its own, pinned like any other.
+            TItem::Fn(f) if f.name.text == "__test$scaled" => seen.0 = true,
             TItem::Fn(f) if f.name.text == "scaled" => {
-                seen.0 = f.test_body.is_some();
                 seen.1 = f.sig.params[1]
                     .default
                     .as_ref()

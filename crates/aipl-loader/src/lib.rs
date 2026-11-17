@@ -921,6 +921,9 @@ impl Loader {
         // because a local keeps the name the author wrote and a constant has
         // been mangled. Substituting here rather than in any later pass is what
         // keeps constants out of the checker, mono and codegen entirely.
+        // A file's `.test` block is a function of its own from here on, so nothing after the
+        // loader holds one attached.
+        let merged = aipl_syntax::hoist_test_bodies(merged);
         let merged = substitute_constants(merged);
         // A named refinement is its target wherever it is written, so it is
         // expanded away here, for the same reason: nothing past the loader

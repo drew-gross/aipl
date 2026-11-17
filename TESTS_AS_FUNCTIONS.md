@@ -56,27 +56,29 @@ It is how an attached block reaches Rust, in three forms: a function's own `.tes
 
 ## Rounds
 
-### Round A: the Rust side hoists once, early
+### Round A: the Rust side hoists once, at the end of loading
 
-One place turns `test_body` into functions, straight after the loader reads a file, so nothing
-after it sees `test_body`. Still Rust; no AIPL change; no bootstrap.
+One place turns `test_body` into functions, once the loader has finished with a file, so
+nothing after the loader sees `test_body`. Still Rust; no AIPL change; no bootstrap. The
+loader's own handling of `test_body` (operator gating, rewriting, baking, keyword arguments,
+dropping an imported file's) stays until Round B, when the field goes, so that the compiler
+finds every use.
 
-- [ ] The conversion `test_body → __test$f` (name by `test_fn_name`, `is_pub: true`, no
-      parameters, effects `[]` for a test and `["measure"]` for a benchmark) moves out of
-      `synthesize_driver` into one function the loader calls per file.
-- [ ] `synthesize_driver` keeps selection by role (`fn_role`: `TestBody`, `Benchmark`) and the
-      driver (`__test_main`, reported names derived from the names: `f`, `f.benchmark`,
-      `test block N`).
-- [ ] `without_tests` drops by role. Imported files lose their test functions; a program for
-      `run`/`build` drops them in one place.
-- [ ] Delete the downstream `test_body` handling: `pin_test_body`, the mono passes, the
-      `check_operators`/`rewrite_expr`/`kwargs` special cases (a test function is an ordinary
-      function there). `bake.rs`: `is_test_code` is true for a `TestBody` role as well.
-- [ ] `ast::Function.test_body` is still decoded (AIPL still sends it) and consumed by the one
-      conversion; nothing else reads it.
-- Watch: test error wording and carets (`tests/suites/check.rs`, the `err_*` fixtures with a
-  test block), `check`'s per-test rows, `trace` refusal inside a test, `assert` baking,
-  the LSP (`aipl-lsp/src/server.rs` calls `build_test_program`), `perf.rs`, `main.rs:600`.
+- [x] `aipl_syntax::hoist_test_bodies` makes the `__test$f` function (public, no parameters,
+      the block as its body, effects `[]` for a test and `["measure"]` for a benchmark) and
+      drops a top-level test's carrier; the loader applies it to the merged items.
+- [x] `synthesize_driver` selects by role (`test_body_source_name`, `benchmark_source_name`)
+      and builds the driver; reported names come from the source name.
+- [x] `benchmark_diagnostics`, `build_benchmark_program` and `main.rs`'s `has_tests` read the
+      test functions.
+- [x] The pinner no longer types an attached block: `pin_test_body` is gone, and a test is
+      pinned as the function it is. `display` names `__test$f` as `f`, so a message about a
+      test block reads as before.
+- [ ] Moved to Round B: deleting the downstream `test_body` handling (the mono passes,
+      `check_operators`/`rewrite_expr`/`kwargs` special cases, `ast::Function.test_body`), which
+      is simplest when the field itself is removed.
+- Watch: test error wording and carets, `check`'s per-test rows, `trace` refusal inside a
+  test, `assert` baking, the LSP, `perf.rs`, baseline rows for programs with tests.
 
 ### Round B: AIPL hoists the `.test` block; Rust drops `test_body`
 

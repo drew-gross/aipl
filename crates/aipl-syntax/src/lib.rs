@@ -2995,6 +2995,63 @@ pub fn test_helper_source_name(name: &str) -> Option<&str> {
     }
 }
 
+/// The name of the function whose `.test` block `name` is the body of — `f` for
+/// `__test$f`, and `__benchmark$f` for the function made of a `.benchmark` block
+/// — or `None` when `name` is not a test body.
+pub fn test_body_source_name(name: &str) -> Option<&str> {
+    match fn_role(name) {
+        FnRole::TestBody => name.strip_prefix(test_fn_name("").as_str()),
+        FnRole::Plain | FnRole::TestHelper(_) | FnRole::Benchmark(_) => None,
+    }
+}
+
+/// `items`, each function's `.test` block made into a function of its own: `__test$f`, public,
+/// with no parameters, the block as its body, and the effects the block may use (a benchmark
+/// block's is `measure` and nothing else; a test block's is none, so it shims whatever it
+/// uses). It follows the function, which loses the block. A top-level `test({ .. })` has no
+/// function behind it, so its carrier is dropped and only the block's function is left.
+pub fn hoist_test_bodies(items: Vec<ast::Item>) -> Vec<ast::Item> {
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let ast::Item::Fn(f) = item else {
+            out.push(item);
+            continue;
+        };
+        let Some(block) = f.test_body.clone() else {
+            out.push(ast::Item::Fn(f));
+            continue;
+        };
+        let effects = if benchmark_source_name(&f.name).is_some() {
+            vec!["measure".to_string()]
+        } else {
+            Vec::new()
+        };
+        let test_fn = ast::Function {
+            name: f.name.renamed(test_fn_name(&f.name)),
+            is_pub: true,
+            sig: ast::Signature {
+                type_vars: Vec::new(),
+                case_params: Vec::new(),
+                params: Vec::new(),
+                effects,
+                return_ty: None,
+            },
+            body: block,
+            test_body: None,
+            test_fns: Vec::new(),
+            doc: None,
+        };
+        if unattached_test_ordinal(&f.name).is_none() {
+            out.push(ast::Item::Fn(ast::Function {
+                test_body: None,
+                ..f
+            }));
+        }
+        out.push(ast::Item::Fn(test_fn));
+    }
+    out
+}
+
 /// Whether `name` is a hoisted test helper. Test code like the body it came
 /// from, so `assert` is baked in it too.
 pub fn is_test_helper(name: &str) -> bool {
@@ -3072,12 +3129,14 @@ pub fn benchmark_diagnostics(program: &ast::Program) -> Vec<Error> {
     let mut out = Vec::new();
     for item in &program.items {
         let ast::Item::Fn(f) = item else { continue };
-        if benchmark_source_name(&f.name).is_none() {
+        // The block is the body of the function made of it.
+        if test_body_source_name(&f.name)
+            .and_then(benchmark_source_name)
+            .is_none()
+        {
             continue;
         }
-        let Some(block) = f.test_body.as_ref() else {
-            continue;
-        };
+        let block = &f.body;
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         each_subexpr(block, &mut |e| {
             let ast::ExprKind::Call(callee, args, _) = &e.kind else {

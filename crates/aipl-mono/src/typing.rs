@@ -814,7 +814,9 @@ impl TuplePattern {
 /// every non-root file's top-level names). Neither can appear in a user-written
 /// identifier, so this only ever strips compiler-internal decoration.
 pub(crate) fn display(name: &str) -> &str {
-    aipl_syntax::strip_mangle_prefix(name)
+    let name = aipl_syntax::strip_mangle_prefix(name);
+    // The function made of a `.test` block is named for the one it tests.
+    aipl_syntax::test_body_source_name(name).unwrap_or(name)
 }
 
 /// `t` less its outer refinements, and what they exclude.

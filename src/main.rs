@@ -597,8 +597,8 @@ fn leak_gate(
 ) -> Result<Vec<(&'static str, aipl::perf::Leak)>, String> {
     let has_tests = tests_ran
         && program.items.iter().any(|item| {
-            matches!(item, aipl::ast::Item::Fn(f) if f.test_body.is_some()
-            && aipl::benchmark_source_name(&f.name).is_none())
+            matches!(item, aipl::ast::Item::Fn(f) if aipl::test_body_source_name(&f.name)
+            .is_some_and(|source| aipl::benchmark_source_name(source).is_none()))
         });
     let main_runs = sections_on && sections::runs_main(spec) && spec.report.is_none();
     let mut runs: Vec<(&'static str, aipl::ast::Program)> = Vec::new();
