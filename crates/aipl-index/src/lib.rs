@@ -346,14 +346,11 @@ fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
     for item in &program.items {
         match item {
             Item::Fn(f) => {
-                // A function declared inside a `.test` block is hoisted to the
-                // top level under a name the source never spells. It is private
-                // to its test, so it is not indexed. Neither is the function
-                // standing in for a `.benchmark` block, which no source names. Nor
-                // is the one carrying a top-level `test({ .. })`.
-                if aipl_syntax::test_helper_source_name(&f.name).is_some()
-                    || aipl_syntax::benchmark_source_name(&f.name).is_some()
-                    || aipl_syntax::unattached_test_ordinal(&f.name).is_some()
+                // The functions a `.test` block, its helpers and a `.benchmark` block become
+                // have names the source never spells, and are private to their test, so
+                // they are not indexed. Neither is the function carrying a top-level
+                // `benchmark({ .. })`, which no source names.
+                if aipl_syntax::fn_role(&f.name) != aipl_syntax::FnRole::Plain
                     || aipl_syntax::unattached_benchmark_ordinal(&f.name).is_some()
                 {
                     continue;

@@ -152,13 +152,6 @@ pub(crate) fn expand_keyword_args(program: &Program, root_index: u32) -> Result<
                 is_pub: f.is_pub,
                 sig,
                 body: cx.expand_expr(&f.body, &locals)?,
-                // A `.test` body has no parameters in scope — only globals.
-                test_body: f
-                    .test_body
-                    .as_ref()
-                    .map(|tb| cx.expand_expr(tb, &HashSet::new()))
-                    .transpose()?,
-                test_fns: Vec::new(),
                 doc: f.doc.clone(),
             }))
         })

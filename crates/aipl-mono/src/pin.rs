@@ -1304,7 +1304,6 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
         is_pub: f.is_pub,
         sig,
         body,
-        test_body: None,
         doc: f.doc.clone(),
     })
 }

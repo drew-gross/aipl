@@ -73,7 +73,6 @@ pub fn counting_variants_pinned(program: &TProgram, effectful: &HashSet<String>)
             TItem::Fn(f) => {
                 let mut f = f.clone();
                 f.body = rewrite(&f.body, &mut cx);
-                f.test_body = f.test_body.as_ref().map(|t| rewrite(t, &mut cx));
                 TItem::Fn(f)
             }
             other => other.clone(),
@@ -269,7 +268,6 @@ fn mint(
             ..f.sig.clone()
         },
         body,
-        test_body: None,
         doc: Some(format!(
             "The counting variant of `{}`: how long its result is, measured \
              rather than built. Synthesized by the compiler for a call whose \

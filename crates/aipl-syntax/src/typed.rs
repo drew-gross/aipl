@@ -1020,7 +1020,6 @@ pub struct TFunction {
     pub is_pub: bool,
     pub sig: TSignature<Ty>,
     pub body: TExpr<Ty>,
-    pub test_body: Option<TExpr<Ty>>,
     pub doc: Option<String>,
 }
 
@@ -1132,8 +1131,6 @@ impl TProgram {
                         is_pub: f.is_pub,
                         sig: f.sig.erase(),
                         body: Expr::new(ExprKind::Unit, f.body.span.clone()),
-                        test_body: None,
-                        test_fns: Vec::new(),
                         doc: f.doc.clone(),
                     }),
                     TItem::Struct(s) => Item::Struct(StructDecl {

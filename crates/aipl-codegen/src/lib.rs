@@ -1801,8 +1801,6 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
             return_ty: Some(Type::Primitive(Primitive::I64)),
         },
         body,
-        test_body: None,
-        test_fns: Vec::new(),
         doc: None,
     }));
     Program {

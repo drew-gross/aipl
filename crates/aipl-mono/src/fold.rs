@@ -129,10 +129,6 @@ pub fn fold_constants_pinned(
         match item {
             TItem::Fn(f) if scope.covers(&f.name.text) => {
                 f.body = fold_pinned(&f.body, &HashMap::new());
-                f.test_body = f
-                    .test_body
-                    .as_ref()
-                    .map(|x| fold_pinned(x, &HashMap::new()));
             }
             TItem::Struct(s) => {
                 for field in &mut s.fields {

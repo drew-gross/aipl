@@ -247,11 +247,6 @@ impl Body for aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty> {
 pub struct FunctionView<'a, B> {
     pub name: &'a str,
     pub body: &'a B,
-    /// A `.test({ .. })` block's body, which is compiled like any other code
-    /// and so is optimized like any other code — and has to be compared like
-    /// it, or a pass that only improved a test would read as having done
-    /// nothing.
-    pub test_body: Option<&'a B>,
     /// Parameters shadow same-named globals within the body, so a call to a
     /// `(T) -> bool` parameter named `pred` is not a reference to a top-level
     /// `pred`. Without this the call graph gains edges that do not exist, and
@@ -268,7 +263,6 @@ impl Optimizable for Program {
                 Item::Fn(f) => Some(FunctionView {
                     name: &f.name,
                     body: &f.body,
-                    test_body: f.test_body.as_ref(),
                     params: f.sig.params.iter().map(|p| p.name.clone()).collect(),
                 }),
                 _ => None,
@@ -286,7 +280,6 @@ impl Optimizable for aipl_syntax::typed::TProgram {
                 aipl_syntax::typed::TItem::Fn(f) => Some(FunctionView {
                     name: &f.name,
                     body: &f.body,
-                    test_body: f.test_body.as_ref(),
                     params: f.sig.params.iter().map(|p| p.name.clone()).collect(),
                 }),
                 _ => None,
@@ -303,10 +296,6 @@ impl Optimizable for MonoProgram {
             .map(|f: &ConcreteFn| FunctionView {
                 name: &f.name,
                 body: &f.body,
-                // Monomorphization has already folded each `.test` block into
-                // the `__test_main` it synthesizes, so there is no separate
-                // test body left to compare by this point.
-                test_body: None,
                 params: f.params.iter().map(|p| p.name.clone()).collect(),
             })
             .collect()
@@ -488,9 +477,6 @@ fn recorded_spans(program: &impl Optimizable) -> HashSet<Site> {
     for f in program.functions() {
         let file = origin(f.name);
         f.body.collect_recorded(&file, &mut out, &mut unrecorded);
-        if let Some(test_body) = f.test_body {
-            test_body.collect_recorded(&file, &mut out, &mut unrecorded);
-        }
     }
     // A site that arrives with both has an expression whose type pinning left to default beside
     // one it did not (two files share offsets, and an inlined body keeps its own), so what a pass
@@ -549,9 +535,6 @@ fn lost_records(program: &impl Optimizable, recorded: &HashSet<Site>) -> Vec<Str
         let file = origin(f.name);
         let mut found = Vec::new();
         f.body.collect_lost(&file, recorded, &mut found);
-        if let Some(test_body) = f.test_body {
-            test_body.collect_lost(&file, recorded, &mut found);
-        }
         out.extend(
             found
                 .into_iter()
@@ -626,15 +609,15 @@ fn named(functions: &HashSet<String>) -> String {
 /// inlined into its one caller, and that caller's body changed — so the
 /// progress is already accounted for, by the function that absorbed it.
 fn rewritten_functions<P: Optimizable>(before: &P, after: &P) -> HashSet<String> {
-    let was: HashMap<&str, (&P::Body, Option<&P::Body>)> = before
+    let was: HashMap<&str, &P::Body> = before
         .functions()
         .into_iter()
-        .map(|f| (f.name, (f.body, f.test_body)))
+        .map(|f| (f.name, f.body))
         .collect();
     after
         .functions()
         .into_iter()
-        .filter(|f| was.get(f.name) != Some(&(f.body, f.test_body)))
+        .filter(|f| was.get(f.name) != Some(&f.body))
         .map(|f| f.name.to_string())
         .collect()
 }
@@ -661,9 +644,6 @@ fn references<B: Body>(f: &FunctionView<'_, B>) -> HashSet<String> {
     let mut bound: HashSet<&str> = f.params.iter().map(String::as_str).collect();
     let mut counts: HashMap<&str, usize> = HashMap::new();
     f.body.count_uses(&mut bound, &mut counts);
-    if let Some(test_body) = f.test_body {
-        test_body.count_uses(&mut bound, &mut counts);
-    }
     counts.into_keys().map(str::to_string).collect()
 }
 
@@ -692,8 +672,6 @@ mod tests {
                 return_ty: None,
             },
             body,
-            test_body: None,
-            test_fns: Vec::new(),
             doc: None,
         })
     }

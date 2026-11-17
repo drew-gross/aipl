@@ -18,10 +18,6 @@ pub fn fold_extends_pinned(program: &TProgram, scope: &Scope) -> TProgram {
         if let TItem::Fn(f) = item {
             if scope.covers(&f.name.text) {
                 f.body = fold_expr(&f.body, &mut ArrayReceivers::from_params(&f.sig.params));
-                f.test_body = f
-                    .test_body
-                    .as_ref()
-                    .map(|t| fold_expr(t, &mut ArrayReceivers::from_params(&f.sig.params)));
             }
         }
     }

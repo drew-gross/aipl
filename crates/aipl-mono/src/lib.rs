@@ -229,10 +229,6 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                         ..f.sig.clone()
                     },
                     body: lcr_expr(&f.body, &lcr, &mut scope),
-                    test_body: f
-                        .test_body
-                        .as_ref()
-                        .map(|tb| lcr_expr(tb, &lcr, &mut scope)),
                     ..f.clone()
                 })
             }
@@ -342,8 +338,6 @@ fn ctor_wrapper_fn(w: &CtorWrapper, ctor: &str) -> Function {
             ExprKind::Call(Callee::User(ctor.to_string()), args, false),
             0..0,
         ),
-        test_body: None,
-        test_fns: Vec::new(),
         doc: None,
     }
 }
@@ -599,10 +593,6 @@ pub fn lower_tuples(program: &Program) -> Program {
                     .as_ref()
                     .map(|t| lt_ty(t, &mut fields_map, &mut order));
                 let new_body = lt_expr(&f.body, &mut fields_map, &mut order);
-                let new_test = f
-                    .test_body
-                    .as_ref()
-                    .map(|tb| lt_expr(tb, &mut fields_map, &mut order));
                 Item::Fn(Function {
                     sig: Signature {
                         params: new_params,
@@ -610,7 +600,6 @@ pub fn lower_tuples(program: &Program) -> Program {
                         ..f.sig.clone()
                     },
                     body: new_body,
-                    test_body: new_test,
                     ..f.clone()
                 })
             }
@@ -1323,7 +1312,6 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                         .map(|t| lc.lower_ty(t))
                         .transpose()?;
                     let body = lc.lower_expr(&f.body)?;
-                    let test_body = f.test_body.as_ref().map(|t| lc.lower_expr(t)).transpose()?;
                     Item::Fn(Function {
                         sig: Signature {
                             params,
@@ -1331,7 +1319,6 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                             ..f.sig.clone()
                         },
                         body,
-                        test_body,
                         ..f.clone()
                     })
                 }

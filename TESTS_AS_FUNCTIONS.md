@@ -82,13 +82,21 @@ finds every use.
 
 ### Round B: AIPL hoists the `.test` block; Rust drops `test_body`
 
-- [ ] `hoist_test_fns.aipl` makes `__test$f` from `test_body` (and keeps the helpers and the
-      benchmark function as it does), so `Function` coming out of it has `test_body: none`.
-- [ ] `ffi_ast.rs` stops decoding `test_body`, `test_fns` and `benchmark`. Bootstrap: the new
-      decoder reads the old artifact's fields for one round, then the fallback goes.
-- [ ] Delete Round A's Rust conversion and `ast::Function.test_body`, `test_fns`.
-- Watch: the hoisted names and spans (`__test$` functions point at the block, not at the
-  function), reported names, `fn_names.aipl` roles.
+- [x] `hoist_test_fns.aipl` makes `__test$f` from `test_body` (`with_test_function`: public, no
+      parameters, effects `measure` for a benchmark and none otherwise, the carrier of a
+      top-level `test({ .. })` dropped), after `f`, the helpers and the benchmark function as
+      before. `Function` coming out of it has `test_body: none`.
+- [x] `ffi_ast.rs` no longer decodes `test_body` or `test_fns`; `ast::Function` and
+      `TFunction` have neither. The conversion Round A put in the loader is gone.
+- [x] The loader's `test_body` handling is gone: operators are gated in the test functions as in any
+      function, `bake.rs` treats a `TestBody` role as test code, and a file that is not the
+      root keeps none of its test code (`is_test_code`, by role).
+- [x] The mono passes (`passes`, `hygiene`, `fold`, the inliners, `instantiation`,
+      `lower_reductions`, `grid_literals`, `typed_util`) carry no `test_body`.
+- Bootstrap: the new decoder ignores the AIPL fields, so with the old artifact a `.test`
+  block is silently dropped until the staged IR is promoted, which `cargo handoff` does
+  before it runs anything that counts tests.
+- Watch: hoisted names and spans, reported names, `fn_names.aipl` roles, baseline rows.
 
 ### Round C: the stage in the types
 

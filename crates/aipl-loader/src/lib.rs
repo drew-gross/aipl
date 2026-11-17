@@ -888,11 +888,12 @@ impl Loader {
             let is_root = path == root;
             let view = &full_views[path];
             for item in &file.items {
+                // A file loaded for a program that is not its own keeps none of its tests.
+                if !is_root && is_test_code(item) {
+                    continue;
+                }
                 if let Item::Fn(f) = item {
                     check_operators(&f.body, view).map_err(|e| self.attribute(path, root, e))?;
-                    if let Some(tb) = &f.test_body {
-                        check_operators(tb, view).map_err(|e| self.attribute(path, root, e))?;
-                    }
                     // Keyword-parameter defaults are expressions too — an
                     // operator used in one needs this file's import.
                     for p in &f.sig.params {
@@ -908,7 +909,7 @@ impl Loader {
                     }
                     _ => None,
                 };
-                let rewritten = rewrite_item(item, view, &ctor_cases, is_root)
+                let rewritten = rewrite_item(item, view, &ctor_cases)
                     .map_err(|e| self.attribute(path, root, e))?;
                 if let (Some(written), Item::Const(c)) = (&const_written, &rewritten) {
                     check_const_value(written, c).map_err(|e| self.attribute(path, root, e))?;
@@ -921,9 +922,6 @@ impl Loader {
         // because a local keeps the name the author wrote and a constant has
         // been mangled. Substituting here rather than in any later pass is what
         // keeps constants out of the checker, mono and codegen entirely.
-        // A file's `.test` block is a function of its own from here on, so nothing after the
-        // loader holds one attached.
-        let merged = aipl_syntax::hoist_test_bodies(merged);
         let merged = substitute_constants(merged);
         // A named refinement is its target wherever it is written, so it is
         // expanded away here, for the same reason: nothing past the loader
@@ -1015,19 +1013,16 @@ fn syntax_builtins(items: &[Item]) -> Vec<Callee> {
     out
 }
 
-/// `item` with its `.test` block and the functions declared in it dropped, and
-/// `None` for the function a `.benchmark` block stands as — what a file
-/// keeps when it is loaded for a program that is not its own.
+/// Whether `item` is test code: a `.test` block, a helper declared in one, or the function a
+/// `.benchmark` block stands as.
+fn is_test_code(item: &Item) -> bool {
+    matches!(item, Item::Fn(f) if aipl_syntax::fn_role(&f.name) != aipl_syntax::FnRole::Plain)
+}
+
+/// `item` unless it is test code: what a file keeps when it is loaded for a program that is not
+/// its own.
 fn without_tests(item: Item) -> Option<Item> {
-    match item {
-        Item::Fn(f) if aipl_syntax::benchmark_source_name(&f.name).is_some() => None,
-        Item::Fn(mut f) => {
-            f.test_body = None;
-            f.test_fns = Vec::new();
-            Some(Item::Fn(f))
-        }
-        other => Some(other),
-    }
+    (!is_test_code(&item)).then_some(item)
 }
 
 /// The rules a `variant W = V without C` declaration is held to, on its target
@@ -1230,8 +1225,6 @@ fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
                 return_ty: c.ty.clone(),
             },
             body: c.value.clone(),
-            test_body: None,
-            test_fns: Vec::new(),
             doc: c.doc.clone(),
         }));
     }
@@ -1261,7 +1254,6 @@ fn item_exprs_mut(item: &mut Item) -> Vec<&mut Expr> {
         Item::Fn(f) => {
             out.extend(f.sig.params.iter_mut().filter_map(|p| p.default.as_mut()));
             out.push(&mut f.body);
-            out.extend(f.test_body.as_mut());
         }
         Item::Struct(s) => out.extend(s.fields.iter_mut().filter_map(|f| f.default.as_mut())),
         Item::Variant(v) => out.extend(
@@ -1462,12 +1454,6 @@ pub fn unmangled_name(name: &str) -> &str {
     }
 }
 
-/// Rewrite one item's global references through `view`. `is_root` says whether
-/// `item` comes from the file being loaded directly, as opposed to a
-/// transitively imported one: a non-root function's `.test({ .. })` body is
-/// dropped rather than carried into the merged [`Program`], so `aipl check`'s
-/// test driver (`build_test_program`) only ever runs the tests that belong to
-/// the file it was pointed at, not every test reachable through its imports.
 /// Resolve a match pattern's constructor name to its variant-qualified global —
 /// the pattern analog of the construction rewriting in [`rewrite_expr`]. A bare
 /// `A` resolves through the file's `view` (an imported or same-file case); a
@@ -1507,11 +1493,11 @@ fn resolve_pattern(pat: &Pattern, view: &HashMap<String, String>, sc: &Scope) ->
     }
 }
 
+/// Rewrite one item's global references through `view`.
 fn rewrite_item(
     item: &Item,
     view: &HashMap<String, String>,
     ctor_cases: &HashMap<String, Vec<String>>,
-    is_root: bool,
 ) -> Result<Item, Error> {
     let sc = &Scope { ctor_cases };
     Ok(match item {
@@ -1573,18 +1559,6 @@ fn rewrite_item(
                 sc,
                 &f.sig.params.iter().map(|p| p.name.clone()).collect(),
             ),
-            // Rewrite global references inside the `.test({ .. })` body too (it
-            // can call the function under test and other globals). Parameters
-            // aren't in scope in a test body — only globals — so no locals.
-            // Dropped entirely for a non-root item — see this function's doc.
-            test_body: if is_root {
-                f.test_body
-                    .as_ref()
-                    .map(|tb| rewrite_expr(tb, view, sc, &std::collections::HashSet::new()))
-            } else {
-                None
-            },
-            test_fns: Vec::new(),
             // Documentation is plain text — no global references to rewrite.
             doc: f.doc.clone(),
         }),

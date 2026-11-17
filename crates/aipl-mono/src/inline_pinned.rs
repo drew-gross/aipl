@@ -197,11 +197,6 @@ fn expand_everywhere(program: &mut TProgram, f: &TFunction, sites: Sites) {
                     sites,
                 );
             }
-            if let Some(t) = g.test_body.as_mut() {
-                if references_name(t, &f.name.text) {
-                    replace_call(t, &f.name.text, &fparams, &f.body, &mut replaced, sites);
-                }
-            }
         }
     }
 }
@@ -225,9 +220,6 @@ pub fn inline_inspected_pinned(program: &TProgram, max_exprs: usize) -> TProgram
     let mut inspected = HashSet::new();
     for f in functions(&program) {
         collect_inspected_callees(&f.body, &mut inspected);
-        if let Some(t) = &f.test_body {
-            collect_inspected_callees(t, &mut inspected);
-        }
     }
     let candidates = {
         let binders = collect_binders(&program);

@@ -50,7 +50,6 @@ pub fn appending_variants_pinned(program: &TProgram) -> TProgram {
             TItem::Fn(f) => {
                 let mut f = f.clone();
                 f.body = rewrite(&f.body, &mut cx);
-                f.test_body = f.test_body.as_ref().map(|t| rewrite(t, &mut cx));
                 TItem::Fn(f)
             }
             other => other.clone(),
@@ -198,7 +197,6 @@ fn mint(f: &TFunction, variant: &str) -> Option<TFunction> {
             ..f.sig.clone()
         },
         body,
-        test_body: None,
         doc: Some(format!(
             "The appending variant of `{}`: its elements, appended into the \
              caller's array instead of collected into one of its own. \

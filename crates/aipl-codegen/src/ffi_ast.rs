@@ -121,10 +121,10 @@ fn program(v: &FfiValue) -> R<ast::Program> {
     })
 }
 
-/// One parsed item. A function's `.test` helpers and `.benchmark` attribute have
-/// already become functions of their own: `parse_and_partial_load` runs
-/// `hoist_test_fns` before the value crosses, so the `test_fns` and `benchmark`
-/// fields it carries are empty here.
+/// One parsed item. A function's `.test` block, its helpers and its `.benchmark` attribute have
+/// already become functions of their own: `parse_and_partial_load` runs `hoist_test_fns` before
+/// the value crosses, so the `test_body`, `test_fns` and `benchmark` fields the AIPL function
+/// carries are empty here, and the Rust function has none.
 fn item(v: &FfiValue) -> R<ast::Item> {
     let (case, payload) = variant(v)?;
     Ok(match case {
@@ -166,8 +166,6 @@ fn function(v: &FfiValue) -> R<ast::Function> {
             return_ty: maybe(field(sig, "return_ty")?, ty)?,
         },
         body: expr(field(v, "body")?)?,
-        test_body: maybe(field(v, "test_body")?, expr)?,
-        test_fns: each(field(v, "test_fns")?, function)?,
         doc: maybe(field(v, "doc")?, text)?,
     })
 }

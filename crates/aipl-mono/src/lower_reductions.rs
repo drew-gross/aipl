@@ -46,9 +46,6 @@ pub fn lower_reductions_pinned(
         match item {
             TItem::Fn(f) => {
                 lower_pinned(&mut f.body);
-                if let Some(t) = f.test_body.as_mut() {
-                    lower_pinned(t);
-                }
             }
             TItem::Struct(s) => {
                 for field in &mut s.fields {

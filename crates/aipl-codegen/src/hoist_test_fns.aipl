@@ -1,19 +1,21 @@
-# The two rewrites that turn a function's `.test` and `.benchmark` attributes
-# into ordinary top-level functions, so that everything after the parse — the
-# loader's rewrites included, which is how they recognize test code — sees only
-# functions.
+# The rewrites that turn a function's `.test` and `.benchmark` attributes into ordinary
+# top-level functions, so that everything after the parse — the loader's rewrites included,
+# which is how they recognize test code — sees only functions.
 #
-# - A `.benchmark({ .. })` attribute becomes `__benchmark$<f>`: private, no
-#   parameters, a unit body, and the block as its `.test` body (so `aipl check`
-#   runs it, `assert` works in it, and an imported file's is dropped, all by the
-#   machinery `.test` already has). It sits right after `f` and the helpers `f`'s
-#   own `.test` block declared.
+# - A `.test({ .. })` block becomes `__test$<f>`: public, no parameters, the block as its
+#   body, declaring no effect (so `aipl check` runs it, `assert` works in it, and a test
+#   shims whatever it uses). It sits right after `f`.
+# - A `.benchmark({ .. })` attribute becomes `__benchmark$<f>`: private, no parameters, a
+#   unit body — the block itself is `__test$__benchmark$<f>`, which declares `measure` and
+#   nothing else. They sit right after `f` and the helpers `f`'s own `.test` block declared.
 # - A function declared inside a `.test` block moves out to the top level under
 #   `test_helper_name`, reachable only from where it was declared: its uses in
 #   the test body and in the block's other helpers (a helper may call itself and
 #   its siblings) are renamed with it, and nothing else in the file can spell the
 #   hoisted name. The helpers of one test land right after the function that
 #   carries it, in declaration order.
+# - A top-level `test({ .. })` is carried by a function that exists only for it; the block
+#   becomes `__test$<carrier>` and the carrier goes.
 #
 # Renaming is by name, not by scope: a `let` in the test body that shadows a
 # helper's name is not tracked, the same way a call's name resolves in the
@@ -21,12 +23,19 @@
 
 import { equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
 import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
-import { benchmark_fn_name, test_helper_name } from "./fn_names.aipl";
+import {
+    Benchmark,
+    benchmark_fn_name,
+    fn_role,
+    is_unattached_test,
+    test_fn_name,
+    test_helper_name,
+} from "./fn_names.aipl";
 import { BenchmarkBlock, Fn, Function, Item, Program, Signature } from "./item.aipl";
 import { SpanStr } from "./lexer.aipl";
 
-# `program` with every `.test` helper and `.benchmark` block moved out to a
-# top-level function of its own.
+# `program` with every `.test` block and its helpers, and every `.benchmark` block, moved out
+# to top-level functions of their own.
 pub fn hoist_test_fns(self: Program) -> Program { ..self, items: self.items$hoisted_items().join() }
 
 fn hoisted_items(self: Item) -> Item[] {
@@ -36,14 +45,14 @@ fn hoisted_items(self: Item) -> Item[] {
     }
 }
 
-# `f`, then its helpers, then the function standing for its `.benchmark` block
-# and that block's helpers.
+# `f`, then its helpers, then the function standing for its `.benchmark` block and that
+# block's helpers, each followed by the function its own `.test` block is.
 fn function_items(self: Function) -> Item[] {
     let own = Function { ..self, benchmark: none }.hoisted();
     let stand_in = self.benchmark
         .map(|block| self.benchmark_function(block).hoisted())
         .value_or([]);
-    [..own, ..stand_in].map(Fn)
+    [..own, ..stand_in]$with_test_function().join().map(Fn)
 }
 
 # The function standing for `self`'s `.benchmark` block. Named at the
@@ -77,6 +86,33 @@ fn hoisted(self: Function) -> Function[] {
         body: h.body.rename_uses(renames),
     });
     [owner, ..helpers]
+}
+
+# `self`, and the function its `.test` block is: `__test$<self>`, public, with no
+# parameters and the block as its body, which declares `measure` when it is a `.benchmark`
+# block and no effect otherwise. The function is `self` less the block, and not there at all
+# for a top-level `test({ .. })`, whose carrier has nothing else to say.
+fn with_test_function(self: Function) -> Function[] {
+    let some(block) = self.test_body else { return [self]; };
+    let effects = match (fn_role(self.name.text)) {
+        Benchmark(..) => ["measure"],
+        _ => [],
+    };
+    let test = Function {
+        name: SpanStr { ..self.name, text: test_fn_name(self.name.text) },
+        is_pub: true,
+        sig: Signature { type_vars: [], params: [], effects, return_ty: none },
+        body: block,
+        test_body: none,
+        test_fns: [],
+        benchmark: none,
+        doc: none,
+    };
+    if (self.name.text.is_unattached_test()) {
+        [test]
+    } else {
+        [Function { ..self, test_body: none }, test]
+    }
 }
 
 # What `name` is renamed to by `renames`, or `name` itself.

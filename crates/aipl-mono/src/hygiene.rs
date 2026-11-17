@@ -98,19 +98,17 @@ pub fn violations(program: &impl Optimizable) -> BTreeSet<Violation> {
     let globals: HashSet<&str> = views.iter().map(|f| f.name).collect();
     let mut out = BTreeSet::new();
     for f in &views {
-        for body in std::iter::once(f.body).chain(f.test_body) {
-            let mut walk = Walk {
-                function: f.name,
-                globals: &globals,
-                scope: f.params.clone(),
-                binders: HashMap::new(),
-                out: &mut out,
-            };
-            for p in &f.params {
-                *walk.binders.entry(p.clone()).or_default() += 1;
-            }
-            body.hygiene(&mut walk);
+        let mut walk = Walk {
+            function: f.name,
+            globals: &globals,
+            scope: f.params.clone(),
+            binders: HashMap::new(),
+            out: &mut out,
+        };
+        for p in &f.params {
+            *walk.binders.entry(p.clone()).or_default() += 1;
         }
+        f.body.hygiene(&mut walk);
     }
     out
 }
@@ -378,8 +376,6 @@ mod tests {
                 return_ty: None,
             },
             body,
-            test_body: None,
-            test_fns: Vec::new(),
             doc: None,
         })
     }

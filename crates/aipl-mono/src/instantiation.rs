@@ -165,9 +165,6 @@ pub fn reinstantiated(
                 reinstantiate(e, &owner, &signatures, instances, &mut unresolved)
             };
             visit(&mut f.body);
-            if let Some(test_body) = &mut f.test_body {
-                visit(test_body);
-            }
         }
     }
     (out, unresolved)

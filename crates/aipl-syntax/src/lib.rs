@@ -770,19 +770,6 @@ pub mod ast {
         pub is_pub: bool,
         pub sig: Signature,
         pub body: Expr,
-        /// The body of an attached `.test({ .. })` block, if any. A statement
-        /// block (asserts plus whatever setup) that the `check` command runs as
-        /// a test for this function; ignored by `run`/`build`. The `assert(c)`
-        /// calls inside it are rewritten at parse time to `__assert(c, "loc")`.
-        pub test_body: Option<Expr>,
-        /// Functions declared inside the `.test({ .. })` block — helpers
-        /// private to the test, never `pub`, unreachable from anything else.
-        /// Filled by the parser and emptied by `hoist_test_fns.aipl` (run by
-        /// `parse_and_partial_load`), which hoists each one to a top-level item
-        /// and renames its uses in the test body and the helpers themselves; so
-        /// every later pass sees only ordinary private functions, and this is
-        /// always empty past the parser.
-        pub test_fns: Vec<Function>,
         /// The text of the `# ..` doc comment above the declaration, if any —
         /// structured
         /// documentation for the function, surfaced by the `doc` command and
@@ -3005,53 +2992,6 @@ pub fn test_body_source_name(name: &str) -> Option<&str> {
     }
 }
 
-/// `items`, each function's `.test` block made into a function of its own: `__test$f`, public,
-/// with no parameters, the block as its body, and the effects the block may use (a benchmark
-/// block's is `measure` and nothing else; a test block's is none, so it shims whatever it
-/// uses). It follows the function, which loses the block. A top-level `test({ .. })` has no
-/// function behind it, so its carrier is dropped and only the block's function is left.
-pub fn hoist_test_bodies(items: Vec<ast::Item>) -> Vec<ast::Item> {
-    let mut out = Vec::with_capacity(items.len());
-    for item in items {
-        let ast::Item::Fn(f) = item else {
-            out.push(item);
-            continue;
-        };
-        let Some(block) = f.test_body.clone() else {
-            out.push(ast::Item::Fn(f));
-            continue;
-        };
-        let effects = if benchmark_source_name(&f.name).is_some() {
-            vec!["measure".to_string()]
-        } else {
-            Vec::new()
-        };
-        let test_fn = ast::Function {
-            name: f.name.renamed(test_fn_name(&f.name)),
-            is_pub: true,
-            sig: ast::Signature {
-                type_vars: Vec::new(),
-                case_params: Vec::new(),
-                params: Vec::new(),
-                effects,
-                return_ty: None,
-            },
-            body: block,
-            test_body: None,
-            test_fns: Vec::new(),
-            doc: None,
-        };
-        if unattached_test_ordinal(&f.name).is_none() {
-            out.push(ast::Item::Fn(ast::Function {
-                test_body: None,
-                ..f
-            }));
-        }
-        out.push(ast::Item::Fn(test_fn));
-    }
-    out
-}
-
 /// Whether `name` is a hoisted test helper. Test code like the body it came
 /// from, so `assert` is baked in it too.
 pub fn is_test_helper(name: &str) -> bool {
@@ -3098,7 +3038,8 @@ pub fn trace_diagnostics(program: &ast::Program, command: &str) -> Vec<Error> {
     let mut out = Vec::new();
     for item in &program.items {
         let ast::Item::Fn(f) = item else { continue };
-        for body in [Some(&f.body), f.test_body.as_ref()].into_iter().flatten() {
+        {
+            let body = &f.body;
             each_subexpr(body, &mut |e| {
                 if matches!(&e.kind, ast::ExprKind::Call(c, _, _) if *c == ast::Callee::Trace) {
                     let e = Error::at(
@@ -3820,8 +3761,6 @@ pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
             // A declaration only: the checker reads the signature, and the body is
             // never run. `none` is a well-typed body for an optional result.
             body: ast::Expr::new(ast::ExprKind::None, 0..0),
-            test_body: None,
-            test_fns: Vec::new(),
             doc: None,
         }));
     }
@@ -4372,9 +4311,6 @@ pub fn each_item_expr(items: &[ast::Item], f: &mut impl FnMut(&ast::Expr)) {
                     }
                 }
                 each_subexpr(&func.body, f);
-                if let Some(t) = &func.test_body {
-                    each_subexpr(t, f);
-                }
             }
             ast::Item::Struct(s) => {
                 for field in &s.fields {
@@ -4814,9 +4750,6 @@ fn each_body_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut ast::Expr))
         match item {
             ast::Item::Fn(func) => {
                 f(&mut func.body);
-                if let Some(t) = &mut func.test_body {
-                    f(t);
-                }
             }
             ast::Item::Struct(s) => {
                 for fd in &mut s.fields {

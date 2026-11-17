@@ -44,9 +44,6 @@ pub(crate) fn map_pinned_bodies(
         if let aipl_syntax::typed::TItem::Fn(f) = item {
             if covers(&f.name.text) {
                 rewrite(&f.name.text, &mut f.body);
-                if let Some(test_body) = &mut f.test_body {
-                    rewrite(&f.name.text, test_body);
-                }
             }
         }
     }

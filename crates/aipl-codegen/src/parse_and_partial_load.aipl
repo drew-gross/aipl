@@ -99,8 +99,9 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     assert(names.contains("__test$double$five()"));
     assert(!names.contains(" four()"));
 
-    // A `.benchmark` block becomes `__benchmark$<f>`, after `f` and its
-    // helpers, with the block's own helpers after it.
+    // A `.test` block becomes `__test$<f>`, after `f`; a `.benchmark` block becomes
+    // `__benchmark$<f>`, after `f` and its helpers, with the function the block is
+    // and then the block's own helpers after it.
     let benchmark = parse_and_partial_load("""
         fn answer() -> i64 { 42 }.test({
             fn t() -> i64 { 1 }
@@ -113,10 +114,16 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let order = benchmark.program.items$item_name();
     assert(order == [
         "answer",
+        "__test$answer",
         "__test$answer$t",
         "__benchmark$answer",
+        "__test$__benchmark$answer",
         "__test$__benchmark$answer$p",
     ]);
+
+    // A top-level `test({ .. })` leaves only the function its block is.
+    let standalone = parse_and_partial_load("test({ assert(true); })")?;
+    assert(standalone.program.items$item_name() == ["__test$__test_block_1"]);
 })
 
 // A function's name, and the empty string for any other item.

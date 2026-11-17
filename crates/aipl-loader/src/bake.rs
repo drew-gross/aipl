@@ -145,16 +145,13 @@ pub(crate) fn bake(items: &mut [Item], src: &str, label: &str) -> Result<(), Err
         next_trace_value: 0,
     };
     for item in items {
-        // A `.test` block's own functions were hoisted to top level while
-        // the file is parsed, under a name `is_test_helper` recognizes — so a
-        // function has exactly two bodies to walk, and test code is identifiable
-        // by name.
+        // A `.test` block and its helpers were hoisted to top-level functions while the
+        // file is parsed, under names `is_test_body` and `is_test_helper` recognize — so
+        // test code is identifiable by name.
         let Item::Fn(f) = item else { continue };
-        let is_test_code = aipl_syntax::is_test_helper(&f.name);
+        let is_test_code =
+            aipl_syntax::is_test_helper(&f.name) || aipl_syntax::is_test_body(&f.name);
         baker.bake_body(&mut f.body, is_test_code)?;
-        if let Some(test_body) = &mut f.test_body {
-            baker.bake_body(test_body, true)?;
-        }
     }
     Ok(())
 }

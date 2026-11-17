@@ -63,9 +63,6 @@ pub fn lower_grid_literals(program: &Program) -> Result<Program, Error> {
                     .collect();
                 let ret = f.sig.return_ty.clone();
                 lower(&mut f.body, ret.as_ref(), ret.as_ref(), &mut env, &declared)?;
-                if let Some(test) = f.test_body.as_mut() {
-                    lower(test, None, None, &mut env, &declared)?;
-                }
                 Item::Fn(f)
             }
             other => other.clone(),
