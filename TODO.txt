@@ -546,7 +546,6 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
-  "use a plan doc" skill (describes the plan, has stages with checklist items per stage, regularly gets pruned, gets deleted when it's done)
   we don't have backwards compatiple users yet, we don't need to say "x is now y" in errors
   make "develop aipl project" skill that describes how currently projects are for dogfooding the compiler, working on a project should work like how it works for users, and should generate ideas for how to improve the language or dev loop, but not implement them (I'll record the suggestions for later implementation)
   make an "add lint" skill that describes how to lint against a reimplementation
