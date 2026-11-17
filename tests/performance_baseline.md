@@ -880,3 +880,4 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/variants/without_case_imported | 8 | 499 | 499 | 1469 | 5640 |
 | tests/cases/variants/without_narrowing | 0 | 0 | 0 | 201 | 1012 |
 | tests/cases/variants/without_throughout | 14 | 840 | 544 | 668 | 2684 |
+| tests/cases/variants/without_throughout_forms | 30 | 1816 | 728 | 2004 | 5324 |

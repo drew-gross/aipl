@@ -919,6 +919,7 @@ case_tests! {
     cases_variants_without_case_imported = "cases/variants/without_case_imported",
     cases_variants_without_narrowing = "cases/variants/without_narrowing",
     cases_variants_without_throughout = "cases/variants/without_throughout",
+    cases_variants_without_throughout_forms = "cases/variants/without_throughout_forms",
     crates_aipl_codegen_src_ast = "crates/aipl-codegen/src/ast",
     crates_aipl_codegen_src_bound = "crates/aipl-codegen/src/bound",
     crates_aipl_codegen_src_brace_entry = "crates/aipl-codegen/src/brace_entry",

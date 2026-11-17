@@ -1659,6 +1659,8 @@ impl Pinner<'_> {
                     && args.iter().all(|a| self.clean_of(a, c))
             }
             TExprKind::Construct(_, inits) => inits.iter().all(|i| self.clean_of(&i.value, c)),
+            // A case with no payload.
+            TExprKind::Ident(_) => self.constructed_case(e).is_some_and(|case| case != c),
             TExprKind::None | TExprKind::Unit => true,
             _ => false,
         }
@@ -1667,12 +1669,27 @@ impl Pinner<'_> {
     /// Whether the part `e` of a value holds no case `c`: its type cannot hold one, or is
     /// refined to hold none, or what `e` is shows it.
     fn clean_of(&self, e: &TExpr<It>, c: &str) -> bool {
-        !self.holds_case(&e.ty, c)
-            || self
-                .table
-                .exclusions(&e.ty)
-                .contains(&aipl_syntax::ast::Exclusion::Throughout(c.to_string()))
+        self.type_is_clean_of(&e.ty, c)
             || self.shows(e, &aipl_syntax::ast::Exclusion::Throughout(c.to_string()))
+    }
+
+    /// Whether every value of type `t` holds no case `c`: nothing in `t` can hold one, or the
+    /// parts that can are refined to hold none (the elements of an array of refined values).
+    fn type_is_clean_of(&self, t: &It, c: &str) -> bool {
+        if !self.holds_case(t, c) {
+            return true;
+        }
+        let wanted = aipl_syntax::ast::Exclusion::Throughout(c.to_string());
+        if self.table.exclusions(t).contains(&wanted) {
+            return true;
+        }
+        match self.table.shallow(t) {
+            It::Opt(i) | It::Arr(i) | It::Case(i) | It::Set(i, _) => self.type_is_clean_of(&i, c),
+            It::Dict(a, b) | It::Res(a, b) => {
+                self.type_is_clean_of(&a, c) && self.type_is_clean_of(&b, c)
+            }
+            _ => false,
+        }
     }
 
     /// Whether a value of type `t` can hold a case `c`. A type nothing has fixed holds none.
@@ -1769,8 +1786,12 @@ impl Pinner<'_> {
                 return Ok(());
             }
         }
-        self.agree(&a, &e).or_else(|_| {
-            let (given, wanted) = (self.table.show(&a), self.table.show(&e));
+        // The value keeps its refinements, so a variable it meets is fixed to the refined type.
+        self.agree(actual, &e).or_else(|_| {
+            let (given, wanted) = (
+                aipl_syntax::type_name(&self.refined_type(actual)),
+                aipl_syntax::type_name(&self.refined_type(expected)),
+            );
             let hint = match (&a, &e) {
                 (It::Prim(x), It::Prim(y)) if x.is_int() && y.is_int() => format!(
                     " — {wanted} cannot hold every {given}, so convert with `.narrow()`, which \
@@ -1782,11 +1803,32 @@ impl Pinner<'_> {
         })
     }
 
+    /// The type of a value that is `a` or `b`: their bases agree, and it keeps each exclusion
+    /// both are known to meet, by their types or by what they are.
+    fn joined(&mut self, a: &TExpr<It>, b: &TExpr<It>) -> Result<It, String> {
+        let (base_a, base_b) = (self.table.shallow(&a.ty), self.table.shallow(&b.ty));
+        self.agree(&base_a, &base_b)?;
+        let (given_a, given_b) = (self.table.exclusions(&a.ty), self.table.exclusions(&b.ty));
+        let mut out = base_a;
+        for x in given_a.iter().chain(&given_b) {
+            let met = |given: &[aipl_syntax::ast::Exclusion], e: &TExpr<It>| {
+                excluded_by(given, x) || self.shows(e, x)
+            };
+            let wrapped = self.table.exclusions(&out).contains(x);
+            if !wrapped && met(&given_a, a) && met(&given_b, b) {
+                out = It::Without(Box::new(out), x.clone());
+            }
+        }
+        Ok(out)
+    }
+
     /// Whether two types are interchangeable here, binding variables as it goes.
     fn agree(&mut self, a: &It, e: &It) -> Result<(), String> {
         // A refined value goes where its base does; the reverse needs every exclusion shown.
+        // A type nothing has fixed yet (the element of `[]`) takes the refinement it meets.
+        let open = matches!(self.table.chase(a), It::Var(_));
         let (given, wanted) = (self.table.exclusions(a), self.table.exclusions(e));
-        if let Some(missing) = wanted.iter().find(|x| !excluded_by(&given, x)) {
+        if let Some(missing) = wanted.iter().find(|x| !open && !excluded_by(&given, x)) {
             return Err(format!("it is not shown to exclude {}", missing.spelling()));
         }
         let (raw_a, raw_e) = (a.clone(), e.clone());
@@ -1986,8 +2028,9 @@ impl Pinner<'_> {
                 }
                 let (da, db) = (aipl_syntax::diverges(ta), aipl_syntax::diverges(tb));
                 // A branch that leaves the function has no value to agree with.
+                let mut ty = if da { b.ty.clone() } else { a.ty.clone() };
                 if !da && !db {
-                    self.agree(&a.ty, &b.ty).or_else(|_| {
+                    ty = self.joined(&a, &b).or_else(|_| {
                         reject(
                             format!(
                                 "if branches have mismatched types: {} vs {}",
@@ -1998,7 +2041,6 @@ impl Pinner<'_> {
                         )
                     })?;
                 }
-                let ty = if da { b.ty.clone() } else { a.ty.clone() };
                 self.node(K::If(Box::new(c), Box::new(a), Box::new(b)), ty, e)
             }
             ExprKind::While(c, body) => {

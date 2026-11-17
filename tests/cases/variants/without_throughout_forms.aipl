@@ -1,0 +1,71 @@
+# What shows a value clean of a case `throughout`: a constructor with no payload, an array or
+# a `map` over clean parts, and the two branches of an `if`, one written and one handed on.
+# (A closure's result keeps the refinement of what it returns, which is how the `map` is clean.)
+# A `mut` array declared with the refined element type starts empty and takes clean parts.
+
+import { equal as ==, push, wrapping_add_assign as += } from builtins;
+
+variant Shape = Dot | Blank | Circle(i64) | Group(Shape[])
+
+variant Solid = Shape without Dot throughout
+
+fn count(self: Solid) -> i64 {
+    match (self) {
+        Blank => 0,
+        Circle(..) => 1,
+        Group(parts) => parts$count().sum_parts(),
+    }
+}.test({
+    assert(count(Blank) == 0);
+    assert(count(Group([Circle(1), Blank, Circle(2)])) == 2);
+})
+
+fn sum_parts(self: i64[]) -> i64 {
+    mut total = 0;
+    for (let n : self) {
+        set total += n;
+    }
+    total
+}.test({
+    assert([1, 2].sum_parts() == 3);
+})
+
+// A constructor with no payload is clean.
+fn blank() -> Solid { Blank }.test({
+    assert(count(blank()) == 0);
+})
+
+// An array of refined parts is one, and so is a `map` that returns them.
+fn regroup(parts: Solid[]) -> Solid { Group(parts$identity()) }.test({
+    assert(count(regroup([Circle(1), Circle(2)])) == 2);
+})
+
+fn identity(self: Solid) -> Solid { self }.test({
+    assert(count(identity(Circle(3))) == 1);
+})
+
+// One branch written, the other handed on, in either order and bound before it is returned.
+fn pick(s: Solid, keep: bool) -> Solid { if (keep) { s } else { Blank } }.test({
+    assert(count(pick(Circle(1), true)) == 1);
+    assert(count(pick(Circle(1), false)) == 0);
+})
+
+fn pick_bound(s: Solid, keep: bool) -> Solid {
+    let chosen = if (keep) { Blank } else { s };
+    chosen
+}.test({
+    assert(count(pick_bound(Circle(1), true)) == 0);
+    assert(count(pick_bound(Circle(1), false)) == 1);
+})
+
+// An array declared with the refined element type, filled from refined parts.
+fn gather(parts: Solid[]) -> Solid {
+    mut out: Solid[] = [];
+    for (let part : parts) {
+        set out.push(part);
+        set out.push(Blank);
+    }
+    Group(out)
+}.test({
+    assert(count(gather([Circle(1), Blank, Circle(2)])) == 2);
+})
