@@ -878,4 +878,5 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/variants/variant_in_variant_payload | 0 | 0 | 0 | 59 | 320 |
 | tests/cases/variants/without_case | 27 | 1718 | 1718 | 4490 | 8536 |
 | tests/cases/variants/without_case_imported | 8 | 499 | 499 | 1469 | 5640 |
+| tests/cases/variants/without_narrowing | 0 | 0 | 0 | 201 | 1012 |
 | tests/cases/variants/without_throughout | 14 | 840 | 544 | 668 | 2684 |

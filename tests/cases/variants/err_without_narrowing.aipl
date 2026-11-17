@@ -1,0 +1,38 @@
+variant Shape = Dot | Circle(i64) | Square(i64)
+
+variant Solid = Shape without Dot
+
+fn area(s: Solid) -> i64 {
+    match (s) {
+        Circle(r) => r,
+        Square(w) => w,
+    }
+}
+
+// `Dot` is not matched above the `_`, so it is still a `Shape`.
+fn unsorted(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => r,
+        _ => area(s),
+    }
+}
+
+// A nested pattern covers no case.
+fn partial(s: Shape) -> i64 {
+    match (s) {
+        Square(1) => 1,
+        _ => area(s),
+    }
+}
+--- check --compile ---
+error: fn "area" arg 0: expected Shape without Dot, got Shape: nothing shows it is not Dot
+  --> ./tests/cases/variants/err_without_narrowing.aipl:16:19
+   |
+16 |         _ => area(s),
+   |                   ^
+
+error: fn "area" arg 0: expected Shape without Dot, got Shape: nothing shows it is not Dot
+  --> ./tests/cases/variants/err_without_narrowing.aipl:24:19
+   |
+24 |         _ => area(s),
+   |                   ^

@@ -9,7 +9,7 @@ lints:
   lint_hit.aipl's set_operations() repeats which builtins BUILTINS puts in the `sets` library; the AIPL lints cannot ask Rust, so the two lists agree by hand
 
 without (refinements; goal: `desugared` returns an Expr that cannot hold LetPattern/ForPattern/ProviderShim, checked; do the recursive-refinement step first):
-  a `match` should narrow its scrutinee in the remaining arms (`_`, a binder) to `V without <cases matched earlier>`, and so should the else of `if (let ..)` / `is_case`; today `_ => inner` returns the unrefined type, so a refined return needs every other arm re-listed
+  narrowing in the else of `if (let ..)` / `is_case` (a `match` already narrows a plain-local scrutinee in a `_` arm); a `match` on a non-local scrutinee, and `Opt`/`Res` scrutinees, still do not narrow
   cases for refined types through generics and closures (map, right_fold, arrays of refined elements, a lambda returning one); the pin.rs / typed_infer.rs paths for Without are only covered by direct matches and parameters
   once refinements can be recursive: make Expr generic over its kind (`Expr<K>`, `ExprKind<E>`) and give desugared the core type; check ffi_ast.rs still decodes the instance, and drop the dead LetPattern/ForPattern/ProviderShim arms downstream of desugar (item.aipl own_names, expr.aipl helpers shared with the surface). Same for Binding and Param::pattern
 type checker:

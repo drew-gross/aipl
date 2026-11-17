@@ -2550,12 +2550,13 @@ impl Pinner<'_> {
                 };
                 self.node(K::Try(Box::new(x)), ty, e)
             }
-            ExprKind::Match(scrut, arms) => {
-                let scrut = self.expr(scrut)?;
+            ExprKind::Match(scrut_src, arms) => {
+                let scrut = self.expr(scrut_src)?;
                 let st = self.known(&scrut.ty, &scrut.span)?;
                 let excluded = self.table.exclusions(&scrut.ty);
                 let result = self.fresh();
                 let mut out = Vec::new();
+                let mut covered: Vec<String> = Vec::new();
                 for arm in arms {
                     self.excluded_case(&st, &excluded, &arm.pattern, &arm.span)?;
                     // A `_` stands for the unnamed cases of a variant; an optional's and a
@@ -2575,20 +2576,41 @@ impl Pinner<'_> {
                         );
                     }
                     self.begin_pattern(arm);
-                    let (pattern, binds) = self.pattern(&arm.pattern, &scrut.ty, &arm.span)?;
-                    let binds = binds
+                    // What a `_` or a binder stands for is the scrutinee less the cases above it.
+                    let remaining = if matches!(arm.pattern, Pattern::Wildcard | Pattern::Bind(_)) {
+                        self.narrowed(&scrut.ty, &covered)
+                    } else {
+                        scrut.ty.clone()
+                    };
+                    let (pattern, binds) = self.pattern(&arm.pattern, &remaining, &arm.span)?;
+                    let mut binds: Vec<(String, It, Option<Span>)> = binds
                         .into_iter()
                         .map(|(n, t)| {
                             let binder = arm.written.binder(&n);
                             (n, t, binder)
                         })
                         .collect();
+                    // A scrutinee that is a plain local is the narrowed value inside the arm.
+                    if let (ExprKind::Ident(name), true) = (
+                        &scrut_src.kind,
+                        self.table.exclusions(&remaining).len() > excluded.len(),
+                    ) {
+                        if let Some(b) = self.env.get(name).filter(|b| !b.mutable) {
+                            let binder = b.binder.clone();
+                            if !binds.iter().any(|(n, ..)| n == name) {
+                                binds.push((name.clone(), remaining.clone(), binder));
+                            }
+                        }
+                    }
                     let (saved, body) = self.scoped(binds, |p| p.expr_at(&arm.body, pos))?;
                     self.restore(saved);
                     if !aipl_syntax::diverges(&arm.body) {
                         self.agree(&body.ty, &result).or_else(|m| {
                             reject(format!("the arms of a `match` disagree ({m})"), &arm.span)
                         })?;
+                    }
+                    if let Pattern::Ctor { name, .. } = &arm.pattern {
+                        covered.push(name.split('@').next().unwrap_or(name).to_string());
                     }
                     out.push(TMatchArm {
                         pattern,
@@ -3071,6 +3093,29 @@ impl Pinner<'_> {
             crate::match_check::check_match_exhaustive(&view, &ty, arms, span.clone())
                 .map_err(rejected)
         }
+    }
+
+    /// `st`, a scrutinee's type, as the value is once the cases in `covered` are matched: a
+    /// variant less those cases. Anything that is not a variant is unchanged.
+    fn narrowed(&self, st: &It, covered: &[String]) -> It {
+        let mut out = self.table.chase(st);
+        if covered.is_empty() || !matches!(self.table.shallow(&out), It::Named(_) | It::Gen(..)) {
+            return out;
+        }
+        let view = TypeView::new(self.decls);
+        let Some(cases) = crate::match_check::MatchInfo::cases_of(&view, &self.refined_type(st))
+        else {
+            return out;
+        };
+        for case in covered {
+            let wanted = aipl_syntax::ast::Exclusion::NamedCase(case.clone());
+            if cases.iter().any(|(c, _)| c == case)
+                && !self.table.exclusions(&out).contains(&wanted)
+            {
+                out = It::Without(Box::new(out), wanted);
+            }
+        }
+        out
     }
 
     /// A pattern may not name a case the scrutinee has been refined to lack.
