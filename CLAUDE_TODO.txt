@@ -8,6 +8,7 @@ lints:
   lint_hit.aipl's set_operations() repeats which builtins BUILTINS puts in the `sets` library; the AIPL lints cannot ask Rust, so the two lists agree by hand
 
 without (refinements; goal: `desugared` returns an Expr that cannot hold LetPattern/ForPattern/ProviderShim, checked):
+  tests/benchmarks as functions, and the written/hoisted stage in the types: plan in TESTS_AS_FUNCTIONS.md
   narrowing in the else of `if (let ..)` / `is_case` (a `match` already narrows a plain-local scrutinee in a `_` arm); a `match` on a non-local scrutinee, and `Opt`/`Res` scrutinees, still do not narrow
   cases for refined types through generics and closures (map, right_fold, arrays of refined elements, a lambda returning one); the pin.rs / typed_infer.rs paths for Without are only covered by direct matches and parameters
   `without` takes one exclusion per clause, so `desugared`'s return type stacks by parentheses (`((Expr without A throughout) without B throughout) without C throughout`); allow a comma list (grammar_aipl.aipl `ty`, walker.aipl: parser and formatter first, hand off, then use it)

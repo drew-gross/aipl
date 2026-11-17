@@ -115,6 +115,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  hoisting handles lambdas as well
+  Item's function should say it's kind (Fn, Test, Benchmark, maybe Main?) loader can use this to throw out the bits that aren't used (e.g. only write the test when running with --test)
   unused_imports should be rephrased as a set difference
   so many let nothing = [] for no discernable reason. Seems silly.
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
@@ -544,12 +546,14 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
+  "use a plan doc" skill (describes the plan, has stages with checklist items per stage, regularly gets pruned, gets deleted when it's done)
   we don't have backwards compatiple users yet, we don't need to say "x is now y" in errors
   make "develop aipl project" skill that describes how currently projects are for dogfooding the compiler, working on a project should work like how it works for users, and should generate ideas for how to improve the language or dev loop, but not implement them (I'll record the suggestions for later implementation)
   make an "add lint" skill that describes how to lint against a reimplementation
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  lint functions after hoisting with a different "this lints a function" kind of lint
   xs.map(|p| p.name$shout().len()) should hit the "use $" lint
   lint should happend after resolution so that we don't need to check fn.name.starts_with("__builtin_"), it should just be fn.is_builtin
   slots_read_by_field is looking at names - it should know from a flag
