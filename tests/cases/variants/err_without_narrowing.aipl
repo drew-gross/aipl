@@ -24,6 +24,13 @@ fn partial(s: Shape) -> i64 {
         _ => area(s),
     }
 }
+
+// The branch that hands on a plain `Shape` is blamed, and both missing refinements are named.
+variant Round = Solid without Square
+
+fn takes_round(r: Round) -> i64 { 1 }
+
+fn blame_the_arm(s: Shape, flag: bool) -> i64 { takes_round(if (flag) { Circle(1) } else { s }) }
 --- check --compile ---
 error: fn "area" arg 0: expected Shape without Dot, got Shape: nothing shows it is not Dot
   --> ./tests/cases/variants/err_without_narrowing.aipl:16:19
@@ -36,3 +43,9 @@ error: fn "area" arg 0: expected Shape without Dot, got Shape: nothing shows it 
    |
 24 |         _ => area(s),
    |                   ^
+
+error: fn "takes_round" arg 0: expected Shape without Dot without Square, got Shape: nothing shows it is not Square, Dot
+  --> ./tests/cases/variants/err_without_narrowing.aipl:33:92
+   |
+33 | fn blame_the_arm(s: Shape, flag: bool) -> i64 { takes_round(if (flag) { Circle(1) } else { s }) }
+   |                                                                                            ^

@@ -1569,8 +1569,19 @@ impl Pinner<'_> {
             .collect();
         if let Some(x) = unshown.first() {
             let wanted = aipl_syntax::type_name(&self.refined_type(expected));
-            let hint = format!(": nothing shows it is not {}", x.spelling());
-            return reject(site.mismatch(&self.table.show(&e.ty), &wanted, &hint), span);
+            let spelled: Vec<_> = unshown.iter().map(|x| x.spelling()).collect();
+            let hint = format!(": nothing shows it is not {}", spelled.join(", "));
+            // A value passed on by a block, a branch or an arm is blamed where it is produced.
+            let culprit = self.unshown_at(e, x);
+            let at = if std::ptr::eq(culprit, e) {
+                span
+            } else {
+                &culprit.span
+            };
+            return reject(
+                site.mismatch(&self.table.show(&culprit.ty), &wanted, &hint),
+                at,
+            );
         }
         // What was shown is not part of the type the value has; compare the bases.
         let base = self.table.shallow(expected);
@@ -1611,6 +1622,32 @@ impl Pinner<'_> {
                 Exclusion::EmptyArray => false,
             },
         }
+    }
+
+    /// The part of `e` that fails to show it is not `x`, found through the same forms `shows`
+    /// reaches: the tail of a block, the branch or arm that is not shown, or `e` itself.
+    fn unshown_at<'e>(&self, e: &'e TExpr<It>, x: &aipl_syntax::ast::Exclusion) -> &'e TExpr<It> {
+        let first = |parts: &[&'e TExpr<It>]| {
+            parts
+                .iter()
+                .copied()
+                .find(|p| !self.shows(p, x))
+                .map(|p| self.unshown_at(p, x))
+        };
+        let found = match &e.kind {
+            TExprKind::Seq(_, tail)
+            | TExprKind::Let(_, _, tail)
+            | TExprKind::LetMut(_, _, tail)
+            | TExprKind::Assign(_, _, tail) => first(&[tail]),
+            TExprKind::If(_, a, b) => first(&[a, b]),
+            TExprKind::IfLet(arm, _, other) => first(&[&arm.body, other]),
+            TExprKind::Match(_, arms) => {
+                let bodies: Vec<_> = arms.iter().map(|a| &a.body).collect();
+                first(&bodies)
+            }
+            _ => None,
+        };
+        found.unwrap_or(e)
     }
 
     /// Whether what `e` is shows it holds no case `c` anywhere: a constructor of another case,
