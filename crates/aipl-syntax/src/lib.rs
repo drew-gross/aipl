@@ -1317,6 +1317,10 @@ pub mod ast {
         /// name, as it is declared — cases are never mangled, so the name means
         /// the same wherever the type is read.
         NamedCase(String),
+        /// `V without C throughout`: no `C` in a value of the base, and none in
+        /// anything it holds that can itself hold one. Last in the enum so an
+        /// artifact built before it decodes as it did.
+        Throughout(String),
     }
 
     impl Exclusion {
@@ -1325,6 +1329,7 @@ pub mod ast {
             match self {
                 Exclusion::EmptyArray => "[]".to_string(),
                 Exclusion::NamedCase(name) => name.clone(),
+                Exclusion::Throughout(name) => format!("{name} throughout"),
             }
         }
     }
@@ -2587,6 +2592,9 @@ pub fn flex_fit(
                 }
                 _ => Ok(None),
             },
+            // What `C throughout` asks of everything a value holds is the
+            // pinner's to check; no literal is granted it here.
+            ast::Exclusion::Throughout(_) => Ok(None),
         },
         _ => Ok(None),
     }

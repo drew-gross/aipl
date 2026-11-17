@@ -388,6 +388,7 @@ import {
     Result as TyResult,
     Set as TySet,
     SetOrder,
+    Throughout,
     Tuple as TyTuple,
     Ty,
     Unit as TyUnit,
@@ -767,10 +768,14 @@ fn types() -> Production<AiplTok, Ast>[] {
         Maybe(Then([Lit("without"), Named("exclusion")])),
     ]);
 
-    // What a `without` clause excludes: the empty array, or the name of a case.
-    // A further kind of exclusion is another alternative here and another
-    // `Exclusion` case, not a change to `ty`.
-    let exclusion: Rule<AiplTok> = OneOf([Then([Lit("["), Lit("]")]), Term(Name)]);
+    // What a `without` clause excludes: the empty array, or the name of a case,
+    // which `throughout` extends to everything the type holds. A further kind of
+    // exclusion is another alternative here and another `Exclusion` case, not a
+    // change to `ty`.
+    let exclusion: Rule<AiplTok> = OneOf([
+        Then([Lit("["), Lit("]")]),
+        Then([Term(Name), Maybe(Lit("throughout"))]),
+    ]);
 
     // The `(`-led forms are ordered longest-first, since every one of them
     // opens the same way: `(A, B) -> R` over `(A, B)[]` over `(A, B)!E` over
@@ -814,8 +819,9 @@ fn types() -> Production<AiplTok, Ast>[] {
     [
         pl("ty", ty, "a type", TryMk(lower_ty)),
         p("ty_head", ty_head, TryMk(lower_ty_head)),
-        // The excluded `[]` is written against itself, like an array suffix.
-        pt("exclusion", exclusion, TryMk(lower_exclusion)),
+        // The excluded `[]` is written against itself by `aipl_space`, and `throughout`
+        // is set off from the case it follows.
+        p("exclusion", exclusion, TryMk(lower_exclusion)),
         // Type position takes no trailing comma even when a list breaks — the
         // grammar says so twice, once with `trailing_sep: false` to the parser
         // and once with `strict()` to the printer.
@@ -4344,6 +4350,7 @@ pub fn format_aipl_ty(src: str, width: u64) -> str!ParseError {
     // A refinement: `without` and its excluded value take a space each side.
     assert(format_aipl_ty("i64 [ ] without [ ]", 100)? == "i64[] without []");
     assert(format_aipl_ty("( i64 [ ] without [ ] ) ?", 100)? == "(i64[] without [])?");
+    assert(format_aipl_ty("V  without  C   throughout", 100)? == "V without C throughout");
 
     // A comment inside a type is not layout, so it survives.
     assert(format_aipl_ty("Map < str , /* k */ i64 >", 100)? == "Map<str, /* k */ i64>");
@@ -4531,6 +4538,13 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
     assert(ty_dump("Tree<T> without Leaf") == "Without(Generic(Tree, T), Leaf)");
     assert(ty_dump("(V without C)?") == "Optional(Without(V, C))");
     assert(ty_dump("(V without C) without D") == "Without(Without(V, C), D)");
+
+    // A case may be left out of everything the type holds, not only of the type.
+    assert(ty_dump("V without C throughout") == "Without(V, C throughout)");
+    assert(ty_dump("(V without C throughout) without D") == "Without(Without(V, C throughout), D)");
+    assert(
+        ty_dump("Tree<T> without Leaf throughout") == "Without(Generic(Tree, T), Leaf throughout)",
+    );
 })
 
 # One AIPL **pattern**, lowered to the AST.
@@ -5675,7 +5689,7 @@ fn expr_dump(src: str) -> str {
 # spellings on either side of a gap, so `import` then `{` is one question
 # (yes) and `#` then `{` in a set type is another (no).
 fn aipl_space(l: str, r: str) -> bool {
-    l == "->" || r == "->" || l == ":" || l == "import" || l == "from" || l == "as" || r == "as" || r == "from" || l == "without" || r == "without"
+    l == "->" || r == "->" || l == ":" || l == "import" || l == "from" || l == "as" || r == "as" || r == "from" || l == "without" || r == "without" || r == "throughout"
 }
 
 # The whole rule set, read losslessly — every byte accounted for by a token or a
@@ -6462,12 +6476,13 @@ fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }
 }
 
-# `exclusion` — what a `without` clause leaves out: `[]`, or a case by name. The
-# first token tells them apart, since the name is the only form that starts with
-# one.
+# `exclusion` — what a `without` clause leaves out: `[]`, a case by name, or a case
+# by name followed by `throughout`. The first token tells the array from the others,
+# since a name is the only form that starts with one.
 fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     match (node.own_texts(src)) {
         ["[", ..] => ok(AExclusion(EmptyArray)),
+        [name, "throughout"] => ok(AExclusion(Throughout(name))),
         [name, ..] => ok(AExclusion(NamedCase(name))),
         _ => err(ParseError { message: "an exclusion matched no token", span: node.span() }),
     }

@@ -1,0 +1,77 @@
+# The ways `V without C throughout` is refused: a plain `V` where it is wanted, a
+# construction with a `C` somewhere inside, an arm for the excluded case (at the top or in a
+# part), a case nothing in the base can hold, and a base that holds nothing to refine.
+
+variant Shape = Dot | Circle(i64) | Group(Shape[])
+
+variant Solid = Shape without Dot throughout
+
+fn takes(s: Solid) -> i64 { 1 }
+
+fn plain(s: Shape) -> i64 { takes(s) }
+
+fn dot_inside() -> i64 { takes(Group([Circle(1), Dot])) }
+
+fn arm_for_excluded(s: Solid) -> str {
+    match (s) {
+        Dot => "dot",
+        Circle(..) => "circle",
+        Group(..) => "group",
+    }
+}
+
+fn arm_in_a_part(s: Solid) -> i64 {
+    match (s) {
+        Circle(..) => 0,
+        Group(parts) => {
+            for (let part : parts) {
+                match (part) {
+                    Dot => takes(part),
+                    Circle(..) => 0,
+                    Group(..) => 0,
+                };
+            }
+            1
+        },
+    }
+}
+
+fn no_such_case(s: Shape without Nope throughout) -> i64 { 1 }
+
+fn nothing_to_hold(n: i64 without Dot throughout) -> i64 { 1 }
+--- check --compile ---
+error: fn "takes" arg 0: expected Shape without Dot throughout, got Shape: nothing shows it is not Dot throughout
+  --> ./tests/cases/variants/err_without_throughout.aipl:11:35
+   |
+11 | fn plain(s: Shape) -> i64 { takes(s) }
+   |                                   ^
+
+error: fn "takes" arg 0: expected Shape without Dot throughout, got Shape: nothing shows it is not Dot throughout
+  --> ./tests/cases/variants/err_without_throughout.aipl:13:32
+   |
+13 | fn dot_inside() -> i64 { takes(Group([Circle(1), Dot])) }
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Shape has no constructor "Dot"
+  --> ./tests/cases/variants/err_without_throughout.aipl:17:9
+   |
+17 |         Dot => "dot",
+   |         ^^^
+
+error: Shape has no constructor "Dot"
+  --> ./tests/cases/variants/err_without_throughout.aipl:29:21
+   |
+29 |                     Dot => takes(part),
+   |                     ^^^
+
+error: fn "no_such_case": `without Nope throughout` leaves out a case of everything Shape holds, and nothing in it can hold a case "Nope"
+  --> ./tests/cases/variants/err_without_throughout.aipl:39:4
+   |
+39 | fn no_such_case(s: Shape without Nope throughout) -> i64 { 1 }
+   |    ^^^^^^^^^^^^
+
+error: fn "nothing_to_hold": `without Dot throughout` leaves out a case of everything i64 holds, and nothing in it can hold a case "Dot"
+  --> ./tests/cases/variants/err_without_throughout.aipl:41:4
+   |
+41 | fn nothing_to_hold(n: i64 without Dot throughout) -> i64 { 1 }
+   |    ^^^^^^^^^^^^^^^

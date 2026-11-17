@@ -673,10 +673,14 @@ fn ty_head(self: W) -> WDoc!FmtError {
 }
 
 # What a `without` clause excludes: the empty array, `[]`, written against
-# itself, or the name of a case of the variant the type refines.
+# itself, or the name of a case of the variant the type refines, which `throughout`
+# extends to everything the type holds.
 fn exclusion(self: W) -> WDoc!FmtError {
     if (self.peek_is(Ident)) {
         let WStr { w, text } = self.bump();
+        if (w.peek_text() == "throughout") {
+            return ok(WDoc { w: w.bump().w, doc: Text(`{text} throughout`) });
+        };
         return ok(WDoc { w, doc: Text(text) });
     };
     let closed = self.expect("[")?.w.expect("]")?.w;

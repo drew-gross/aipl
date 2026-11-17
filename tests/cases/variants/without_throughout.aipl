@@ -1,0 +1,48 @@
+# `Shape without Dot throughout` is a `Shape` with no `Dot` in it, and none in anything it
+# holds that can hold one: the parts of a `Group`, and the shape a struct carries. A `match`
+# on one needs no `Dot` arm, and what an arm binds is refined the same way, so a part can be
+# handed straight to the function that asked for the refined type. It is a `Shape` at run
+# time, and a plain `Shape` does not go where it is wanted; a value that is visibly clean
+# (a constructor whose every part is) does.
+
+import { equal as ==, wrapping_add_assign as +=, wrapping_mul as * } from builtins;
+
+variant Shape = Dot | Circle(i64) | Group(Shape[])
+
+struct Labeled { shape: Shape, name: str }
+
+variant Solid = Shape without Dot throughout
+
+variant SolidLabeled = Labeled without Dot throughout
+
+fn area(s: Solid) -> i64 {
+    match (s) {
+        Circle(r) => 3 * r * r,
+        Group(parts) => {
+            mut total = 0;
+            for (let part : parts) {
+                set total += area(part);
+            }
+            total
+        },
+    }
+}.test({
+    assert(area(Circle(2)) == 12);
+    assert(area(Group([Circle(1), Group([Circle(2), Circle(1)])])) == 18);
+    assert(area(Group([])) == 0);
+})
+
+// The field of a refined struct is refined, so it is handed on as one.
+fn labeled_area(SolidLabeled { shape }) -> i64 { area(shape) }.test({
+    assert(labeled_area(Labeled { shape: Circle(1), name: "c" }) == 3);
+})
+
+// Written inline, with the same meaning.
+fn inline_area(s: Shape without Dot throughout) -> i64 { area(s) }.test({
+    assert(inline_area(Group([Circle(1)])) == 3);
+})
+
+// A `Solid` is accepted where a `Shape` is wanted.
+fn widen(s: Solid) -> Shape { s }.test({
+    assert(widen(Circle(1)) == Circle(1));
+})

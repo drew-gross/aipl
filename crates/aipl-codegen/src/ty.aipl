@@ -28,18 +28,21 @@ variant Ty =
 
 # What a `T without X` type leaves out — the `X`. One case per kind of value the
 # checker knows how to exclude: the empty array literal, `[]`, or a case of a
-# variant, by its declared name.
-variant Exclusion = EmptyArray | NamedCase(str)
+# variant, by its declared name, or such a case left out of everything the type holds
+# too (`C throughout`).
+variant Exclusion = EmptyArray | NamedCase(str) | Throughout(str)
 
 # The excluded value as the user writes it after `without`.
 pub fn show_exclusion(self: Exclusion) -> str {
     match (self) {
         EmptyArray => "[]",
         NamedCase(name) => name,
+        Throughout(name) => `{name} throughout`,
     }
 }.test({
     assert(EmptyArray.show_exclusion() == "[]");
     assert(NamedCase("Leaf").show_exclusion() == "Leaf");
+    assert(Throughout("Leaf").show_exclusion() == "Leaf throughout");
 })
 
 # How a set orders its elements: `#{T}` promises no order, `#>{T}` walks

@@ -1046,6 +1046,16 @@ fn check_refinement_target(
         Type::Named(v) | Type::Generic(v, _) => ctor_cases.get(v),
         _ => None,
     };
+    // `C throughout` reaches into what a struct holds, so a struct may be its base; the
+    // checker's validation of the expanded type says whether anything in it can hold a `C`.
+    if cases.is_none()
+        && !excluded.is_empty()
+        && excluded
+            .iter()
+            .all(|x| matches!(x, aipl_syntax::ast::Exclusion::Throughout(_)))
+    {
+        return Ok(());
+    }
     let Some(cases) = cases else {
         return Err(Error::at(
             format!(
@@ -1068,7 +1078,8 @@ fn check_refinement_target(
                     decl.name.span.clone(),
                 ));
             }
-            aipl_syntax::ast::Exclusion::NamedCase(_) => {}
+            aipl_syntax::ast::Exclusion::NamedCase(_)
+            | aipl_syntax::ast::Exclusion::Throughout(_) => {}
             aipl_syntax::ast::Exclusion::EmptyArray => {
                 return Err(Error::at(
                     format!(

@@ -509,21 +509,27 @@ struct Decls {
 }
 
 impl Decls {
+    fn tables(&self) -> crate::typing::DeclTables<'_> {
+        crate::typing::DeclTables {
+            structs: &self.structs,
+            variants: &self.variants,
+            generic_structs: &self.generic_structs,
+            generic_variants: &self.generic_variants,
+        }
+    }
+
     /// Whether `t`, as written, may appear in a declaration or annotation.
     fn validate(&self, t: &Type, type_params: &[String], ctx: &str, at: &Span) -> Res<()> {
-        crate::typing::validate_type(
-            &crate::typing::DeclTables {
-                structs: &self.structs,
-                variants: &self.variants,
-                generic_structs: &self.generic_structs,
-                generic_variants: &self.generic_variants,
-            },
-            t,
-            type_params,
-            ctx,
-        )
-        .map_err(|e| Failure::Rejected(e.or_at(at.clone())))
+        crate::typing::validate_type(&self.tables(), t, type_params, ctx)
+            .map_err(|e| Failure::Rejected(e.or_at(at.clone())))
     }
+}
+
+/// Whether the exclusions `given` include `x`. A value that lacks a case throughout lacks it.
+fn excluded_by(given: &[aipl_syntax::ast::Exclusion], x: &aipl_syntax::ast::Exclusion) -> bool {
+    use aipl_syntax::ast::Exclusion;
+    given.contains(x)
+        || matches!(x, Exclusion::NamedCase(c) if given.contains(&Exclusion::Throughout(c.clone())))
 }
 
 /// `span`, unless it is the placeholder for a name written nowhere.
@@ -1559,7 +1565,7 @@ impl Pinner<'_> {
             .table
             .exclusions(expected)
             .into_iter()
-            .filter(|x| !given.contains(x) && !shown(x, self))
+            .filter(|x| !excluded_by(&given, x) && !shown(x, self))
             .collect();
         if let Some(x) = unshown.first() {
             let wanted = aipl_syntax::type_name(&self.refined_type(expected));
@@ -1594,11 +1600,107 @@ impl Pinner<'_> {
             TExprKind::IfLet(arm, _, other) => self.shows(&arm.body, x) && self.shows(other, x),
             TExprKind::Match(_, arms) => arms.iter().all(|a| self.shows(&a.body, x)),
             TExprKind::Return(_) => true,
-            TExprKind::ArrayLit(items) => matches!(x, Exclusion::EmptyArray) && !items.is_empty(),
+            TExprKind::ArrayLit(items) => match x {
+                Exclusion::EmptyArray => !items.is_empty(),
+                Exclusion::Throughout(c) => items.iter().all(|item| self.clean_of(item, c)),
+                Exclusion::NamedCase(_) => false,
+            },
             _ => match x {
                 Exclusion::NamedCase(d) => self.constructed_case(e).is_some_and(|c| c != *d),
+                Exclusion::Throughout(c) => self.shows_throughout(e, c),
                 Exclusion::EmptyArray => false,
             },
+        }
+    }
+
+    /// Whether what `e` is shows it holds no case `c` anywhere: a constructor of another case,
+    /// or a struct literal, whose every part is clean in turn.
+    fn shows_throughout(&self, e: &TExpr<It>, c: &str) -> bool {
+        match &e.kind {
+            TExprKind::Call { args, .. } => {
+                self.constructed_case(e).is_some_and(|case| case != c)
+                    && args.iter().all(|a| self.clean_of(a, c))
+            }
+            TExprKind::Construct(_, inits) => inits.iter().all(|i| self.clean_of(&i.value, c)),
+            TExprKind::None | TExprKind::Unit => true,
+            _ => false,
+        }
+    }
+
+    /// Whether the part `e` of a value holds no case `c`: its type cannot hold one, or is
+    /// refined to hold none, or what `e` is shows it.
+    fn clean_of(&self, e: &TExpr<It>, c: &str) -> bool {
+        !self.holds_case(&e.ty, c)
+            || self
+                .table
+                .exclusions(&e.ty)
+                .contains(&aipl_syntax::ast::Exclusion::Throughout(c.to_string()))
+            || self.shows(e, &aipl_syntax::ast::Exclusion::Throughout(c.to_string()))
+    }
+
+    /// Whether a value of type `t` can hold a case `c`. A type nothing has fixed holds none.
+    fn holds_case(&self, t: &It, c: &str) -> bool {
+        let tables = self.decls.tables();
+        match self.table.shallow(t) {
+            It::Named(n) => tables.named_reaches_case(&n, c),
+            It::Gen(n, args) => {
+                tables.named_reaches_case(&n, c) || args.iter().any(|a| self.holds_case(a, c))
+            }
+            It::Case(i) | It::Opt(i) | It::Arr(i) | It::Set(i, _) => self.holds_case(&i, c),
+            It::Dict(a, b) | It::Res(a, b) => self.holds_case(&a, c) || self.holds_case(&b, c),
+            It::Unit | It::Prim(_) | It::Rigid(_) | It::Fn(..) | It::Var(_) | It::Without(..) => {
+                false
+            }
+        }
+    }
+
+    /// The cases `t` is refined to lack throughout (`V without C throughout`).
+    fn throughout_cases(&self, t: &It) -> Vec<String> {
+        self.table
+            .exclusions(t)
+            .into_iter()
+            .filter_map(|x| match x {
+                aipl_syntax::ast::Exclusion::Throughout(c) => Some(c),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `t`, a type found inside a value refined to lack the cases `deep` throughout, carrying
+    /// that refinement for every part of it that can hold one.
+    fn deepen(&self, t: &It, deep: &[String]) -> It {
+        if deep.is_empty() {
+            return t.clone();
+        }
+        let go = |i: &It| Box::new(self.deepen(i, deep));
+        match self.table.chase(t) {
+            It::Without(inner, x) => It::Without(go(&inner), x),
+            named @ (It::Named(_) | It::Gen(..)) => {
+                if let It::Gen(base, args) = &named {
+                    if base.starts_with(crate::typing::TUPLE_TEMPLATE) {
+                        return It::Gen(
+                            base.clone(),
+                            args.iter().map(|a| self.deepen(a, deep)).collect(),
+                        );
+                    }
+                }
+                let mut out = named.clone();
+                for c in deep {
+                    let have = self.table.exclusions(&out);
+                    let wanted = aipl_syntax::ast::Exclusion::Throughout(c.clone());
+                    if self.holds_case(&named, c) && !have.contains(&wanted) {
+                        out = It::Without(Box::new(out), wanted);
+                    }
+                }
+                out
+            }
+            It::Opt(i) => It::Opt(go(&i)),
+            It::Arr(i) => It::Arr(go(&i)),
+            It::Case(i) => It::Case(go(&i)),
+            It::Set(i, o) => It::Set(go(&i), o),
+            It::Dict(k, v) => It::Dict(go(&k), go(&v)),
+            It::Res(a, b) => It::Res(go(&a), go(&b)),
+            other => other,
         }
     }
 
@@ -1647,7 +1749,7 @@ impl Pinner<'_> {
     fn agree(&mut self, a: &It, e: &It) -> Result<(), String> {
         // A refined value goes where its base does; the reverse needs every exclusion shown.
         let (given, wanted) = (self.table.exclusions(a), self.table.exclusions(e));
-        if let Some(missing) = wanted.iter().find(|x| !given.contains(x)) {
+        if let Some(missing) = wanted.iter().find(|x| !excluded_by(&given, x)) {
             return Err(format!("it is not shown to exclude {}", missing.spelling()));
         }
         let (raw_a, raw_e) = (a.clone(), e.clone());
@@ -2179,6 +2281,8 @@ impl Pinner<'_> {
                     );
                 }
                 let ty = self.field_type(&owner, field, &e.span)?;
+                // A value refined to lack a case throughout holds only parts that lack it too.
+                let ty = self.deepen(&ty, &self.throughout_cases(&x.ty));
                 self.node(K::Field(Box::new(x), field.clone()), ty, e)
             }
             ExprKind::Index(a, i) => {
@@ -2372,7 +2476,7 @@ impl Pinner<'_> {
                 let scrut = self.expr(scrut)?;
                 let st = self.known(&scrut.ty, &scrut.span)?;
                 self.begin_pattern(arm);
-                let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
+                let (pattern, binds) = self.pattern(&arm.pattern, &scrut.ty, &arm.span)?;
                 if arm.pattern.is_nested() {
                     let view = TypeView::new(self.decls);
                     let ty = self.refined_type(&st);
@@ -2471,7 +2575,7 @@ impl Pinner<'_> {
                         );
                     }
                     self.begin_pattern(arm);
-                    let (pattern, binds) = self.pattern(&arm.pattern, &st, &arm.span)?;
+                    let (pattern, binds) = self.pattern(&arm.pattern, &scrut.ty, &arm.span)?;
                     let binds = binds
                         .into_iter()
                         .map(|(n, t)| {
@@ -2981,10 +3085,10 @@ impl Pinner<'_> {
             return Ok(());
         };
         let bare = name.split('@').next().unwrap_or(name);
-        if excluded
-            .iter()
-            .any(|x| matches!(x, aipl_syntax::ast::Exclusion::NamedCase(c) if c == bare))
-        {
+        if excluded.iter().any(|x| {
+            matches!(x, aipl_syntax::ast::Exclusion::NamedCase(c)
+                    | aipl_syntax::ast::Exclusion::Throughout(c) if c == bare)
+        }) {
             return reject(
                 format!(
                     "{} has no constructor {bare:?}",
@@ -3606,6 +3710,13 @@ impl Pinner<'_> {
         st: &It,
         span: &Span,
     ) -> Res<(TPattern<It>, Vec<(String, It)>)> {
+        // What the scrutinee is refined to lack: the shape below sees only its base, so the
+        // refinement is carried to the payloads and the binders from here.
+        let raw = self.table.chase(st);
+        let deep = self.throughout_cases(&raw);
+        if matches!(pattern, Pattern::Ctor { .. } | Pattern::Nested { .. }) {
+            self.excluded_case(&raw, &self.table.exclusions(&raw), pattern, span)?;
+        }
         let st = &self.table.shallow(st);
         Ok(match pattern {
             Pattern::Wildcard => (TPattern::Wildcard, Vec::new()),
@@ -3645,7 +3756,7 @@ impl Pinner<'_> {
                 } else {
                     (
                         TPattern::Bind(name.clone()),
-                        vec![(name.clone(), st.clone())],
+                        vec![(name.clone(), self.deepen(&raw, &deep))],
                     )
                 }
             }
@@ -3666,7 +3777,11 @@ impl Pinner<'_> {
                         self.note_case(owner, bare);
                     }
                 }
-                let payload = self.ctor_payload(st, bare, span)?;
+                let payload: Vec<It> = self
+                    .ctor_payload(st, bare, span)?
+                    .iter()
+                    .map(|t| self.deepen(t, &deep))
+                    .collect();
                 if *ignore_payload && payload.is_empty() {
                     return reject(
                         format!(
@@ -3705,7 +3820,11 @@ impl Pinner<'_> {
             }
             Pattern::Nested { name, args } => {
                 let bare = name.split('@').next().unwrap_or(name);
-                let payload = self.ctor_payload(st, bare, span)?;
+                let payload: Vec<It> = self
+                    .ctor_payload(st, bare, span)?
+                    .iter()
+                    .map(|t| self.deepen(t, &deep))
+                    .collect();
                 if args.len() != payload.len() {
                     return reject(format!("{bare:?} has {} slot(s)", payload.len()), span);
                 }
@@ -4869,6 +4988,31 @@ fn check_literals(e: &TExpr<Ty>, site: &Span) -> Res<()> {
     result
 }
 
+/// `t` as found inside a value that lacks the case `case` throughout: every part of it that can
+/// hold one is refined to lack it too.
+fn refine_throughout(tables: &crate::typing::DeclTables, t: &Type, case: &str) -> Type {
+    let go = |i: &Type| Box::new(refine_throughout(tables, i, case));
+    let wanted = aipl_syntax::ast::Exclusion::Throughout(case.to_string());
+    match t {
+        Type::Named(_) | Type::Generic(..) => {
+            if tables.reaches_case(t, case) {
+                Type::Without(Box::new(t.clone()), wanted)
+            } else {
+                t.clone()
+            }
+        }
+        Type::Without(inner, x) if *x == wanted => Type::Without(inner.clone(), x.clone()),
+        Type::Without(inner, x) => Type::Without(go(inner), x.clone()),
+        Type::Optional(i) => Type::Optional(go(i)),
+        Type::Array(i) => Type::Array(go(i)),
+        Type::Case(i) => Type::Case(go(i)),
+        Type::Set(i, o) => Type::Set(go(i), *o),
+        Type::Dict(k, v) => Type::Dict(go(k), go(v)),
+        Type::Result(a, b) => Type::Result(go(a), go(b)),
+        other => other.clone(),
+    }
+}
+
 /// The declarations seen as the match rules need them (`match_check`).
 struct TypeView<'a> {
     decls: &'a Decls,
@@ -4933,6 +5077,20 @@ impl crate::match_check::MatchInfo for TypeView<'_> {
                 Some(cases)
             }
             Type::Without(base, aipl_syntax::ast::Exclusion::EmptyArray) => self.cases_of(base),
+            // `V without C throughout` has the cases of `V` less `C`, and each payload is
+            // refined the same way.
+            Type::Without(base, aipl_syntax::ast::Exclusion::Throughout(excluded)) => {
+                let tables = self.decls.tables();
+                let mut cases = self.cases_of(base)?;
+                cases.retain(|(c, _)| c != excluded);
+                let refine = |t: &Type| refine_throughout(&tables, t, excluded);
+                Some(
+                    cases
+                        .into_iter()
+                        .map(|(c, payload)| (c, payload.iter().map(&refine).collect()))
+                        .collect(),
+                )
+            }
             Type::Named(n) => self.decls.variants.get(n).cloned(),
             Type::Generic(base, args) => {
                 let tmpl = self.decls.generic_variants.get(base)?;

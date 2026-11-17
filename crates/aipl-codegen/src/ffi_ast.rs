@@ -348,6 +348,7 @@ fn exclusion(v: &FfiValue) -> R<ast::Exclusion> {
     Ok(match case {
         "EmptyArray" => ast::Exclusion::EmptyArray,
         "NamedCase" => ast::Exclusion::NamedCase(text(at(payload, 0, case)?)?),
+        "Throughout" => ast::Exclusion::Throughout(text(at(payload, 0, case)?)?),
         other => return Err(unknown("Exclusion", other)),
     })
 }

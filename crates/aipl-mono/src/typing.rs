@@ -324,6 +324,12 @@ impl<'a> TypeValidator<'a> {
                 Some(cases)
             }
             Type::Without(base, Exclusion::EmptyArray) => self.cases_of(base),
+            // `C throughout` also leaves out `C` of the type itself.
+            Type::Without(base, Exclusion::Throughout(excluded)) => {
+                let mut cases = self.cases_of(base)?;
+                cases.retain(|(c, _)| c != excluded);
+                Some(cases)
+            }
             Type::Named(n) => self.variant_cases(n),
             Type::Generic(base, args) => {
                 let tmpl = self.generic_variants.get(base)?;
@@ -472,7 +478,26 @@ impl TypeValidator<'_> {
                     // type parameter is let through for the same reason as
                     // above, and an exclusion already made leaves nothing to
                     // exclude twice.
-                    (Exclusion::NamedCase(_), Type::TypeVar(_)) => Ok(()),
+                    (Exclusion::NamedCase(_) | Exclusion::Throughout(_), Type::TypeVar(_)) => Ok(()),
+                    // `V without C throughout`: the base is a struct or variant, and `C` is a
+                    // case something in it can hold.
+                    (Exclusion::Throughout(case), other) => {
+                        let tables = DeclTables {
+                            structs: self.structs,
+                            variants: self.variants,
+                            generic_structs: self.generic_structs,
+                            generic_variants: self.generic_variants,
+                        };
+                        let user_type = matches!(other, Type::Named(_) | Type::Generic(..));
+                        if user_type && tables.reaches_case(other, case) {
+                            Ok(())
+                        } else {
+                            Err(Error::msg(format!(
+                                "{ctx}: `without {case} throughout` leaves out a case of everything {} holds, and nothing in it can hold a case {case:?}",
+                                tyname(base)
+                            )))
+                        }
+                    }
                     (Exclusion::NamedCase(case), other) => match self.cases_of(base) {
                         Some(cases) if cases.iter().any(|(c, _)| c == case) => Ok(()),
                         Some(_) => Err(Error::msg(format!(
@@ -1245,6 +1270,70 @@ pub(crate) struct DeclTables<'a> {
     pub variants: &'a HashMap<String, Vec<(String, Vec<Type>)>>,
     pub generic_structs: &'a HashMap<String, StructDecl>,
     pub generic_variants: &'a HashMap<String, VariantDecl>,
+}
+
+impl DeclTables<'_> {
+    /// Whether a value of the type `name` can hold a case `case`: `name` is a variant with
+    /// it, or a struct or variant whose fields or payloads can hold one in turn. This is what
+    /// `V without C throughout` reaches through, and where it stops.
+    pub(crate) fn named_reaches_case(&self, name: &str, case: &str) -> bool {
+        self.named_reaches(name, case, &mut HashSet::new())
+    }
+
+    /// [`DeclTables::named_reaches_case`] for a written type, through whatever it wraps.
+    /// A function type holds nothing a `throughout` follows.
+    pub(crate) fn reaches_case(&self, t: &Type, case: &str) -> bool {
+        self.reaches(t, case, &mut HashSet::new())
+    }
+
+    fn reaches(&self, t: &Type, case: &str, seen: &mut HashSet<String>) -> bool {
+        match t {
+            Type::Named(n) => self.named_reaches(n, case, seen),
+            Type::Generic(n, args) => {
+                self.named_reaches(n, case, seen)
+                    || args.iter().any(|a| self.reaches(a, case, seen))
+            }
+            Type::Case(i)
+            | Type::Optional(i)
+            | Type::Array(i)
+            | Type::Set(i, _)
+            | Type::Without(i, _) => self.reaches(i, case, seen),
+            Type::Dict(a, b) | Type::Result(a, b) => {
+                self.reaches(a, case, seen) || self.reaches(b, case, seen)
+            }
+            Type::Tuple(es) => es.iter().any(|e| self.reaches(e, case, seen)),
+            Type::Unit
+            | Type::Primitive(_)
+            | Type::TypeVar(_)
+            | Type::Any
+            | Type::Unknown
+            | Type::ConcatStr
+            | Type::Fn(..) => false,
+        }
+    }
+
+    fn named_reaches(&self, name: &str, case: &str, seen: &mut HashSet<String>) -> bool {
+        if !seen.insert(name.to_string()) {
+            return false;
+        }
+        if let Some(cases) = self.variants.get(name) {
+            return cases.iter().any(|(c, payload)| {
+                c == case || payload.iter().any(|t| self.reaches(t, case, seen))
+            });
+        }
+        if let Some(fields) = self.structs.get(name) {
+            return fields.iter().any(|(_, t, _)| self.reaches(t, case, seen));
+        }
+        if let Some(v) = self.generic_variants.get(name) {
+            return v.cases.iter().any(|c| {
+                c.name.text == case || c.payload.iter().any(|p| self.reaches(&p.ty, case, seen))
+            });
+        }
+        if let Some(s) = self.generic_structs.get(name) {
+            return s.fields.iter().any(|f| self.reaches(&f.ty, case, seen));
+        }
+        false
+    }
 }
 
 /// Whether `t`, as a user wrote it, is a type that may appear there: it names a type that
