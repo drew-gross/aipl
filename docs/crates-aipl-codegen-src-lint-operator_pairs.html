@@ -41,7 +41,7 @@
             <a class="anchor" href="#item-paired">paired</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn paired(self: WrittenItem[], written: str, target: str) -&#62; Pairing?</code></pre>
+          <pre class="signature"><code>pub fn paired(self: Item[], written: str, target: str) -&#62; Pairing?</code></pre>
 
           <div class="doc"><p>How <code>items</code> can be advised to write <code>target</code> where they write <code>written</code>, or <code>none</code> when there is nothing that provably means the same.</p><p>The written operator has to be the file's own and a builtin: a user function of that name has no flavor to pair with. Where <code>target</code> has only one flavor there is nothing to choose and it is that one; where it has several, the one sharing the written operator's flavor is the one that means the same. A <code>target</code> the file already imports counts only if it is that builtin — one bound to the other flavor, or to a function of the file's own, would not mean what the advice says.</p></div>
 

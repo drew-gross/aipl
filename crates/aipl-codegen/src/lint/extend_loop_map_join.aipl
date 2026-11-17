@@ -21,23 +21,21 @@
 
 import { equal as ==, extend, filter, join, map, to_str } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
+import { Function, Item } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
-import { LintHit, imported_as, lint_messages, on_functions_filled } from "./lint_hit.aipl";
+import { UnfilledHit, imported_as, lint_in_unfilled_messages } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `extend`s.
-pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
-    let some(extend) = program.items.imported_as("extend") else { return []; };
-    program.on_functions_filled(|Function { body }| {
-        body
-            .accumulations(extend)
-            .filter(is_advisable)
-            .map(|loop| loop.filled_hit([..loop.element_stages(), ("join", "()")]))
-    })
+pub fn extend_loop_map_join(Function { body }, items: Item[]) -> UnfilledHit[] {
+    let some(extend) = items.imported_as("extend") else { return []; };
+    body
+        .accumulations(extend)
+        .filter(is_advisable)
+        .map(|loop| loop.filled_hit([..loop.element_stages(), ("join", "()")]))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[][]) -> i64[] \{ {body} }`,
             extend_loop_map_join,
         )
@@ -88,7 +86,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     // Shapes the lint must leave alone.
     // The loop does something else as well. A pipeline has nowhere to put it.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn logged(xs: i64[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -104,7 +102,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     );
     // A seed with elements is not an empty array to be filled.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn seeded(xs: i64[]) -> i64[] {
                     mut out: i64[] = [0];
@@ -119,7 +117,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     );
     // An `else` branch is work the pipeline has nowhere to put.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn either(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -138,7 +136,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     );
     // What is added reads the array itself, which the pipeline no longer has.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn doubling(xs: i64[]) -> i64[] {
                     mut out: i64[] = [1];
@@ -153,7 +151,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     );
     // An indexed loop uses its index, which `map` has no way to pass.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn indexed(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -170,7 +168,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     // Shapes the lint flags, and what it says of them.
     // A transformed piece per element: a `map` then a `join`.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn pairs(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -185,7 +183,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     );
     // Under a guard, a `filter` first.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn pairs_of_positives(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -200,7 +198,7 @@ pub fn extend_loop_map_join(program: WrittenProgram) -> LintHit[] {
     );
     // The elements are themselves arrays, added unchanged: just a `join`.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn flattened(xs: i64[][]) -> i64[] {
                     mut out: i64[] = [];

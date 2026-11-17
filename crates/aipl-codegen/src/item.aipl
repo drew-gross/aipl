@@ -578,25 +578,9 @@ pub fn function_names(self: Function) -> #{str} {
     }
 }
 
-# The names a function's attributes mention: its `.test` body and `.benchmark` block, and the
-# helpers declared in either.
-fn attribute_names(self: Attributes) -> #{str} {
-    #{
-        ..self.test_body$names_in().value_or(#{}),
-        ..self.test_fns$function_names().union_all(),
-        ..self.benchmark$benchmark_names().value_or(#{}),
-    }
-}
-
-# The names a `.benchmark` block mentions: in the block and in its helpers.
-fn benchmark_names(self: BenchmarkBlock) -> #{str} {
-    #{..self.body.names_in(), ..self.fns$function_names().union_all()}
-}
-
 # The names an item mentions outside an import list. An import mentions none.
-pub fn item_names(self: SuperItem) -> #{str} {
+pub fn item_names(self: Item) -> #{str} {
     match (self) {
-        WrittenFn(f, attributes) => #{..f.function_names(), ..attributes.attribute_names()},
         LoweredFn(f) => f.function_names(),
         Struct(s) => s.fields$names().union_all(),
         Variant(v) => v.cases$payload.join()$case_param_names().union_all(),

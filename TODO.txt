@@ -115,6 +115,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  imported_as shoudln't accept a string name, it should accept a builting variant arm
   hoisting handles lambdas as well
   Item's function should say it's kind (Fn, Test, Benchmark, maybe Main?) loader can use this to throw out the bits that aren't used (e.g. only write the test when running with --test) and test_body_source_name doesn't need to exist
   unused_imports should be rephrased as a set difference
@@ -552,7 +553,6 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  lint functions after hoisting with a different "this lints a function" kind of lint
   xs.map(|p| p.name$shout().len()) should hit the "use $" lint
   lint should happend after resolution so that we don't need to check fn.name.starts_with("__builtin_"), it should just be fn.is_builtin
   slots_read_by_field is looking at names - it should know from a flag

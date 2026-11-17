@@ -33,14 +33,12 @@ import {
 } from builtins;
 import { Call, Expr, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
+import { Function, Item } from "../item.aipl";
 import {
-    LintHit,
     UnfilledHit,
     bound_to,
     imported_as,
-    lint_messages,
-    on_functions_filled,
+    lint_in_unfilled_messages,
     spans_its_text,
     unfilled,
 } from "./lint_hit.aipl";
@@ -50,18 +48,17 @@ import { is_zero } from "./slice_bounds.aipl";
 struct Names { equal: bool, logical_not: bool, nonempty: str?, len: str? }
 
 # A hit for each emptiness test in the program that is asked the long way.
-pub fn is_empty_longhand(program: WrittenProgram) -> LintHit[] {
-    let items = program.items;
+pub fn is_empty_longhand(Function { body }, items: Item[]) -> UnfilledHit[] {
     let names = Names {
         equal: items.bound_to("==") == some("equal"),
         logical_not: items.bound_to("!") == some("logical_not"),
         nonempty: items.imported_as("is_nonempty"),
         len: items.imported_as("len"),
     };
-    program.on_functions_filled(|Function { body }| body.descendants()$long_way(names).collect_ok())
+    body.descendants()$long_way(names).collect_ok()
 }.test({
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(x: i64[]) -> bool \{ {body} }`,
             is_empty_longhand,
         )
@@ -100,7 +97,7 @@ pub fn is_empty_longhand(program: WrittenProgram) -> LintHit[] {
     // `is_empty` does not even accept what it takes, so advising it would advise code that does not
     // compile. (A file cannot both define `len` and import the builtin one.)
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 import { equal as == } from builtins;
                 variant List = Nil | Cons(i64)

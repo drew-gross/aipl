@@ -29,23 +29,18 @@
 
 import { equal as ==, filter, map } from builtins;
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
+import { Function, Item } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
-import { LintHit, imported_as, lint_messages, on_functions_filled } from "./lint_hit.aipl";
+import { UnfilledHit, imported_as, lint_in_unfilled_messages } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `push`es.
-pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
-    let some(push) = program.items.imported_as("push") else { return []; };
-    program.on_functions_filled(|Function { body }| {
-        body
-            .accumulations(push)
-            .filter(is_advisable)
-            .map(|loop| loop.filled_hit(loop.element_stages()))
-    })
+pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
+    let some(push) = items.imported_as("push") else { return []; };
+    body.accumulations(push).filter(is_advisable).map(|loop| loop.filled_hit(loop.element_stages()))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64[] \{ {body} }`,
             push_loop_pipeline,
         )
@@ -103,20 +98,20 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     assert(messages("map", "mut out = []; for (let x : xs) { set out.push(x * 2); } out")? == []);
     // Shapes the lint must leave alone.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
             push_loop_pipeline,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }""",
             push_loop_pipeline,
         )? == [],
     );
     // The loop does something else as well. A pipeline has nowhere to put it.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn logged(xs: i64[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -136,7 +131,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // else is not one. Recognizing it would mean a second rule with a different
     // rewrite, so it is left alone rather than mis-advised.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn signs(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -158,7 +153,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // already done — a "take the first two" loop, which no `filter` predicate can
     // express.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn first_two(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -175,7 +170,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // So does the pushed element: the running length is the index this element
     // lands at, which a `map` lambda cannot see.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn indexed(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -190,7 +185,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     );
     // The seed already holds something, so the array is not just the loop's output.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn with_head(xs: i64[]) -> i64[] {
                     mut out = [0];
@@ -209,7 +204,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // to be the very next statement rather than reasoning about what a statement
     // there might do.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn offset(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -227,7 +222,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // Two pushes per element. The loop emits more elements than it consumes, which
     // is an `extend`, not a `map`.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn doubled_up(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -247,7 +242,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // pushes somewhere else. The seed and the push have to name the same array,
     // and the loop has to be the seed's very next statement.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn nested_targets(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -265,7 +260,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // A `while` loop. Its condition is not an iteration, so there is nothing to
     // build a pipeline over.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn counted(n: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -284,7 +279,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // A range with a guard. Only `map` takes a range, so there is no `filter` to
     // write.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn even_below(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -301,7 +296,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // A range pushed whole: the array of its values, which has no spelling the lint
     // could advise.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn upto(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -318,7 +313,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // Shapes the lint flags, and what it says of them.
     // Both: a guard and a transformed element.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn scaled_above(xs: i64[], lo: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -333,7 +328,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     );
     // No guard — every element is pushed, transformed. That is a `map` alone.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn doubled(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -351,7 +346,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // `set out = out.push(x);` is the same statement written out, so it is flagged
     // the same way.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn above(xs: i64[], lo: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -368,7 +363,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     // Neither: the loop copies the array one element at a time, so the array itself
     // is the answer and there is no pipeline to build.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn copied(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -381,13 +376,18 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
             push_loop_pipeline,
         )? == [],
     );
-    assert(lint_messages("fn evens(n: i64) -> i64[] { [n, n * 2] }", push_loop_pipeline)? == []);
+    assert(
+        lint_in_unfilled_messages(
+            "fn evens(n: i64) -> i64[] { [n, n * 2] }",
+            push_loop_pipeline,
+        )? == [],
+    );
 
     // A call-shaped iterable can't be quoted back into the advice — its span stops
     // before its parens — so the message names neither it nor a receiver, and the
     // chain reads as the method calls to append.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn from_call(n: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -402,7 +402,7 @@ pub fn push_loop_pipeline(program: WrittenProgram) -> LintHit[] {
     );
     // A range: `map` takes one, so a transformed push over it is a `map` alone.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """
                 fn squares(n: u64) -> u64[] {
                     mut out: u64[] = [];

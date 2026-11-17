@@ -33,14 +33,12 @@ import {
 } from builtins;
 import { Call, Expr, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
+import { Function, Item } from "../item.aipl";
 import {
-    LintHit,
     UnfilledHit,
     bound_to,
     imported_as,
-    lint_messages,
-    on_functions_filled,
+    lint_in_unfilled_messages,
     text_after,
     unfilled,
 } from "./lint_hit.aipl";
@@ -50,8 +48,7 @@ import { is_zero } from "./slice_bounds.aipl";
 struct Names { less_than: bool, greater_than: bool, logical_not: bool, len: str?, empty: str? }
 
 # A hit for each length compared against zero, or negated emptiness test, in the program.
-pub fn len_gt_zero(program: WrittenProgram) -> LintHit[] {
-    let items = program.items;
+pub fn len_gt_zero(Function { body }, items: Item[]) -> UnfilledHit[] {
     let names = Names {
         less_than: items.bound_to("<") == some("less_than"),
         greater_than: items.bound_to(">") == some("greater_than"),
@@ -59,12 +56,10 @@ pub fn len_gt_zero(program: WrittenProgram) -> LintHit[] {
         len: items.imported_as("len"),
         empty: items.imported_as("is_empty"),
     };
-    program.on_functions_filled(
-        |Function { body }| body.descendants()$nonempty_test(names).collect_ok(),
-    )
+    body.descendants()$nonempty_test(names).collect_ok()
 }.test({
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(x: i64[]) -> bool \{ {body} }`,
             len_gt_zero,
         )
@@ -109,7 +104,7 @@ pub fn len_gt_zero(program: WrittenProgram) -> LintHit[] {
 
     // An operator the file binds to a function of its own is a call to that function, not a length test.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """import { len } from builtins; import { my_lt as < } from "./myord.aipl"; fn f(x: i64[]) -> bool { 0 < x.len() }""",
             len_gt_zero,
         )? == [],

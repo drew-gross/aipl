@@ -59,6 +59,7 @@ import {
     While,
     descendants,
 } from "../expr.aipl";
+import { Benchmark, Plain, TestBody, TestHelper, fn_role } from "../fn_names.aipl";
 import { Function } from "../item.aipl";
 import {
     UnfilledHit,
@@ -72,7 +73,7 @@ import { option_matches, receiver_text } from "./option_match.aipl";
 import { passes_through, wraps_with } from "./result_match.aipl";
 
 # A hit for each `match` in the function that turns an optional into a result.
-pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
+pub fn match_value_or_err(Function { body, sig, name }) -> UnfilledHit[] {
     body
         .option_matches()
         .map(
@@ -103,7 +104,9 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
                 // is where AIPL's discipline does the work: a caller declares at least the
                 // effects of everything it calls, so a function that declares none cannot
                 // reach an effectful call at all. In an effect-declaring function the lint
-                // stays quiet, since it cannot tell which calls carry the effect.
+                // stays quiet, since it cannot tell which calls carry the effect, and a test
+                // block declares none but is run with whatever shims it installs, so it is
+                // one too.
                 let stays = built
                     .descendants()
                     .any(|e| match (e.kind) {
@@ -111,7 +114,9 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
                         Call("assert", _, _) => true,
                         _ => false,
                     });
-                if (stays || sig.effects.is_nonempty()) { return none; };
+                if (stays || sig.effects.is_nonempty() || name.text.is_test_code()) {
+                    return none;
+                };
 
                 // A single token splices back verbatim, escapes and quotes included, while
                 // anything wider has a span that stops at its last token — before a
@@ -506,4 +511,13 @@ pub fn match_value_or_err(Function { body, sig }) -> UnfilledHit[] {
 # that does not import `value_or_err`, as the tests' sources do not.
 fn message(advice: str) -> str {
     `this \`match\` turns an optional into a result — {advice}, importing \`value_or_err\` from builtins`
+}
+
+# Whether `self` names a function a `.test` or `.benchmark` block became, or a helper declared in
+# one.
+fn is_test_code(self: str) -> bool {
+    match (self.fn_role()) {
+        Plain => false,
+        TestBody | TestHelper(..) | Benchmark(..) => true,
+    }
 }

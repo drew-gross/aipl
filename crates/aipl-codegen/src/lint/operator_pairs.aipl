@@ -15,7 +15,8 @@ import {
     value_or,
 } from builtins;
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
-import { WrittenItem } from "../item.aipl";
+import { hoist_test_fns } from "../hoist_test_fns.aipl";
+import { Item } from "../item.aipl";
 import { operator_named_forms } from "../operator_named_forms.aipl";
 import { bound_to } from "./lint_hit.aipl";
 
@@ -38,7 +39,7 @@ fn flavor(self: str) -> str { self.split("_").first().value_or("") }.test({
 # one; where it has several, the one sharing the written operator's flavor is the one that means the
 # same. A `target` the file already imports counts only if it is that builtin — one bound to the other
 # flavor, or to a function of the file's own, would not mean what the advice says.
-pub fn paired(self: WrittenItem[], written: str, target: str) -> Pairing? {
+pub fn paired(self: Item[], written: str, target: str) -> Pairing? {
     let written_name = self.bound_to(written)?;
     if (!written.operator_named_forms().contains(written_name)) { return none; };
     let forms = target.operator_named_forms();
@@ -57,7 +58,7 @@ pub fn paired(self: WrittenItem[], written: str, target: str) -> Pairing? {
     }
 }.test({
     fn pairing(src: str, written: str, target: str) -> Pairing?!ParseFailure {
-        ok(aipl_parse_surface_file(src)?.program.items.paired(written, target))
+        ok(aipl_parse_surface_file(src)?.program.hoist_test_fns().items.paired(written, target))
     }
     // The flavor of the file's `+` picks the step, and the import is named until it is made.
     assert(pairing("import { wrapping_add as + } from builtins;", "+", "++")? == some(Pairing {

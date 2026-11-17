@@ -10,12 +10,12 @@
 # false hit costs a build that cannot be made to pass except by `#[allow]`.
 
 import { collect_arms, equal as ==, filter, join, map } from builtins;
-import { Import, ImportDecl, SuperProgram, item_names, local } from "../item.aipl";
+import { Import, ImportDecl, Program, item_names, local } from "../item.aipl";
 import { LintHit, hit, lint_hits, lint_messages } from "./lint_hit.aipl";
 import { difference, has, to_set, union_all } from sets;
 
 # A hit for each name `program` imports and nothing in it references.
-pub fn unused_imports(SuperProgram { items }) -> LintHit[] {
+pub fn unused_imports(Program { items }) -> LintHit[] {
     // Every name the file mentions outside its own import lists: called and
     // referenced idents, constructed structs, match constructors, operator
     // spellings, and every name appearing in a type — signatures, struct fields, // variant payloads, and inline `let`/lambda annotations. Each item mentions

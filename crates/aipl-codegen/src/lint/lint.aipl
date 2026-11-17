@@ -5,7 +5,7 @@
 # a line in `lint`; the hits come back in the order the lints are listed.
 
 import { equal as == } from builtins;
-import { SuperProgram, WrittenProgram } from "../item.aipl";
+import { Program, SuperProgram } from "../item.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
@@ -56,9 +56,10 @@ import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 
 # Every hit the ported lints find in `program`.
 #
-# A lint is either a function of the whole program or of one function, and
-# `on_functions` is what runs the second kind over every body that is code.
-pub fn lint(program: WrittenProgram) -> LintHit[] {
+# A lint is either a function of the whole program or of one function, and `on_functions` is
+# what runs the second kind over every function of the program, which is every body that is
+# code. One that also needs the file's imports takes the program's `items` beside the function.
+pub fn lint(program: Program) -> LintHit[] {
     [
         ..unused_imports(program),
         ..duplicate_import_source(program),
@@ -76,21 +77,21 @@ pub fn lint(program: WrittenProgram) -> LintHit[] {
         ..program.on_functions_filled(match_case_as_case),
         ..program.on_functions_filled(match_case_try_as_case),
         ..program.on_functions_filled(let_else_as_case),
-        ..push_loop_pipeline(program),
-        ..extend_loop_map_join(program),
-        ..push_loop_collect_ok(program),
-        ..union_loop_union_all(program),
-        ..push_array_literal(program),
+        ..program.on_functions_filled(|function| push_loop_pipeline(function, program.items)),
+        ..program.on_functions_filled(|function| extend_loop_map_join(function, program.items)),
+        ..program.on_functions_filled(|function| push_loop_collect_ok(function, program.items)),
+        ..program.on_functions_filled(|function| union_loop_union_all(function, program.items)),
+        ..program.on_functions(|function| push_array_literal(function, program.items)),
         ..program.on_functions_filled(return_loop_find_if),
-        ..return_loop_any_all(program),
-        ..eta_lambda(program),
-        ..map_find_if_some(program),
-        ..map_constant_repeat(program),
-        ..zip_with_pair_zip(program),
-        ..push_loop_zip_with(program),
-        ..with_value_or_self(program),
+        ..program.on_functions_filled(|function| return_loop_any_all(function, program.items)),
+        ..program.on_functions(|function| eta_lambda(function, program.items)),
+        ..program.on_functions_filled(|function| map_find_if_some(function, program.items)),
+        ..program.on_functions_filled(|function| map_constant_repeat(function, program.items)),
+        ..program.on_functions_filled(|function| zip_with_pair_zip(function, program.items)),
+        ..program.on_functions_filled(|function| push_loop_zip_with(function, program.items)),
+        ..program.on_functions_filled(|function| with_value_or_self(function, program.items)),
         ..program.on_functions_filled(return_loop_find_index),
-        ..interp_to_str(program),
+        ..program.on_functions(|function| interp_to_str(function, program.items)),
         ..program.on_functions(interp_literal),
         ..program.on_functions(slice_whole),
         ..program.on_functions(slice_to_len),
@@ -101,11 +102,11 @@ pub fn lint(program: WrittenProgram) -> LintHit[] {
         ..program.on_functions(set_spread_field),
         ..program.on_functions_filled(set_spread_insert),
         ..program.on_functions_filled(set_spread_push),
-        ..step_by_one(program),
-        ..compound_assign(program),
-        ..len_gt_zero(program),
-        ..value_or_compare(program),
-        ..is_empty_longhand(program),
+        ..program.on_functions(|function| step_by_one(function, program.items)),
+        ..program.on_functions(|function| compound_assign(function, program.items)),
+        ..program.on_functions_filled(|function| len_gt_zero(function, program.items)),
+        ..program.on_functions(|function| value_or_compare(function, program.items)),
+        ..program.on_functions_filled(|function| is_empty_longhand(function, program.items)),
     ]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }) == []);

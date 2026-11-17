@@ -7,8 +7,13 @@ description: Add or port a lint in AIPL (crates/aipl-codegen/src/lint/) — the 
 
 Lints are AIPL: one file per lint in `crates/aipl-codegen/src/lint/<name>.aipl`,
 registered in `lint/lint.aipl`, listed in `DOGFOOD_SOURCE_FILES`
-(`crates/aipl-codegen/src/lib.rs`), run on the written-form AST and returning
-hits. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
+(`crates/aipl-codegen/src/lib.rs`), run on the program after hoisting (every body is a
+function, the `.test` and `.benchmark` blocks included) and before desugaring (so
+the source forms are still there), returning hits. Most lints are a function of one
+`Function`, run over every function by `on_functions` and its variants; one that needs
+the file's imports (the `imported_as` names it advises) takes the program's `items`
+beside the function, as `push_loop_pipeline` does. A lint of the whole program
+(`unused_imports`) takes the `Program`. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
 helpers), `case_of_equal_is_case.aipl` (a lint that names a builtin). The
 one-line hit span and `#[allow]` squelching are in the "Authoring a lint" section of
 CLAUDE.md and in the add-builtin skill's step 4.
@@ -18,7 +23,8 @@ CLAUDE.md and in the add-builtin skill's step 4.
 DRY is critical here. Before writing a helper, search for it:
 
 - `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `imported_as`, `on_functions`,
-  `on_functions_unfilled`, the `lint_*` test drivers.
+  `on_functions_unfilled`, the `lint_*` test drivers (`lint_in_messages` and
+  `lint_in_unfilled_messages` for a lint that takes `items`).
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl`, `lint/option_match.aipl`,
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
   shape and its pipeline advice), `lint/interpolation.aipl` — shared shape recognizers.

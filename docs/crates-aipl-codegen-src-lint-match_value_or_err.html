@@ -28,7 +28,7 @@
             <a class="anchor" href="#item-match_value_or_err">match_value_or_err</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_value_or_err(__spat$2931: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_value_or_err(__spat$3015: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> in the function that turns an optional into a result.</p></div>
 
@@ -52,6 +52,20 @@
           <pre class="signature"><code>fn message(advice: str) -&#62; str</code></pre>
 
           <div class="doc"><p>What is said of an optional turned into a result with the given <code>advice</code>, for a file that does not import <code>value_or_err</code>, as the tests' sources do not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_test_code">
+          <h3>
+            <a class="anchor" href="#item-is_test_code">is_test_code</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_test_code(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> names a function a <code>.test</code> or <code>.benchmark</code> block became, or a helper declared in one.</p></div>
 
 
         </section>

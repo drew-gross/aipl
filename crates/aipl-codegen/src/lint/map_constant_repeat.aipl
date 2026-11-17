@@ -55,53 +55,43 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
-import {
-    LintHit,
-    Named,
-    UnfilledHit,
-    imported_as,
-    lint_messages,
-    on_functions_filled,
-    quote,
-} from "./lint_hit.aipl";
+import { Function, Item } from "../item.aipl";
+import { Named, UnfilledHit, imported_as, lint_in_unfilled_messages, quote } from "./lint_hit.aipl";
 
 # A hit for each `map` over a function that ignores its argument.
-pub fn map_constant_repeat(program: WrittenProgram) -> LintHit[] {
-    let some(map_name) = program.items.imported_as("map") else { return []; };
-    program.on_functions_filled(|Function { body }| {
-        body
-            .descendants()
-            .map(
-                |call| {
-                    let Call(callee, arguments, _) = call.kind else { return none; };
-                    let [receiver, lambda] = arguments else { return none; };
-                    let Lambda(parameters, constant) = lambda.kind else { return none; };
-                    let [parameter] = parameters else { return none; };
-                    if (callee != map_name || receiver.is_range() || !constant.is_constant(
-                        parameter.synthesized_name(),
-                    )) {
-                        return none;
-                    };
-                    some(UnfilledHit {
-                        named: [
-                            Named {
-                                text: `"{map_name}" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
-                                builtin: "repeat",
-                            },
-                            Named { text: `({receiver.quote("<items>")}.`, builtin: "len" },
-                        ],
-                        tail: `())"`,
-                        span: lambda.span,
-                    })
-                },
-            )
-            .collect_ok()
-    })
+pub fn map_constant_repeat(Function { body }, items: Item[]) -> UnfilledHit[] {
+    let some(map_name) = items.imported_as("map") else { return []; };
+    body
+        .descendants()
+        .map(
+            |call| {
+                let Call(callee, arguments, _) = call.kind else { return none; };
+                let [receiver, lambda] = arguments else { return none; };
+                let Lambda(parameters, constant) = lambda.kind else { return none; };
+                let [parameter] = parameters else { return none; };
+                if (callee != map_name || receiver.is_range() || !constant.is_constant(
+                    parameter.synthesized_name(),
+                )) {
+                    return none;
+                };
+                some(UnfilledHit {
+                    named: [
+                        Named {
+                            text: `"{map_name}" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
+                            builtin: "repeat",
+                        },
+                        Named { text: `({receiver.quote("<items>")}.`, builtin: "len" },
+                    ],
+                    tail: `())"`,
+                    span: lambda.span,
+                })
+            },
+        )
+        .collect_ok()
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[], c: i64) -> i64[] \{ {body} }`,
             map_constant_repeat,
         )
@@ -138,26 +128,29 @@ pub fn map_constant_repeat(program: WrittenProgram) -> LintHit[] {
     assert(messages(all, "(0..3).map(|x| 0)")? == []);
     assert(messages("repeat, len", "xs.map(|x| 0)")? == []);
     // Shapes the lint must leave alone.
-    assert(lint_messages("fn next_id() -> i64 { 1 }", map_constant_repeat)? == []);
+    assert(lint_in_unfilled_messages("fn next_id() -> i64 { 1 }", map_constant_repeat)? == []);
 
     // Shapes the lint flags, and what it says of them.
     assert(
-        lint_messages("fn zeros(xs: i64[]) -> i64[] { xs.map(|x| 0) }", map_constant_repeat)? == [],
+        lint_in_unfilled_messages(
+            "fn zeros(xs: i64[]) -> i64[] { xs.map(|x| 0) }",
+            map_constant_repeat,
+        )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """fn blanks(names: str[]) -> str[] { names.map(|_| "") }""",
             map_constant_repeat,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn defaults(xs: i64[], fallback: i64) -> i64[] { xs.map(|x| fallback) }",
             map_constant_repeat,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             """fn cells(xs: i64[]) -> Cell[] { xs.map(|x| Cell { filled: false, label: "empty" }) }""",
             map_constant_repeat,
         )? == [],

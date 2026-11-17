@@ -61,27 +61,26 @@ import {
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
-import { Function, WrittenFn, WrittenItem, WrittenProgram } from "../item.aipl";
+import { Function, Item, LoweredFn } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import {
     LintHit,
     hit,
     imported_as,
     imported_locals,
-    lint_messages,
-    on_functions,
+    lint_in_messages,
     quote,
 } from "./lint_hit.aipl";
 
 # A hit for each lambda in the program that adds nothing to what it forwards to.
-pub fn eta_lambda(program: WrittenProgram) -> LintHit[] {
-    let map_name = program.items.imported_as("map");
-    let methods = program.items.methods_in_view();
-    program.on_functions(|Function { body }| body.lambda_hits(map_name, methods))
+pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {
+    let map_name = items.imported_as("map");
+    let methods = items.methods_in_view();
+    body.lambda_hits(map_name, methods)
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_messages(
             `import \{ {imports} } from builtins; struct P \{ name: str } fn shout(self: str) -> str \{ self } fn f(xs: P[], ys: str[]) -> i64 \{ {body} }`,
             eta_lambda,
         )
@@ -134,8 +133,8 @@ pub fn eta_lambda(program: WrittenProgram) -> LintHit[] {
     assert(messages("", "h(|a| a(a))")? == []);
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_messages("fn is_big(x: i64) -> bool { x > 100 }", eta_lambda)? == []);
-    assert(lint_messages(
+    assert(lint_in_messages("fn is_big(x: i64) -> bool { x > 100 }", eta_lambda)? == []);
+    assert(lint_in_messages(
         "fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }",
         eta_lambda,
     )? == [`lambda only forwards its argument(s) to "is_big" — pass "is_big" directly`]);
@@ -145,8 +144,8 @@ pub fn eta_lambda(program: WrittenProgram) -> LintHit[] {
 # named `self`, which is what method-call syntax is defined by, and a lowercase builtin the
 # file imports. A function from another file is not here — its parameters are not in view
 # when a file is linted.
-fn methods_in_view(self: WrittenItem[]) -> str[] {
-    let own = self.collect_arms(WrittenFn)$method_name().collect_ok();
+fn methods_in_view(self: Item[]) -> str[] {
+    let own = self.collect_arms(LoweredFn)$method_name().collect_ok();
     let imported = self
         .imported_locals()
         .filter(|name| name[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyz_".contains(c)));
@@ -154,7 +153,7 @@ fn methods_in_view(self: WrittenItem[]) -> str[] {
 }
 
 # The name of the function `self`, when it takes a `self`.
-fn method_name(self: WrittenFn(Function { sig, name }, _)) -> str? {
+fn method_name(self: LoweredFn(Function { sig, name })) -> str? {
     if (sig.params
         .first()
         .is_some_and(|parameter| parameter.binding.name_at(parameter.name_span) == "self")) {

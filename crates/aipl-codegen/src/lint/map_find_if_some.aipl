@@ -28,46 +28,38 @@ import {
 } from builtins;
 import { Call, Expr, Ident, Lambda, descendants, synthesized_name } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
-import {
-    LintHit,
-    imported_as,
-    lint_messages,
-    on_functions_filled,
-    unfilled,
-} from "./lint_hit.aipl";
+import { Function, Item } from "../item.aipl";
+import { UnfilledHit, imported_as, lint_in_unfilled_messages, unfilled } from "./lint_hit.aipl";
 
 # A hit for each `map(..).find_if(is_some)` chain in the program.
-pub fn map_find_if_some(program: WrittenProgram) -> LintHit[] {
-    let some(map_name) = program.items.imported_as("map") else { return []; };
-    let some(find_if) = program.items.imported_as("find_if") else { return []; };
-    let some(is_some) = program.items.imported_as("is_some") else { return []; };
-    program.on_functions_filled(|Function { body }| {
-        body
-            .descendants()
-            .map(
-                |chain| {
-                    let Call(outer, arguments, _) = chain.kind else { return none; };
-                    let [mapped, predicate] = arguments else { return none; };
-                    let Call(inner, inner_arguments, _) = mapped.kind else { return none; };
-                    if (outer != find_if || inner != map_name || inner_arguments.len() != 2) {
-                        return none;
-                    };
-                    if (!predicate.is_the_function(is_some)) { return none; };
-                    some(unfilled(
-                        "find_map",
-                        `"{map_name}" then "{find_if}({is_some})" is the first element with an answer, wrapped twice — write "`,
-                        `(..)" over the mapping function, which hands the answer back once`,
-                        chain.span,
-                    ))
-                },
-            )
-            .collect_ok()
-    })
+pub fn map_find_if_some(Function { body }, items: Item[]) -> UnfilledHit[] {
+    let some(map_name) = items.imported_as("map") else { return []; };
+    let some(find_if) = items.imported_as("find_if") else { return []; };
+    let some(is_some) = items.imported_as("is_some") else { return []; };
+    body
+        .descendants()
+        .map(
+            |chain| {
+                let Call(outer, arguments, _) = chain.kind else { return none; };
+                let [mapped, predicate] = arguments else { return none; };
+                let Call(inner, inner_arguments, _) = mapped.kind else { return none; };
+                if (outer != find_if || inner != map_name || inner_arguments.len() != 2) {
+                    return none;
+                };
+                if (!predicate.is_the_function(is_some)) { return none; };
+                some(unfilled(
+                    "find_map",
+                    `"{map_name}" then "{find_if}({is_some})" is the first element with an answer, wrapped twice — write "`,
+                    `(..)" over the mapping function, which hands the answer back once`,
+                    chain.span,
+                ))
+            },
+        )
+        .collect_ok()
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64?? \{ {body} }`,
             map_find_if_some,
         )
@@ -104,19 +96,19 @@ pub fn map_find_if_some(program: WrittenProgram) -> LintHit[] {
     assert(messages("map, is_some", "xs.map(g).find_if(is_some)")? == []);
     // Shapes the lint must leave alone.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }",
             map_find_if_some,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn first_big(xs: i64[]) -> i64? { xs.map(|x| x * 10).find_if(|y| y == 20) }",
             map_find_if_some,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn first_some(os: i64?[]) -> i64?? { os.find_if(is_some) }",
             map_find_if_some,
         )? == [],
@@ -124,19 +116,19 @@ pub fn map_find_if_some(program: WrittenProgram) -> LintHit[] {
 
     // Shapes the lint flags, and what it says of them.
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }",
             map_find_if_some,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn first_nonzero(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(is_some) }",
             map_find_if_some,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_unfilled_messages(
             "fn first_nonzero_lambda(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(|o| o.is_some()) }",
             map_find_if_some,
         )? == [],

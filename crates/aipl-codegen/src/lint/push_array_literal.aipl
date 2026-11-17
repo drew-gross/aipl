@@ -40,21 +40,19 @@ import {
 } from builtins;
 import { ArrayLit, Expr, Ident, LetMut, Spread, collect_expr_cases } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
+import { Function, Item } from "../item.aipl";
 import { Pushed, pushed } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, hit, imported_as, lint_messages, on_functions, quote } from "./lint_hit.aipl";
+import { LintHit, hit, imported_as, lint_in_messages, quote } from "./lint_hit.aipl";
 
 # A hit for each array the program binds `mut`, pushes onto and returns.
-pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
-    let some(push) = program.items.imported_as("push") else { return []; };
-    program.on_functions(|Function { body }| {
-        body.collect_expr_cases(LetMut)$literal(push).collect_ok()
-    })
+pub fn push_array_literal(Function { body }, items: Item[]) -> LintHit[] {
+    let some(push) = items.imported_as("push") else { return []; };
+    body.collect_expr_cases(LetMut)$literal(push).collect_ok()
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[], x: i64) -> i64[] \{ {body} }`,
             push_array_literal,
         )
@@ -91,7 +89,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     // A pushed element that mentions the binding: `out.len()` is a running index,
     // and the literal has no `out` for it to refer to.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn indexed(xs: u64[]) -> u64[] {
                     mut out = xs;
@@ -106,7 +104,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     // A statement between the pushes and the result reads `out` half-built, so the
     // pushes are not the last thing that happens to it.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn logged(xs: i64[], x: i64) !prints -> i64[] {
                     mut out = xs;
@@ -122,7 +120,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     // The binding outlives the pushes — something else appends to it later, so
     // there is no single literal that spells it.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn twice(xs: u64[], x: u64) -> u64[] {
                     mut out = xs;
@@ -137,7 +135,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     );
     // A push is not the last statement: the block returns something else.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn counted(xs: i64[], x: i64) -> u64 {
                     mut out = xs;
@@ -149,7 +147,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_messages(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
             push_array_literal,
         )? == [],
@@ -158,7 +156,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     // Shapes the lint flags, and what it says of them.
     // One push onto a named seed — the plain case.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn appended(xs: i64[], x: i64) -> i64[] {
                     mut out = xs;
@@ -173,7 +171,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     // A run of pushes collapses the same way, and an empty seed needs no spread
     // at all. The annotation goes away with the binding.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn pair(a: i64, b: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -185,12 +183,12 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
             push_array_literal,
         )? == [],
     );
-    assert(lint_messages("fn evens(n: i64) -> i64[] { [n, n * 2] }", push_array_literal)? == []);
+    assert(lint_in_messages("fn evens(n: i64) -> i64[] { [n, n * 2] }", push_array_literal)? == []);
 
     // A call-shaped seed can't be quoted back into the advice — its span stops
     // before its parens — so the literal is shown with a placeholder in its place.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn from_call(n: i64, x: i64) -> i64[] {
                     mut out = evens(n);
@@ -205,7 +203,7 @@ pub fn push_array_literal(program: WrittenProgram) -> LintHit[] {
     // The same goes for a computed element. The longhand `set out = out.push(..)`
     // is the same statement written out, so it is flagged the same way.
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn scaled(xs: i64[], n: i64) -> i64[] {
                     mut out = xs;

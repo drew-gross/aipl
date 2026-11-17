@@ -29,8 +29,8 @@ import {
 } from builtins;
 import { Assign, Call, Expr, Num, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenItem, WrittenProgram } from "../item.aipl";
-import { LintHit, hit, lint_messages, on_functions, spans_its_text } from "./lint_hit.aipl";
+import { Function, Item } from "../item.aipl";
+import { LintHit, hit, lint_in_messages, spans_its_text } from "./lint_hit.aipl";
 import { Pairing, paired } from "./operator_pairs.aipl";
 import { is_same_place } from "./places.aipl";
 
@@ -43,7 +43,7 @@ struct Step { spelling: str, commutative: bool, missing: str? }
 struct Written { operator: str, step: Step }
 
 # The advice for the operator `written`, when it has any in a file with these `items`.
-pub fn step_for(self: WrittenItem[], written: str) -> Step? {
+pub fn step_for(self: Item[], written: str) -> Step? {
     let (spelling, commutative) = if (written == "+") {
         ("++", true)
     } else if (written == "+=") {
@@ -58,21 +58,21 @@ pub fn step_for(self: WrittenItem[], written: str) -> Step? {
 }
 
 # A hit for each long-hand step by one in the program.
-pub fn step_by_one(program: WrittenProgram) -> LintHit[] {
+pub fn step_by_one(Function { body }, items: Item[]) -> LintHit[] {
     let steps = ["+", "+=", "-", "-="]
-        .map(|operator| program.items.step_for(operator).map(|step| Written { operator, step }))
+        .map(|operator| items.step_for(operator).map(|step| Written { operator, step }))
         .collect_ok();
     if (steps.is_empty()) { return []; };
-    program.on_functions(|Function { body }| body.descendants()$long_step(steps).collect_ok())
+    body.descendants()$long_step(steps).collect_ok()
 }.test({
     fn on_field(body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_messages(
             `import \{ wrapping_add as + } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
             step_by_one,
         )
     }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_messages(
             `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
             step_by_one,
         )
@@ -126,7 +126,7 @@ pub fn step_by_one(program: WrittenProgram) -> LintHit[] {
 
     // An operator bound to one of the file's own functions is not the builtin, whatever it is called.
     assert(
-        lint_messages(
+        lint_in_messages(
             """import { add as + } from "./mymath.aipl"; fn f(x: i64) -> i64 { mut n = x; set n = n + 1; n }""",
             step_by_one,
         )? == [],

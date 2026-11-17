@@ -29,27 +29,24 @@ import {
 } from builtins;
 import { Bool, Call, Char, Expr, Num, Str, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, WrittenProgram } from "../item.aipl";
-import { LintHit, bound_to, hit, imported_as, lint_messages, on_functions } from "./lint_hit.aipl";
+import { Function, Item } from "../item.aipl";
+import { LintHit, bound_to, hit, imported_as, lint_in_messages } from "./lint_hit.aipl";
 
 # What the file's imports make of the comparisons and `value_or` this lint reads.
 struct Names { equal: bool, not_equal: bool, value_or: str }
 
 # A hit for each optional in the program that is filled with a literal only to be compared with another.
-pub fn value_or_compare(program: WrittenProgram) -> LintHit[] {
-    let items = program.items;
+pub fn value_or_compare(Function { body }, items: Item[]) -> LintHit[] {
     let some(value_or) = items.imported_as("value_or") else { return []; };
     let names = Names {
         equal: items.bound_to("==") == some("equal"),
         not_equal: items.bound_to("!=") == some("not_equal"),
         value_or,
     };
-    program.on_functions(
-        |Function { body }| body.descendants()$filled_to_reject(names).collect_ok(),
-    )
+    body.descendants()$filled_to_reject(names).collect_ok()
 }.test({
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_messages(
+        lint_in_messages(
             `import \{ {imports} } from builtins; fn f(x: char?) -> bool \{ {body} }`,
             value_or_compare,
         )
@@ -75,25 +72,25 @@ pub fn value_or_compare(program: WrittenProgram) -> LintHit[] {
 
     // Shapes the lint flags, and what it says of them.
     assert(
-        lint_messages(
+        lint_in_messages(
             "fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' }",
             value_or_compare,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_messages(
             "fn dot_first(c: char?) -> bool { '.' == c.value_or(' ') }",
             value_or_compare,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_messages(
             "fn not_dot(c: char?) -> bool { c.value_or(' ') != '.' }",
             value_or_compare,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_messages(
             "fn free_form(c: char?) -> bool { value_or(c, ' ') == '.' }",
             value_or_compare,
         )? == [],
@@ -102,13 +99,13 @@ pub fn value_or_compare(program: WrittenProgram) -> LintHit[] {
     // Not flagged: the default and the compared value agree, so this is a genuine
     // "none or dot" test that `c == some('.')` would answer differently.
     assert(
-        lint_messages(
+        lint_in_messages(
             "fn dot_or_none(c: char?) -> bool { c.value_or('.') == '.' }",
             value_or_compare,
         )? == [],
     );
     assert(
-        lint_messages(
+        lint_in_messages(
             """
                 fn subject() !prints {
                     print(is_dot(some('.')).to_str());

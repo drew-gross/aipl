@@ -27,9 +27,9 @@
             <a class="anchor" href="#item-lint">lint</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint(program: WrittenProgram) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn lint(program: Program) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>Every hit the ported lints find in <code>program</code>.</p><p>A lint is either a function of the whole program or of one function, and <code>on_functions</code> is what runs the second kind over every body that is code.</p></div>
+          <div class="doc"><p>Every hit the ported lints find in <code>program</code>.</p><p>A lint is either a function of the whole program or of one function, and <code>on_functions</code> is what runs the second kind over every function of the program, which is every body that is code. One that also needs the file's imports takes the program's <code>items</code> beside the function.</p></div>
 
 
         </section>
