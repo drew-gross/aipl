@@ -339,6 +339,56 @@ fn the_references_of_a_field_are_that_fields_uses() {
     }
 }
 
+/// A use in a file nobody has opened is still a use: the references are the
+/// project's, found by checking each workspace file that mentions the name. A
+/// file that does not compile has nothing resolved to list and is left out, and
+/// a file that does not mention the name is never checked.
+#[test]
+fn the_references_include_files_that_are_not_open() {
+    const LIBRARY: &str = "pub fn helper(n: i64) -> i64 { n }\n";
+    const USER: &str = "import { helper } from \"./library.aipl\";\n\
+                        \n\
+                        fn twice(n: i64) -> i64 { helper(helper(n)) }\n";
+    let workspace = Workspace::new(
+        "references_unopened",
+        &[
+            ("library.aipl", LIBRARY),
+            ("user.aipl", USER),
+            ("broken.aipl", "fn bad() -> i64 { helper(missing) }\n"),
+            ("unrelated.aipl", "fn other() -> i64 { 1 }\n"),
+        ],
+    );
+    let mut server = opened(&workspace, "library.aipl");
+    let root = fs::canonicalize(&workspace.dir).expect("resolve workspace");
+    request(
+        &mut server,
+        "initialize",
+        json!({ "rootUri": format!("file://{}", root.display()) }),
+    );
+    analysed(&mut server, &workspace, "library.aipl");
+
+    let user = workspace.uri("user.aipl");
+    let from = cursor_on(LIBRARY, "helper");
+    let expected = vec![
+        triple(&workspace.uri("library.aipl"), from.clone()),
+        triple(&user, cursor_on(USER, "helper }")),
+        triple(&user, cursor_on(USER, "helper(helper")),
+        triple(&user, past_start(USER, "helper(helper", 7)),
+    ];
+    // Twice: the second answer comes from what the first kept.
+    for _ in 0..2 {
+        assert_eq!(
+            references_at(
+                &mut server,
+                &workspace.uri("library.aipl"),
+                from.clone(),
+                true
+            ),
+            expected
+        );
+    }
+}
+
 #[test]
 fn the_references_of_a_function_are_its_calls() {
     let (workspace, mut server) = shared_name("the_references_of_a_func");

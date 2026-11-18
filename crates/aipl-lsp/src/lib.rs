@@ -77,7 +77,7 @@ pub const DEBOUNCE: Duration = Duration::from_millis(300);
 /// Stack for the diagnostics worker, matching what the CLI gives its own
 /// worker: codegen and the checker recurse per AST node, deep enough to
 /// overflow a default thread stack on a moderately sized program.
-const WORKER_STACK: usize = 256 * 1024 * 1024;
+pub(crate) const WORKER_STACK: usize = 256 * 1024 * 1024;
 
 /// Serve the protocol on stdin/stdout until the client exits or closes the
 /// pipe. This is what `aipl lsp` runs.

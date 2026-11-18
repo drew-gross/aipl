@@ -8,7 +8,7 @@
 //! | request | answered by |
 //! |---|---|
 //! | `textDocument/definition` | the name resolutions the type checker recorded for the document ([`crate::navigation`]) |
-//! | `textDocument/references` | the same resolutions, from every open document's analysis |
+//! | `textDocument/references` | the same resolutions, from every open document's analysis and from the analysis of each other file in the workspace that mentions the name |
 //! | `textDocument/hover` | [`aipl_index::Symbol`]'s `detail` and `doc`, for a builtin from [`aipl_index::builtin`] |
 //! | `textDocument/documentSymbol` | [`aipl_index::FileIndex::outline`] |
 //! | `textDocument/formatting` | [`aipl_codegen::format_source`] |
@@ -28,7 +28,7 @@ use serde_json::{json, Value};
 use crate::analysis::Analyses;
 use crate::navigation::{Navigation, Site, Under};
 use crate::text::{path_to_uri, uri_to_path, LineIndex};
-use crate::workspace::mentions_word;
+use crate::workspace::{aipl_files, mentions_word};
 
 /// One open document, as the editor last told us it reads.
 struct Document {
@@ -104,6 +104,12 @@ pub struct Server {
     /// [`Typed`]. Written by [`Server::record`] when the diagnostics worker
     /// finishes a check.
     typed: HashMap<String, Typed>,
+    /// The directories the client opened as the workspace, which is what a
+    /// request about the whole project searches.
+    roots: Vec<PathBuf>,
+    /// What the type checker made of workspace files that are not open, by
+    /// path, kept for as long as every file each was built from reads as it did.
+    scanned: HashMap<PathBuf, Navigation>,
 }
 
 impl Server {
@@ -123,7 +129,10 @@ impl Server {
         let id = message.get("id").cloned();
         let params = &message["params"];
         match method {
-            "initialize" => reply(id, initialize_result()),
+            "initialize" => {
+                self.roots = workspace_roots(params);
+                reply(id, initialize_result())
+            }
             "shutdown" => reply(id, Value::Null),
             "exit" => Reaction {
                 exit: true,
@@ -315,9 +324,13 @@ impl Server {
     /// are told apart by the type the field is read off.
     ///
     /// Looks through the analysis of every open document, which covers the files
-    /// each one imports. A document whose analysis is missing, out of date or a
-    /// compile error is an error here when it mentions the name, because its
-    /// uses cannot be listed and a list without them would read as complete.
+    /// each one imports, and then through every other file of the workspace that
+    /// mentions the name (see [`Server::scan_workspace`]), so the list is the
+    /// project's and not only what happens to be open. An open document whose
+    /// analysis is missing, out of date or a compile error is an error here when
+    /// it mentions the name, because its uses cannot be listed and a list without
+    /// them would read as complete. A file that is not open and does not compile
+    /// has no resolved names to list and is left out.
     fn references(&mut self, params: &Value) -> Result<Value, String> {
         let (under, path, text, offset) = self.under(params)?;
         let declaration = match under {
@@ -333,12 +346,14 @@ impl Server {
             .as_bool()
             .unwrap_or(true);
         let uri = uri_of(&params["textDocument"]);
-        let here = self.current_navigation(&uri, &text)?;
-        let name = here
+        let name = self
+            .current_navigation(&uri, &text)?
             .source(&declaration.file)
             .and_then(|source| source.get(declaration.span.clone()))
             .unwrap_or_default()
             .to_string();
+        self.scan_workspace(&name);
+        let here = self.current_navigation(&uri, &text)?;
 
         let mut locations: Vec<(PathBuf, usize, Value)> = Vec::new();
         let mut seen: HashSet<(PathBuf, usize, usize)> = HashSet::new();
@@ -374,6 +389,11 @@ impl Server {
                 }
             }
         }
+        for navigation in self.scanned.values() {
+            for site in navigation.uses_of(&declaration) {
+                add(navigation, &site);
+            }
+        }
         locations.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
         Ok(Value::Array(
             locations
@@ -381,6 +401,81 @@ impl Server {
                 .map(|(_, _, location)| location)
                 .collect(),
         ))
+    }
+
+    /// Type-check every workspace file that could use `name` and that no
+    /// analysis already covers, keeping what each check found in
+    /// [`Server::scanned`].
+    ///
+    /// A file is covered when an open document's analysis, or a kept one, was
+    /// built from it: checking a program checks every file it imports, so one
+    /// check often settles several. A file that does not mention `name` is never
+    /// checked, and an open document is left to the open-document analysis, whose
+    /// state is what [`Server::references`] reports on. Kept analyses are dropped
+    /// when any file they were built from has changed.
+    ///
+    /// The check is the compiler's whole frontend, so it runs on a thread with the
+    /// stack the diagnostics worker has, and a file it panics on is left out like
+    /// one that does not compile.
+    fn scan_workspace(&mut self, name: &str) {
+        let documents = &self.documents;
+        let read = |path: &Path| source_in(documents, path);
+        self.scanned
+            .retain(|_, navigation| navigation.is_current(&read));
+        let mut covered: HashSet<PathBuf> = self
+            .scanned
+            .values()
+            .flat_map(|navigation| navigation.files().cloned())
+            .collect();
+        for (uri, typed) in &self.typed {
+            if let (Typed::Ready { navigation, .. }, true) = (
+                typed,
+                documents
+                    .get(uri)
+                    .is_some_and(|document| document.text == typed.text()),
+            ) {
+                covered.extend(navigation.files().cloned());
+            }
+        }
+        let open: HashSet<PathBuf> = documents
+            .values()
+            .filter_map(|document| document.path.as_deref().map(resolved))
+            .collect();
+        let candidates: Vec<(PathBuf, String)> = aipl_files(&self.roots)
+            .iter()
+            .map(|path| resolved(path))
+            .filter(|path| !covered.contains(path) && !open.contains(path))
+            .filter_map(|path| {
+                let text = read(&path)?;
+                mentions_word(&text, name).then_some((path, text))
+            })
+            .collect();
+        if candidates.is_empty() {
+            return;
+        }
+        let scanned = &mut self.scanned;
+        let scan = || {
+            for (path, text) in candidates {
+                if covered.contains(&path) {
+                    continue;
+                }
+                let checked =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| check(&path, &text)));
+                if let Ok(Ok(navigation)) = checked {
+                    covered.extend(navigation.files().cloned());
+                    scanned.insert(path, navigation);
+                }
+            }
+        };
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("aipl-lsp workspace scan".to_string())
+                .stack_size(crate::WORKER_STACK)
+                .spawn_scoped(scope, scan)
+                .expect("spawn the workspace scan")
+                .join()
+                .expect("the scan catches the panics of the checks it runs");
+        });
     }
 
     fn hover(&mut self, params: &Value) -> Value {
@@ -487,6 +582,21 @@ impl Server {
             "newText": formatted,
         }])
     }
+}
+
+/// The directories the client opened as the workspace: its folders, or the
+/// single root of an older client.
+fn workspace_roots(params: &Value) -> Vec<PathBuf> {
+    let folders: Vec<&str> = params["workspaceFolders"]
+        .as_array()
+        .map(|folders| folders.iter().filter_map(|f| f["uri"].as_str()).collect())
+        .unwrap_or_default();
+    let uris = if folders.is_empty() {
+        params["rootUri"].as_str().into_iter().collect()
+    } else {
+        folders
+    };
+    uris.into_iter().filter_map(uri_to_path).collect()
 }
 
 /// The document a request names, and the byte offset of its `position`.

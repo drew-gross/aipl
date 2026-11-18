@@ -386,6 +386,20 @@ impl Navigation {
         self.sources.get(file).map(String::as_str)
     }
 
+    /// Every file the program was built from.
+    pub fn files(&self) -> impl Iterator<Item = &PathBuf> {
+        self.sources.keys()
+    }
+
+    /// Whether every file the program was built from still reads as it did,
+    /// `read` giving a file's current text (`None` for one with no text to
+    /// compare, such as a builtin's source).
+    pub fn is_current(&self, read: &dyn Fn(&Path) -> Option<String>) -> bool {
+        self.sources
+            .iter()
+            .all(|(file, text)| read(file).is_none_or(|now| now == *text))
+    }
+
     /// Every written use of `declaration` this program has, in source order.
     pub fn uses_of(&self, declaration: &Site) -> Vec<Site> {
         let mut found: Vec<Site> = self
