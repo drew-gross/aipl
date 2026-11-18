@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use aipl_parser::parse_with_allows;
+use aipl_parser::parse_and_lint;
 use aipl_syntax::ast::Callee;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item, LambdaParam,
@@ -324,7 +324,7 @@ impl Loader {
     /// [`Loader::prepare`], so a lint sees what the author wrote rather than the
     /// block it desugars to.
     fn parse_and_lint(&self, src: &str) -> Result<(Program, Vec<Span>), Vec<Error>> {
-        let parsed = parse_with_allows(src)?;
+        let parsed = parse_and_lint(src)?;
         if !parsed.lints.is_empty() {
             return Err(parsed.lints);
         }

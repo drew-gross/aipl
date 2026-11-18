@@ -5764,7 +5764,7 @@ let GRAMMAR: Grammar<AiplTok, Ast> = aipl_grammar();
 # reaches — does the work once instead of per file.
 let PREPARED_GRAMMAR: Prepared<AiplTok, Ast>!ParseError = prepare(aipl_grammar());
 
-# The whole of `aipl_parser::parse_with_allows`, on this side: strip the
+# The whole of `aipl_parser::parse_and_lint`, on this side: strip the
 # expected-output sections, refuse trailing whitespace, lex losslessly, keep the
 # `#[allow]` spans, parse and lower.
 #

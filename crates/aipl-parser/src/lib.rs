@@ -248,9 +248,9 @@ pub fn set_parse_hook(f: fn(&str) -> Result<Parsed, Vec<Error>>) {
 /// `Program`.
 ///
 /// A file with several syntax errors fails here with the first; a caller that
-/// reports them all wants [`parse_with_allows`].
+/// reports them all wants [`parse_and_lint`].
 pub fn parse(input: &str) -> Result<Program, Error> {
-    parse_with_allows(input)
+    parse_and_lint(input)
         .map(|parsed| parsed.program)
         .map_err(|errors| {
             errors
@@ -268,7 +268,7 @@ pub fn parse(input: &str) -> Result<Program, Error> {
 /// in source order and never empty: where the grammar has committed to what
 /// must come next, a miss is reported and the parse reads on, so several slips
 /// in one file are all reported by one run.
-pub fn parse_with_allows(input: &str) -> Result<Parsed, Vec<Error>> {
+pub fn parse_and_lint(input: &str) -> Result<Parsed, Vec<Error>> {
     let hook = PARSE_HOOK
         .get()
         .expect("parse hook not installed before parsing (call install_parser_hooks)");

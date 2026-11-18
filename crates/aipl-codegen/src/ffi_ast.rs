@@ -40,7 +40,7 @@ pub fn program_from_ffi(v: &FfiValue) -> R<ast::Program> {
 }
 
 /// The `Program` and the lint errors behind a `Res(Ok(..))` returned by
-/// `parse_and_partial_load` — the whole of what `aipl_parser::parse_with_allows`
+/// `parse_and_partial_load` — the whole of what `aipl_parser::parse_and_lint`
 /// returns, which is what the parser hook hands back.
 ///
 /// A parse failure comes back as every `ParseError` it found, each its message at
