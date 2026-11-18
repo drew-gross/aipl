@@ -51,7 +51,9 @@ error messages (regressions when the pinner replaced the checker's reporting; th
   `grid_get` literal without a grid: was "cannot infer a type for T in __builtin_grid_get", now names `grid_get` which the user didn't write
 
 effects / shims:
+  networking (http_get, then more): plan in NETWORKING.md
   undeclared-effect error in a test should say to add a `shim`
+  shim bindings cannot name a helper fn declared in a `.test` block (hoisted name is not resolved); cases use closures instead
 
 check:
   `.benchmark` blocks run in another process, so `check` counts them in its totals and prints their failures but gives them no row in the per-file listing; the assertion tally needs to cross back from the instrumented run

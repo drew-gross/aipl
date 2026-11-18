@@ -839,20 +839,24 @@ impl Loader {
                     }
                     builtin.name().to_string()
                 } else if let (true, Some(canonical)) = (
-                    library == aipl_syntax::builtin::MAIN_LIBRARY,
+                    library == aipl_syntax::builtin_type_library(&n.name),
                     aipl_syntax::builtin_type_canonical(&n.name),
                 ) {
                     canonical
                 } else {
                     // Imported from the wrong library: say which one holds it.
-                    let message = match aipl_syntax::builtin::Builtin::library_of(&n.name) {
-                        Some(elsewhere) if elsewhere != library => format!(
+                    let message =
+                        match aipl_syntax::builtin::Builtin::library_of(&n.name).or_else(|| {
+                            aipl_syntax::builtin_type_canonical(&n.name)
+                                .map(|_| aipl_syntax::builtin_type_library(&n.name))
+                        }) {
+                            Some(elsewhere) if elsewhere != library => format!(
                             "\"{}\" is not in the {library} library; import it from {elsewhere}: \
                              `import {{ {} }} from {elsewhere};`",
                             n.name, n.name
                         ),
-                        _ => format!("\"{}\" is not a builtin", n.name),
-                    };
+                            _ => format!("\"{}\" is not a builtin", n.name),
+                        };
                     return Err(self.attribute(path, root, Error::at(message, n.span.clone())));
                 };
                 import_sites

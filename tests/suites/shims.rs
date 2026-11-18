@@ -58,7 +58,9 @@ fn linker_runtime_reserves_every_slot() {
 fn every_operation_is_a_builtin() {
     for (effect, op) in shim_operations() {
         assert!(
-            aipl_syntax::ast::Callee::importable(op).is_some(),
+            aipl_syntax::builtin::Builtin::all()
+                .iter()
+                .any(|builtin| builtin.name() == op),
             "effect \"!{effect}\" lists operation {op:?}, which is not an importable builtin"
         );
     }

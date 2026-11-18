@@ -25,6 +25,7 @@ import {
     to_str,
     write_string_to_file,
 } from builtins;
+import { HttpResponse, http_get } from network;
 
 // ---- prints: the shim swallows the output. (A shim that printed would reach
 // itself, since the shim stays installed while it runs.)
@@ -123,6 +124,22 @@ fn shimmed_run() -> str {
     }
 }
 
+// ---- http_get
+fn canned_response(url: str, timeout_seconds: u64) -> HttpResponse!Error {
+    ok(HttpResponse { status: 204, headers: [], body: url })
+}
+
+fn fetch(url: str) !http_get -> HttpResponse!Error { http_get(url, timeout_seconds=5) }
+
+fn shimmed_fetch() -> str {
+    shim http_get { http_get = canned_response } {
+        match (fetch("http://example.test/")) {
+            ok(r) => `{r.status} {r.body}`,
+            err(e) => e,
+        }
+    }
+}
+
 test({
     mut out = "";
     shim prints {
@@ -142,6 +159,7 @@ test({
         print(shimmed_key());
         print(shimmed_terminal());
         print(shimmed_run());
+        print(shimmed_fetch());
         greet();
     };
     assert(out == """
@@ -153,6 +171,7 @@ test({
         some(65)
         enter, move to 2,5, clear, leave
         ran tool exit=3
+        204 http://example.test/
         hello
 
     """);

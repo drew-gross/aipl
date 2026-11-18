@@ -2527,7 +2527,8 @@ impl Pinner<'_> {
                     let mut msg = format!("unknown struct {name:?}");
                     if aipl_syntax::IMPORTABLE_BUILTIN_TYPES.contains(&name.as_str()) {
                         msg.push_str(&format!(
-                            " — {name:?} is a builtin type; import it with `import {{ {name} }} from builtins;`"
+                            " — {name:?} is a builtin type; import it with `import {{ {name} }} from {};`",
+                            aipl_syntax::builtin_type_library(name)
                         ));
                     }
                     return reject(msg, &e.span);

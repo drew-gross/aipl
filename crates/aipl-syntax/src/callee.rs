@@ -269,6 +269,8 @@ pub enum Callee {
     NowNanos,
     MonotonicNow,
     ExecuteProgram,
+    /// `http_get(self: str, timeout_seconds: u64 = 30) -> HttpResponse!Error` — an HTTP GET.
+    HttpGet,
     Union,
     UnionAll,
     /// `set_map(self: #{T}, f: (T) -> U) -> U[]` — `map` for a set, yielding an
@@ -634,6 +636,7 @@ impl Callee {
             Callee::NowNanos => "__builtin_now_nanos",
             Callee::MonotonicNow => "__builtin_monotonic_now",
             Callee::ExecuteProgram => "__builtin_execute_program",
+            Callee::HttpGet => "__builtin_http_get",
             Callee::Union => "__builtin_union",
             Callee::UnionAll => "__builtin_union_all",
             Callee::SetMap => "__builtin_set_map",

@@ -411,6 +411,7 @@ syntax:
   map should take any container and return the same container (then replace map_ok)
 
 strings:
+  separate strings by ASCII, UTF-8, etc. Disallow control chars in ascii, use a separate type for that. Also need a bytes type, for stuff like files.
   single-line triple quotes should not eat leading whitespace i.e """   x   """ contains all 6 spaces
   literals should be a separate tag maybe?
 

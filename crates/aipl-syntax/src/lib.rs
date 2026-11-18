@@ -3293,6 +3293,11 @@ pub const BUILTIN_SIGNATURES: &str = r#"
 struct __builtin_Span { start: u64, end: u64 }
 // A finished child process's captured output and exit status.
 struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
+// One header line of an HTTP response: its name as the server wrote it, and its value.
+struct __builtin_HttpHeader { name: str, value: str }
+// A response to an HTTP request: the final status code, the headers in the order they arrived,
+// and the body as text.
+struct __builtin_HttpResponse { status: u16, headers: __builtin_HttpHeader[], body: str }
 // What one `measure(..)` call cost: heap allocations made, bytes those requested,
 // the most heap that was live at once (counted from what was live when the
 // window opened), and CLIF instructions executed. All deterministic for a given
@@ -3414,6 +3419,17 @@ fn __builtin_monotonic_now() !clock -> u64 { 0 }
 # `"echo".execute_program(args = ["hi"])` passes argv.
 fn __builtin_execute_program(self: str, args: str[] = []) !execute_program -> __builtin_ExecResult!Error {
     ok(__builtin_ExecResult { stdout: "", stderr: "", exit_code: 0 })
+}
+
+# Request `self` (a URL) with HTTP GET and wait for the response, following redirects:
+# `ok(HttpResponse)` for any response the server gave, whatever its status (a 404 is an `ok`
+# response with `status == 404`); `err(message)` only when no response was produced (the
+# name did not resolve, the connection was refused, TLS failed, the request took longer than
+# `timeout_seconds`, or the body was not text: a `str` holds no NUL byte and only valid UTF-8).
+# `timeout_seconds` is a keyword parameter defaulting to 30, so `url.http_get()` waits at most
+# half a minute and `url.http_get(timeout_seconds = 5)` five seconds.
+fn __builtin_http_get(self: str, timeout_seconds: u64 = 30) !http_get -> __builtin_HttpResponse!Error {
+    ok(__builtin_HttpResponse { status: 0, headers: [], body: "" })
 }
 
 # The text of a value, exactly what `` `{v}` `` interpolates: a `char` or `str` renders bare,
@@ -4177,6 +4193,7 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
             "leave_alternate_screen",
         ],
     ),
+    ("http_get", &["http_get"]),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -4193,6 +4210,7 @@ pub const SHIM_ONLY_EFFECTS: &[&str] = &["random"];
 /// is not the same as writing text to it (`prints`);
 /// `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
+/// `http_get` = makes an HTTP GET request over the network;
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
 /// (so a function's result depends on when it ran); `random` = draws random
 /// numbers, which only a `shim` can supply ([`SHIM_ONLY_EFFECTS`]). `measure` is internal:
@@ -4207,6 +4225,7 @@ pub const KNOWN_EFFECTS: &[&str] = &[
     "write_files",
     "list_files",
     "execute_program",
+    "http_get",
     "clock",
     "random",
     "measure",
@@ -4242,7 +4261,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 15;
+pub const SHIM_SLOT_COUNT: usize = 16;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes
@@ -4261,6 +4280,8 @@ pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &[
     "Measurement",
     "Grid",
     "RandomProvider",
+    "HttpResponse",
+    "HttpHeader",
     "IEEE754Float32",
     "IEEE754Float64",
 ];
@@ -4289,6 +4310,15 @@ pub const GRID_TYPE: &str = "__builtin_Grid";
 pub fn is_grid_instance(name: &str) -> bool {
     name.strip_prefix(GRID_TYPE)
         .is_some_and(|rest| rest.starts_with('$'))
+}
+
+/// The library an importable builtin type is imported from: `network` for the types of the
+/// network operations, the main library for the rest.
+pub fn builtin_type_library(name: &str) -> &'static str {
+    match name {
+        "HttpResponse" | "HttpHeader" => builtin::NETWORK_LIBRARY,
+        _ => builtin::MAIN_LIBRARY,
+    }
 }
 
 /// Canonical internal name for an importable builtin type, or `None` if

@@ -405,7 +405,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/effects/shim_clock | 7 | 276 | 276 | 472 | 3044 |
 | tests/cases/effects/shim_closures | 24 | 1845 | 1709 | 5411 | 17320 |
 | tests/cases/effects/shim_covers_synthesized_functions | 38 | 2545 | 2545 | 5678 | 8744 |
-| tests/cases/effects/shim_effects | 47 | 3395 | 3155 | 7262 | 23496 |
+| tests/cases/effects/shim_effects | 52 | 3766 | 3526 | 8077 | 26648 |
 | tests/cases/effects/transitive_caller_with_declaration_passes | 1 | 88 | 88 | 478 | 4204 |
 | tests/cases/equality/arrays | 8 | 640 | 640 | 2106 | 4488 |
 | tests/cases/equality/optionals | 0 | 0 | 0 | 205 | 820 |
@@ -586,6 +586,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/methods/mutating/rebuild_from_loop | 2 | 128 | 176 | 1593 | 2760 |
 | tests/cases/methods/mutating/recursive_receiver | 31 | 1202 | 132 | 12929 | 15124 |
 | tests/cases/methods/mutating/set_writeback_form | 3 | 128 | 144 | 933 | 2232 |
+| tests/cases/network/shim_http_get | 6 | 451 | 371 | 888 | 4996 |
 | tests/cases/optimizations/appending_variant | 404 | 24508 | 24730 | 60172 | 10916 |
 | tests/cases/optimizations/appending_variant_accumulator | 6 | 368 | 376 | 3632 | 6356 |
 | tests/cases/optimizations/appending_variant_not_minted | 12 | 556 | 452 | 886 | 3260 |

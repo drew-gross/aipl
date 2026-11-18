@@ -1,0 +1,27 @@
+# `http_get` is shimmable like every effect: a test stands in for the network with the
+# response it wants, so code that fetches a page is tested without one. A response is a
+# status, the headers in the order they arrived, and the body.
+
+import { equal as == } from builtins;
+import { HttpHeader, HttpResponse, http_get } from network;
+
+# The body of `self`, or why there is none.
+fn page(self: str) !http_get -> str {
+    match (self.http_get()) {
+        ok(response) => `{response.status}: {response.body}`,
+        err(message) => `failed: {message}`,
+    }
+}.test({
+    shim http_get {
+        http_get = |url, timeout_seconds| ok(HttpResponse {
+            status: 200,
+            headers: [HttpHeader { name: "Content-Type", value: "text/plain" }],
+            body: `hello from {url}`,
+        }),
+    } {
+        assert("http://a.test/".page() == "200: hello from http://a.test/");
+    };
+    shim http_get { http_get = |url, timeout_seconds| err("connection refused") } {
+        assert("http://a.test/".page() == "failed: connection refused");
+    };
+})

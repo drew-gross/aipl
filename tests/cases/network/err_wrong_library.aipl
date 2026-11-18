@@ -1,0 +1,11 @@
+# `http_get` is in the `network` library, not the main one.
+
+import { http_get } from builtins;
+
+fn subject() !http_get -> bool { "http://localhost/".http_get().is_some() }
+--- check --compile ---
+error: "http_get" is not in the builtins library; import it from network: `import { http_get } from network;`
+ --> ./tests/cases/network/err_wrong_library.aipl:3:10
+  |
+3 | import { http_get } from builtins;
+  |          ^^^^^^^^

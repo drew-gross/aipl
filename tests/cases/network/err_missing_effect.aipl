@@ -1,0 +1,17 @@
+# `http_get` has the `!http_get` effect; a caller that doesn't declare it is rejected.
+
+import { print } from builtins;
+import { http_get } from network;
+
+fn subject() !prints {
+    match ("http://localhost/".http_get()) {
+        ok(r) => print(r.body),
+        err(e) => print(e),
+    };
+}
+--- check --compile ---
+error: fn "http_get" has effect "!http_get" but the calling function does not declare it
+ --> ./tests/cases/network/err_missing_effect.aipl:7:12
+  |
+7 |     match ("http://localhost/".http_get()) {
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

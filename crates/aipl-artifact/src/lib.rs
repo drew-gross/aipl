@@ -477,7 +477,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // The out pointer for the line; the flag comes back in a register.
         "aipl_read_line" => sig(1, true),
         "aipl_char_to_str" => sig(2, false),
-        "aipl_execute_program" => sig(3, false),
+        "aipl_execute_program" | "aipl_http_get" => sig(3, false),
         "aipl_str_starts_with_at" | "aipl_str_starts_with_char" => sig(3, true),
         "aipl_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),

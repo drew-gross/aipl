@@ -452,7 +452,8 @@ impl TypeValidator<'_> {
                     let mut msg = format!("{ctx}: unknown type {n:?}");
                     if aipl_syntax::IMPORTABLE_BUILTIN_TYPES.contains(&n.as_str()) {
                         msg.push_str(&format!(
-                            " — {n:?} is a builtin type; import it with `import {{ {n} }} from builtins;`"
+                            " — {n:?} is a builtin type; import it with `import {{ {n} }} from {};`",
+                            aipl_syntax::builtin_type_library(n)
                         ));
                     }
                     Err(Error::msg(msg))

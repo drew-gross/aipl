@@ -1117,8 +1117,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 15] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 15];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 16] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 16];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
@@ -1283,6 +1283,12 @@ pub extern "C" fn aipl_execute_program(
 }
 
 
+
+/// `http_get` under the wide ABI: the `HttpResponse!Error` goes to `out`. Borrows the URL.
+#[no_mangle]
+pub extern "C" fn aipl_http_get(out: *mut u8, _url: *const str24::Str, _timeout_seconds: i64) {
+    write_err_wide(out, b"http_get is not available");
+}
 
 // ---------- POSIX process spawning (`execute_program`) ----------
 //

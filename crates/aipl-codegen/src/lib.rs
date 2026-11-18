@@ -505,6 +505,12 @@ extern "C" fn aipl_execute_program(
     }
 }
 
+/// `http_get` under the wide ABI: the `HttpResponse!Error` goes to `out`.
+#[no_mangle]
+extern "C" fn aipl_http_get(out: *mut u8, _url: *const str24::Str, _timeout_seconds: i64) {
+    write_err_wide(out, b"http_get is not available");
+}
+
 /// Spawn `program` with `args` and collect its output. `None` if it could not be
 /// launched, or if either stream holds a NUL byte (which a NUL-terminated `str`
 /// cannot represent — the same constraint `read_file_to_string` has).
@@ -3848,6 +3854,7 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_random_state", aipl_random_state as *const u8);
     jit_builder.symbol("aipl_random_unshimmed", aipl_random_unshimmed as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
+    jit_builder.symbol("aipl_http_get", aipl_http_get as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
         "aipl_str_split_iter_init",
@@ -7473,7 +7480,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_retain_str"
         | "aipl_arr_drop_opt_str"
         | "aipl_arr_retain_opt_str" => (2, Ret::None),
-        "aipl_execute_program" => (3, Ret::None),
+        "aipl_execute_program" | "aipl_http_get" => (3, Ret::None),
         // The cursor, the source, and the separator: a split walk's whole state
         // (`str24::SplitIter`), written into the caller's stack slot.
         "aipl_str_split_iter_init" => (3, Ret::None),
@@ -7766,6 +7773,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::NowNanos, "aipl_now_nanos"),
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
+        (Callee::HttpGet, "aipl_http_get"),
         (Callee::Trim, "aipl_trim"),
         // The `*_str` family — each one entry point, so there is no custom
         // codegen arm: the ordinary-call path reads the signature registered
