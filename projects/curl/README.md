@@ -1,4 +1,4 @@
-# aipl-curl
+# curl
 
 Fetches a URL with `http_get` and prints what the server answers, like a small `curl`.
 
@@ -16,7 +16,7 @@ Content-Type: text/html
 ## Usage
 
 ```
-aipl-curl [-i] [-t <seconds>] <url>
+curl [-i] [-t <seconds>] <url>
 ```
 
 Prints the response's body. `-i` prints the status line and the headers first, then a blank

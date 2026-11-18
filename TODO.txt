@@ -29,7 +29,6 @@ projects:
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
     scrapers
   curl:
-    rename to curl instead of aipl-curl
 
 floats:
   trig operations (sine, cosine, etc. NOT sin, cos. User can import as if they want abbreviations)
@@ -244,9 +243,11 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 print:
-  add options like indentation, print grids as grids, quoting, etc.
+  rename prints effect to print
+  add options like indentation, print grids as grids (tabulate?), quoting, etc.
 
 dev loop:
+  merge docs and doc commands (separate commands for 1 vs. many files is atypical)
   Add subset flags to check e.g. aipl check --format
   have the clir IR include the human readable version of data section strings in comments
   check should validate remaining sections (performance, check)

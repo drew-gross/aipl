@@ -96,15 +96,15 @@ fn show_header(self: HttpHeader) -> str { `{self.name}: {self.value}` }
 fn main(args: str[]) !prints !http_get -> i64 {
     match (parse_args(args)) {
         err(e) => {
-            print(`aipl-curl: {e}`);
-            print("usage: aipl-curl [-i] [-t <seconds>] <url>");
+            print(`curl: {e}`);
+            print("usage: curl [-i] [-t <seconds>] <url>");
             1
         },
         ok(invocation) => match (invocation.url.http_get(
             timeout_seconds=invocation.timeout_seconds,
         )) {
             err(e) => {
-                print(`aipl-curl: {e}`);
+                print(`curl: {e}`);
                 1
             },
             ok(response) => {
