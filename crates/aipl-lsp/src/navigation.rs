@@ -266,6 +266,22 @@ impl Navigation {
                     }
                 }
             }
+            // The case a `without` clause leaves out is that case of the variant
+            // the clause refines.
+            for exclusion in &source.exclusion_uses {
+                let Some(name) = source.source.get(exclusion.span.clone()) else {
+                    continue;
+                };
+                if let Some(site) = cases.get(&(exclusion.target.as_str(), name)) {
+                    uses.push((
+                        Site {
+                            file: file.clone(),
+                            span: exclusion.span.clone(),
+                        },
+                        Found::Declared(site.clone()),
+                    ));
+                }
+            }
             // A keyword argument's name is the parameter it was passed for.
             for keyword in &source.keyword_uses {
                 if let Some(site) =

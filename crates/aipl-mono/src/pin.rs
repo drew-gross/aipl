@@ -3186,7 +3186,7 @@ impl Pinner<'_> {
         }
         if let Some(sig) = self.decls.sigs.get(name).cloned() {
             let sig = sig.sig;
-            self.resolve(&e.name_span, Target::Function(name.to_string()));
+            self.resolve(&e.name_span, function_target(name));
             if sig.is_generic() {
                 return reject(
                     format!(
@@ -4501,7 +4501,7 @@ impl Pinner<'_> {
             }
         }
         if matches!(callee, Callee::Some | Callee::IntParse) {
-            self.resolve(&e.name_span, Target::Function(name.to_string()));
+            self.resolve(&e.name_span, function_target(name));
         }
         match callee {
             Callee::Some if args.len() == 1 => {
@@ -4998,7 +4998,7 @@ impl Pinner<'_> {
             }
             return reject(msg, &e.span);
         };
-        self.resolve(&e.name_span, Target::Function(name.to_string()));
+        self.resolve(&e.name_span, function_target(name));
         let mut sig = sig.sig;
         // `(row, column).is_in_bounds_of(grid)`, and `grid.try_set((row, column), value)`.
         if *callee == Callee::IsInBoundsOf && args.len() == 2 {
@@ -5290,7 +5290,7 @@ impl Pinner<'_> {
                 && !self.decls.generic_ctors.contains_key(name)
             {
                 if let Some(sig) = self.decls.sigs.get(name).map(|s| s.sig.clone()) {
-                    self.resolve(&arg.name_span, Target::Function(name.clone()));
+                    self.resolve(&arg.name_span, function_target(name));
                     for effect in &sig.effects {
                         if !self.effects.contains(effect) {
                             return reject(
@@ -5636,5 +5636,21 @@ impl crate::match_check::MatchInfo for TypeView<'_> {
             }
             _ => None,
         }
+    }
+}
+
+/// What a function name written in the program refers to. The shared wrapper
+/// the loader makes of a constructor used as a value (`xs.map(Circle)`) is the
+/// case the author wrote, not a function they declared.
+fn function_target(name: &str) -> Target {
+    match name
+        .strip_prefix(aipl_syntax::CTOR_WRAPPER_PREFIX)
+        .and_then(|rest| rest.split_once('$'))
+    {
+        Some((variant, case)) => Target::Case {
+            variant: variant.to_string(),
+            case: case.to_string(),
+        },
+        None => Target::Function(name.to_string()),
     }
 }

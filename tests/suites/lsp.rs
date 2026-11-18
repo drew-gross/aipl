@@ -1343,3 +1343,44 @@ fn a_function_passed_as_a_value_goes_to_its_declaration() {
         cursor_on(util, "double(n: i64)")
     );
 }
+
+/// A case written in every position the language has for naming one.
+const CASE_SHAPES: &str = "import { collect_arms } from builtins;\n\
+                           \n\
+                           struct Fun { name: i64 }\n\
+                           \n\
+                           variant Super = Written(Fun) | Lowered(Fun)\n\
+                           \n\
+                           variant Plain = Super without Lowered\n\
+                           \n\
+                           fn bare(s: Super without Lowered) -> i64 { 1 }\n\
+                           \n\
+                           fn make(f: Fun) -> Super { Lowered(f) }\n\
+                           \n\
+                           fn arm(s: Super) -> i64 { match (s) { Lowered(Fun { name }) => name, Written(Fun { name as other }) => other } }\n\
+                           \n\
+                           fn collected(items: Super[]) -> i64[] { items.collect_arms(Lowered)$declared() }\n\
+                           \n\
+                           fn declared(self: Lowered(Fun { name })) -> i64 { name }\n";
+
+/// A case goes to its declaration from a constructor call, a pattern, a
+/// parameter pattern, the case passed to `collect_arms`, and the `without`
+/// clauses of a refinement declaration and of a type.
+#[test]
+fn a_case_goes_to_its_declaration_wherever_it_is_named() {
+    let workspace = Workspace::new("case_shapes", &[("main.aipl", CASE_SHAPES)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let declaration = cursor_on(CASE_SHAPES, "Lowered(Fun)");
+    for snippet in [
+        "Lowered\n\nfn bare",
+        "Lowered) -> i64 { 1 }",
+        "Lowered(f) }",
+        "Lowered(Fun { name }) =>",
+        "Lowered)$declared",
+        "Lowered(Fun { name })) ->",
+    ] {
+        let found = definition_at(&mut server, &uri, cursor_on(CASE_SHAPES, snippet));
+        assert_eq!(found["range"]["start"], declaration, "from {snippet:?}");
+    }
+}

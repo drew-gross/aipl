@@ -977,6 +977,7 @@ impl Loader {
                     imports: import_sites.get(path).cloned().unwrap_or_default(),
                     type_uses: type_sites(file, &full_views[path]),
                     type_var_uses: type_var_sites(file),
+                    exclusion_uses: exclusion_sites(file, &full_views[path]),
                     keyword_uses: Vec::new(),
                 };
             }
@@ -2121,6 +2122,26 @@ fn type_var_sites(file: &LoadedFile) -> Vec<Span> {
                 .is_some_and(|n| type_vars.contains(n))
         })
         .cloned()
+        .collect()
+}
+
+/// The cases written after a `without` in `file`'s types, each with the variant
+/// the name before the `without` means. `without` is a keyword, so a type token
+/// spelled that way is always the clause, and the token after it its exclusion.
+fn exclusion_sites(
+    file: &LoadedFile,
+    view: &HashMap<String, String>,
+) -> Vec<aipl_syntax::ast::ImportSite> {
+    let text = |span: &Span| file.source.get(span.clone());
+    file.type_uses
+        .windows(3)
+        .filter(|window| text(&window[1]) == Some("without"))
+        .filter_map(|window| {
+            Some(aipl_syntax::ast::ImportSite {
+                span: window[2].clone(),
+                target: view.get(text(&window[0])?)?.clone(),
+            })
+        })
         .collect()
 }
 

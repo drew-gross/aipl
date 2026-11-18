@@ -401,6 +401,11 @@ pub mod ast {
         /// parameter (`T` in `fn f<T>(x: T)`). Which declaration it means is
         /// the parameter list of the item that holds it.
         pub type_var_uses: Vec<Span>,
+        /// Each case a `without` clause leaves out (`C` in `V without C`): where
+        /// it is written, and the global name of the variant before the
+        /// `without`. A clause whose base is not a bare variant name is not
+        /// listed.
+        pub exclusion_uses: Vec<ImportSite>,
         /// Each keyword argument written in the file (`f(k = v)`): the calls are
         /// positional once the loader has expanded them, so this is what says
         /// where the name was and which parameter it meant.

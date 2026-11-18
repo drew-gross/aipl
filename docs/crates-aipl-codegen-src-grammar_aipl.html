@@ -2732,7 +2732,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn type_leaves(self: Cst, names: str[], inside: bool) -&#62; Span[]</code></pre>
 
-          <div class="doc"><p>Every token written inside a type annotation, in source order, and every name a pattern puts in front of its slots: the names a language server resolves to declarations. A token is in a type when some <code>ty</code> node holds it, at any depth, so <code>Pair&lt;i64&gt;[]</code> yields <code>Pair</code>, <code>&lt;</code>, <code>i64</code>, <code>&gt;</code> and the brackets. The loader keeps the ones that name something.</p></div>
+          <div class="doc"><p>Every token written inside a type annotation, in source order, and every name a pattern puts in front of its slots: the names a language server resolves to declarations. A token is in a type when some <code>ty</code> node holds it, at any depth, so <code>Pair&lt;i64&gt;[]</code> yields <code>Pair</code>, <code>&lt;</code>, <code>i64</code>, <code>&gt;</code> and the brackets. A refinement declaration (<code>variant W = V without C</code>) is all of it a type, so its tokens are yielded too, <code>without</code> among them: the name after a <code>without</code> is a case of the variant before it. The loader keeps the ones that name something.</p></div>
 
 
         </section>

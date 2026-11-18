@@ -5809,6 +5809,16 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     // the case and the struct, and not the names the slots bind.
     assert(aipl_parse_file("fn f(self: Fn(Function { body })) { }")?.type_uses == [11..13, 14..22]);
     assert(aipl_parse_file("fn f(p: Q) { let Point { x } = p; }")?.type_uses == [8..9, 17..22]);
+
+    // A refinement declaration's tokens, from `variant` to the excluded case.
+    assert(aipl_parse_file("variant W = V without C")?.type_uses == [
+        0..7,
+        8..9,
+        10..11,
+        12..13,
+        14..21,
+        22..23,
+    ]);
     assert(program.show_program() == "fn f() = Seq(g(), ())");
 
     // Every named parameter shape, lowered. The six are six distinct runs of
@@ -5939,14 +5949,16 @@ fn allow_spans(lexed: LexResult<AiplTok>) -> Span[] {
 # Every token written inside a type annotation, in source order, and every name
 # a pattern puts in front of its slots: the names a language server resolves to
 # declarations. A token is in a type when some `ty` node holds it, at any depth,
-# so `Pair<i64>[]` yields `Pair`, `<`, `i64`, `>` and the brackets. The loader
-# keeps the ones that name something.
+# so `Pair<i64>[]` yields `Pair`, `<`, `i64`, `>` and the brackets. A refinement
+# declaration (`variant W = V without C`) is all of it a type, so its tokens are
+# yielded too, `without` among them: the name after a `without` is a case of the
+# variant before it. The loader keeps the ones that name something.
 fn type_leaves(self: Cst, names: str[], inside: bool) -> Span[] {
     match (self) {
         Leaf(span) => if (inside) { [span] } else { [] },
         Tree(production, kids) => {
             let name = names[production].value_or("");
-            let in_type = inside || name == "ty";
+            let in_type = inside || name == "ty" || name == "refinement_decl";
             [
                 ..if (PATTERN_PRODUCTIONS.contains(name)) { kids.constructor_names() } else { [] },
                 ..kids$type_leaves(names, in_type).join(),
