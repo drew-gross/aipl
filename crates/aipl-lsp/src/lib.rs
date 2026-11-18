@@ -176,7 +176,17 @@ fn publish_diagnostics(pending: Receiver<String>, server: &Mutex<Server>, output
             // Copy the document out, then let go of the server: the check
             // below is the whole frontend, and a request arriving mid-check
             // must not wait for it.
-            let Some(snapshot) = lock(server).snapshot(&uri) else {
+            let (checked, snapshot) = {
+                let mut server = lock(server);
+                (server.take_checked(&uri), server.snapshot(&uri))
+            };
+            if let Some(message) = checked {
+                if send(output, &message).is_err() {
+                    return;
+                }
+                continue;
+            }
+            let Some(snapshot) = snapshot else {
                 continue;
             };
             // A panic in the frontend costs this document's diagnostics, not

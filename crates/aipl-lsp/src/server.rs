@@ -108,6 +108,11 @@ pub struct Server {
     /// What the type checker made of workspace files that are not open, by
     /// path, kept for as long as every file each was built from reads as it did.
     scanned: HashMap<PathBuf, Navigation>,
+    /// The diagnostics of a check a request ran itself, by URI, with the text
+    /// they are for: not yet published, and no longer worth computing again.
+    /// Dropped by anything that makes the check stale — see
+    /// [`Server::take_checked`].
+    checked_on_demand: HashMap<String, (String, Value)>,
 }
 
 impl Server {
@@ -149,11 +154,16 @@ impl Server {
             // A save changes no text, but it does change what every *other*
             // file sees: this buffer's imports now resolve to what was just
             // written. Rechecking is the cheapest way to say so.
-            "textDocument/didSave" => recheck(uri_of(&params["textDocument"])),
+            "textDocument/didSave" => {
+                let uri = uri_of(&params["textDocument"]);
+                self.checked_on_demand.remove(&uri);
+                recheck(uri)
+            }
             "textDocument/didClose" => {
                 let uri = uri_of(&params["textDocument"]);
                 self.documents.remove(&uri);
                 self.typed.remove(&uri);
+                self.checked_on_demand.remove(&uri);
                 // Diagnostics belong to the server until it says otherwise, so
                 // a closed document's have to be withdrawn explicitly or the
                 // editor keeps showing them.
@@ -217,6 +227,7 @@ impl Server {
 
     fn open(&mut self, document: &Value) {
         let uri = uri_of(document);
+        self.checked_on_demand.remove(&uri);
         self.documents.insert(
             uri.clone(),
             Document {
@@ -231,6 +242,7 @@ impl Server {
     /// so in `initialize`), so each change carries the new text entire and
     /// there is no edit to apply — only the last one counts.
     fn change(&mut self, uri: &str, params: &Value) {
+        self.checked_on_demand.remove(uri);
         let Some(document) = self.documents.get_mut(uri) else {
             return;
         };
@@ -286,7 +298,19 @@ impl Server {
             return;
         };
         let analysis = on_large_stack("aipl-lsp analysis", || analyse(&snapshot));
-        self.record(analysis);
+        let text = snapshot.text.clone();
+        let message = self.record(analysis);
+        self.checked_on_demand.insert(snapshot.uri, (text, message));
+    }
+
+    /// The diagnostics a request already computed for the current text of `uri`,
+    /// once: what the diagnostics worker publishes instead of checking the same
+    /// text again. `None` when no request did, or when an edit, a save or a
+    /// close has happened since — a save changes what the document's imports
+    /// read as, so the check is worth redoing.
+    pub fn take_checked(&mut self, uri: &str) -> Option<Value> {
+        let (text, message) = self.checked_on_demand.remove(uri)?;
+        (self.documents.get(uri)?.text == text).then_some(message)
     }
 
     /// The navigation of the document at `uri`, if it was built from exactly

@@ -510,6 +510,46 @@ fn a_request_before_the_check_has_finished_checks_the_document_itself() {
     );
 }
 
+/// A check a request ran is published rather than run again — once, and only
+/// for the text it was run on.
+#[test]
+fn a_check_a_request_ran_is_published_instead_of_run_again() {
+    let workspace = Workspace::new("checked", &[("main.aipl", SHARED_NAME)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(
+        server.take_checked(&uri),
+        None,
+        "nothing has been asked yet"
+    );
+
+    definition_at(&mut server, &uri, cursor_on(SHARED_NAME, "name + tag"));
+    let message = server
+        .take_checked(&uri)
+        .expect("the check the request ran");
+    assert_eq!(message["method"], json!("textDocument/publishDiagnostics"));
+    assert_eq!(message["params"]["diagnostics"], json!([]));
+    assert_eq!(server.take_checked(&uri), None, "published once");
+
+    // Each edit makes the next request check again, and what that check found
+    // is dropped by a save or a further edit before the worker gets to it.
+    for (version, stale_by) in [(2, "didSave"), (3, "didChange")] {
+        let edited = format!("{SHARED_NAME}{}", "\n".repeat(version));
+        change(&mut server, &uri, version as i64, &edited);
+        definition_at(&mut server, &uri, cursor_on(&edited, "name + tag"));
+        if stale_by == "didSave" {
+            notify(
+                &mut server,
+                "textDocument/didSave",
+                json!({ "textDocument": { "uri": uri } }),
+            );
+        } else {
+            change(&mut server, &uri, 4, &format!("{edited}\n"));
+        }
+        assert_eq!(server.take_checked(&uri), None, "{stale_by} makes it stale");
+    }
+}
+
 #[test]
 fn a_document_that_does_not_compile_says_so() {
     let broken = format!("{SHARED_NAME}\nfn bad() -> i64 {{ missing }}\n");
