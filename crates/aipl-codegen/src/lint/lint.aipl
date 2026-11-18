@@ -21,7 +21,7 @@ import { interp_to_str } from "./interp_to_str.aipl";
 import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
-import { LintHit, on_functions, on_functions_filled, on_functions_once } from "./lint_hit.aipl";
+import { LintHit, filled, functions, hits, hits_once, unfilled_hits } from "./lint_hit.aipl";
 import { map_constant_repeat } from "./map_constant_repeat.aipl";
 import { map_find_if_some } from "./map_find_if_some.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
@@ -56,57 +56,59 @@ import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 
 # Every hit the ported lints find in `program`.
 #
-# A lint is either a function of the whole program or of one function, and `on_functions` is
-# what runs the second kind over every function of the program, which is every body that is
-# code. One that also needs the file's imports takes the program's `items` beside the function.
+# A lint is either a function of the whole program or of one function. The program's functions
+# are listed once, and each function lint is run over them: every body that is code. One that
+# also needs the file's imports takes the program's `items` beside the function.
 pub fn lint(program: Program) -> LintHit[] {
+    let items = program.items;
+    let functions = program.functions();
     [
         ..unused_imports(program),
         ..duplicate_import_source(program),
-        ..program.on_functions(destructure),
-        ..program.on_functions(unused_binding),
-        ..program.on_functions_once(fn_body_type_stutter),
-        ..program.on_functions_filled(match_bool_is_case),
-        ..program.on_functions_filled(case_of_equal_is_case),
-        ..program.on_functions_filled(match_is_some_and),
-        ..program.on_functions_filled(match_value_or),
-        ..program.on_functions_filled(match_value_or_err),
-        ..program.on_functions_filled(match_map_value_or),
-        ..program.on_functions_filled(match_map_err),
-        ..program.on_functions_filled(match_map_ok),
-        ..program.on_functions_filled(match_case_as_case),
-        ..program.on_functions_filled(match_case_try_as_case),
-        ..program.on_functions_filled(let_else_as_case),
-        ..program.on_functions_filled(|function| push_loop_pipeline(function, program.items)),
-        ..program.on_functions_filled(|function| extend_loop_map_join(function, program.items)),
-        ..program.on_functions_filled(|function| push_loop_collect_ok(function, program.items)),
-        ..program.on_functions_filled(|function| union_loop_union_all(function, program.items)),
-        ..program.on_functions(|function| push_array_literal(function, program.items)),
-        ..program.on_functions_filled(return_loop_find_if),
-        ..program.on_functions_filled(|function| return_loop_any_all(function, program.items)),
-        ..program.on_functions(|function| eta_lambda(function, program.items)),
-        ..program.on_functions_filled(|function| map_find_if_some(function, program.items)),
-        ..program.on_functions_filled(|function| map_constant_repeat(function, program.items)),
-        ..program.on_functions_filled(|function| zip_with_pair_zip(function, program.items)),
-        ..program.on_functions_filled(|function| push_loop_zip_with(function, program.items)),
-        ..program.on_functions_filled(|function| with_value_or_self(function, program.items)),
-        ..program.on_functions_filled(return_loop_find_index),
-        ..program.on_functions(|function| interp_to_str(function, program.items)),
-        ..program.on_functions(interp_literal),
-        ..program.on_functions(slice_whole),
-        ..program.on_functions(slice_to_len),
-        ..program.on_functions(slice_from_zero),
-        ..program.on_functions_filled(char_set_literal),
-        ..program.on_functions(arm_block_value),
-        ..program.on_functions(field_init_shorthand),
-        ..program.on_functions(set_spread_field),
-        ..program.on_functions_filled(set_spread_insert),
-        ..program.on_functions_filled(set_spread_push),
-        ..program.on_functions(|function| step_by_one(function, program.items)),
-        ..program.on_functions(|function| compound_assign(function, program.items)),
-        ..program.on_functions_filled(|function| len_gt_zero(function, program.items)),
-        ..program.on_functions(|function| value_or_compare(function, program.items)),
-        ..program.on_functions_filled(|function| is_empty_longhand(function, program.items)),
+        ..functions.hits(destructure),
+        ..functions.hits(unused_binding),
+        ..functions.hits_once(fn_body_type_stutter),
+        ..functions.unfilled_hits(match_bool_is_case).filled(items),
+        ..functions.unfilled_hits(case_of_equal_is_case).filled(items),
+        ..functions.unfilled_hits(match_is_some_and).filled(items),
+        ..functions.unfilled_hits(match_value_or).filled(items),
+        ..functions.unfilled_hits(match_value_or_err).filled(items),
+        ..functions.unfilled_hits(match_map_value_or).filled(items),
+        ..functions.unfilled_hits(match_map_err).filled(items),
+        ..functions.unfilled_hits(match_map_ok).filled(items),
+        ..functions.unfilled_hits(match_case_as_case).filled(items),
+        ..functions.unfilled_hits(match_case_try_as_case).filled(items),
+        ..functions.unfilled_hits(let_else_as_case).filled(items),
+        ..functions.unfilled_hits(|function| push_loop_pipeline(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| extend_loop_map_join(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| push_loop_collect_ok(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| union_loop_union_all(function, items)).filled(items),
+        ..functions.hits(|function| push_array_literal(function, items)),
+        ..functions.unfilled_hits(return_loop_find_if).filled(items),
+        ..functions.unfilled_hits(|function| return_loop_any_all(function, items)).filled(items),
+        ..functions.hits(|function| eta_lambda(function, items)),
+        ..functions.unfilled_hits(|function| map_find_if_some(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| map_constant_repeat(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| zip_with_pair_zip(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| push_loop_zip_with(function, items)).filled(items),
+        ..functions.unfilled_hits(|function| with_value_or_self(function, items)).filled(items),
+        ..functions.unfilled_hits(return_loop_find_index).filled(items),
+        ..functions.hits(|function| interp_to_str(function, items)),
+        ..functions.hits(interp_literal),
+        ..functions.hits(slice_whole),
+        ..functions.hits(slice_to_len),
+        ..functions.hits(slice_from_zero),
+        ..functions.unfilled_hits(char_set_literal).filled(items),
+        ..functions.hits(arm_block_value),
+        ..functions.hits(field_init_shorthand),
+        ..functions.hits(set_spread_field),
+        ..functions.unfilled_hits(set_spread_insert).filled(items),
+        ..functions.unfilled_hits(set_spread_push).filled(items),
+        ..functions.hits(|function| step_by_one(function, items)),
+        ..functions.hits(|function| compound_assign(function, items)),
+        ..functions.unfilled_hits(|function| len_gt_zero(function, items)).filled(items),
+        ..functions.hits(|function| value_or_compare(function, items)),
+        ..functions.unfilled_hits(|function| is_empty_longhand(function, items)).filled(items),
     ]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }) == []);

@@ -246,56 +246,56 @@
 
 
 
-        <section class="item" id="item-on_functions">
+        <section class="item" id="item-functions">
           <h3>
-            <a class="anchor" href="#item-on_functions">on_functions</a>
+            <a class="anchor" href="#item-functions">functions</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions(self: Program, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn functions(self: Program) -&#62; Function[]</code></pre>
 
-          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>on_functions</code>] is what runs it over a program, so no function lint decides for itself which bodies to look at. A function lint that needs to know the file's imports takes its <code>items</code> beside the function.</p><p>The program is read after hoisting, so every body that is code to check is a function: each function, the <code>.test</code> and <code>.benchmark</code> blocks as the functions they became, and the helpers declared in a block.</p></div>
+          <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>hits</code>] and its variants run it over the program's [<code>functions</code>], so no function lint decides for itself which bodies to look at. A function lint that needs to know the file's imports takes its <code>items</code> beside the function.</p><p>The program is read after hoisting, so every body that is code to check is a function: each function, the <code>.test</code> and <code>.benchmark</code> blocks as the functions they became, and the helpers declared in a block.</p><p>Every function of the program, in the order it is written.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-on_functions_once">
+        <section class="item" id="item-hits">
           <h3>
-            <a class="anchor" href="#item-on_functions_once">on_functions_once</a>
+            <a class="anchor" href="#item-hits">hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions_once(self: Program, lint: (Function) -&#62; LintHit?) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn hits(self: Function[], lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>[<code>on_functions</code>] for a lint that reports at most one hit for a function.</p></div>
+          <div class="doc"><p>What the function lint <code>lint</code> reports for each of <code>self</code>.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-on_functions_unfilled">
+        <section class="item" id="item-hits_once">
           <h3>
-            <a class="anchor" href="#item-on_functions_unfilled">on_functions_unfilled</a>
+            <a class="anchor" href="#item-hits_once">hits_once</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions_unfilled(self: Program, lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn hits_once(self: Function[], lint: (Function) -&#62; LintHit?) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>[<code>on_functions</code>] for a lint whose hits are [<code>UnfilledHit</code>]s.</p></div>
+          <div class="doc"><p>[<code>hits</code>] for a lint that reports at most one hit for a function.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-on_functions_filled">
+        <section class="item" id="item-unfilled_hits">
           <h3>
-            <a class="anchor" href="#item-on_functions_filled">on_functions_filled</a>
+            <a class="anchor" href="#item-unfilled_hits">unfilled_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn on_functions_filled(self: Program, lint: (Function) -&#62; UnfilledHit[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn unfilled_hits(self: Function[], lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
 
-          <div class="doc"><p>[<code>on_functions_unfilled</code>], each hit filled in for the program's own imports.</p></div>
+          <div class="doc"><p>[<code>hits</code>] for a lint whose hits are [<code>UnfilledHit</code>]s, which [<code>filled</code>] fills in.</p></div>
 
 
         </section>
@@ -485,20 +485,6 @@
           <pre class="signature"><code>fn builtin_locals(self: Import, name: str) -&#62; str[]</code></pre>
 
           <div class="doc"><p>What an import brings under <code>name</code>, when it is from builtins.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-functions">
-          <h3>
-            <a class="anchor" href="#item-functions">functions</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn functions(self: SuperProgram) -&#62; Function[]</code></pre>
-
-          <div class="doc"><p>Every function of the program, in the order it is written.</p></div>
 
 
         </section>

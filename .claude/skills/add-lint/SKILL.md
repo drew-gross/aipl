@@ -10,7 +10,8 @@ registered in `lint/lint.aipl`, listed in `DOGFOOD_SOURCE_FILES`
 (`crates/aipl-codegen/src/lib.rs`), run on the program after hoisting (every body is a
 function, the `.test` and `.benchmark` blocks included) and before desugaring (so
 the source forms are still there), returning hits. Most lints are a function of one
-`Function`, run over every function by `on_functions` and its variants; one that needs
+`Function`, run over the program's functions (`lint()` lists them once) by `hits`, `hits_once`
+and `unfilled_hits`; one that needs
 the file's imports (the `imported_as` names it advises) takes the program's `items`
 beside the function, as `push_loop_pipeline` does. A lint of the whole program
 (`unused_imports`) takes the `Program`. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
@@ -22,8 +23,8 @@ CLAUDE.md and in the add-builtin skill's step 4.
 
 DRY is critical here. Before writing a helper, search for it:
 
-- `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `imported_as`, `on_functions`,
-  `on_functions_unfilled`, the `lint_*` test drivers (`lint_in_messages` and
+- `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `imported_as`, `functions`,
+  `hits`, `unfilled_hits`, the `lint_*` test drivers (`lint_in_messages` and
   `lint_in_unfilled_messages` for a lint that takes `items`).
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl`, `lint/option_match.aipl`,
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
@@ -44,7 +45,7 @@ A "don't reimplement `foo()`" lint tells the author to call a function. The
 lint cannot know how the linted file spells it (alias, or not imported at all),
 so it must **not** hard-code the name in the message and must not take an
 import parameter. Return `UnfilledHit[]` — `unfilled(builtin, before, after,
-span)` — and let the caller hydrate it with `filled` / `on_functions_unfilled`,
+span)` — and let the caller hydrate it with `filled` / `unfilled_hits`,
 which fills in the file's spelling and adds the ", importing `X` from builtins"
 hint when it is not imported. Register the lint in `lint.aipl` in its
 unfilled form.
