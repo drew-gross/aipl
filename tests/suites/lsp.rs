@@ -1649,3 +1649,74 @@ fn what_a_set_assigns_goes_to_its_binding_and_field() {
         );
     }
 }
+
+const NATIVE_BUILTIN: &str = "import { len } from builtins;\n\
+                              \n\
+                              fn width(s: str) -> u64 { s.len() }\n";
+
+/// A builtin the compiler expands itself has no source, so go-to-definition opens a file of
+/// its signature and documentation instead, and its uses are listed like any declaration's.
+#[test]
+fn a_builtin_with_no_source_goes_to_a_file_documenting_it() {
+    let workspace = Workspace::new("native_builtin", &[("main.aipl", NATIVE_BUILTIN)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    for snippet in ["len }", "len()"] {
+        let found = definition_at(&mut server, &uri, cursor_on(NATIVE_BUILTIN, snippet));
+        let documented = found["uri"].as_str().expect("a uri");
+        assert!(
+            documented.ends_with("/aipl-builtin-docs/len.aipl"),
+            "from {snippet:?}: {documented}"
+        );
+        // The name in the signature line: after the header's two lines and the empty one.
+        assert_eq!(
+            found["range"]["start"],
+            json!({ "line": 3, "character": 5 }),
+            "from {snippet:?}"
+        );
+        let text = fs::read_to_string(documented.trim_start_matches("file://"))
+            .expect("the documentation file exists");
+        assert!(
+            text.starts_with(
+                "# `len` is a builtin the compiler expands itself: there is no source to show, so this is\n\
+                 # its signature and documentation.\n\
+                 #\n\
+                 # fn len<T: any>(self: T[]) -> u64\n"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.lines()
+                .all(|line| line.is_empty() || line.starts_with('#')),
+            "{text}"
+        );
+        // Opened in the editor, it is documentation and not a program: no diagnostics.
+        open(&mut server, documented, &text);
+        let snapshot = server.snapshot(documented).expect("a snapshot");
+        let published = aipl::lsp::server::diagnostics(&snapshot);
+        assert_eq!(published["params"]["diagnostics"], json!([]), "{published}");
+    }
+    let uses = references_at(&mut server, &uri, cursor_on(NATIVE_BUILTIN, "len()"), false);
+    assert_eq!(
+        uses,
+        vec![
+            triple(&uri, cursor_on(NATIVE_BUILTIN, "len }")),
+            triple(&uri, cursor_on(NATIVE_BUILTIN, "len()")),
+        ]
+    );
+}
+
+/// The method a `set xs.method(..)` calls is the function it names: a builtin with no source
+/// goes to the file documenting it.
+#[test]
+fn the_method_a_set_calls_goes_to_the_function_it_names() {
+    let workspace = Workspace::new("set_method", &[("main.aipl", ASSIGNMENTS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let found = definition_at(&mut server, &uri, cursor_on(ASSIGNMENTS, "push(item)"));
+    let documented = found["uri"].as_str().expect("a uri");
+    assert!(
+        documented.ends_with("/aipl-builtin-docs/push.aipl"),
+        "{documented}"
+    );
+}

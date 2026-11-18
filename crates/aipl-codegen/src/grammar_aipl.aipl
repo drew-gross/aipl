@@ -2708,7 +2708,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
             let end = args.last()$span.value_or(target.span);
             let span = join_spans(name_span, end);
-            let value = at(Call(method, [recv, ..args], true), span);
+            let value = at(Call(method, [recv, ..args], true), span).named_at(target.name_span);
             return ok(AStmt(SAssign(recv, value, span)));
         };
         return err(ParseError {

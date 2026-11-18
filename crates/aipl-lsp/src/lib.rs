@@ -15,6 +15,7 @@
 //! | [`jsonrpc`] | the base protocol: `Content-Length`-framed JSON |
 //! | [`text`] | byte offsets ↔ line/character, paths ↔ `file://` URIs |
 //! | `analysis` | what has been worked out about each file, kept between requests |
+//! | `builtin_docs` | the file a builtin with no source is documented in, for go-to-definition to land on |
 //! | `workspace` | which `.aipl` files a workspace holds |
 //! | [`server`] | the requests, and the open documents they are answered against |
 //! | [`serve_stdio`] | the loop that wires those to a pipe, and the diagnostics worker |
@@ -50,6 +51,7 @@
 //! that runs when the program is already well-formed.
 
 mod analysis;
+mod builtin_docs;
 pub mod jsonrpc;
 mod navigation;
 pub mod server;

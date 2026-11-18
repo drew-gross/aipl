@@ -107,6 +107,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 highlighter:
+  throughout isn't hightlighting as a keyword
   range collapsing in character classes
   fold regions and bracket pair coloring
 
@@ -296,7 +297,8 @@ char:
 lsp:
   warm the cache in the background on start and on edit
   docs hover should work on Error, err, ok, etc.
-  go-to-def on a keyword/operator (e.g. `fn`, `$`, `.` should show the docs for that operator. Maybe for builtins too.)
+  go-to-def on a keyword/operator (e.g. `fn`, `$`, `.` should show the docs for that operator)
+  go-to-def on builtins temp file should highlight
 
 bugs:
   lint quirk: Equivalence assumption: the ++/+= flavor matching uses the wrapping_/saturating_ name prefix instead of Rust's canonical-callee table. It is equivalent for every real import. It differs only for an absurd alias such as wrapping_add as ++.

@@ -544,7 +544,8 @@ fn builtin_type(global: &str) -> Option<String> {
         .then(|| name.to_string())
 }
 
-/// A builtin written in AIPL is a place to jump to; a native one is not.
+/// A builtin written in AIPL is a place to jump to; a native one goes to a file of its
+/// documentation.
 fn builtin_found(name: &str, sources: &mut HashMap<PathBuf, String>) -> Option<Found> {
     let builtin = aipl_index::builtin_canonical(name)?;
     Some(match builtin.file {
@@ -556,6 +557,14 @@ fn builtin_found(name: &str, sources: &mut HashMap<PathBuf, String>) -> Option<F
                 span: builtin.symbol.name_span,
             })
         }
-        None => Found::Native(name.to_string()),
+        // No source to jump to, so the signature and docs are written out as a place to go.
+        None => match crate::builtin_docs::document(&builtin.symbol) {
+            Some((file, text, span)) => {
+                let file = resolved(&file);
+                sources.entry(file.clone()).or_insert(text);
+                Found::Declared(Site { file, span })
+            }
+            None => Found::Native(name.to_string()),
+        },
     })
 }

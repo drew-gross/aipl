@@ -457,6 +457,11 @@ impl Server {
                     }
                 }
                 _ if !mentions_word(&document.text, &name) => {}
+                // A file documenting a builtin holds no program, so it has no uses to list.
+                _ if document
+                    .path
+                    .as_deref()
+                    .is_some_and(crate::builtin_docs::is_documentation) => {}
                 Some(Typed::Broken { text, message }) if *text == document.text => {
                     return Err(format!(
                         "cannot list every use of `{name}`: {other_uri} does not compile ({message})"
@@ -868,6 +873,16 @@ pub(crate) struct Analysis {
 /// go-to-definition has to keep answering while it does.
 pub(crate) fn analyse(snapshot: &Snapshot) -> Analysis {
     let lines = LineIndex::new(&snapshot.text);
+    if crate::builtin_docs::is_documentation(&snapshot.path) {
+        return Analysis {
+            uri: snapshot.uri.clone(),
+            message: publish_diagnostics(&snapshot.uri, snapshot.version, Vec::new()),
+            typed: Typed::Broken {
+                text: snapshot.text.clone(),
+                message: "this file documents a builtin; it is not a program".to_string(),
+            },
+        };
+    }
     let (found, typed) = match check(&snapshot.path, &snapshot.text) {
         Ok(navigation) => (
             Vec::new(),
