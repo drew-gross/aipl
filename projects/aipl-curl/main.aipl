@@ -1,0 +1,116 @@
+import {
+    equal as ==,
+    first,
+    greater_than as >,
+    int_parse,
+    join,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    print,
+    push,
+    put,
+    starts_with,
+    value_or_err,
+} from builtins;
+import { HttpHeader, HttpResponse, http_get } from network;
+
+# A parsed command line: the page to fetch, whether to print the status and headers before the
+# body, and how long to wait for the server.
+struct Invocation { url: str, include_headers: bool, timeout_seconds: u64 }
+
+# The seconds `self` spells, or why it is not a number of them.
+fn seconds(self: str) -> u64!str {
+    let wait: u64? = self.int_parse();
+    wait.value_or_err(`not a number of seconds: {self}`)
+}.test({
+    assert(seconds("5") == ok(5));
+    assert(seconds("0") == ok(0));
+    assert(seconds("five") == err("not a number of seconds: five"));
+    assert(seconds("-1") == err("not a number of seconds: -1"));
+    assert(seconds("") == err("not a number of seconds: "));
+})
+
+# The invocation `args` spell: one URL, with `-i` to include the response's status and
+# headers and `-t <seconds>` to change the 30 second timeout.
+fn parse_args(args: str[]) -> Invocation!str {
+    mut url: str[] = [];
+    mut include_headers = false;
+    mut timeout_seconds: u64 = 30;
+    mut waiting_for_seconds = false;
+    for (let arg : args) {
+        if (waiting_for_seconds) {
+            set timeout_seconds = seconds(arg)?;
+            set waiting_for_seconds = false;
+        } else if (arg == "-i") {
+            set include_headers = true;
+        } else if (arg == "-t") {
+            set waiting_for_seconds = true;
+        } else if (arg.starts_with('-') && arg.len() > 1) {
+            return err(`unknown option {arg}`);
+        } else {
+            set url.push(arg);
+        };
+    }
+    if (waiting_for_seconds) { return err("-t needs a number of seconds"); };
+    if (url.len() > 1) { return err("more than one URL given"); };
+    let some(address) = url.first() else { return err("no URL given"); };
+    ok(Invocation { url: address, include_headers, timeout_seconds })
+}.test({
+    let plain = Invocation { url: "http://a.test/", include_headers: false, timeout_seconds: 30 };
+    assert(parse_args(["http://a.test/"])? == plain);
+    assert(parse_args(["-i", "http://a.test/"])? == Invocation { ..plain, include_headers: true });
+    assert(parse_args(["http://a.test/", "-t", "5"])? == Invocation {
+        ..plain,
+        timeout_seconds: 5,
+    });
+    assert(parse_args([]) == err("no URL given"));
+    assert(parse_args(["a", "b"]) == err("more than one URL given"));
+    assert(parse_args(["-x", "a"]) == err("unknown option -x"));
+    assert(parse_args(["a", "-t"]) == err("-t needs a number of seconds"));
+    assert(parse_args(["a", "-t", "soon"]) == err("not a number of seconds: soon"));
+})
+
+# What is printed for `response`: with `include_headers`, the status and then a line per
+# header, a blank line, and the body; otherwise the body alone.
+fn render(self: HttpResponse, include_headers: bool) -> str {
+    if (!include_headers) { return self.body; };
+    let lines = [`HTTP {self.status}`, ..self.headers$show_header()];
+    `{lines.join(sep="\n")}\n\n{self.body}`
+}.test({
+    let response = HttpResponse {
+        status: 200,
+        headers: [HttpHeader { name: "Server", value: "test" }],
+        body: "hello",
+    };
+    assert(response.render(false) == "hello");
+    assert(response.render(true) == "HTTP 200\nServer: test\n\nhello");
+})
+
+# One header as the server wrote it: `Name: value`.
+fn show_header(self: HttpHeader) -> str { `{self.name}: {self.value}` }
+
+# Fetch the URL named on the command line and print what the server answers, like `curl`. Any
+# response is a success, whatever its status; exits 1 — after saying why — for a bad command
+# line or when no response came.
+fn main(args: str[]) !prints !http_get -> i64 {
+    match (parse_args(args)) {
+        err(e) => {
+            print(`aipl-curl: {e}`);
+            print("usage: aipl-curl [-i] [-t <seconds>] <url>");
+            1
+        },
+        ok(invocation) => match (invocation.url.http_get(
+            timeout_seconds=invocation.timeout_seconds,
+        )) {
+            err(e) => {
+                print(`aipl-curl: {e}`);
+                1
+            },
+            ok(response) => {
+                put(response.render(invocation.include_headers));
+                0
+            },
+        },
+    }
+}
