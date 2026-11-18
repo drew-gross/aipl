@@ -30,6 +30,8 @@ mod highlighting;
 mod lsp;
 #[path = "suites/mono.rs"]
 mod mono;
+#[path = "suites/network.rs"]
+mod network;
 #[path = "suites/parser.rs"]
 mod parser;
 #[path = "suites/pin.rs"]

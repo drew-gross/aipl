@@ -28,6 +28,8 @@ projects:
     accept paths, don't do munging
     archetypes_of does some weird stuff with sets (why convert to array when caller converts back to set?)
     scrapers
+  curl:
+    rename to curl instead of aipl-curl
 
 floats:
   trig operations (sine, cosine, etc. NOT sin, cos. User can import as if they want abbreviations)

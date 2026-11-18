@@ -51,7 +51,9 @@ error messages (regressions when the pinner replaced the checker's reporting; th
   `grid_get` literal without a grid: was "cannot infer a type for T in __builtin_grid_get", now names `grid_get` which the user didn't write
 
 effects / shims:
-  networking (http_get, then more): plan in NETWORKING.md
+  http_get: request headers (`headers = [..]`); needs the runtimes to read an array of structs they are handed
+  http_get: other verbs (post, put, delete); decide `HttpHeader[]` vs a dict for request headers when they land
+  http_get is missing from the instrumented AOT runtime's per-builtin call counts (`aipl report` breakdown)
   undeclared-effect error in a test should say to add a `shim`
   shim bindings cannot name a helper fn declared in a `.test` block (hoisted name is not resolved); cases use closures instead
 
