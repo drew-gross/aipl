@@ -1463,3 +1463,189 @@ fn a_shorthand_field_goes_to_the_field_and_the_local() {
         ]
     );
 }
+
+/// Where `definition_at` sends the cursor on `snippet` of `text`, as the start of each location.
+fn definition_starts(server: &mut Server, uri: &str, text: &str, snippet: &str) -> Vec<Value> {
+    match definition_at(server, uri, cursor_on(text, snippet)) {
+        Value::Array(locations) => locations
+            .iter()
+            .map(|location| location["range"]["start"].clone())
+            .collect(),
+        location => vec![location["range"]["start"].clone()],
+    }
+}
+
+const SHAPES_LIBRARY: &str = "variant Shape = Circle(r: i64) | Square(side: i64)\n\
+                              \n\
+                              variant Round = Shape without Square\n";
+
+const SHAPES_MAIN: &str = "import { Circle, Round, Shape } from \"./library.aipl\";\n\
+                           \n\
+                           fn build() -> Shape { Circle(1) }\n\
+                           \n\
+                           fn pick(s: Round) -> i64 { 1 }\n";
+
+/// A case and a named refinement go to their declarations from an import list, and the
+/// refinement from an annotation too.
+#[test]
+fn a_case_and_a_refinement_go_to_their_declarations_from_an_import() {
+    let workspace = Workspace::new(
+        "imported_cases",
+        &[("library.aipl", SHAPES_LIBRARY), ("main.aipl", SHAPES_MAIN)],
+    );
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let library = workspace.uri("library.aipl");
+    let found = |server: &mut Server, snippet: &str| {
+        let location = definition_at(server, &uri, cursor_on(SHAPES_MAIN, snippet));
+        assert_eq!(location["uri"], json!(library), "from {snippet:?}");
+        location["range"]["start"].clone()
+    };
+    assert_eq!(
+        found(&mut server, "Circle, Round"),
+        cursor_on(SHAPES_LIBRARY, "Circle(r")
+    );
+    assert_eq!(
+        found(&mut server, "Round, Shape"),
+        cursor_on(SHAPES_LIBRARY, "Round =")
+    );
+    assert_eq!(
+        found(&mut server, "Round) -> i64"),
+        cursor_on(SHAPES_LIBRARY, "Round =")
+    );
+}
+
+const LITERALS: &str = "import { Span } from builtins;\n\
+                        \n\
+                        struct Fun { name: i64, line: i64 }\n\
+                        \n\
+                        fn renamed(f: Fun) -> i64 { Fun { ..f, name: 2 }.line }\n\
+                        \n\
+                        fn width(s: Span) -> (Span, u64) { (s, s.end) }\n";
+
+/// A struct literal with a spread names its struct, and a builtin type is a builtin with no
+/// source to show — whether it is imported, annotated, or has a field read off it.
+#[test]
+fn a_spread_literal_names_its_struct_and_builtin_types_say_they_have_no_source() {
+    let workspace = Workspace::new("literals", &[("main.aipl", LITERALS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(
+        definition_starts(&mut server, &uri, LITERALS, "Fun { ..f"),
+        vec![cursor_on(LITERALS, "Fun { name")]
+    );
+    assert_eq!(
+        definition_starts(&mut server, &uri, LITERALS, "name: 2"),
+        vec![cursor_on(LITERALS, "name: i64")]
+    );
+    for snippet in ["Span }", "Span) ->", "end)"] {
+        let error = request_error(
+            &mut server,
+            "textDocument/definition",
+            json!({ "textDocument": { "uri": uri }, "position": cursor_on(LITERALS, snippet) }),
+        );
+        assert!(
+            error.ends_with("is a builtin the compiler expands itself; it has no source to show"),
+            "from {snippet:?}: {error}"
+        );
+    }
+}
+
+const CONSTANTS: &str = "let GREETING = \"hello\";\n\
+                         \n\
+                         let PAIR: i64[] = [1, 2];\n\
+                         \n\
+                         fn greet() -> str { GREETING }\n\
+                         \n\
+                         fn pair() -> i64[] { PAIR }\n";
+
+/// A constant goes to its declaration whether it is a literal, which is spliced into its uses,
+/// or computed, which becomes a function.
+#[test]
+fn a_constant_goes_to_its_declaration() {
+    let workspace = Workspace::new("constants", &[("main.aipl", CONSTANTS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(
+        definition_starts(&mut server, &uri, CONSTANTS, "GREETING }"),
+        vec![cursor_on(CONSTANTS, "GREETING =")]
+    );
+    assert_eq!(
+        definition_starts(&mut server, &uri, CONSTANTS, "PAIR }"),
+        vec![cursor_on(CONSTANTS, "PAIR: i64")]
+    );
+}
+
+const ALTERNATIVES: &str = "variant Named = Name(text: str) | Alias(text: str, source: str)\n\
+                            \n\
+                            fn text_of(n: Named) -> str { match (n) { Name(text) | Alias(text, _) => text } }\n\
+                            \n\
+                            struct Fun { name: i64 }\n\
+                            \n\
+                            fn name_of(Fun { name }) -> i64 { name }\n";
+
+/// A use in an arm shared by alternatives goes to the binder of each, and a field read out into
+/// a binder goes to the field from the binder and to the binder from a use.
+#[test]
+fn a_binder_shared_by_alternatives_goes_to_each_and_a_destructured_field_to_its_field() {
+    let workspace = Workspace::new("alternatives", &[("main.aipl", ALTERNATIVES)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(
+        definition_starts(&mut server, &uri, ALTERNATIVES, "text }"),
+        vec![
+            cursor_on(ALTERNATIVES, "text) | Alias"),
+            cursor_on(ALTERNATIVES, "text, _) =>"),
+        ]
+    );
+    assert_eq!(
+        definition_starts(&mut server, &uri, ALTERNATIVES, "name }) ->"),
+        vec![cursor_on(ALTERNATIVES, "name: i64")],
+        "the binder is the field it reads"
+    );
+    assert_eq!(
+        definition_starts(&mut server, &uri, ALTERNATIVES, "name }\n"),
+        vec![cursor_on(ALTERNATIVES, "name }) ->")],
+        "a use is the binder"
+    );
+}
+
+const ASSIGNMENTS: &str =
+    "import { push, wrapping_add as +, wrapping_increment as ++ } from builtins;\n\
+                           \n\
+                           struct Counter { total: i64 }\n\
+                           \n\
+                           fn run(items: i64[]) -> i64 {\n\
+                           \u{20}   mut count = 0;\n\
+                           \u{20}   mut counter = Counter { total: 0 };\n\
+                           \u{20}   mut seen: i64[] = [];\n\
+                           \u{20}   for (let item : items) {\n\
+                           \u{20}       set count = item;\n\
+                           \u{20}       set counter.total = item;\n\
+                           \u{20}       set seen.push(item);\n\
+                           \u{20}       set count++;\n\
+                           \u{20}   }\n\
+                           \u{20}   count + counter.total\n\
+                           }\n";
+
+/// The name a `set` writes to goes to the binding it assigns, and the field of a field path to
+/// the field, whether the statement is an assignment, a mutating method call or `++`.
+#[test]
+fn what_a_set_assigns_goes_to_its_binding_and_field() {
+    let workspace = Workspace::new("assignments", &[("main.aipl", ASSIGNMENTS)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    for (from, to) in [
+        ("count = item;", "count = 0;"),
+        ("counter.total = item", "counter = Counter"),
+        ("total = item;", "total: i64 }"),
+        ("seen.push(item)", "seen: i64[]"),
+        ("count++", "count = 0;"),
+    ] {
+        assert_eq!(
+            definition_starts(&mut server, &uri, ASSIGNMENTS, from),
+            vec![cursor_on(ASSIGNMENTS, to)],
+            "from {from:?}"
+        );
+    }
+}

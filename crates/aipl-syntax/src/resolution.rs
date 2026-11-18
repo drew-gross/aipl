@@ -48,12 +48,21 @@ pub struct Resolution {
 /// a name that resolved two different ways is dropped: a wrong answer is worse
 /// than a missing one.
 ///
-/// The one pair of answers a name may keep is a field and a local: a struct
-/// literal's shorthand `T { kind }` writes the field it initializes and the
-/// binding it reads with the same characters.
+/// A name may keep several answers when each is a local, and one more when it is a
+/// field. A struct literal's shorthand `T { kind }` writes the field it initializes and
+/// the binding it reads with the same characters; and a use in an arm shared by
+/// alternatives (`A(x) | B(x) => x`) reads the binder of each.
 pub fn settled(found: Vec<Resolution>) -> Vec<Resolution> {
     let mut out: Vec<Resolution> = Vec::new();
     let mut conflicted: Vec<(String, Span)> = Vec::new();
+    let compatible = |a: &Target, b: &Target| {
+        matches!(
+            (a, b),
+            (Target::Local(_), Target::Local(_))
+                | (Target::Field { .. }, Target::Local(_))
+                | (Target::Local(_), Target::Field { .. })
+        )
+    };
     for r in found {
         if conflicted.iter().any(|(f, s)| *f == r.in_fn && *s == r.at) {
             continue;
@@ -64,19 +73,11 @@ pub fn settled(found: Vec<Resolution>) -> Vec<Resolution> {
         if same.iter().any(|&i| out[i].target == r.target) {
             continue;
         }
-        let shorthand = |a: &Target, b: &Target| {
-            matches!(
-                (a, b),
-                (Target::Field { .. }, Target::Local(_)) | (Target::Local(_), Target::Field { .. })
-            )
-        };
-        match same.as_slice() {
-            [] => out.push(r),
-            [i] if shorthand(&out[*i].target, &r.target) => out.push(r),
-            _ => {
-                out.retain(|o| !(o.in_fn == r.in_fn && o.at == r.at));
-                conflicted.push((r.in_fn, r.at));
-            }
+        if same.iter().all(|&i| compatible(&out[i].target, &r.target)) {
+            out.push(r);
+        } else {
+            out.retain(|o| !(o.in_fn == r.in_fn && o.at == r.at));
+            conflicted.push((r.in_fn, r.at));
         }
     }
     out
@@ -114,9 +115,30 @@ mod tests {
             settled(vec![field.clone(), local.clone(), field.clone()]),
             vec![field.clone(), local.clone()]
         );
-        // A third answer spoils both.
-        let other = found(1..2, Target::Local(9..10));
+        // An answer of another kind spoils both.
+        let other = found(1..2, Target::Function("g".to_string()));
         assert_eq!(settled(vec![field, local, other]), vec![]);
+    }
+
+    #[test]
+    fn a_name_read_through_several_binders_keeps_each() {
+        let first = found(1..2, Target::Local(7..8));
+        let second = found(1..2, Target::Local(9..10));
+        assert_eq!(
+            settled(vec![first.clone(), second.clone(), first.clone()]),
+            vec![first, second]
+        );
+        // Two fields are two answers for one name, and neither is kept.
+        let field = |owner: &str| {
+            found(
+                1..2,
+                Target::Field {
+                    owner: owner.to_string(),
+                    field: "x".to_string(),
+                },
+            )
+        };
+        assert_eq!(settled(vec![field("S"), field("T")]), vec![]);
     }
 
     #[test]

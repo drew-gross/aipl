@@ -4501,7 +4501,11 @@ impl Pinner<'_> {
                 );
             }
         }
-        if matches!(callee, Callee::Some | Callee::IntParse) {
+        // A builtin the compiler types itself is still the builtin the author named, whichever
+        // shape it was decided to have.
+        if matches!(callee, Callee::Some | Callee::IntParse)
+            || aipl_syntax::builtin::Builtin::of(&callee).is_some()
+        {
             self.resolve(&e.name_span, function_target(name));
         }
         match callee {

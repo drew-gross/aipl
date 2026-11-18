@@ -406,6 +406,16 @@ pub mod ast {
         /// `without`. A clause whose base is not a bare variant name is not
         /// listed.
         pub exclusion_uses: Vec<ImportSite>,
+        /// Each named refinement the file declares (`variant W = V without C`),
+        /// which the loader expands away: where its name is written, and the
+        /// global name that uses of it resolve to.
+        pub refinements: Vec<ImportSite>,
+        /// Each top-level constant the file declares: where its name is written,
+        /// and the global name its uses mean.
+        pub constants: Vec<ImportSite>,
+        /// Each use of a constant in the file. The loader replaces a use with the
+        /// constant's value, so this is what says where it was written.
+        pub constant_uses: Vec<ImportSite>,
         /// Each keyword argument written in the file (`f(k = v)`): the calls are
         /// positional once the loader has expanded them, so this is what says
         /// where the name was and which parameter it meant.

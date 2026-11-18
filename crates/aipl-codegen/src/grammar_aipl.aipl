@@ -2657,12 +2657,14 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
     // The target: `set` then names joined by `.`. `at` ends on the first token
     // that is neither, which is the form's own operator.
-    mut target = at(Ident(name), name_span);
+    mut target = at(Ident(name), name_span).named_at(name_span);
     mut at_op = 2;
     while (toks[at_op] == some(".")) {
         let member = toks[at_op + 1].value_or("");
         let member_span = spans[at_op + 1].value_or(name_span);
-        set target = at(Field(target, member), join_spans(name_span, member_span));
+        set target = at(Field(target, member), join_spans(name_span, member_span)).named_at(
+            member_span,
+        );
         set at_op += 2;
     }
     let op = toks[at_op].value_or("");

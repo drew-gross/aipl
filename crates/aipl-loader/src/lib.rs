@@ -926,7 +926,7 @@ impl Loader {
         // because a local keeps the name the author wrote and a constant has
         // been mangled. Substituting here rather than in any later pass is what
         // keeps constants out of the checker, mono and codegen entirely.
-        let merged = substitute_constants(merged);
+        let (merged, constant_uses) = substitute_constants(merged);
         // A named refinement is its target wherever it is written, so it is
         // expanded away here, for the same reason: nothing past the loader
         // should have to know a type can have a second name. Its diagnostics
@@ -972,6 +972,7 @@ impl Loader {
         // today) reads as an empty entry, which attributes nothing rather than
         // attributing wrongly.
         let mut sources = vec![aipl_syntax::ast::FileSource::default(); self.next_index as usize];
+        let root_file_index = self.files.get(root).map_or(0, |file| file.index);
         for (path, file) in &self.files {
             if let Some(slot) = sources.get_mut(file.index as usize) {
                 *slot = aipl_syntax::ast::FileSource {
@@ -982,6 +983,36 @@ impl Loader {
                     type_uses: type_sites(file, &full_views[path]),
                     type_var_uses: type_var_sites(file),
                     exclusion_uses: exclusion_sites(file, &full_views[path]),
+                    constants: file
+                        .items
+                        .iter()
+                        .filter_map(|item| match item {
+                            Item::Const(c) => Some(aipl_syntax::ast::ImportSite {
+                                span: c.name.span.clone(),
+                                target: mangle(path == root, file.index, &c.name.text),
+                            }),
+                            _ => None,
+                        })
+                        .collect(),
+                    constant_uses: constant_uses
+                        .iter()
+                        .filter(|(item, _)| {
+                            aipl_syntax::mangled_file_index(item).unwrap_or(root_file_index)
+                                == file.index
+                        })
+                        .map(|(_, site)| site.clone())
+                        .collect(),
+                    refinements: file
+                        .items
+                        .iter()
+                        .filter_map(|item| match item {
+                            Item::Refinement(r) => Some(aipl_syntax::ast::ImportSite {
+                                span: r.name.span.clone(),
+                                target: mangle(path == root, file.index, &r.name.text),
+                            }),
+                            _ => None,
+                        })
+                        .collect(),
                     keyword_uses: Vec::new(),
                 };
             }
@@ -1202,7 +1233,12 @@ fn is_const_literal(e: &Expr) -> bool {
 /// (`constant_initializer_name`) and each use a call to it: codegen answers
 /// that call from a cache, so the value is built once and every later use
 /// shares it.
-fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
+///
+/// Also returns where each use was written, as `(the global name of the item holding it, the
+/// use)`: once replaced, nothing else says there was a constant there.
+fn substitute_constants(
+    items: Vec<Item>,
+) -> (Vec<Item>, Vec<(String, aipl_syntax::ast::ImportSite)>) {
     let mut values: HashMap<String, Expr> = HashMap::new();
     let mut initializers: Vec<Item> = Vec::new();
     for item in &items {
@@ -1238,15 +1274,24 @@ fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
         .filter(|i| !matches!(i, Item::Const(_)))
         .chain(initializers)
         .collect();
+    let mut uses = Vec::new();
     if values.is_empty() {
-        return items;
+        return (items, uses);
     }
     for item in &mut items {
+        let holder = match item {
+            Item::Fn(f) => f.name.text.clone(),
+            Item::Struct(s) => s.name.text.clone(),
+            Item::Variant(v) => v.name.text.clone(),
+            _ => String::new(),
+        };
+        let mut found = Vec::new();
         for e in item_exprs_mut(item) {
-            splice_constants(e, &values);
+            splice_constants(e, &values, &mut found);
         }
+        uses.extend(found.into_iter().map(|site| (holder.clone(), site)));
     }
-    items
+    (items, uses)
 }
 
 /// Every expression an item holds, mutably: a function's body, its test body
@@ -1277,15 +1322,27 @@ fn item_exprs_mut(item: &mut Item) -> Vec<&mut Expr> {
 /// `e` with each `Ident` naming a constant replaced by that constant's literal.
 /// The literal keeps the *use site's* span, so a diagnostic about the value
 /// points at where it was written rather than at the declaration.
-fn splice_constants(e: &mut Expr, values: &HashMap<String, Expr>) {
+fn splice_constants(
+    e: &mut Expr,
+    values: &HashMap<String, Expr>,
+    uses: &mut Vec<aipl_syntax::ast::ImportSite>,
+) {
     if let ExprKind::Ident(name) = &e.kind {
         if let Some(lit) = values.get(name.as_str()) {
+            uses.push(aipl_syntax::ast::ImportSite {
+                span: e
+                    .name_span
+                    .as_deref()
+                    .cloned()
+                    .unwrap_or_else(|| e.span.clone()),
+                target: name.clone(),
+            });
             e.kind = lit.kind.clone();
             return;
         }
     }
     for kid in e.children_mut() {
-        splice_constants(kid, values);
+        splice_constants(kid, values, uses);
     }
 }
 

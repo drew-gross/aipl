@@ -354,6 +354,19 @@ impl Server {
                     self.current_navigation(&uri_of(&params["textDocument"]), &text)?;
                 // One place is a location; a name that is two things at once
                 // (a shorthand field) is both.
+                // A name that is also a declaration goes to what it reads, not to itself.
+                let here = resolved(&path);
+                let elsewhere: Vec<&Site> = sites
+                    .iter()
+                    .filter(|site| {
+                        !(site.file == here && site.span.start <= offset && offset <= site.span.end)
+                    })
+                    .collect();
+                let sites: Vec<&Site> = if elsewhere.is_empty() {
+                    sites.iter().collect()
+                } else {
+                    elsewhere
+                };
                 let mut locations: Vec<Value> = sites
                     .iter()
                     .map(|site| location(navigation, site))

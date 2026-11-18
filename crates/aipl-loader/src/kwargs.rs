@@ -1475,7 +1475,9 @@ impl Expander {
                         tmp,
                         ann,
                         Box::new(self.expand_expr(&base, locals)?),
-                        Box::new(Expr::new(built, e.span.clone())),
+                        // The literal keeps the spans the author wrote, the struct's name
+                        // among them.
+                        Box::new(Expr::rebuilt(built, e)),
                     ),
                 }
             }

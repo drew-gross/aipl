@@ -50,6 +50,8 @@ pub(crate) struct Navigation {
     /// Each declaration name written in the program, which is also the thing it
     /// resolves to: the cursor on a field's own declaration asks for its uses.
     declarations: Vec<Site>,
+    /// The names that bind a local some use reads: a `let`, a `for`, a pattern's binder.
+    binders: Vec<Site>,
     /// The text of every file the program was built from, as the checker saw it,
     /// because a span means nothing against any other version of its file.
     sources: HashMap<PathBuf, String>,
@@ -113,6 +115,7 @@ impl Navigation {
         let mut fields: HashMap<(&str, &str), Site> = HashMap::new();
         let mut cases: HashMap<(&str, &str), Site> = HashMap::new();
         let mut declarations: Vec<Site> = Vec::new();
+        let mut binders: Vec<Site> = Vec::new();
         // The items that declare type parameters, with where each starts in its
         // file: an item runs from its name to the next item's, so a type
         // parameter written in an annotation belongs to the item it sits in.
@@ -220,6 +223,36 @@ impl Navigation {
             }
         }
 
+        // A named refinement is expanded away before the checker, so its declaration is
+        // known only from what the loader recorded of each file.
+        let mut refinements: HashMap<&str, Site> = HashMap::new();
+        for source in program.sources.iter().filter(|s| !s.path.is_empty()) {
+            let file = resolved(Path::new(&source.path));
+            for refinement in &source.refinements {
+                let site = Site {
+                    file: file.clone(),
+                    span: refinement.span.clone(),
+                };
+                refinements.insert(&refinement.target, site.clone());
+                declarations.push(site);
+            }
+        }
+
+        // A constant is replaced by its value before the checker sees it, so its declaration and
+        // its uses are known only from what the loader recorded of each file.
+        let mut constants: HashMap<&str, Site> = HashMap::new();
+        for source in program.sources.iter().filter(|s| !s.path.is_empty()) {
+            let file = resolved(Path::new(&source.path));
+            for constant in &source.constants {
+                let site = Site {
+                    file: file.clone(),
+                    span: constant.span.clone(),
+                };
+                constants.insert(&constant.target, site.clone());
+                declarations.push(site);
+            }
+        }
+
         let mut uses: Vec<(Site, Found)> = Vec::new();
         // The names in each file's import lists, which the loader bound.
         for source in program.sources.iter().filter(|s| !s.path.is_empty()) {
@@ -229,14 +262,17 @@ impl Navigation {
                 let declared = structs
                     .get(written.target.as_str())
                     .or_else(|| variants.get(written.target.as_str()))
-                    .cloned();
-                if let Some(site) = declared {
+                    .or_else(|| refinements.get(written.target.as_str()))
+                    .cloned()
+                    .map(Found::Declared)
+                    .or_else(|| builtin_type(&written.target).map(Found::Native));
+                if let Some(found) = declared {
                     uses.push((
                         Site {
                             file: file.clone(),
                             span: written.span.clone(),
                         },
-                        Found::Declared(site),
+                        found,
                     ));
                 }
             }
@@ -265,6 +301,17 @@ impl Navigation {
                             }),
                         ));
                     }
+                }
+            }
+            for constant_use in &source.constant_uses {
+                if let Some(site) = constants.get(constant_use.target.as_str()) {
+                    uses.push((
+                        Site {
+                            file: file.clone(),
+                            span: constant_use.span.clone(),
+                        },
+                        Found::Declared(site.clone()),
+                    ));
                 }
             }
             // The case a `without` clause leaves out is that case of the variant
@@ -299,11 +346,19 @@ impl Navigation {
             }
             for import in &source.imports {
                 let found = match import.target.strip_prefix("__builtin_") {
-                    Some(builtin) => builtin_found(builtin, &mut sources),
+                    Some(builtin) => builtin_found(builtin, &mut sources)
+                        .or_else(|| builtin_type(&import.target).map(Found::Native)),
+                    // A case is imported by its constructor's name, `Case@Variant`.
                     None => functions
                         .get(import.target.as_str())
                         .or_else(|| structs.get(import.target.as_str()))
                         .or_else(|| variants.get(import.target.as_str()))
+                        .or_else(|| refinements.get(import.target.as_str()))
+                        .or_else(|| constants.get(import.target.as_str()))
+                        .or_else(|| {
+                            let (case, variant) = import.target.split_once('@')?;
+                            cases.get(&(variant, case))
+                        })
                         .cloned()
                         .map(Found::Declared),
                 };
@@ -326,8 +381,15 @@ impl Navigation {
                 Target::Field { owner, field } => fields
                     .get(&(owner.as_str(), field.as_str()))
                     .cloned()
-                    .map(Found::Declared),
-                Target::Struct(name) => structs.get(name.as_str()).cloned().map(Found::Declared),
+                    .map(Found::Declared)
+                    .or_else(|| {
+                        builtin_type(owner).map(|owner| Found::Native(format!("{owner}.{field}")))
+                    }),
+                Target::Struct(name) => structs
+                    .get(name.as_str())
+                    .cloned()
+                    .map(Found::Declared)
+                    .or_else(|| builtin_type(name).map(Found::Native)),
                 Target::Case { variant, case } => cases
                     .get(&(variant.as_str(), case.as_str()))
                     .cloned()
@@ -342,6 +404,7 @@ impl Navigation {
                         span: span.clone(),
                     };
                     declarations.push(site.clone());
+                    binders.push(site.clone());
                     Some(Found::Declared(site))
                 }
             };
@@ -369,9 +432,14 @@ impl Navigation {
             (&a.file, a.span.start, a.span.end).cmp(&(&b.file, b.span.start, b.span.end))
         });
         declarations.dedup();
+        binders.sort_by(|a, b| {
+            (&a.file, a.span.start, a.span.end).cmp(&(&b.file, b.span.start, b.span.end))
+        });
+        binders.dedup();
         Navigation {
             uses,
             declarations,
+            binders,
             sources,
         }
     }
@@ -398,6 +466,23 @@ impl Navigation {
                     }
                     Found::Declared(_) => {}
                     Found::Native(name) => native = Some(name.clone()),
+                }
+            }
+            // A name that is also a declaration — a field read out into a binder, `Expr { span }`
+            // in a pattern — stands for that binding too. Only a declaration written exactly where
+            // the name is: a binder, not any declaration that happens to share the span.
+            for (name, _) in covering
+                .iter()
+                .filter(|(site, _)| site.span.len() == narrowest)
+            {
+                for site in self
+                    .binders
+                    .iter()
+                    .filter(|site| site.file == name.file && site.span == name.span)
+                {
+                    if !declared.contains(site) && !declared.is_empty() {
+                        declared.push(site.clone());
+                    }
                 }
             }
             return match (declared.is_empty(), native) {
@@ -448,6 +533,15 @@ impl Navigation {
 /// declaration carries.
 fn written(span: &Span) -> bool {
     span.start < span.end
+}
+
+/// The name a builtin type is imported by (`Span`, `HttpResponse`), when `global` is the global
+/// name of one. Such a type is declared in the compiler's own table, not in a file.
+fn builtin_type(global: &str) -> Option<String> {
+    let name = global.strip_prefix("__builtin_")?;
+    aipl_syntax::IMPORTABLE_BUILTIN_TYPES
+        .contains(&name)
+        .then(|| name.to_string())
 }
 
 /// A builtin written in AIPL is a place to jump to; a native one is not.
