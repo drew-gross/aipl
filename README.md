@@ -15,7 +15,8 @@ output it produces.
 
 ```
 cargo build
-./target/debug/aipl run   [-- args...]       # compile and JIT-execute `main` from ./main.aipl
+./target/debug/aipl run   [-- args...]       # build `main` from ./main.aipl into a temporary native binary and run it
+./target/debug/aipl run --jit [-- args...]   # compile and execute it in-process instead
 ./target/debug/aipl build file.aipl -o app   # link a native executable
 ./target/debug/aipl check [path...] [--fix]  # run every fn's tests; --fix formats and refreshes stale sections
 ./target/debug/aipl report file.aipl         # allocations, instructions, binary size and per-function counts for one run

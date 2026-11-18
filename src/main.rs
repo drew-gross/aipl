@@ -97,7 +97,9 @@ fn cli() -> ExitCode {
 fn usage(prog: &str) -> String {
     format!(
         "usage:
-  {prog} run   [--flamegraph <out.svg> [--inverted]] [-- args...]  compile and JIT-execute `main` from ./main.aipl, exiting with its result
+  {prog} run   [--jit] [--flamegraph <out.svg> [--inverted]] [-- args...]
+                                            build `main` from ./main.aipl into a temporary native binary and
+                                            run it, exiting with its result (`--jit` runs it in-process instead)
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
@@ -172,8 +174,11 @@ A source file's name must end in `.aipl`, and so must any file it imports; a
 command refuses any other before reading it.
 
 `run` always runs `main` from `main.aipl` in the working directory; arguments
-after `--` go to it. A `main` that doesn't take `str[]` gets them parsed as i64
-(arity 0, 1, or 2 is supported). `--flamegraph <out.svg>` samples where `main`
+after `--` go to it. It builds the program the way `build` does, into a temporary
+executable, and runs that: what it does is what the built binary does. `--jit`
+compiles and executes it in-process instead, which skips the link and the temporary
+file; there a `main` that doesn't take `str[]` gets the arguments parsed as i64
+(arity 0, 1, or 2 is supported). `--flamegraph <out.svg>` implies `--jit` and samples where `main`
 spends its CPU time (at 997 Hz, by walking the stack) and writes it as an
 interactive flame graph: one box per function, stacked caller below callee, each
 as wide as its share of the samples. Click a box to zoom to it; Search highlights
@@ -212,6 +217,7 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     // `run`'s own options come first; everything after `--` is for `main`.
     let mut flamegraph = None;
     let mut inverted = false;
+    let mut jit = false;
     let mut rest = &args[..];
     let trailing = loop {
         match rest {
@@ -223,6 +229,10 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
             }
             [flag, after @ ..] if flag == "--inverted" => {
                 inverted = true;
+                rest = after;
+            }
+            [flag, after @ ..] if flag == "--jit" => {
+                jit = true;
                 rest = after;
             }
             [other, ..] => {
@@ -238,6 +248,13 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     let program = loader::load_program(Path::new(file), dbg).map_err(|e| render_err(file, e))?;
     if inverted && flamegraph.is_none() {
         return Err("`--inverted` draws a flame graph; add `--flamegraph <out.svg>`".to_string());
+    }
+    // A flame graph samples the JIT's code, so asking for one is asking for the JIT.
+    if !jit && flamegraph.is_none() {
+        return run_built(&program, trailing, dbg).map_err(|e| match e {
+            RunError::Compile(e) => render_err(file, e),
+            RunError::Other(message) => message,
+        });
     }
     let comp = match flamegraph {
         Some(_) => Compilation::new_profiled(&program, dbg),
@@ -292,6 +309,50 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     // Like a native binary, the process exits with `main`'s return value, which
     // the OS truncates to its low 8 bits.
     Ok(ExitCode::from((result & 0xff) as u8))
+}
+
+/// Why [`run_built`] could not run the program: the compiler refused it (a diagnostic to render
+/// against the source), or something around the compile failed (linking, the temporary directory,
+/// starting the binary).
+enum RunError {
+    Compile(Vec<Error>),
+    Other(String),
+}
+
+/// `aipl run`'s default: build `program` into a temporary native binary exactly as `build` does,
+/// run it with `arguments`, and exit as it did, so a program behaves the same under `run` as the
+/// executable `build` writes. A `trace` is allowed, as under the JIT: watching a program run is
+/// what it is for.
+fn run_built(
+    program: &aipl::ast::Program,
+    arguments: &[String],
+    dbg: DebugOptions,
+) -> Result<ExitCode, RunError> {
+    let other = |what: &str, e: &dyn std::fmt::Display| RunError::Other(format!("{what}: {e}"));
+    let comp = ObjectCompilation::new(program, "main", dbg, false).map_err(RunError::Compile)?;
+    let object = comp
+        .emit()
+        .map_err(|e| other("could not emit the program", &e))?;
+    let directory = std::env::temp_dir().join(format!("aipl-run-{}", std::process::id()));
+    std::fs::create_dir_all(&directory)
+        .map_err(|e| other("could not make a temporary directory", &e))?;
+    let executable = directory.join(binary::default_exe_name("main"));
+    let outcome = binary::link(&object, &executable)
+        .map_err(|e| other("could not link the program", &e))
+        .and_then(|()| {
+            std::process::Command::new(&executable)
+                .args(arguments)
+                .status()
+                .map_err(|e| other("could not run the program", &e))
+        });
+    let _ = std::fs::remove_dir_all(&directory);
+    let status = outcome?;
+    // A program ended by a signal has no exit code; the shell's convention is 128 plus the signal.
+    let code = status.code().unwrap_or_else(|| {
+        use std::os::unix::process::ExitStatusExt;
+        128 + status.signal().unwrap_or(0)
+    });
+    Ok(ExitCode::from((code & 0xff) as u8))
 }
 
 /// Report a failed command on stderr and exit 1, or pass on the exit code a

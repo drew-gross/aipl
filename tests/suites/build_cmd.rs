@@ -129,6 +129,26 @@ fn run_does_not_refuse_a_trace() {
 }
 
 #[test]
+fn run_exits_with_the_result_of_main_in_a_native_binary_and_under_the_jit() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_run_exit");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(dir.join("main.aipl"), "fn main() -> i64 { 7 }\n").expect("write temp source");
+    for flags in [&[][..], &["--jit"][..]] {
+        let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+            .arg("run")
+            .args(flags)
+            .current_dir(&dir)
+            .output()
+            .expect("spawn aipl run");
+        assert_eq!(out.status.code(), Some(7), "flags {flags:?}");
+    }
+    assert!(
+        !dir.join("main").exists(),
+        "`run` should not leave an executable behind"
+    );
+}
+
+#[test]
 fn run_passes_what_follows_the_separator_to_main() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_run_args");
     std::fs::create_dir_all(&dir).expect("create temp dir");
@@ -195,12 +215,12 @@ const LINES_IN: &str = "one\r\ntwo\n\nthree";
 const LINES_OUT: &str = "[one]\n[two]\n[]\n[three]\n4 lines\n";
 
 #[test]
-fn read_line_reads_piped_lines_under_run() {
+fn read_line_reads_piped_lines_under_the_jit() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_read_line_run");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     std::fs::write(dir.join("main.aipl"), ECHO_LINES).expect("write temp source");
     let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
-    command.arg("run").current_dir(&dir);
+    command.arg("run").arg("--jit").current_dir(&dir);
     assert_eq!(echo_lines(command, LINES_IN), LINES_OUT);
 }
 
@@ -238,12 +258,12 @@ const BYTES_IN: &str = "\x1b[A\nz";
 const BYTES_OUT: &str = "some(27)\nsome(91)\nsome(\"A\")\nsome(122)\nnone\n";
 
 #[test]
-fn read_byte_reads_piped_bytes_under_run() {
+fn read_byte_reads_piped_bytes_under_the_jit() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_read_byte_run");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     std::fs::write(dir.join("main.aipl"), READ_BYTES).expect("write temp source");
     let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
-    command.arg("run").current_dir(&dir);
+    command.arg("run").arg("--jit").current_dir(&dir);
     assert_eq!(echo_lines(command, BYTES_IN), BYTES_OUT);
 }
 
@@ -284,12 +304,12 @@ const KEYS_IN: &str = "\x1b[A\x1b[B\x1b[C\x1b[Dx\x1bz";
 const KEYS_OUT: &str = "up\ndown\nright\nleft\nother 120\nother 122\n";
 
 #[test]
-fn read_key_decodes_piped_arrow_keys_under_run() {
+fn read_key_decodes_piped_arrow_keys_under_the_jit() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_read_key_run");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     std::fs::write(dir.join("main.aipl"), READ_KEYS).expect("write temp source");
     let mut command = Command::new(env!("CARGO_BIN_EXE_aipl"));
-    command.arg("run").current_dir(&dir);
+    command.arg("run").arg("--jit").current_dir(&dir);
     assert_eq!(echo_lines(command, KEYS_IN), KEYS_OUT);
 }
 
@@ -323,12 +343,13 @@ fn terminal_operations_send_their_control_sequences() {
 }
 
 #[test]
-fn terminal_operations_send_their_control_sequences_under_run() {
+fn terminal_operations_send_their_control_sequences_under_the_jit() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_terminal_run");
     std::fs::create_dir_all(&dir).expect("create the scratch directory");
     std::fs::write(dir.join("main.aipl"), TERMINAL).expect("write the source");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
         .arg("run")
+        .arg("--jit")
         .current_dir(&dir)
         .output()
         .expect("run the program");
@@ -358,12 +379,13 @@ fn put_writes_without_a_newline() {
 }
 
 #[test]
-fn put_writes_without_a_newline_under_run() {
+fn put_writes_without_a_newline_under_the_jit() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("build_cmd_put_run");
     std::fs::create_dir_all(&dir).expect("create the scratch directory");
     std::fs::write(dir.join("main.aipl"), PUT).expect("write the source");
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
         .arg("run")
+        .arg("--jit")
         .current_dir(&dir)
         .output()
         .expect("run the program");

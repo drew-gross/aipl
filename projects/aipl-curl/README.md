@@ -3,11 +3,9 @@
 Fetches a URL with `http_get` and prints what the server answers, like a small `curl`.
 
 ```sh
-$ ./aipl build main.aipl
-wrote main
-$ ./main http://example.com/
+$ ./aipl run -- http://example.com/
 <!doctype html>…
-$ ./main -i http://example.com/
+$ ./aipl run -- -i http://example.com/
 HTTP 200
 Content-Type: text/html
 …
@@ -29,7 +27,8 @@ Exits 0 for any response, a 404 included: the status is the server's answer, not
 (the name did not resolve, the connection was refused, the request timed out, or the body was
 not text).
 
-Build it before running it: `./aipl run` does not make requests yet, only a built binary does.
+`./aipl run -- <url>` builds and runs it in one step. `./aipl run --jit` runs it in-process, which
+does not make requests yet: build it (`./aipl build main.aipl`) for that.
 
 Not like `curl`: GET only, `http` and `https` only, redirects always followed, a body that is
 not valid text is an error, and errors go to standard output.
