@@ -57,32 +57,28 @@ The AOT runtime cannot use a Rust HTTP crate, so the transport is the system lib
 
 ## Stages
 
-Each ends at a green `cargo handoff`. 4 depends on 2 and 3. Stage 1 (the declaration, the
-`network` library, the `http_get` effect and its shim slot, and runtime entries that answer
-`err("http_get is not available")`) is done: stages 2 and 3 replace those two entries.
-
-### 2. libcurl in the AOT runtime
-
-Goal: a built binary performs the GET.
-
-- [ ] `-lcurl` on the `clang` link line (the instrumented runtime's too)
-- [ ] `aipl_http_get` in `aipl_runtime.rs` through `curl_easy_*`: follow redirects,
-      timeout, collect the final status, the header lines (as `HttpHeader[]`, built the way
-      `list_files` builds its `str[]`) and the body
-- [ ] `err` for a transport failure and for a body that is not a valid `str`
-
-Watch: the runtime is `no_std`, so the curl write/header callbacks and their buffers use
-the runtime's allocator (`rt_alloc`); the allocation counters and the leak gate see these
-allocations, and every one must be freed.
+Each ends at a green `cargo handoff`. 4 depends on 3. The declaration, the `network`
+library, the `http_get` effect and its shim slot are done, and so is the AOT runtime: a
+built binary links `-lcurl` and performs the GET (`http_curl` in `aipl_runtime.rs`). The
+layout of the `HttpResponse!Error` and the text checks on a response are shared with the JIT
+in `crates/aipl-codegen/src/http_response.rs` (`write_http_response`, `write_http_error`,
+`RawResponse`), so a runtime supplies only its transport. The JIT's `aipl_http_get` still
+answers `err("http_get is not available")`.
 
 ### 3. libcurl in the JIT runtime
 
 Goal: `aipl run` and `check` perform the GET with the same result as a build.
 
-- [ ] `aipl_http_get` in `aipl-codegen/src/lib.rs` through the same `curl_easy_*` calls,
-      writing the same layout
-- [ ] the curl declarations shared between the two runtimes if the AOT runtime's file can
-      be included, otherwise kept identical and commented as such
+- [ ] `mod http_response;` in `aipl-codegen/src/lib.rs` (beside `arr24`), and the build
+      script's `rerun-if-changed` already lists it for the AOT side
+- [ ] `aipl_http_get` in `aipl-codegen/src/lib.rs` performs the transfer through the same
+      `curl_easy_*` calls, `#[link(name = "curl")]` on the `aipl` binary's side, and hands
+      `RawResponse` to `write_http_response` / `write_http_error`
+- [ ] the curl declarations and option numbers shared with the AOT runtime if the file can be
+      included (they are `extern "C"` and `core` only), otherwise kept identical and
+      commented as such
+
+Watch: the AOT `http_curl` module is the reference; the JIT may use `std` for its buffers.
 
 ### 4. Tests against a real server, docs
 

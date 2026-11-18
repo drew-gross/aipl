@@ -60,6 +60,8 @@ fn link_with(obj_bytes: &[u8], output: &Path, rt_bytes: &[u8], rt_name: &str) ->
 
     let mut cmd = Command::new(&clang);
     cmd.arg(&obj_path).arg(&rt_path).arg("-o").arg(output);
+    // The runtime's `http_get` is libcurl's, which macOS ships.
+    cmd.arg("-lcurl");
     // Cranelift-emitted objects lack an LC_BUILD_VERSION load command, which
     // triggers a harmless ld warning on macOS. Suppress all ld warnings so
     // the test output stays clean; real errors are still errors (exit ≠ 0).
