@@ -289,8 +289,7 @@ fn builtin_definition(found: &'static aipl_syntax::builtin::Builtin) -> Option<B
         aipl_syntax::builtin::Definition::Aipl { .. } => {
             let path = found.source_path()?;
             let source = std::fs::read_to_string(&path).ok()?;
-            let file = FileIndex::parse(&path, &source).ok()?;
-            let symbol = file.define(name)?.clone();
+            let symbol = parsed_builtin_source(&path, &source)?.define(name)?.clone();
             Some(Builtin {
                 file: Some((path, source)),
                 symbol,
@@ -319,6 +318,27 @@ fn builtin_definition(found: &'static aipl_syntax::builtin::Builtin) -> Option<B
             },
         }),
     }
+}
+
+/// The index of a builtin's source file, parsed once per distinct text.
+///
+/// Several builtins share a file and a program names the same builtin at every
+/// call, so a language server asks for the same file's index hundreds of times
+/// while it reads one program. The text is compared rather than trusted, so an
+/// edit to the file is seen on the next request.
+fn parsed_builtin_source(path: &Path, source: &str) -> Option<std::sync::Arc<FileIndex>> {
+    type Parsed = Option<std::sync::Arc<FileIndex>>;
+    static PARSED: std::sync::Mutex<BTreeMap<PathBuf, (String, Parsed)>> =
+        std::sync::Mutex::new(BTreeMap::new());
+    let mut cache = PARSED.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some((seen, parsed)) = cache.get(path) {
+        if seen == source {
+            return parsed.clone();
+        }
+    }
+    let parsed = FileIndex::parse(path, source).ok().map(std::sync::Arc::new);
+    cache.insert(path.to_path_buf(), (source.to_string(), parsed.clone()));
+    parsed
 }
 
 /// [`aipl_syntax::BUILTIN_SIGNATURES`] indexed, once: the declarations the
