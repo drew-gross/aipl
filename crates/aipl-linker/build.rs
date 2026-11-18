@@ -19,6 +19,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../aipl-codegen/src/charset.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/array_layout.rs");
     println!("cargo:rerun-if-changed=../aipl-codegen/src/http_response.rs");
+    println!("cargo:rerun-if-changed=../aipl-codegen/src/http_curl.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));

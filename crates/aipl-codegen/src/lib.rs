@@ -43,8 +43,12 @@ mod staged_library;
 // failing test. `buffer` is the refcounted allocation a `str` and a plain array
 // block both are.
 mod arr24;
+// The layout of `http_get`'s result and the transport that fills it in, shared with the AOT
+// runtime for the same reason.
 mod array_ops;
 mod buffer;
+mod http_curl;
+mod http_response;
 mod str24_host;
 
 // The 256-bit `#{char}` value. Shared verbatim with the AOT runtime, so
@@ -505,10 +509,13 @@ extern "C" fn aipl_execute_program(
     }
 }
 
-/// `http_get` under the wide ABI: the `HttpResponse!Error` goes to `out`.
+/// `http_get` under the wide ABI: the `HttpResponse!Error` goes to `out`. Borrows the URL; the
+/// request itself is `http_curl`'s, shared with the AOT runtime.
 #[no_mangle]
-extern "C" fn aipl_http_get(out: *mut u8, _url: *const str24::Str, _timeout_seconds: i64) {
-    write_err_wide(out, b"http_get is not available");
+extern "C" fn aipl_http_get(out: *mut u8, url: *const str24::Str, timeout_seconds: i64) {
+    let mut scratch = [0u8; str24::INLINE_CAP];
+    let bytes = unsafe { (*url).bytes(&mut scratch) };
+    http_curl::get(out, bytes, timeout_seconds);
 }
 
 /// Spawn `program` with `args` and collect its output. `None` if it could not be

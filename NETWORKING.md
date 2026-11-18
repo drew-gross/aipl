@@ -57,28 +57,12 @@ The AOT runtime cannot use a Rust HTTP crate, so the transport is the system lib
 
 ## Stages
 
-Each ends at a green `cargo handoff`. 4 depends on 3. The declaration, the `network`
-library, the `http_get` effect and its shim slot are done, and so is the AOT runtime: a
-built binary links `-lcurl` and performs the GET (`http_curl` in `aipl_runtime.rs`). The
-layout of the `HttpResponse!Error` and the text checks on a response are shared with the JIT
-in `crates/aipl-codegen/src/http_response.rs` (`write_http_response`, `write_http_error`,
-`RawResponse`), so a runtime supplies only its transport. The JIT's `aipl_http_get` still
-answers `err("http_get is not available")`.
-
-### 3. libcurl in the JIT runtime
-
-Goal: `aipl run` and `check` perform the GET with the same result as a build.
-
-- [ ] `mod http_response;` in `aipl-codegen/src/lib.rs` (beside `arr24`), and the build
-      script's `rerun-if-changed` already lists it for the AOT side
-- [ ] `aipl_http_get` in `aipl-codegen/src/lib.rs` performs the transfer through the same
-      `curl_easy_*` calls, `#[link(name = "curl")]` on the `aipl` binary's side, and hands
-      `RawResponse` to `write_http_response` / `write_http_error`
-- [ ] the curl declarations and option numbers shared with the AOT runtime if the file can be
-      included (they are `extern "C"` and `core` only), otherwise kept identical and
-      commented as such
-
-Watch: the AOT `http_curl` module is the reference; the JIT may use `std` for its buffers.
+Each ends at a green `cargo handoff`. The declaration, the `network` library, the
+`http_get` effect and its shim slot are done, and so are both runtimes: `aipl run`, `aipl run
+--jit` and a built binary perform the GET. The request is `crates/aipl-codegen/src/http_curl.rs`
+(libcurl through `extern "C"`, `-lcurl` on every link) and the layout of the
+`HttpResponse!Error` with the text checks on a response is `http_response.rs`; both files are
+included by the AOT runtime and are modules of the JIT, so the two cannot differ.
 
 ### 4. Tests against a real server, docs
 
@@ -86,7 +70,7 @@ Goal: the behavior is pinned end to end.
 
 - [ ] a Rust suite (`tests/suites/network.rs`, a `mod` line in `tests/compiler.rs`) that
       serves canned responses from a `TcpListener` on an ephemeral port and runs an AIPL
-      program against it, through `aipl run` and a built binary: status, headers, body, a
+      program against it, through `aipl run`, `aipl run --jit` and a built binary: status, headers, body, a
       404 as `ok`, a redirect, a refused connection and a timeout as `err`, a NUL body as
       `err`
 - [ ] the builtin documented (`aipl docs`), and `http_get`/`HttpResponse` added to the

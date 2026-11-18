@@ -27,8 +27,7 @@ Exits 0 for any response, a 404 included: the status is the server's answer, not
 (the name did not resolve, the connection was refused, the request timed out, or the body was
 not text).
 
-`./aipl run -- <url>` builds and runs it in one step. `./aipl run --jit` runs it in-process, which
-does not make requests yet: build it (`./aipl build main.aipl`) for that.
+`./aipl run -- <url>` builds and runs it in one step; `./aipl build main.aipl` writes the binary.
 
 Not like `curl`: GET only, `http` and `https` only, redirects always followed, a body that is
 not valid text is an error, and errors go to standard output.

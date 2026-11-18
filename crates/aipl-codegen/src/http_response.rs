@@ -31,7 +31,8 @@ pub(crate) extern "C" fn aipl_arr_drop_http_header(elems: *const u8, len: i64) {
         let header = unsafe { elems.add(i * HEADER_SIZE) };
         unsafe {
             core::ptr::read(header as *const super::str24::Str).release();
-            core::ptr::read(header.add(super::str24::STR_SIZE) as *const super::str24::Str).release();
+            core::ptr::read(header.add(super::str24::STR_SIZE) as *const super::str24::Str)
+                .release();
         }
     }
 }
@@ -107,7 +108,10 @@ pub(crate) fn write_http_response(out: *mut u8, response: &RawResponse) {
             return write_http_error(out, b"a response header is not text");
         }
         // The two fresh strings' references move into the array.
-        let element = [super::str24::from_bytes(name), super::str24::from_bytes(value)];
+        let element = [
+            super::str24::from_bytes(name),
+            super::str24::from_bytes(value),
+        ];
         headers = super::array_ops::push_mut(
             headers,
             count,
