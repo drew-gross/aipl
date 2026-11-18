@@ -486,25 +486,27 @@ fn an_import_goes_to_what_it_imports() {
     assert_eq!(location["range"]["start"], cursor_on(UTIL, "add(a: i64"));
 }
 
+/// A request for a document the compiler has not checked at its current text
+/// checks it then, rather than failing until the background check arrives.
 #[test]
-fn a_request_before_the_check_has_finished_says_so() {
+fn a_request_before_the_check_has_finished_checks_the_document_itself() {
     let workspace = Workspace::new("not-yet", &[("main.aipl", SHARED_NAME)]);
     let mut server = opened(&workspace, "main.aipl");
     let uri = workspace.uri("main.aipl");
-    let params =
-        json!({ "textDocument": { "uri": uri }, "position": cursor_on(SHARED_NAME, "name + tag") });
-    assert!(
-        request_error(&mut server, "textDocument/definition", params.clone())
-            .starts_with("still analysing")
+    let at = cursor_on(SHARED_NAME, "name + tag");
+    let declaration = cursor_on(SHARED_NAME, "name: i64, other");
+    assert_eq!(
+        definition_at(&mut server, &uri, at.clone())["range"]["start"],
+        declaration
     );
 
-    analysed(&mut server, &workspace, "main.aipl");
-    let edited = format!("{SHARED_NAME}\n");
+    // An edit makes the last check out of date; the answer is for the new text.
+    let edited = format!("\n{SHARED_NAME}");
     change(&mut server, &uri, 2, &edited);
-    assert!(
-        request_error(&mut server, "textDocument/definition", params)
-            .starts_with("still analysing"),
-        "an edit makes the last check out of date"
+    let moved = definition_at(&mut server, &uri, cursor_on(&edited, "name + tag"));
+    assert_eq!(
+        moved["range"]["start"],
+        cursor_on(&edited, "name: i64, other")
     );
 }
 

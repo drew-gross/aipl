@@ -63,10 +63,8 @@ impl Typed {
     }
 }
 
-fn still_analysing() -> String {
-    "still analysing: the compiler has not finished checking the current text of this \
-     document"
-        .to_string()
+fn not_analysed() -> String {
+    "the compiler has no analysis of the current text of this document".to_string()
 }
 
 /// A declaration site as an LSP `Location`, with its range taken against the
@@ -248,10 +246,15 @@ impl Server {
 
     /// What the compiler resolved the name under the cursor to, with the
     /// document and position the request named — or the reason the compiler
-    /// has no answer, which is an error rather than an empty result so that "the
-    /// server is still working" and "this does not compile" are never mistaken
-    /// for "nothing refers to this". See [`crate::navigation`].
-    fn under(&self, params: &Value) -> Result<(Under, PathBuf, String, usize), String> {
+    /// has no answer, which is an error rather than an empty result so that
+    /// "this does not compile" is never mistaken for "nothing refers to this".
+    /// See [`crate::navigation`].
+    ///
+    /// A document the compiler has not checked at its current text is checked
+    /// now ([`Server::ensure_analysed`]) rather than refused.
+    fn under(&mut self, params: &Value) -> Result<(Under, PathBuf, String, usize), String> {
+        let uri = uri_of(&params["textDocument"]);
+        self.ensure_analysed(&uri);
         let Some((path, text, offset)) = locate(&self.documents, params) else {
             return Err(
                 "this document has no file on disk, so its imports cannot be \
@@ -259,7 +262,7 @@ impl Server {
                     .to_string(),
             );
         };
-        let navigation = self.current_navigation(&uri_of(&params["textDocument"]), text)?;
+        let navigation = self.current_navigation(&uri, text)?;
         Ok((
             navigation.under(path, offset),
             path.to_path_buf(),
@@ -268,12 +271,30 @@ impl Server {
         ))
     }
 
+    /// Check the document at `uri` if the compiler has not checked its current
+    /// text, and keep what it found. The diagnostics worker does the same
+    /// check in the background, a debounce after each edit; a request that
+    /// arrives first does not wait for it to be scheduled, it runs the check
+    /// itself, which takes as long as the frontend does on that file.
+    fn ensure_analysed(&mut self, uri: &str) {
+        let current = self
+            .documents
+            .get(uri)
+            .zip(self.typed.get(uri))
+            .is_some_and(|(document, typed)| document.text == typed.text());
+        let Some(snapshot) = self.snapshot(uri).filter(|_| !current) else {
+            return;
+        };
+        let analysis = on_large_stack("aipl-lsp analysis", || analyse(&snapshot));
+        self.record(analysis);
+    }
+
     /// The navigation of the document at `uri`, if it was built from exactly
     /// `text`.
     fn current_navigation(&self, uri: &str, text: &str) -> Result<&Navigation, String> {
         match self.typed.get(uri) {
-            None => Err(still_analysing()),
-            Some(typed) if typed.text() != text => Err(still_analysing()),
+            None => Err(not_analysed()),
+            Some(typed) if typed.text() != text => Err(not_analysed()),
             Some(Typed::Broken { message, .. }) => Err(format!(
                 "this document does not compile, so what its names refer to is unknown: {message}"
             )),
@@ -352,6 +373,15 @@ impl Server {
             .and_then(|source| source.get(declaration.span.clone()))
             .unwrap_or_default()
             .to_string();
+        let stale: Vec<String> = self
+            .documents
+            .iter()
+            .filter(|(_, document)| mentions_word(&document.text, &name))
+            .map(|(other_uri, _)| other_uri.clone())
+            .collect();
+        for other_uri in stale {
+            self.ensure_analysed(&other_uri);
+        }
         self.scan_workspace(&name);
         let here = self.current_navigation(&uri, &text)?;
 
@@ -414,9 +444,9 @@ impl Server {
     /// state is what [`Server::references`] reports on. Kept analyses are dropped
     /// when any file they were built from has changed.
     ///
-    /// The check is the compiler's whole frontend, so it runs on a thread with the
-    /// stack the diagnostics worker has, and a file it panics on is left out like
-    /// one that does not compile.
+    /// The check is the compiler's whole frontend, so it runs on a large stack
+    /// ([`on_large_stack`]), and a file it panics on is left out like one that does
+    /// not compile.
     fn scan_workspace(&mut self, name: &str) {
         let documents = &self.documents;
         let read = |path: &Path| source_in(documents, path);
@@ -467,15 +497,7 @@ impl Server {
                 }
             }
         };
-        std::thread::scope(|scope| {
-            std::thread::Builder::new()
-                .name("aipl-lsp workspace scan".to_string())
-                .stack_size(crate::WORKER_STACK)
-                .spawn_scoped(scope, scan)
-                .expect("spawn the workspace scan")
-                .join()
-                .expect("the scan catches the panics of the checks it runs");
-        });
+        on_large_stack("aipl-lsp workspace scan", scan);
     }
 
     fn hover(&mut self, params: &Value) -> Value {
@@ -582,6 +604,22 @@ impl Server {
             "newText": formatted,
         }])
     }
+}
+
+/// Run `work` on a thread with the stack the diagnostics worker has, because the
+/// compiler's frontend recurses per AST node and overflows a default stack on a
+/// moderately sized program. A panic in `work` is raised again here, where the
+/// request handler catches it.
+fn on_large_stack<T: Send>(name: &str, work: impl FnOnce() -> T + Send) -> T {
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .name(name.to_string())
+            .stack_size(crate::WORKER_STACK)
+            .spawn_scoped(scope, work)
+            .expect("spawn a thread for the compiler")
+            .join()
+    })
+    .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
 
 /// The directories the client opened as the workspace: its folders, or the
