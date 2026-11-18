@@ -97,7 +97,7 @@ fn cli() -> ExitCode {
 fn usage(prog: &str) -> String {
     format!(
         "usage:
-  {prog} run   [--jit] [--flamegraph <out.svg> [--inverted]] [-- args...]
+  {prog} run   [--jit [--flamegraph <out.svg> [--inverted]]] [-- args...]
                                             build `main` from ./main.aipl into a temporary native binary and
                                             run it, exiting with its result (`--jit` runs it in-process instead)
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
@@ -178,7 +178,7 @@ after `--` go to it. It builds the program the way `build` does, into a temporar
 executable, and runs that: what it does is what the built binary does. `--jit`
 compiles and executes it in-process instead, which skips the link and the temporary
 file; there a `main` that doesn't take `str[]` gets the arguments parsed as i64
-(arity 0, 1, or 2 is supported). `--flamegraph <out.svg>` implies `--jit` and samples where `main`
+(arity 0, 1, or 2 is supported). `--flamegraph <out.svg>` needs `--jit` and samples where `main`
 spends its CPU time (at 997 Hz, by walking the stack) and writes it as an
 interactive flame graph: one box per function, stacked caller below callee, each
 as wide as its share of the samples. Click a box to zoom to it; Search highlights
@@ -249,8 +249,12 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
     if inverted && flamegraph.is_none() {
         return Err("`--inverted` draws a flame graph; add `--flamegraph <out.svg>`".to_string());
     }
-    // A flame graph samples the JIT's code, so asking for one is asking for the JIT.
-    if !jit && flamegraph.is_none() {
+    if flamegraph.is_some() && !jit {
+        return Err(
+            "`--flamegraph` samples the JIT's code; add `--jit` to profile in-process".to_string(),
+        );
+    }
+    if !jit {
         return run_built(&program, trailing, dbg).map_err(|e| match e {
             RunError::Compile(e) => render_err(file, e),
             RunError::Other(message) => message,

@@ -40,5 +40,5 @@ out="$root/target/profiling/$stage$suffix.svg"
 
 # `aipl run` runs the `main.aipl` of its working directory.
 cd "$root/profiling"
-"$root/target/debug/aipl" run --flamegraph "$out" ${inverted[@]+"${inverted[@]}"} -- "$stage" "${files[@]}"
+"$root/target/debug/aipl" run --jit --flamegraph "$out" ${inverted[@]+"${inverted[@]}"} -- "$stage" "${files[@]}"
 echo "flame graph: $out"

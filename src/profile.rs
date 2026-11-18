@@ -1,4 +1,4 @@
-//! A sampling CPU profiler for JIT-compiled AIPL, behind `aipl run --flamegraph`.
+//! A sampling CPU profiler for JIT-compiled AIPL, behind `aipl run --jit --flamegraph`.
 //!
 //! It is the profiler Brendan Gregg's flame graphs are drawn from: a tick every
 //! 1/997 s of CPU time (an odd rate, so sampling does not fall into lockstep

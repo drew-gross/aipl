@@ -3,7 +3,7 @@
 #     profiling/flamegraph.sh            # the default stage over the compiler's sources
 #     profiling/flamegraph.sh format     # one stage; see below
 #
-# `aipl run --flamegraph` samples where this `main` spends its CPU time, so what
+# `aipl run --jit --flamegraph` samples where this `main` spends its CPU time, so what
 # the graph shows is the compiler's code — the lexer, the parser, the loader's
 # per-file passes and the formatter, all of which are AIPL — running over source.
 # The passes written in Rust (the loader's flattening, the type checker, code

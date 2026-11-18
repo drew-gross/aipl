@@ -874,6 +874,7 @@ report:
   options to dump the clif, the binary, the asm, etc.
 
 flamegraph:
+  make bin mode support --flamegraph (not just jit)
   make a deterministic version of flamegraph that works on the deterministic instructions counter
   rewrite profiling/flamegraph.sh to aipl or rust
   do something more useful on error

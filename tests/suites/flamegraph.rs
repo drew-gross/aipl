@@ -35,7 +35,7 @@ fn main() !prints {
     .expect("write main.aipl");
 
     let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
-        .args(["run", "--flamegraph", "profile.svg"])
+        .args(["run", "--jit", "--flamegraph", "profile.svg"])
         .current_dir(&dir)
         .output()
         .expect("spawn aipl");
@@ -54,4 +54,22 @@ fn main() !prints {
         titles.iter().any(|t| t.starts_with("fib (")),
         "no fib frame in {titles:?}"
     );
+}
+
+#[test]
+fn a_flame_graph_needs_the_jit_to_be_asked_for() {
+    let dir = std::env::temp_dir().join(format!("aipl_flamegraph_nojit_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(dir.join("main.aipl"), "fn main() {}\n").expect("write main.aipl");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .args(["run", "--flamegraph", "profile.svg"])
+        .current_dir(&dir)
+        .output()
+        .expect("spawn aipl");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "`--flamegraph` samples the JIT's code; add `--jit` to profile in-process\n"
+    );
+    assert!(!out.status.success());
+    assert!(!dir.join("profile.svg").exists());
 }
