@@ -58,8 +58,9 @@ pub(crate) struct Navigation {
 /// The answer to "what is under the cursor".
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Under {
-    /// A name the compiler resolved to a declaration written in a file.
-    Declared(Site),
+    /// A name the compiler resolved to declarations written in files: one, or
+    /// two when the name stands for a field and a local at once (`T { kind }`).
+    Declared(Vec<Site>),
     /// A name the compiler resolved to a builtin that has no source.
     Native(String),
     /// Nothing the compiler resolved — neither a use nor a declaration it knows.
@@ -380,19 +381,33 @@ impl Navigation {
         let file = resolved(file);
         let covers =
             |site: &Site| site.file == file && site.span.start <= offset && offset <= site.span.end;
-        let used = self
-            .uses
-            .iter()
-            .filter(|(site, _)| covers(site))
-            .min_by_key(|(site, _)| site.span.len());
-        if let Some((_, found)) = used {
-            return match found {
-                Found::Declared(site) => Under::Declared(site.clone()),
-                Found::Native(name) => Under::Native(name.clone()),
+        let covering: Vec<&(Site, Found)> =
+            self.uses.iter().filter(|(site, _)| covers(site)).collect();
+        // The narrowest name under the cursor: a name inside a longer one is the
+        // one being pointed at.
+        if let Some(narrowest) = covering.iter().map(|(site, _)| site.span.len()).min() {
+            let mut declared: Vec<Site> = Vec::new();
+            let mut native = None;
+            for (_, found) in covering
+                .iter()
+                .filter(|(site, _)| site.span.len() == narrowest)
+            {
+                match found {
+                    Found::Declared(site) if !declared.contains(site) => {
+                        declared.push(site.clone())
+                    }
+                    Found::Declared(_) => {}
+                    Found::Native(name) => native = Some(name.clone()),
+                }
+            }
+            return match (declared.is_empty(), native) {
+                (false, _) => Under::Declared(declared),
+                (true, Some(name)) => Under::Native(name),
+                (true, None) => Under::Nothing,
             };
         }
         match self.declarations.iter().find(|site| covers(site)) {
-            Some(site) => Under::Declared(site.clone()),
+            Some(site) => Under::Declared(vec![site.clone()]),
             None => Under::Nothing,
         }
     }

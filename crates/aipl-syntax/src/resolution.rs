@@ -47,6 +47,10 @@ pub struct Resolution {
 /// expression more than once (a lambda body is checked per candidate type), and
 /// a name that resolved two different ways is dropped: a wrong answer is worse
 /// than a missing one.
+///
+/// The one pair of answers a name may keep is a field and a local: a struct
+/// literal's shorthand `T { kind }` writes the field it initializes and the
+/// binding it reads with the same characters.
 pub fn settled(found: Vec<Resolution>) -> Vec<Resolution> {
     let mut out: Vec<Resolution> = Vec::new();
     let mut conflicted: Vec<(String, Span)> = Vec::new();
@@ -54,13 +58,25 @@ pub fn settled(found: Vec<Resolution>) -> Vec<Resolution> {
         if conflicted.iter().any(|(f, s)| *f == r.in_fn && *s == r.at) {
             continue;
         }
-        match out.iter().position(|o| o.in_fn == r.in_fn && o.at == r.at) {
-            Some(i) if out[i].target == r.target => {}
-            Some(i) => {
-                out.remove(i);
+        let same: Vec<usize> = (0..out.len())
+            .filter(|&i| out[i].in_fn == r.in_fn && out[i].at == r.at)
+            .collect();
+        if same.iter().any(|&i| out[i].target == r.target) {
+            continue;
+        }
+        let shorthand = |a: &Target, b: &Target| {
+            matches!(
+                (a, b),
+                (Target::Field { .. }, Target::Local(_)) | (Target::Local(_), Target::Field { .. })
+            )
+        };
+        match same.as_slice() {
+            [] => out.push(r),
+            [i] if shorthand(&out[*i].target, &r.target) => out.push(r),
+            _ => {
+                out.retain(|o| !(o.in_fn == r.in_fn && o.at == r.at));
                 conflicted.push((r.in_fn, r.at));
             }
-            None => out.push(r),
         }
     }
     out
@@ -82,6 +98,25 @@ mod tests {
     fn a_repeat_of_one_answer_is_kept_once() {
         let r = found(1..2, Target::Function("g".to_string()));
         assert_eq!(settled(vec![r.clone(), r.clone()]), vec![r]);
+    }
+
+    #[test]
+    fn a_field_and_a_local_at_one_name_are_both_kept() {
+        let field = found(
+            1..2,
+            Target::Field {
+                owner: "S".to_string(),
+                field: "x".to_string(),
+            },
+        );
+        let local = found(1..2, Target::Local(7..8));
+        assert_eq!(
+            settled(vec![field.clone(), local.clone(), field.clone()]),
+            vec![field.clone(), local.clone()]
+        );
+        // A third answer spoils both.
+        let other = found(1..2, Target::Local(9..10));
+        assert_eq!(settled(vec![field, local, other]), vec![]);
     }
 
     #[test]

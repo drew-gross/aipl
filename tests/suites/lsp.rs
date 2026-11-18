@@ -1424,3 +1424,42 @@ fn a_case_goes_to_its_declaration_wherever_it_is_named() {
         assert_eq!(found["range"]["start"], declaration, "from {snippet:?}");
     }
 }
+
+const SHORTHAND: &str = "struct Expr { kind: i64, span: i64 }\n\
+                         \n\
+                         struct Core { kind: i64, span: i64 }\n\
+                         \n\
+                         fn with_kind(Expr { span }, kind: i64) -> i64 { Core { kind, span }.span }\n";
+
+/// A name written once that is both a field and a local — `Core { kind, span }` — goes to both
+/// declarations, and its references are those of both.
+#[test]
+fn a_shorthand_field_goes_to_the_field_and_the_local() {
+    let workspace = Workspace::new("shorthand", &[("main.aipl", SHORTHAND)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let at = cursor_on(SHORTHAND, "kind, span }");
+    let found = definition_at(&mut server, &uri, at.clone());
+    let starts: Vec<Value> = found
+        .as_array()
+        .unwrap_or_else(|| panic!("two locations, got {found}"))
+        .iter()
+        .map(|location| location["range"]["start"].clone())
+        .collect();
+    assert_eq!(
+        starts,
+        vec![
+            cursor_on(SHORTHAND, "kind: i64, span: i64 }\n\nfn"),
+            cursor_on(SHORTHAND, "kind: i64) ->"),
+        ]
+    );
+    let references = references_at(&mut server, &uri, at, true);
+    assert_eq!(
+        references,
+        vec![
+            triple(&uri, cursor_on(SHORTHAND, "kind: i64, span: i64 }\n\nfn")),
+            triple(&uri, cursor_on(SHORTHAND, "kind: i64) ->")),
+            triple(&uri, cursor_on(SHORTHAND, "kind, span }")),
+        ]
+    );
+}

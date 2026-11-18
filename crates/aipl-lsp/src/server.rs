@@ -349,10 +349,19 @@ impl Server {
     fn definition(&mut self, params: &Value) -> Result<Value, String> {
         let (under, path, text, offset) = self.under(params)?;
         match under {
-            Under::Declared(site) => {
+            Under::Declared(sites) => {
                 let navigation =
                     self.current_navigation(&uri_of(&params["textDocument"]), &text)?;
-                Ok(location(navigation, &site))
+                // One place is a location; a name that is two things at once
+                // (a shorthand field) is both.
+                let mut locations: Vec<Value> = sites
+                    .iter()
+                    .map(|site| location(navigation, site))
+                    .collect();
+                Ok(match locations.len() {
+                    1 => locations.remove(0),
+                    _ => Value::Array(locations),
+                })
             }
             Under::Native(name) => Err(format!(
                 "`{name}` is a builtin the compiler expands itself; it has no source to show"
@@ -378,8 +387,8 @@ impl Server {
     /// has no resolved names to list and is left out.
     fn references(&mut self, params: &Value) -> Result<Value, String> {
         let (under, path, text, offset) = self.under(params)?;
-        let declaration = match under {
-            Under::Declared(site) => site,
+        let declarations = match under {
+            Under::Declared(sites) => sites,
             Under::Native(name) => {
                 return Err(format!(
                     "`{name}` is a builtin the compiler expands itself; its uses are not tracked"
@@ -393,8 +402,8 @@ impl Server {
         let uri = uri_of(&params["textDocument"]);
         let name = self
             .current_navigation(&uri, &text)?
-            .source(&declaration.file)
-            .and_then(|source| source.get(declaration.span.clone()))
+            .source(&declarations[0].file)
+            .and_then(|source| source.get(declarations[0].span.clone()))
             .unwrap_or_default()
             .to_string();
         let stale: Vec<String> = self
@@ -421,13 +430,17 @@ impl Server {
             }
         };
         if include_declaration {
-            add(here, &declaration);
+            for declaration in &declarations {
+                add(here, declaration);
+            }
         }
         for (other_uri, document) in &self.documents {
             match self.typed.get(other_uri) {
                 Some(Typed::Ready { text, navigation }) if *text == document.text => {
-                    for site in navigation.uses_of(&declaration) {
-                        add(navigation, &site);
+                    for declaration in &declarations {
+                        for site in navigation.uses_of(declaration) {
+                            add(navigation, &site);
+                        }
                     }
                 }
                 _ if !mentions_word(&document.text, &name) => {}
@@ -444,8 +457,10 @@ impl Server {
             }
         }
         for navigation in self.scanned.values() {
-            for site in navigation.uses_of(&declaration) {
-                add(navigation, &site);
+            for declaration in &declarations {
+                for site in navigation.uses_of(declaration) {
+                    add(navigation, &site);
+                }
             }
         }
         locations.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));

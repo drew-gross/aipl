@@ -296,6 +296,7 @@ char:
 lsp:
   warm the cache in the background on start and on edit
   docs hover should work on Error, err, ok, etc.
+  go-to-def on a keyword/operator (e.g. `fn`, `$`, `.` should show the docs for that operator. Maybe for builtins too.)
 
 bugs:
   lint quirk: Equivalence assumption: the ++/+= flavor matching uses the wrapping_/saturating_ name prefix instead of Rust's canonical-callee table. It is equivalent for every real import. It differs only for an absurd alias such as wrapping_add as ++.
