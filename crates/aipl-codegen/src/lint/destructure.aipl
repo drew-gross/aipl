@@ -393,7 +393,7 @@ variant Place = Parameter(str) | Bound(str?) | Slot(str?, str[])
 # How `name` is taken apart in `scope`, when it is. `value` is what a `let` binds it
 # to, and `struct_name` the struct the source already names for it, if any.
 fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: str?) -> Taken? {
-    let Uses { mentions, field_reads, shadowed, fields as _ } = self.uses_of(name);
+    let Uses { mentions, field_reads, shadowed } = self.uses_of(name);
     if (!shadowed && field_reads == 0 && mentions == 1) {
         if (let some((span, named, fields)) = self.opening_destructure(name, struct_name)) {
             return some(Opening(span, named, fields));

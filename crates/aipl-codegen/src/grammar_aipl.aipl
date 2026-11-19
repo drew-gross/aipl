@@ -5584,6 +5584,13 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     );
     assert(program_dump("""import { x } from "./p.aipl";""") == `import [x] from "./p.aipl"`);
 
+    // A struct pattern names the fields it reads; `as _` for one it does not is refused.
+    assert(
+        program_dump(
+            "fn f() { let P { a, b as _ } = g(); a }",
+        ) == "error: a struct pattern names only the fields it reads; leave this field out instead of binding it to `_`",
+    );
+
     // Documentation attaches at `item`, in front of the declaration — and an
     // import brings a name in rather than declaring one, so it takes none.
     assert(program_dump("# a doc\nfn f() { }") == "doc(a doc) fn f() = ()");
@@ -6362,8 +6369,19 @@ fn arm_binders() -> Rule<AiplTok> {
 }
 
 fn field_binders() -> Rule<AiplTok> {
-    let binder: Rule<AiplTok> = Then([Term(Name), Maybe(Then([Lit("as"), Term(Name)]))]);
+    // A field the pattern does not read is left out of it (`P { a }` reads `a` and ignores the
+    // rest), so `field as _` has nothing to say that leaving the field out does not.
+    let unread: Rule<AiplTok> = Then([Lit("_"), Refuse(Msg(unread_field_binder()))]);
+    let binder: Rule<AiplTok> = Then([
+        Term(Name),
+        Maybe(Then([Lit("as"), OneOf([unread, Term(Name)])])),
+    ]);
     Many(binder, min=1, sep=Lit(","), nested_in=braces(), spaced=true)
+}
+
+# What a struct pattern says to `field as _`.
+fn unread_field_binder() -> str {
+    "a struct pattern names only the fields it reads; leave this field out instead of binding it to `_`"
 }
 
 # The order a `#`-led bracket names, from the token after the `#`: `>` is

@@ -7,7 +7,7 @@ fn f(p: P) -> i64 {
     x
 }
 --- check --compile ---
-error: expected Name, found `}`
+error: expected Name or `_`, found `}`
  --> ./tests/cases/syntax/err_destructure_rename_missing_name.aipl:6:18
   |
 6 |     let P { x as } = p;
