@@ -700,6 +700,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/sets/char_set_to_array | 9 | 188 | 236 | 3890 | 6284 |
 | tests/cases/sets/elem_types | 2 | 34 | 34 | 346 | 1692 |
 | tests/cases/sets/empty_char_set_contexts | 56 | 3938 | 3938 | 7633 | 14292 |
+| tests/cases/sets/empty_literal_generic_param | 4 | 216 | 192 | 385 | 1860 |
 | tests/cases/sets/iteration | 21 | 1390 | 1486 | 3622 | 8356 |
 | tests/cases/sets/ordered | 62 | 3931 | 3931 | 10677 | 19424 |
 | tests/cases/sets/seeded_empty | 22 | 1275 | 1275 | 4368 | 9688 |

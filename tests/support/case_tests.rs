@@ -667,6 +667,7 @@ case_tests! {
     cases_sets_char_set_to_array = "cases/sets/char_set_to_array",
     cases_sets_elem_types = "cases/sets/elem_types",
     cases_sets_empty_char_set_contexts = "cases/sets/empty_char_set_contexts",
+    cases_sets_empty_literal_generic_param = "cases/sets/empty_literal_generic_param",
     cases_sets_err_map_on_set = "cases/sets/err_map_on_set",
     cases_sets_err_ordered_elem = "cases/sets/err_ordered_elem",
     cases_sets_err_ordered_mismatch = "cases/sets/err_ordered_mismatch",

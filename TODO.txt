@@ -489,15 +489,11 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 sets:
-  add insert method
   add to_set (Q: how to decide if ordered?)
-  support #{T}?
-  bug: #{} does not flex through a generic parameter.
   Dicts and sets can't be optional cores or dict elements, so #{} can't flex there either.
   There's no dict-insert or dict-union builtin, so a dict can't be grown — which also means the empty-block representation can't be observed to differ.
   An unannotated let x = #{}; still settles on a set, since there's no context to decide from. (maybe require the annotation? maybe flex?)
   support conversion to other containers
-  support other types
 
 parser:
   implement fix-it suggestions using Expect
@@ -555,7 +551,7 @@ skills:
 
 lint:
   make the "unused functions" lint not count .test/.benchmark blocks that don't actually use the function (need to support standalone benchmark, currently many hang off empty fn work () {})
-  xs.map(|p| p.name$shout().len()) should hit the "use $" lint
+  xs.map(|p| p.name$shout().len()) should hit the "use $$" lint to be xs$name$$shout()$len() after we have $$ operator
   lint should happend after resolution so that we don't need to check fn.name.starts_with("__builtin_"), it should just be fn.is_builtin
   slots_read_by_field is looking at names - it should know from a flag
   arms.all(|arm| arm.body.kind.is_case(Bool)) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early returng123)
@@ -565,7 +561,6 @@ lint:
   turn trace rejection into a lint, but make some lints non-squelchable
   turn refuse_sectioned_import into a lint
   let some(x) = e else { return none; } should just be let x = e?;
-  lint against unused variables and unused field destructuring items (even with as _, I don't think we need to adopt the "_ is intentionally unused" pattern)
   extend with a 1-char str literal should be push with a char literal
   go through the lint (and fusion) conditions and comment all of them
   merged-lint/fusion technique that works as a lint when a structure shows up in source and as a fusion when it shows up after inlining
@@ -665,6 +660,7 @@ design:
   apis should express intent
 
 optimizations:
+  dead code elimination
   dead store elimination
   unused expression elimination
   retain elision:
@@ -1069,11 +1065,8 @@ Make sure recursive with backpointer structs work e.g. graphs (but also need to 
 
 make a strip_trailing_whitespace if I can figure out a good name for it (that isn't confusing between all lines and one line)
 
-Allow int literals to flex to the type they are being assinged to / passed as
-
 narrower ints should take up less space
 
-dead code elimination
 the lexer still wants a real dispatch structure — a first-char jump table over rules rather than a linear scan — since it's the thing every parse in the corpus pays for.
 
 I built and measured three fixes, cumulatively:
@@ -1103,40 +1096,33 @@ sort:
   Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 
 Reasons doc.aipl uses a cons list:
-    1. fits borrows the stack in Rust; AIPL has no references.
+  1. fits borrows the stack in Rust; AIPL has no references.
 
-    This is the real driver. The Rust fits takes the outer work stack by reference (doc.rs:241):
+  This is the real driver. The Rust fits takes the outer work stack by reference (doc.rs:241):
 
-    fn fits(budget: usize, candidate: &Doc, rest: &[(usize, Mode, &Doc)]) -> bool
+  fn fits(budget: usize, candidate: &Doc, rest: &[(usize, Mode, &Doc)]) -> bool
 
-    …and then has to rebuild it anyway to push the candidate: rest.iter().map(|(_, m, d)| (*m, *d)).collect() (doc.rs:245) — an O(depth) clone on every group, affordable only because the elements are small Copy tuples of borrowed &Doc.
+  …and then has to rebuild it anyway to push the candidate: rest.iter().map(|(_, m, d)| (*m, *d)).collect() (doc.rs:245) — an O(depth) clone on every group, affordable only because the elements are small Copy tuples of borrowed &Doc.
 
-    AIPL has no borrows; everything passed is an owned/refcounted value. A cons-list tail is shared by pointer, so the AIPL version seeds the lookahead in O(1) with no copy at all (doc.aipl:162):
+  AIPL has no borrows; everything passed is an owned/refcounted value. A cons-list tail is shared by pointer, so the AIPL version seeds the lookahead in O(1) with no copy at all (doc.aipl:162):
 
-    aipl
-    fits(width - col, WCons(sp, true, inner, rest))
+  aipl
+  fits(width - col, WCons(sp, true, inner, rest))
 
-    The list is "the rest of the line" — the same structure the printer holds, reused rather than reconstructed. That's strictly better than what the Rust code does, and it only works because the tail is persistent.
+  The list is "the rest of the line" — the same structure the printer holds, reused rather than reconstructed. That's strictly better than what the Rust code does, and it only works because the tail is persistent.
 
-    2. There is no pop builtin.
+  2. There is no pop builtin.
 
-    the language has push, but nothing pops. The only way to shrink an array is a slice, and xs[start..end] is documented as "a fresh heap array copying the element range" (aipl-codegen/src/lib.rs:13511). So while let Some(x) = stack.pop() has no direct translation — emulating it via slicing makes the printer quadratic in document size.
+  the language has push, but nothing pops. The only way to shrink an array is a slice, and xs[start..end] is documented as "a fresh heap array copying the element range" (aipl-codegen/src/lib.rs:13511). So while let Some(x) = stack.pop() has no direct translation — emulating it via slicing makes the printer quadratic in document size.
 
-    3. The loop is recursion, so the stack has to be a value.
+  3. The loop is recursion, so the stack has to be a value.
 
-    go and fits are tail-recursive with the work list as a parameter, where Rust uses while let over a mut local. AIPL does have while (tests/cases/loops/while_loop.aipl), but the functional formulation needs a persistent stack, and WCons gives one where push is a single allocation sharing the existing tail. prepend (doc.aipl:217) is then just a right_fold conses onto that tail, matching Rust's reverse-order push loop.
+  go and fits are tail-recursive with the work list as a parameter, where Rust uses while let over a mut local. AIPL does have while (tests/cases/loops/while_loop.aipl), but the functional formulation needs a persistent stack, and WCons gives one where push is a single allocation sharing the existing tail. prepend (doc.aipl:217) is then just a right_fold conses onto that tail, matching Rust's reverse-order push loop.
 
-    Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
+  Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
 
 signedness:
     2. An integer literal doesn't flex through a constructor. In a fn returning u64!E,
       ok(0) types its payload i64 and is rejected, so the three "declined" sites in
       lexer.aipl bind `let declined: u64 = 0;` first. Literals flex fine into an
       annotated let, a parameter, or a struct field — just not through ok/err/some.
-
-    3. A lambda or fn-ref specialization created inside a .test body inherits that
-      body's "all effects allowed", and a production caller then reuses the same
-      instance — so a helper called from both places fails with a spurious effect
-      error (ucount_while$lam0 has effect "!prints"). That is why ucount_while carries
-      no .test block. This is the "test-block effect poisoning" already seen while
-      porting the lexer, now with a concrete reproducer.

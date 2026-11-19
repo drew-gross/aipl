@@ -1,0 +1,21 @@
+# An empty set literal passed where the parameter is `#{T}`, with `T` a type parameter of
+# the callee. Nothing in the literal says what `T` is, so it is taken from another argument
+# when there is one and is otherwise left open, which the call does not need.
+
+import { equal as ==, is_empty, len, wrapping_add as + } from builtins;
+
+fn count<T: any>(s: #{T}) -> u64 { s.len() }.test({
+    assert(count(#{}) == 0);
+    assert(count(#{1}) == 1);
+})
+
+fn same<T: any>(s: #{T}) -> #{T} { s }.test({
+    assert(same(#{}).is_empty());
+    assert(same(#{'a'}).len() == 1);
+})
+
+fn paired<T: any>(s: #{T}, extra: T[]) -> u64 { s.len() + extra.len() }.test({
+    // `T` is fixed by the second argument, whose elements the empty set then shares.
+    assert(paired(#{}, ["x", "y"]) == 2);
+    assert(paired(#{"x"}, ["y"]) == 2);
+})
