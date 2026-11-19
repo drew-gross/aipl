@@ -1070,11 +1070,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         ]),
     ]);
     let while_stmt: Rule<AiplTok> = OneOf([
-        Then([
-            Lit("while"),
-            one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens()),
-            Named("loop_body"),
-        ]),
+        Then([Lit("while"), let_condition(), Named("loop_body")]),
         Then([Lit("while"), one(Named("expr"), nested_in=parens()), Named("loop_body")]),
     ]);
     let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Expect(Lit(";"))]);
@@ -1168,7 +1164,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let atom: Rule<AiplTok> = OneOf([
         Then([
             Lit("if"),
-            one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens()),
+            let_condition(),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
@@ -1264,7 +1260,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let else_branch: Rule<AiplTok> = OneOf([
         Then([
             Lit("if"),
-            one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens()),
+            let_condition(),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
@@ -6390,6 +6386,12 @@ fn nest3(
 fn case_payload() -> Rule<AiplTok> {
     // A case pattern's parenthesized slots, each a pattern of its own.
     nest("(", Named("ctor_payload"), ")", strict())
+}
+
+// `(let PATTERN = EXPR)`: the condition of `if (let ..)` and `while (let ..)`, which runs
+// its block when the value matches the pattern.
+fn let_condition() -> Rule<AiplTok> {
+    one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens())
 }
 
 // `p: Point { x, y }` and `p: Wrap(inner)`: a name bound to the whole value, which is
