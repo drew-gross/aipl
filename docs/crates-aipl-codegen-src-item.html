@@ -221,7 +221,7 @@
           </h3>
           <pre class="signature"><code>variant Visibility</code></pre>
 
-          <div class="doc"><p>How a function is reached. <code>Public</code> is written <code>pub</code> and may be imported; <code>EntryPoint</code> is reached by whatever runs the file — <code>main</code>, and the blocks <code>check</code> runs — without being importable; <code>Private</code> is reached only by a call from inside the file.</p></div>
+          <div class="doc"><p>How a function is reached. <code>Public</code> is written <code>pub</code> and may be imported; <code>EntryPoint</code> is reached by whatever runs the file, as <code>main</code> is, without being importable; <code>Test</code> and <code>Benchmark</code> are the functions a <code>.test</code> and a <code>.benchmark</code> block become, run by <code>check</code>; <code>Private</code> is reached only by a call from inside the file.</p></div>
 
 
           <ul class="cases">
@@ -237,6 +237,16 @@
             </li>
 
             <li id="item-EntryPoint"><code>EntryPoint</code>
+
+
+            </li>
+
+            <li id="item-Test"><code>Test</code>
+
+
+            </li>
+
+            <li id="item-Benchmark"><code>Benchmark</code>
 
 
             </li>

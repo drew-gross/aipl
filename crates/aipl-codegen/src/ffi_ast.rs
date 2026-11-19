@@ -149,9 +149,13 @@ fn const_decl(v: &FfiValue) -> R<ast::ConstDecl> {
 }
 
 /// Whether a function is `pub`. The AIPL side says more (`Visibility`), but only `Public`
-/// is importable: `main` and the test blocks are found by name here.
+/// is importable. The functions a test or benchmark block becomes count as `pub` here;
+/// `main` and the carriers of such blocks are found by name.
 fn function_is_pub(v: &FfiValue) -> R<bool> {
-    Ok(variant(field(v, "visibility")?)?.0 == "Public")
+    Ok(matches!(
+        variant(field(v, "visibility")?)?.0,
+        "Public" | "Test" | "Benchmark"
+    ))
 }
 
 fn function(v: &FfiValue) -> R<ast::Function> {

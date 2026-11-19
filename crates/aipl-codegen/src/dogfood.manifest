@@ -34,7 +34,7 @@
 ; variant __m36__SuperItem 288 WrittenFn(8:__m36__Function,192:__m36__Attributes) LoweredFn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Refinement(8:__m36__RefinementDecl) Import(8:__m36__ImportDecl) Const(8:__m36__ConstDecl)
 ; struct __m36__Function 184 name@0:__m19__SpanStr visibility@40:__m36__Visibility sig@48:__m36__Signature body@136:__m31__Expr shorthand_body@144:bool doc@152:str?
 ; struct __m19__SpanStr 40 text@0:str span@24:__builtin_Span
-; variant __m36__Visibility 8 Public Private EntryPoint
+; variant __m36__Visibility 8 Public Private EntryPoint Test Benchmark
 ; struct __m36__Signature 88 type_vars@0:__m36__TypeParam[] params@24:__m36__Param[] effects@48:str[] return_ty@72:__m30__Ty?
 ; struct __m36__TypeParam 64 name@0:str bound@24:__m35__Bound default@32:__m30__Ty? name_span@48:__builtin_Span
 ; variant __m35__Bound 8 Any Ord Int Variant Cases
@@ -490,4 +490,4 @@
 ; data 335 __tostr_lit_101 66616c7365
 
 ; __builtin_int_parse
-; source-fingerprint 6891932551590945781
+; source-fingerprint 9997624495829829227

@@ -2,10 +2,10 @@
 # top-level functions, so that everything after the parse — the loader's rewrites included,
 # which is how they recognize test code — sees only functions.
 #
-# - A `.test({ .. })` block becomes `__test$<f>`: public, no parameters, the block as its
+# - A `.test({ .. })` block becomes `__test$<f>`: no parameters, the block as its
 #   body, declaring no effect (so `aipl check` runs it, `assert` works in it, and a test
 #   shims whatever it uses). It sits right after `f`.
-# - A `.benchmark({ .. })` attribute becomes `__benchmark$<f>`: private, no parameters, a
+# - A `.benchmark({ .. })` attribute becomes `__benchmark$<f>`: no parameters, a
 #   unit body — the block itself is `__test$__benchmark$<f>`, which declares `measure` and
 #   nothing else. They sit right after `f` and the helpers `f`'s own `.test` block declared.
 # - A function declared inside a `.test` block moves out to the top level under
@@ -17,6 +17,10 @@
 # - A top-level `test({ .. })` is carried by a function that exists only for it; the block
 #   becomes `__test$<carrier>` and the carrier goes.
 #
+# The functions this makes are the ones given the `Test` and `Benchmark` visibilities: a block's
+# function is `Test`, or `Benchmark` when it is a `.benchmark` block, and so is the function a
+# `.benchmark` hangs from.
+#
 # Renaming is by name, not by scope: a `let` in the test body that shadows a
 # helper's name is not tracked, the same way a call's name resolves in the
 # loader.
@@ -27,20 +31,21 @@ import {
     Benchmark,
     benchmark_fn_name,
     fn_role,
+    is_unattached_benchmark,
     is_unattached_test,
     test_fn_name,
     test_helper_name,
 } from "./fn_names.aipl";
 import {
     Attributes,
-    EntryPoint,
+    Benchmark as BenchmarkFn,
     Function,
     Item,
     LoweredFn,
     Program,
-    Public,
     Signature,
     SuperProgram,
+    Test,
     WrittenFn,
     WrittenItem,
     WrittenProgram,
@@ -68,7 +73,13 @@ fn function_items(self: Function, Attributes { test_body, test_fns, benchmark })
     let stand_in = benchmark
         .map(|block| self.benchmark_function(block.span).hoisted(some(block.body), block.fns))
         .value_or([]);
-    [..self.hoisted(test_body, test_fns), ..stand_in]
+    // A top-level `benchmark({ .. })`'s carrier is the benchmark's own function.
+    let carrier = if (self.name.text.is_unattached_benchmark()) {
+        Function { ..self, visibility: BenchmarkFn }
+    } else {
+        self
+    };
+    [..carrier.hoisted(test_body, test_fns), ..stand_in]
 }
 
 # The function standing for a `.benchmark` block on `self`, with an empty body: the block
@@ -76,7 +87,7 @@ fn function_items(self: Function, Attributes { test_body, test_fns, benchmark })
 # function itself points.
 fn benchmark_function(self: Function, span: Span) -> Function {
     name: SpanStr { text: benchmark_fn_name(self.name.text), span },
-    visibility: EntryPoint,
+    visibility: BenchmarkFn,
     sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
     body: at(Unit, span),
     doc: none,
@@ -101,7 +112,7 @@ fn hoisted(self: Function, test_body: Expr?, test_fns: Function[]) -> Function[]
     [..self.with_test_function(test_body$rename_uses(renames)), ..helpers]
 }
 
-# `self`, and the function its `.test` block is: `__test$<self>`, public, with no
+# `self`, and the function its `.test` block is: `__test$<self>`, with no
 # parameters and the block as its body, which declares `measure` when it is a `.benchmark`
 # block and no effect otherwise. For a top-level `test({ .. })`, whose carrier has nothing
 # else to say, it is only that function.
@@ -111,9 +122,13 @@ fn with_test_function(self: Function, test_body: Expr?) -> Function[] {
         Benchmark(..) => ["measure"],
         _ => [],
     };
+    let visibility = match (fn_role(self.name.text)) {
+        Benchmark(..) => BenchmarkFn,
+        _ => Test,
+    };
     let test = Function {
         name: SpanStr { ..self.name, text: test_fn_name(self.name.text) },
-        visibility: Public,
+        visibility,
         sig: Signature { type_vars: [], params: [], effects, return_ty: none },
         body: block,
         doc: none,
