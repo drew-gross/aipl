@@ -1689,18 +1689,17 @@ impl Pinner<'_> {
                 return self.coerce(&e.ty, &plain, span, site);
             }
         }
-        // The payload of an `ok`, `err` or `some` is held to the refinement its slot asks for, by
-        // what it is; the wrapper itself is compared without the refinements inside it.
+        // A call whose result is made of its type parameters (`some(x)` is a `T?`) is held to
+        // the refinement each parameter's slot asks for, by what its argument is; the call itself
+        // is compared without the refinements inside it.
         if let TExprKind::Call { callee, args, .. } = &e.kind {
-            let slot = match (callee, self.table.shallow(expected)) {
-                (Callee::Some, It::Opt(inner)) => Some(inner),
-                (Callee::Ok, It::Res(ok, _)) => Some(ok),
-                (Callee::Err, It::Res(_, err)) => Some(err),
-                _ => None,
-            };
-            if let (Some(slot), [arg]) = (slot, args.as_slice()) {
-                if self.mentions_refinement(expected) {
-                    self.coerce_expr(arg, &slot, &arg.span, site)?;
+            if self.mentions_refinement(expected) {
+                if let Some(slots) = self.argument_slots(callee, args.len(), expected) {
+                    for (arg, slot) in args.iter().zip(&slots) {
+                        if let Some(slot) = slot {
+                            self.coerce_expr(arg, slot, &arg.span, site)?;
+                        }
+                    }
                     let plain = self.unrefined(expected);
                     return self.coerce(&e.ty, &plain, span, site);
                 }
@@ -1856,18 +1855,12 @@ impl Pinner<'_> {
     /// or a struct literal, whose every part is clean in turn.
     fn shows_throughout(&self, e: &TExpr<It>, c: &str) -> bool {
         match &e.kind {
-            // `some(x)`, `ok(x)` and `err(x)` hold what `x` holds and nothing else, so they are
-            // clean exactly when `x` is. A defaulted optional keyword argument arrives wrapped.
-            TExprKind::Call {
-                callee: Callee::Some | Callee::Ok | Callee::Err,
-                args,
-                ..
-            } => args.iter().all(|a| self.clean_of(a, c)),
-            TExprKind::Call { args, .. } => {
-                self.constructed_case(e)
-                    .is_some_and(|case| self.case_differs(&case, c))
-                    && args.iter().all(|a| self.clean_of(a, c))
-            }
+            TExprKind::Call { callee, args, .. } => match self.constructed_case(e) {
+                Some(case) => {
+                    self.case_differs(&case, c) && args.iter().all(|a| self.clean_of(a, c))
+                }
+                None => self.call_keeps_clean(callee, args, c),
+            },
             TExprKind::Construct(_, inits) => inits.iter().all(|i| self.clean_of(&i.value, c)),
             // A case with no payload.
             TExprKind::Ident(_) => self
@@ -1875,6 +1868,121 @@ impl Pinner<'_> {
                 .is_some_and(|case| self.case_differs(&case, c)),
             TExprKind::None | TExprKind::Unit => true,
             _ => false,
+        }
+    }
+
+    /// The signature `callee` is declared with: a function's own, or the pseudo signature of
+    /// `some`, `ok` and `err`.
+    fn declared_signature(&self, callee: &Callee) -> Option<&Signature> {
+        match self.decls.sigs.get(callee.name()) {
+            Some(declared) => Some(&declared.sig),
+            None => crate::pseudo_sigs().get(callee.name()),
+        }
+    }
+
+    /// For a call to `callee` with `arguments` arguments whose result is wanted as `expected`:
+    /// the type each argument is wanted as, when the declared result is made of the type
+    /// parameters and nothing in `expected` asks for a refinement of anything else. An argument
+    /// not simply a type parameter's value has no slot (`None`), and a signature that does not
+    /// fit that shape gives nothing.
+    fn argument_slots(
+        &self,
+        callee: &Callee,
+        arguments: usize,
+        expected: &It,
+    ) -> Option<Vec<Option<It>>> {
+        let sig = self.declared_signature(callee)?;
+        let ret = sig.return_ty.as_ref()?;
+        if sig.params.len() != arguments || sig.is_mutating() {
+            return None;
+        }
+        let mut found = Vec::new();
+        if !self.type_parameter_slots(ret, expected, &mut found) {
+            return None;
+        }
+        sig.params
+            .iter()
+            .map(|param| match &param.ty {
+                Type::TypeVar(n) if !param.arity.is_variadic() => {
+                    Some(found.iter().find(|(v, _)| v == n).map(|(_, t)| t.clone()))
+                }
+                other => (!crate::typing::mentions_typevar(other)).then_some(None),
+            })
+            .collect()
+    }
+
+    /// Match the declared result `declared` against the wanted type, recording what is wanted
+    /// where a type parameter stands. False when `expected` asks for a refinement of a part that
+    /// is not a type parameter, or the shapes differ.
+    fn type_parameter_slots(
+        &self,
+        declared: &Type,
+        expected: &It,
+        found: &mut Vec<(String, It)>,
+    ) -> bool {
+        if let Type::TypeVar(n) = declared {
+            // As written, refinements included: `shallow` would strip them.
+            found.push((n.clone(), expected.clone()));
+            return true;
+        }
+        match (declared, self.table.shallow(expected)) {
+            (Type::Optional(d), It::Opt(i)) | (Type::Array(d), It::Arr(i)) => {
+                self.type_parameter_slots(d, &i, found)
+            }
+            (Type::Result(da, db), It::Res(a, b)) => {
+                self.type_parameter_slots(da, &a, found) && self.type_parameter_slots(db, &b, found)
+            }
+            (other, wanted) => {
+                !crate::typing::mentions_typevar(other) && !self.mentions_refinement(&wanted)
+            }
+        }
+    }
+
+    /// Whether a call to `callee` yields a value holding no case `c`, judged from its declared
+    /// signature alone: the result's type holds a `c` only through a type parameter, and every
+    /// argument that supplies a type parameter holds none. A function cannot make a value of a
+    /// type parameter, only pass on the ones it was given, so it adds no `c` of its own. A
+    /// function-typed parameter is the exception, since what it returns is not an argument.
+    fn call_keeps_clean(&self, callee: &Callee, args: &[TExpr<It>], c: &str) -> bool {
+        let Some(sig) = self.declared_signature(callee) else {
+            return false;
+        };
+        let Some(ret) = &sig.return_ty else {
+            return false;
+        };
+        sig.params.len() == args.len()
+            && !sig.is_mutating()
+            && !self.declared_holds_case(ret, c)
+            && sig.params.iter().zip(args).all(|(param, arg)| {
+                if !crate::typing::mentions_typevar(&param.ty) {
+                    return true;
+                }
+                !param.arity.is_variadic()
+                    && !declared_has_function(&param.ty)
+                    && self.clean_of(arg, c)
+            })
+    }
+
+    /// Whether the declared type `t` can hold a case `c` other than through a type parameter
+    /// (which the caller's arguments decide).
+    fn declared_holds_case(&self, t: &Type, c: &str) -> bool {
+        match t {
+            Type::TypeVar(_) | Type::Any | Type::Unit | Type::Primitive(_) => false,
+            Type::Named(n) => self.name_reaches(n, c),
+            Type::Generic(n, args) => {
+                self.name_reaches(n, c) || args.iter().any(|a| self.declared_holds_case(a, c))
+            }
+            Type::Case(i)
+            | Type::Optional(i)
+            | Type::Array(i)
+            | Type::Set(i, _)
+            | Type::Without(i, _) => self.declared_holds_case(i, c),
+            Type::Dict(a, b) | Type::Result(a, b) => {
+                self.declared_holds_case(a, c) || self.declared_holds_case(b, c)
+            }
+            Type::Tuple(es) => es.iter().any(|e| self.declared_holds_case(e, c)),
+            // Anything not understood is taken to hold one.
+            Type::Fn(..) | Type::Unknown | Type::ConcatStr => true,
         }
     }
 
@@ -5664,5 +5772,22 @@ fn function_target(name: &str) -> Target {
             case: case.to_string(),
         },
         None => Target::Function(name.to_string()),
+    }
+}
+
+/// Whether the declared type `t` has a function type anywhere in it.
+fn declared_has_function(t: &Type) -> bool {
+    match t {
+        Type::Fn(..) => true,
+        Type::Case(i)
+        | Type::Optional(i)
+        | Type::Array(i)
+        | Type::Set(i, _)
+        | Type::Without(i, _) => declared_has_function(i),
+        Type::Dict(a, b) | Type::Result(a, b) => {
+            declared_has_function(a) || declared_has_function(b)
+        }
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(declared_has_function),
+        _ => false,
     }
 }

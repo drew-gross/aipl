@@ -3733,6 +3733,19 @@ fn __random_seed_from_clock() !clock {}
 fn __template_interp<T: any>(self: T) -> str { "" }
 "#;
 
+/// What `some`, `ok` and `err` take and give, written as the signatures they would have if they
+/// were functions. The checker types them itself (the side of a result that nothing pins is
+/// settled by where the value goes), so these are not what a call is checked against; they say
+/// what a call's result is made of, which is what a rule about a result that is "clean" of a
+/// case needs: `some(x)` holds what `x` holds and nothing else. A bodyless declaration is not
+/// valid AIPL, so each has a body that is never read. The side of a result that the argument
+/// does not supply is a type parameter of its own, which nothing in the call fixes.
+pub const PSEUDO_SIGNATURES: &str = r#"
+fn some<T: any>(self: T) -> T? { none }
+fn ok<T: any, E: any>(self: T) -> T!E { err(self) }
+fn err<E: any, T: any>(self: E) -> T!E { ok(self) }
+"#;
+
 /// `items` — the parsed [`BUILTIN_SIGNATURES`] — with a declaration added for every
 /// reduction, synthesized from the signature of its step.
 ///

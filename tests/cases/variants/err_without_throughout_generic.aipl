@@ -1,0 +1,25 @@
+# A call's result is clean only when it is made of its function's type parameters and the arguments
+# supplying them are clean. `some`, `ok` and `err` are held to it like any function, and so is one
+# that returns what a function it was handed returns.
+
+variant Rule = Literal(str) | Wrap(Rule) | Named(str)
+
+variant Linked = Rule without Named throughout
+
+fn from_function<T: any>(self: () -> T) -> T { self() }
+
+fn called() -> Linked { from_function(|| Named("b")) }
+
+fn dirty(rule: Rule) -> Linked? { some(rule) }
+--- check --compile ---
+error: fn "called": body returns Rule, but the declared return type is Rule without Named throughout: nothing shows it is not Named throughout
+  --> ./tests/cases/variants/err_without_throughout_generic.aipl:11:25
+   |
+11 | fn called() -> Linked { from_function(|| Named("b")) }
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fn "dirty": body returns Rule, but the declared return type is Rule without Named throughout: nothing shows it is not Named throughout
+  --> ./tests/cases/variants/err_without_throughout_generic.aipl:13:40
+   |
+13 | fn dirty(rule: Rule) -> Linked? { some(rule) }
+   |                                        ^^^^

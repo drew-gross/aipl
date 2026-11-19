@@ -15,3 +15,19 @@ fn list_of(text: str) -> Linked { Many(Literal(text), separator=Literal(",")) }.
 fn bare(text: str) -> Linked { Many(Literal(text)) }.test({
     assert(bare("a") == Many(Literal("a")));
 })
+
+// Any function whose result is made only of its type parameters passes cleanliness on; `some`,
+// `ok` and `err` are no different.
+fn lift<T: any>(self: T) -> T? { some(self) }
+
+fn lifted(text: str) -> Linked? { lift(Literal(text)) }.test({
+    assert(lifted("a") == some(Literal("a")));
+})
+
+fn succeeded(text: str) -> Linked!str { ok(Literal(text)) }.test({
+    assert(succeeded("a") == ok(Literal("a")));
+})
+
+fn failed(text: str) -> str!Linked { err(Literal(text)) }.test({
+    assert(failed("a") == err(Literal("a")));
+})

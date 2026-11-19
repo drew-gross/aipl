@@ -3441,6 +3441,27 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
     })
 }
 
+/// [`aipl_syntax::PSEUDO_SIGNATURES`] parsed once and indexed by name: the shape of `some`,
+/// `ok` and `err`, which the checker types itself.
+pub(crate) fn pseudo_sigs() -> &'static HashMap<String, Signature> {
+    static SIGS: OnceLock<HashMap<String, Signature>> = OnceLock::new();
+    SIGS.get_or_init(|| {
+        let program = aipl_parser::parse(aipl_syntax::PSEUDO_SIGNATURES)
+            .expect("pseudo signatures are valid AIPL");
+        program
+            .items
+            .into_iter()
+            .filter_map(|item| match item {
+                Item::Fn(f) => {
+                    let g = normalize(&f).expect("pseudo signatures are valid AIPL");
+                    Some((f.name.text.clone(), g.sig))
+                }
+                _ => None,
+            })
+            .collect()
+    })
+}
+
 /// Names of the builtins declared with a `mut self` receiver. They follow the
 /// mutating-method convention: `set v.f(x)` writes back in place, and every
 /// other position copy-and-modifies. Derived from [`BUILTIN_SIGNATURES`] so no

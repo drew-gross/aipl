@@ -903,6 +903,7 @@ case_tests! {
     cases_variants_err_without_narrowing = "cases/variants/err_without_narrowing",
     cases_variants_err_without_parameters = "cases/variants/err_without_parameters",
     cases_variants_err_without_throughout = "cases/variants/err_without_throughout",
+    cases_variants_err_without_throughout_generic = "cases/variants/err_without_throughout_generic",
     cases_variants_fn_payload = "cases/variants/fn_payload",
     cases_variants_fn_value_returns_boxed = "cases/variants/fn_value_returns_boxed",
     cases_variants_generic_multi_instance = "cases/variants/generic_multi_instance",
