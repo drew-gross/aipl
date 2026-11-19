@@ -443,6 +443,17 @@ struct Production<K: variant, A: any> {
 # grammar file ever spells it out.
 struct Grammar<K: variant, A: any> { prods: Production<K, A>[], groups: ListStyle[] = [] }
 
+# A rule with no `Named` reference left in it, at any depth: what `link` returns. It is a
+# `Rule` at run time, and a `LinkedRule` goes wherever a `Rule` is wanted; the other way needs
+# `link`. A `match` on one needs no `Named` arm, so the driver cannot meet an unresolved reference.
+variant LinkedRule<K: variant> = Rule<K> without Named throughout
+
+# A production whose rule is a `LinkedRule`.
+variant LinkedProduction<K: variant, A: any> = Production<K, A> without Named throughout
+
+# A grammar every rule of which is a `LinkedRule`: what `link` returns.
+variant LinkedGrammar<K: variant, A: any> = Grammar<K, A> without Named throughout
+
 # The production names of `g`, in index order — the table `show` renders a
 # tree against, and what `link` resolves references through.
 pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods$name }
@@ -701,7 +712,7 @@ fn desugar_rules<K: variant>(rs: Rule<K>[]) -> Rule<K>[]!ParseError { rs.try_map
 # `base` is the index the first group in `r` takes; the rest follow in
 # `group_styles` order. It is threaded by arithmetic rather than by a running
 # counter because a rule is a tree and `try_map` has nowhere to keep one.
-fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseError {
+fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> LinkedRule<K>!ParseError {
     match (r) {
         Named(n) => ok(NamedIdx(
             names
@@ -766,7 +777,7 @@ fn opt_group_count<K: variant>(r: Rule<K>?) -> u64 { opt_group_styles(r).len() }
 
 # A `Many`'s separator, linked — `none` stays `none`. Its own function because
 # `?` cannot reach inside an optional.
-fn link_opt<K: variant>(r: Rule<K>?, names: str[], base: u64) -> Rule<K>?!ParseError {
+fn link_opt<K: variant>(r: Rule<K>?, names: str[], base: u64) -> LinkedRule<K>?!ParseError {
     match (r) {
         some(sub) => ok(some(link_rule(sub, names, base)?)),
         none => ok(none),
@@ -775,8 +786,8 @@ fn link_opt<K: variant>(r: Rule<K>?, names: str[], base: u64) -> Rule<K>?!ParseE
 
 # Each rule in `rs`, linked, with `base` advancing past the groups each one
 # holds.
-fn link_rules<K: variant>(rs: Rule<K>[], names: str[], base: u64) -> Rule<K>[]!ParseError {
-    mut out: Rule<K>[] = [];
+fn link_rules<K: variant>(rs: Rule<K>[], names: str[], base: u64) -> LinkedRule<K>[]!ParseError {
+    mut out: LinkedRule<K>[] = [];
     mut b = base;
     for (let r : rs) {
         set out.push(link_rule(r, names, b)?);
@@ -792,7 +803,7 @@ fn link_rules<K: variant>(rs: Rule<K>[], names: str[], base: u64) -> Rule<K>[]!P
 #
 # Idempotent — a `NamedIdx` passes through — so a grammar may be linked once
 # and reused, or handed to `parse` unlinked and linked per call.
-pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
+pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> LinkedGrammar<K, A>!ParseError {
     let names = prod_names(g);
 
     // Two productions of one name would make `Named` mean whichever came first
@@ -811,7 +822,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Desugar first: a bracketed `Many` has its style settled — stated, or read
     // off the rule — before a group index is handed out, so what the table holds
     // is what the rule meant rather than what it wrote.
-    mut prods: Production<K, A>[] = [];
+    mut prods: LinkedProduction<K, A>[] = [];
     mut groups: ListStyle[] = [];
     for (let p : g.prods) {
         let rule = desugar_rule(p.rule)?;

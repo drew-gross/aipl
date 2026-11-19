@@ -401,6 +401,48 @@
 
 
 
+        <section class="item" id="item-LinkedRule">
+          <h3>
+            <a class="anchor" href="#item-LinkedRule">LinkedRule</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant LinkedRule&#60;K: variant&#62; = Rule&#60;K&#62; without Named throughout</code></pre>
+
+          <div class="doc"><p>A rule with no <code>Named</code> reference left in it, at any depth: what <code>link</code> returns. It is a <code>Rule</code> at run time, and a <code>LinkedRule</code> goes wherever a <code>Rule</code> is wanted; the other way needs <code>link</code>. A <code>match</code> on one needs no <code>Named</code> arm, so the driver cannot meet an unresolved reference.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-LinkedProduction">
+          <h3>
+            <a class="anchor" href="#item-LinkedProduction">LinkedProduction</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant LinkedProduction&#60;K: variant, A: any&#62; = Production&#60;K, A&#62; without Named throughout</code></pre>
+
+          <div class="doc"><p>A production whose rule is a <code>LinkedRule</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-LinkedGrammar">
+          <h3>
+            <a class="anchor" href="#item-LinkedGrammar">LinkedGrammar</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant LinkedGrammar&#60;K: variant, A: any&#62; = Grammar&#60;K, A&#62; without Named throughout</code></pre>
+
+          <div class="doc"><p>A grammar every rule of which is a <code>LinkedRule</code>: what <code>link</code> returns.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-prod_names">
           <h3>
             <a class="anchor" href="#item-prod_names">prod_names</a>
@@ -434,7 +476,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$28628: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$29271: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 
@@ -462,7 +504,7 @@
             <a class="anchor" href="#item-link">link</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn link&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; Grammar&#60;K, A&#62;!ParseError</code></pre>
+          <pre class="signature"><code>pub fn link&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; LinkedGrammar&#60;K, A&#62;!ParseError</code></pre>
 
           <div class="doc"><p><code>g</code> with every rule reference resolved: each <code>Named(name)</code> rewritten to the <code>NamedIdx(index)</code> of the production it names, so the driver resolves a reference by indexing rather than by comparing strings. Fails when a reference names no production, or when two productions share a name.</p><p>Idempotent — a <code>NamedIdx</code> passes through — so a grammar may be linked once and reused, or handed to <code>parse</code> unlinked and linked per call.</p></div>
 
@@ -628,7 +670,7 @@
             <a class="anchor" href="#item-link_rule">link_rule</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[], base: u64) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
+          <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[], base: u64) -&#62; LinkedRule&#60;K&#62;!ParseError</code></pre>
 
           <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code> and every bracketed repetition given its entry in the grammar's <code>groups</code> table. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p><p><code>base</code> is the index the first group in <code>r</code> takes; the rest follow in <code>group_styles</code> order. It is threaded by arithmetic rather than by a running counter because a rule is a tree and <code>try_map</code> has nowhere to keep one.</p></div>
 
@@ -656,7 +698,7 @@
             <a class="anchor" href="#item-link_opt">link_opt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[], base: u64) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
+          <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[], base: u64) -&#62; LinkedRule&#60;K&#62;?!ParseError</code></pre>
 
           <div class="doc"><p>A <code>Many</code>'s separator, linked — <code>none</code> stays <code>none</code>. Its own function because <code>?</code> cannot reach inside an optional.</p></div>
 
@@ -670,7 +712,7 @@
             <a class="anchor" href="#item-link_rules">link_rules</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[], base: u64) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
+          <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[], base: u64) -&#62; LinkedRule&#60;K&#62;[]!ParseError</code></pre>
 
           <div class="doc"><p>Each rule in <code>rs</code>, linked, with <code>base</code> advancing past the groups each one holds.</p></div>
 

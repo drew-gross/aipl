@@ -106,6 +106,9 @@ import {
     Inline,
     Kid,
     Kids,
+    LinkedGrammar,
+    LinkedProduction,
+    LinkedRule,
     ListStyle,
     Literal,
     Many,
@@ -219,7 +222,7 @@ struct Parser<K: variant, A: any> {
     attached: Cst[][],
     // The trivia after the last token, which no token consumption can pick up.
     trailing: Cst[],
-    prods: Production<K, A>[],
+    prods: LinkedProduction<K, A>[],
     end: u64,
     // The FIRST set of each production, in `prods` order — what `match_prod`
     // asks before descending. Computed once per parse (`first_sets`, a fixed
@@ -400,7 +403,7 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
 # only `Climb` needs (each operator application nests under it).
 fn match_rule<K: variant, A: any>(
     p: Parser<K, A>,
-    r: Rule<K>,
+    r: LinkedRule<K>,
     pos: u64,
     cur: u64,
     far: Far,
@@ -433,9 +436,6 @@ fn match_rule<K: variant, A: any>(
         // there is nothing matched to point at, so it points at the token
         // that was next.
         Refuse(what) => err(refused(refusal(p, what, pos, pos), far)),
-        // `link` rewrites every one of these; reaching one means the grammar was
-        // handed to the driver unlinked, which `parse_cst` makes impossible.
-        Named(n) => err(grammar_fault(`unlinked rule reference "{n}"`)),
     }
 }
 
@@ -500,7 +500,7 @@ fn match_spelling<K: variant, A: any>(p: Parser<K, A>, s: str, pos: u64, far: Fa
 # whole sequence to where it started — the caller decides what to try next.
 fn match_then<K: variant, A: any>(
     p: Parser<K, A>,
-    rs: Rule<K>[],
+    rs: LinkedRule<K>[],
     pos: u64,
     cur: u64,
     far: Far,
@@ -526,7 +526,7 @@ fn match_then<K: variant, A: any>(
 # identifier, or a number" possible from a choice that failed on all three.
 fn match_one_of<K: variant, A: any>(
     p: Parser<K, A>,
-    rs: Rule<K>[],
+    rs: LinkedRule<K>[],
     pos: u64,
     cur: u64,
     far: Far,
@@ -556,13 +556,13 @@ fn match_one_of<K: variant, A: any>(
 # either the list or a list followed by a stray comma.
 fn match_many<K: variant, A: any>(
     p: Parser<K, A>,
-    sub: Rule<K>,
+    sub: LinkedRule<K>,
     min: u64,
     max: u64?,
-    sep: Rule<K>?,
+    sep: LinkedRule<K>?,
     trailing_sep: bool,
     leading_sep: bool,
-    nested_in: (Rule<K>, Rule<K>)?,
+    nested_in: (LinkedRule<K>, LinkedRule<K>)?,
     group: u64?,
     pos: u64,
     cur: u64,
@@ -605,11 +605,11 @@ fn match_many<K: variant, A: any>(
 fn match_group<K: variant, A: any>(
     p: Parser<K, A>,
     gi: u64,
-    brackets: (Rule<K>, Rule<K>),
-    sub: Rule<K>,
+    brackets: (LinkedRule<K>, LinkedRule<K>),
+    sub: LinkedRule<K>,
     min: u64,
     max: u64?,
-    sep: Rule<K>?,
+    sep: LinkedRule<K>?,
     trailing_sep: bool,
     leading_sep: bool,
     pos: u64,
@@ -640,10 +640,10 @@ fn match_group<K: variant, A: any>(
 # The repetition itself, without brackets.
 fn match_reps<K: variant, A: any>(
     p: Parser<K, A>,
-    sub: Rule<K>,
+    sub: LinkedRule<K>,
     min: u64,
     max: u64?,
-    sep: Rule<K>?,
+    sep: LinkedRule<K>?,
     trailing_sep: bool,
     leading_sep: bool,
     pos: u64,
@@ -742,7 +742,7 @@ fn match_reps<K: variant, A: any>(
 # The separator step: what `sep` matched, or an empty match when there is none.
 fn match_sep<K: variant, A: any>(
     p: Parser<K, A>,
-    sep: Rule<K>?,
+    sep: LinkedRule<K>?,
     pos: u64,
     cur: u64,
     far: Far,
@@ -759,7 +759,7 @@ fn match_sep<K: variant, A: any>(
 # still reports.
 fn match_leading_sep<K: variant, A: any>(
     p: Parser<K, A>,
-    sep: Rule<K>?,
+    sep: LinkedRule<K>?,
     pos: u64,
     cur: u64,
     far: Far,
@@ -775,7 +775,7 @@ fn hit_nothing(pos: u64, far: Far) -> Step { hit: true, pos, kids: [], far }
 # an optional part that was *started* and then went wrong still reports.
 fn match_maybe<K: variant, A: any>(
     p: Parser<K, A>,
-    sub: Rule<K>,
+    sub: LinkedRule<K>,
     pos: u64,
     cur: u64,
     far: Far,
@@ -810,7 +810,7 @@ fn match_maybe<K: variant, A: any>(
 # improve on.
 fn match_expect<K: variant, A: any>(
     p: Parser<K, A>,
-    sub: Rule<K>,
+    sub: LinkedRule<K>,
     pos: u64,
     cur: u64,
     far: Far,
@@ -921,7 +921,7 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
 # point's own test exact: `#{str}` equality is membership, so a round that
 # reaches the same labels by a different route ends the loop instead of spinning
 # — where deduped arrays would have compared unequal on order alone.
-fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> #{str}[] {
+fn label_sets<K: variant, A: any>(prods: LinkedProduction<K, A>[], firsts: First<K>[]) -> #{str}[] {
     mut labels: #{str}[] = [#{}].repeat(prods.len());
     mut going = true;
     while (going) {
@@ -938,8 +938,8 @@ fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[])
 
 # The labels `r` would record at its own first token, given the round's `labels`.
 fn rule_labels<K: variant, A: any>(
-    r: Rule<K>,
-    prods: Production<K, A>[],
+    r: LinkedRule<K>,
+    prods: LinkedProduction<K, A>[],
     firsts: First<K>[],
     labels: #{str}[],
 ) -> #{str} {
@@ -977,17 +977,14 @@ fn rule_labels<K: variant, A: any>(
         // A refusal is an error, never an expectation: nothing is "expected"
         // where it sits, so it labels nothing.
         Refuse(..) => #{},
-        // Unlinked — `parse_cst` links first, so neither is reachable from a
-        // parse; an unlinked grammar simply prunes nothing.
-        Named(..) => #{},
     }
 }
 
 # `rule_labels` across a sequence: each element in turn, stopping after the first
 # that cannot match nothing.
 fn seq_labels<K: variant, A: any>(
-    rs: Rule<K>[],
-    prods: Production<K, A>[],
+    rs: LinkedRule<K>[],
+    prods: LinkedProduction<K, A>[],
     firsts: First<K>[],
     labels: #{str}[],
 ) -> #{str} {
@@ -1002,9 +999,9 @@ fn seq_labels<K: variant, A: any>(
 # Whether `r` can match nothing at all — read off the FIRST sets for a reference,
 # and structural everywhere else. Only `seq_labels` needs it, to know how far
 # along a sequence the first token can still be expected.
-fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
+fn rule_nullable<K: variant>(r: LinkedRule<K>, firsts: First<K>[]) -> bool {
     match (r) {
-        Term(..) | Literal(..) | Named(..) | Refuse(..) => false,
+        Term(..) | Literal(..) | Refuse(..) => false,
         Then(rs) => rs.all(|sub| rule_nullable(sub, firsts)),
         OneOf(rs) => rs.any(|sub| rule_nullable(sub, firsts)),
         // A bracket pair always matches at least its two brackets, so a
@@ -1035,7 +1032,7 @@ fn find_prec(precs: Prec[], text: str, min_power: u64) -> Prec? {
 
 fn match_climb<K: variant, A: any>(
     p: Parser<K, A>,
-    atom: Rule<K>,
+    atom: LinkedRule<K>,
     precs: Prec[],
     pos: u64,
     cur: u64,
@@ -1056,7 +1053,7 @@ fn match_climb<K: variant, A: any>(
 # would have to re-parse.
 fn climb<K: variant, A: any>(
     p: Parser<K, A>,
-    atom: Rule<K>,
+    atom: LinkedRule<K>,
     precs: Prec[],
     pos: u64,
     min_power: u64,
@@ -1238,12 +1235,16 @@ pub fn parse_cst_recovering<K: variant, A: any>(
 # and matches every production it reaches; the parse is identical, only slower.
 # Analysis is a cost worth paying exactly once per grammar and never once per
 # source.
-struct Prepared<K: variant, A: any> { grammar: Grammar<K, A>, firsts: First<K>[], labels: #{str}[] }
+struct Prepared<K: variant, A: any> {
+    grammar: LinkedGrammar<K, A>,
+    firsts: First<K>[],
+    labels: #{str}[],
+}
 
 # `g` linked and analysed — build it once, parse with it many times. Fails the
 # way `link` does: an unresolved reference, or a duplicate rule name.
 pub fn prepare<K: variant, A: any>(g: Grammar<K, A>) -> Prepared<K, A>!ParseError {
-    let grammar: Grammar<K, A> = link(g)?;
+    let grammar: LinkedGrammar<K, A> = link(g)?;
     let firsts = first_sets(grammar)?;
     let labels = label_sets(grammar.prods, firsts);
     ok(Prepared { grammar, firsts, labels })

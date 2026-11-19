@@ -1856,6 +1856,13 @@ impl Pinner<'_> {
     /// or a struct literal, whose every part is clean in turn.
     fn shows_throughout(&self, e: &TExpr<It>, c: &str) -> bool {
         match &e.kind {
+            // `some(x)`, `ok(x)` and `err(x)` hold what `x` holds and nothing else, so they are
+            // clean exactly when `x` is. A defaulted optional keyword argument arrives wrapped.
+            TExprKind::Call {
+                callee: Callee::Some | Callee::Ok | Callee::Err,
+                args,
+                ..
+            } => args.iter().all(|a| self.clean_of(a, c)),
             TExprKind::Call { args, .. } => {
                 self.constructed_case(e)
                     .is_some_and(|case| self.case_differs(&case, c))

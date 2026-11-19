@@ -362,7 +362,6 @@ jit:
   do we really need a jit? What about compiling the tests to a binary?
 
 grammer ideas:
-  Better way of expression specific errors for missing items, e.g. missing semicolon after if should be simpler to express
   3. Indexed accessors — own_texts_at(i) — for the call sites that read only the head and never want the list. Descends, stops, allocates nothing
 
   4. Put the token kind on the leaf. This is the real answer to "should be token comparisons". Leaf(Span) → Leaf(Span, K), making Cst<K> generic — which is consistent with the rest of the pipeline: Rule<K>, Production<K, A>, Grammar<K, A> are all parameterized, and Cst is the one type that isn't, which is exactly why the kind gets thrown away. Then lower_atom becomes match (node.own_kind(0)) { If => .., Match => .., LParen => .. } — exhaustive, so a new token forces a decision at each site, and a typo'd "mathc" becomes a compile error instead of a silently-dead branch. AiplTok already carries Name(str), IntLit(i64), StrLit(str, StrStyle), so sites like lower_shim_binding destructure instead of slicing src at all. Be clear-eyed though: measured, this is ~12%, not 4×. Do it for the "classify once, then match" discipline your own CLAUDE.md argues for; don't do it expecting a speedup.
@@ -379,9 +378,7 @@ syntax:
   support removing multiple arms via throughout at once
   spread optionals into arrays to make tabulate's widths computation simpler
   arr$[i] syntax for getting all items at specified index
-  lets make it allowed to ignore fields when destructuring, so that let Expr { kind, span, value_span as _, name_span as _ } = body; can just be let Expr { kind, span } = body;.
   make HOFs able to treat their predicates as self methods.
-  destructuring structs should be allowed to ignore fields
   .. should maybe work on optionals too? Or anything that can be $'ed?
   .... in an array or set literal should double-unwrap-spread
   support if (let [a, ..] = xs) syntax

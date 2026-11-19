@@ -71,6 +71,8 @@ import {
     Grammar,
     Inline,
     Kids,
+    LinkedGrammar,
+    LinkedRule,
     Literal,
     Many,
     Maybe,
@@ -478,7 +480,7 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 # The fixed point itself, over an already-linked grammar. Split out because the
 # loop reads whole productions and `link` returns a whole grammar, and a `let`
 # binding that only ever has its fields read is a lint.
-fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
+fn linked_first_sets<K: variant, A: any>(g: LinkedGrammar<K, A>) -> First<K>[]!ParseError {
     // One empty set per production.
     mut sets = [First {}].repeat(g.prods.len());
     mut going = true;
@@ -509,7 +511,7 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
 # `nested_in` would report what its items begin with rather than its opening
 # bracket. `link` writes the shorthand out, so anything that has been through it
 # is safe here.
-pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
+pub fn rule_first<K: variant>(r: LinkedRule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
         Term(k) => ok(First { kinds: #{k} }),
         Literal(s) => ok(First { texts: #{s} }),
@@ -566,16 +568,12 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // that reaches one is an error, not a match, so what follows it in the
         // sequence never contributes.
         Refuse(..) => ok(First {}),
-        // `link` rewrites every one of these, and `first_sets` links first —
-        // reaching one means `rule_first` was called with a rule from an
-        // unlinked grammar, whose references cannot be followed.
-        Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
     }
 }.test({
     // The message a `rule_first` failure reports — and a distinguishable string when
     // it unexpectedly succeeded, so a broken assertion says which way it broke.
     // `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
-    fn first_msg(r: Rule<Tok>, sets: First<Tok>[]) -> str {
+    fn first_msg(r: LinkedRule<Tok>, sets: First<Tok>[]) -> str {
         match (rule_first(r, sets)) {
             ok(f) => `unexpectedly computed: {f.show_first()}`,
             err(e) => e.message,
@@ -587,26 +585,26 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     // An arbitrary rule against the grammar's sets — what a driver would prune
     // one alternative with. The optional `!` contributes its spelling without
     // making the sequence nullable, since `atom` after it is not.
-    let r: Rule<Tok> = Then([Maybe(Literal("!")), NamedIdx(3)]);
+    let r: LinkedRule<Tok> = Then([Maybe(Literal("!")), NamedIdx(3)]);
     assert(rule_first(r, sets)?.show_first() == `Num Name "!" "("`);
 
     // A whole-sequence nullability: every element optional, so the rule is too.
-    let r_all_opt: Rule<Tok> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
+    let r_all_opt: LinkedRule<Tok> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
     assert(rule_first(r_all_opt, sets)?.show_first() == `Num "!" <empty>`);
 
     // An `Expect` begins with what its rule does and can match nothing, so what
     // follows it can begin the sequence too — a missing `!` is recovered from,
     // and the `Num` after it is then the first token.
-    let r_expect: Rule<Tok> = Then([Expect(Literal("!")), Term(Num)]);
+    let r_expect: LinkedRule<Tok> = Then([Expect(Literal("!")), Term(Num)]);
     assert(rule_first(r_expect, sets)?.show_first() == `Num "!"`);
-    let r_expect_only: Rule<Tok> = Expect(Literal("!"));
+    let r_expect_only: LinkedRule<Tok> = Expect(Literal("!"));
     assert(rule_first(r_expect_only, sets)?.show_first() == `"!" <empty>`);
 
     // A separated list begins with its item — or, allowing a leading separator,
     // with that too.
-    let r_sep: Rule<Tok> = Many(Term(Num), min=1, sep=Literal("|"), trailing_sep=false);
+    let r_sep: LinkedRule<Tok> = Many(Term(Num), min=1, sep=Literal("|"), trailing_sep=false);
     assert(rule_first(r_sep, sets)?.show_first() == "Num");
-    let r_led: Rule<Tok> = Many(
+    let r_led: LinkedRule<Tok> = Many(
         Term(Num),
         min=1,
         sep=Literal("|"),
@@ -615,11 +613,9 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     );
     assert(rule_first(r_led, sets)?.show_first() == `Num "|"`);
 
-    // A reference that cannot be followed, and one that points nowhere.
-    let r_named: Rule<Tok> = Named("atom");
-    assert(first_msg(r_named, sets) == `unlinked rule reference "atom"`);
+    // A reference that points nowhere.
     let nine: u64 = 9;
-    let r_far: Rule<Tok> = NamedIdx(nine);
+    let r_far: LinkedRule<Tok> = NamedIdx(nine);
     assert(first_msg(r_far, sets) == "no production at index 9");
 })
 

@@ -1,0 +1,17 @@
+# A payload that is an optional (or a result) holds what its value holds, so `some(x)` is clean
+# when `x` is. That includes a defaulted keyword payload given a value, which is wrapped for the
+# optional it is stored in; the refined type it builds needs no case left out by hand.
+
+import { equal as == } from builtins;
+
+variant Rule = Literal(str) | Many(Rule, separator?: Rule = none) | Named(str)
+
+variant Linked = Rule without Named throughout
+
+fn list_of(text: str) -> Linked { Many(Literal(text), separator=Literal(",")) }.test({
+    assert(list_of("a") == Many(Literal("a"), separator=Literal(",")));
+})
+
+fn bare(text: str) -> Linked { Many(Literal(text)) }.test({
+    assert(bare("a") == Many(Literal("a")));
+})

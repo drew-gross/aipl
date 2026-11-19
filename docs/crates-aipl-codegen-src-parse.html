@@ -305,7 +305,7 @@
             <a class="anchor" href="#item-refused">refused</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn refused(error: ParseError, __spat$6744: Far) -&#62; Abort</code></pre>
+          <pre class="signature"><code>fn refused(error: ParseError, __spat$6801: Far) -&#62; Abort</code></pre>
 
           <div class="doc"><p>The <code>Abort</code> for a refusal: an error in the input, with what <code>far</code> had recorded.</p></div>
 
@@ -487,7 +487,7 @@
             <a class="anchor" href="#item-match_rule">match_rule</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: LinkedRule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>Match <code>r</code> at <code>pos</code>. <code>cur</code> is the index of the production being matched, which only <code>Climb</code> needs (each operator application nests under it).</p></div>
 
@@ -557,7 +557,7 @@
             <a class="anchor" href="#item-match_then">match_then</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: LinkedRule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>Every rule in order; children concatenate. A failure anywhere rewinds the whole sequence to where it started — the caller decides what to try next.</p></div>
 
@@ -571,7 +571,7 @@
             <a class="anchor" href="#item-match_one_of">match_one_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_one_of&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_one_of&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: LinkedRule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>The first alternative that matches. Every alternative's expectations are kept in <code>far</code> whether it matched or not, which is what makes &quot;expected <code>(</code>, an identifier, or a number&quot; possible from a choice that failed on all three.</p></div>
 
@@ -585,7 +585,7 @@
             <a class="anchor" href="#item-match_many">match_many</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)?, group: u64?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, min: u64, max: u64?, sep: LinkedRule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, nested_in: (LinkedRule&#60;K&#62;, LinkedRule&#60;K&#62;)?, group: u64?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
 
@@ -599,7 +599,7 @@
             <a class="anchor" href="#item-match_group">match_group</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_group&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, brackets: (Rule&#60;K&#62;, Rule&#60;K&#62;), sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_group&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, brackets: (LinkedRule&#60;K&#62;, LinkedRule&#60;K&#62;), sub: LinkedRule&#60;K&#62;, min: u64, max: u64?, sep: LinkedRule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>A bracketed repetition: <code>open</code>, then the items, then <code>close</code>, kept as one <code>Group</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
 
@@ -613,7 +613,7 @@
             <a class="anchor" href="#item-match_reps">match_reps</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_reps&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_reps&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, min: u64, max: u64?, sep: LinkedRule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>The repetition itself, without brackets.</p></div>
 
@@ -627,7 +627,7 @@
             <a class="anchor" href="#item-match_sep">match_sep</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: LinkedRule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>The separator step: what <code>sep</code> matched, or an empty match when there is none.</p></div>
 
@@ -641,7 +641,7 @@
             <a class="anchor" href="#item-match_leading_sep">match_leading_sep</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_leading_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_leading_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: LinkedRule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>The optional separator in front of a list's first item: what <code>sep</code> matched, or the empty step when it is absent. Its expectations still reach <code>far</code>, as <code>match_maybe</code>'s do, so a leading separator that was started and went wrong still reports.</p></div>
 
@@ -669,7 +669,7 @@
             <a class="anchor" href="#item-match_maybe">match_maybe</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p><code>sub</code>, or nothing. Always matches — but its expectations still reach <code>far</code>, so an optional part that was <em>started</em> and then went wrong still reports.</p></div>
 
@@ -683,7 +683,7 @@
             <a class="anchor" href="#item-match_expect">match_expect</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_expect&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_expect&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p><code>sub</code>, which the grammar is committed to: when it does not match, the miss is recorded as an error in the input and the rule matches nothing instead, as though the missing text had been written. The sequence around it carries on, and no enclosing choice goes on to its next alternative — see <code>Expect</code>.</p><p>The miss is recorded twice, for two readers. A <code>Missing</code> marker goes in the tree, which is how the errors of a parse that <em>succeeds</em> are found: a marker belongs to the path that was taken and goes with it if that path is abandoned. And the slip goes on <code>far</code>, which is how a parse that does not succeed finds them: a miss or a refusal has no tree to look in, only the failure record every rule hands on.</p><p><code>sub</code> is matched against a failure record of its own, so the error says what <em>this</em> rule wanted where it stood. Passing <code>far</code> through would let a deeper failure left by an abandoned alternative speak for it, and the message would blame a place the reader has no reason to look. The two are joined afterwards, so what <code>far</code> goes on to report is what it would have been without the <code>Expect</code>.</p><p>The error is the rule's alone, and does <em>not</em> take on what <code>far</code> had already expected at the same token. The operators that could have continued the expression before a missing <code>;</code> are true of the token, but the grammar has said what it needs here: &quot;expected <code>;</code>&quot; is the answer, and a list that buries it among the things that were merely possible is the generic message <code>Expect</code> exists to improve on.</p></div>
 
@@ -739,7 +739,7 @@
             <a class="anchor" href="#item-label_sets">label_sets</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn label_sets&#60;K: variant, A: any&#62;(prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[]) -&#62; #{str}[]</code></pre>
+          <pre class="signature"><code>fn label_sets&#60;K: variant, A: any&#62;(prods: LinkedProduction&#60;K, A&#62;[], firsts: First&#60;K&#62;[]) -&#62; #{str}[]</code></pre>
 
           <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over <em>labels</em> rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned <em>labelled</em> production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is.</p><p>These really are sets, and are spelled as sets. That also makes the fixed point's own test exact: <code>#{str}</code> equality is membership, so a round that reaches the same labels by a different route ends the loop instead of spinning — where deduped arrays would have compared unequal on order alone.</p></div>
 
@@ -753,7 +753,7 @@
             <a class="anchor" href="#item-rule_labels">rule_labels</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn rule_labels&#60;K: variant, A: any&#62;(r: Rule&#60;K&#62;, prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn rule_labels&#60;K: variant, A: any&#62;(r: LinkedRule&#60;K&#62;, prods: LinkedProduction&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The labels <code>r</code> would record at its own first token, given the round's <code>labels</code>.</p></div>
 
@@ -767,7 +767,7 @@
             <a class="anchor" href="#item-seq_labels">seq_labels</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn seq_labels&#60;K: variant, A: any&#62;(rs: Rule&#60;K&#62;[], prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
+          <pre class="signature"><code>fn seq_labels&#60;K: variant, A: any&#62;(rs: LinkedRule&#60;K&#62;[], prods: LinkedProduction&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
 
           <div class="doc"><p><code>rule_labels</code> across a sequence: each element in turn, stopping after the first that cannot match nothing.</p></div>
 
@@ -781,7 +781,7 @@
             <a class="anchor" href="#item-rule_nullable">rule_nullable</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn rule_nullable&#60;K: variant&#62;(r: Rule&#60;K&#62;, firsts: First&#60;K&#62;[]) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn rule_nullable&#60;K: variant&#62;(r: LinkedRule&#60;K&#62;, firsts: First&#60;K&#62;[]) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>r</code> can match nothing at all — read off the FIRST sets for a reference, and structural everywhere else. Only <code>seq_labels</code> needs it, to know how far along a sequence the first token can still be expected.</p></div>
 
@@ -809,7 +809,7 @@
             <a class="anchor" href="#item-match_climb">match_climb</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: LinkedRule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -823,7 +823,7 @@
             <a class="anchor" href="#item-climb">climb</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, min_power: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
+          <pre class="signature"><code>fn climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: LinkedRule&#60;K&#62;, precs: Prec[], pos: u64, min_power: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>Precedence climbing: an atom, then any operator binding at least as tightly as <code>min_power</code>, whose right-hand side is climbed at one power higher (or the same power, for a right-associative level).</p><p>Each application nests <em>both</em> operands under the enclosing production's index while leaving the outermost one flat, so <code>match_prod</code>'s own wrap completes the tree: <code>1 + 2 * 3</code> becomes <code>(expr (expr 1) + (expr (expr 2) * (expr 3)))</code> — one node per operand, shaped by precedence rather than a flat run the lowering would have to re-parse.</p></div>
 
@@ -865,7 +865,7 @@
             <a class="anchor" href="#item-finished">finished</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn finished&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$56113: Step) -&#62; Recovered!ParseError</code></pre>
+          <pre class="signature"><code>fn finished&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$55939: Step) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p>What a parse that ran to a result made of it: the tree and its errors, or the failure that ended it with the <code>Expect</code>s met on the way.</p></div>
 
@@ -879,7 +879,7 @@
             <a class="anchor" href="#item-stopped">stopped</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn stopped&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$57416: Abort) -&#62; Recovered!ParseError</code></pre>
+          <pre class="signature"><code>fn stopped&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$57242: Abort) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p>A parse that a <code>Refuse</code> ended: the input's error, after the <code>Expect</code>s met before it. Anything else that aborts is the grammar's fault, and the call's.</p></div>
 
@@ -935,7 +935,7 @@
             <a class="anchor" href="#item-lower_children">lower_children</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_children&#60;K: variant, A: any&#62;(src: str, __spat$62488: Parts, prods: Production&#60;K, A&#62;[]) -&#62; A[]!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_children&#60;K: variant, A: any&#62;(src: str, __spat$62314: Parts, prods: Production&#60;K, A&#62;[]) -&#62; A[]!ParseError</code></pre>
 
           <div class="doc"><p>The children in <code>parts</code> lowered, in order. <code>parts</code> is the one walk of a node's direct kids (<code>Cst.parts</code>), which splices groups away, so a production that wraps a bracket pair hands its <code>build</code> the same children it would without one — and walking once is what stops each <code>build</code> from rebuilding the same list.</p></div>
 
@@ -991,7 +991,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, __spat$102976: Parts, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$102802: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 
