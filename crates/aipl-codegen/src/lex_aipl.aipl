@@ -106,6 +106,7 @@ variant AiplTok =
     | Else
     | Builtins
     | Without
+    | Throughout
     | EqEq
     | Ne
     | Arrow
@@ -491,6 +492,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         kw("else", Else, S_KEYWORD),
         kw("builtins", Builtins, S_KEYWORD),
         kw("without", Without, S_KEYWORD),
+        kw("throughout", Throughout, S_KEYWORD),
         kw("true", True, S_CONSTANT),
         kw("false", False, S_CONSTANT),
         kw("none", None, S_CONSTANT),
@@ -716,6 +718,15 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
         LBracket,
         RBracket,
         Name("withoutx"),
+    ]);
+
+    // `throughout` follows an excluded case (`V without C throughout`) and is a keyword too.
+    assert(lex_aipl_kinds("V without C throughout throughoutx")? == [
+        Name("V"),
+        Without,
+        Name("C"),
+        Throughout,
+        Name("throughoutx"),
     ]);
 
     // The constant literals get their own kinds, distinct from keywords and from
