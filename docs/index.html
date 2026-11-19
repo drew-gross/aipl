@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">223 files, 1963 items.</p>
+      <p class="summary">224 files, 1969 items.</p>
 
       <ul class="files">
 
@@ -427,7 +427,7 @@
           <p class="file-summary">Introspection over a <code>Grammar</code> (see <code>grammar.aipl</code>): what it <em>says</em>, rendered as EBNF, and what it can <em>start with</em>, computed as FIRST sets. Neither parses anything — both are pure functions of the grammar value, which is the whole reason the grammar is data and the driver is somewhere else.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-ebnf.html#private">17 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-ebnf.html#private">16 private</a></span>
 
 
           <ul class="items">
@@ -769,7 +769,7 @@
           <p class="file-summary">The names the parser gives functions it synthesizes from a declaration's attributes, and the inverse: what a function's name says it is.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">9 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-fn_names.html#private">10 private</a></span>
 
 
           <ul class="items">
@@ -816,6 +816,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-fn_names.html#item-fn_role"><code>fn_role</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-fn_names.html#item-source_function"><code>source_function</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1014,7 +1019,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">207 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">204 private</a></span>
 
 
           <ul class="items">
@@ -3447,6 +3452,31 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-unused_binding.html#item-unused_binding"><code>unused_binding</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-unused_functions.html">crates/aipl-codegen/src/lint/unused_functions.aipl</a>
+
+          <p class="file-summary">The <code>unused_functions</code> lint: a function that is not <code>pub</code> and that nothing else in the file mentions. Nothing outside the file can reach it, so it is dead code, and a lint rather than a warning for the reason <code>unused_imports</code> is: it misstates what the file does and outlives whatever once called it.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-unused_functions.html#private">6 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-unused_functions.html#item-Mentions"><code>Mentions</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-unused_functions.html#item-unused_functions"><code>unused_functions</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

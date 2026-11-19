@@ -1,0 +1,131 @@
+# The `unused_functions` lint: a function that is not `pub` and that nothing else in the
+# file mentions. Nothing outside the file can reach it, so it is dead code, and a lint
+# rather than a warning for the reason `unused_imports` is: it misstates what the file
+# does and outlives whatever once called it.
+#
+# "Mentioned" is syntactic, as it is for imports: a call, a method call, a function used
+# as a value, a shim binding, or a mention from a constant or a struct field's default
+# all count. A function's own body does not, so recursion does not keep one alive. A
+# `.test` or `.benchmark` block on it does, whether or not the block names it: a function
+# that exists to be tested is used, and only one with neither a caller nor a test is dead. Two functions that mention only
+# each other are not reported.
+#
+# Unused means unreachable from the file's entry points, which are `main` and the `pub`
+# functions. A file with none is a bag of tests or fixtures with nowhere to start from, and
+# is left alone.
+
+import {
+    any,
+    equal as ==,
+    filter,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    starts_with,
+} from builtins;
+import { source_function } from "../fn_names.aipl";
+import { Function, Item, LoweredFn, Program, function_names, item_names } from "../item.aipl";
+import { LintHit, functions, hit, lint_hits, lint_messages } from "./lint_hit.aipl";
+import { has, union_all } from sets;
+
+# A function's name and every name its signature and body mention.
+struct Mentions { owner: str, names: #{str} }
+
+# A hit for each private function nothing else mentions, at its name.
+pub fn unused_functions(program: Program) -> LintHit[] {
+    let declarations = program.functions();
+    if (!declarations.any(is_entry_point)) { return []; };
+    let elsewhere = program.items$non_function_names().union_all();
+    let mentions = declarations$mentions();
+    declarations
+        .filter(is_private)
+        .filter(|function| !elsewhere.has(function.name.text))
+        .filter(|function| !mentions.any(|m| m.is_mention_of(function.name.text)))
+        .map(|function| hit(unused_message(function.name.text), function.name.span))
+}.test({
+    // A private function nothing mentions is reported, at its name.
+    assert(lint_messages("fn helper() { } pub fn f() { }", unused_functions)? == [
+        unused_message("helper"),
+    ]);
+    assert(lint_hits("fn f() { } fn helper() { } fn main() { }", unused_functions)?$span == [
+        3..4,
+        14..20,
+    ]);
+
+    // A call, a method call, a function used as a value and a shim binding are mentions.
+    assert(
+        lint_messages(
+            """
+                fn a() -> i64 { 1 }
+                fn b(self: i64) -> i64 { self }
+                fn c(x: i64) -> i64 { x }
+                fn d(text: str) { }
+                pub fn f(xs: i64[]) -> i64 { a() + 1.b() + xs.map(c).len() }
+                pub fn g() { shim prints { print = d } { 1 }; }
+            """,
+            unused_functions,
+        )? == [],
+    );
+
+    // A file with no `main` and nothing `pub` has no entry point, so nothing in it is dead.
+    assert(lint_messages("fn helper() { }", unused_functions)? == []);
+
+    // `pub` functions, and `main`, are reachable from outside the file.
+    assert(lint_messages("pub fn f() { } fn main() { }", unused_functions)? == []);
+
+    // A function's own recursion does not keep it alive.
+    assert(lint_messages("fn f(n: i64) -> i64 { f(n) } fn main() { }", unused_functions)? == [
+        unused_message("f"),
+    ]);
+
+    // Its own test does, as does another function's body or test.
+    assert(lint_messages("fn f() { }.test({ f(); }) fn main() { }", unused_functions)? == []);
+    assert(lint_messages("fn f() { }.test({ g(); }) pub fn g() { }", unused_functions)? == []);
+    assert(lint_messages("fn f() { } pub fn g() { f(); }", unused_functions)? == []);
+    assert(lint_messages("fn f() { } pub fn g() { }.test({ f(); })", unused_functions)? == []);
+
+    // A helper declared in a test block is used by that block.
+    assert(lint_messages("pub fn f() { }.test({ fn h() { } h(); })", unused_functions)? == []);
+
+    // A constant's value and a struct field's default mention functions too.
+    assert(
+        lint_messages("fn f() -> i64 { 1 } let C = f(); fn main() { }", unused_functions)? == [],
+    );
+    assert(
+        lint_messages(
+            "fn f() -> i64 { 1 } struct S { x: i64 = f() } fn main() { }",
+            unused_functions,
+        )? == [],
+    );
+})
+
+# Whether `self` can be reached from outside the file: it is `pub`, or it is `main`.
+fn is_entry_point(self: Function) -> bool { self.is_pub || self.name.text == "main" }
+
+# Whether `self` is a function a lint may report: not `pub`, not `main`, and not one the
+# compiler made (a `.test` or `.benchmark` block, whose names start `__`).
+fn is_private(self: Function) -> bool {
+    !self.is_entry_point() && !self.name.text.starts_with("__")
+}
+
+# The names an item other than a function mentions.
+fn non_function_names(self: Item) -> #{str} {
+    match (self) {
+        LoweredFn(..) => #{},
+        Struct(..) | Variant(..) | Refinement(..) | Import(..) | Const(..) => self.item_names(),
+    }
+}
+
+fn mentions(self: Function) -> Mentions { owner: self.name.text, names: self.function_names() }
+
+# Whether the function `self` describes mentions `name` in a way that keeps it used.
+fn is_mention_of(self: Mentions, name: str) -> bool {
+    self.owner.source_function() == some(name) || (self.owner != name && self.names.has(name))
+}
+
+# What is said of the function `name`.
+fn unused_message(name: str) -> str {
+    `unused function "{name}": nothing in this file mentions it; delete it, or make it pub`
+}

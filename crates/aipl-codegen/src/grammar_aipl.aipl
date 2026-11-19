@@ -64,7 +64,6 @@ import {
     extend,
     filter,
     find_if,
-    find_index,
     first,
     greater_than as >,
     int_parse,
@@ -2418,13 +2417,6 @@ fn lower_block_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # by its fields for `let T { x, y }`.
 fn binder_names(toks: str[]) -> str[] { toks.filter(|w| !binder_punct().contains(w)) }
 
-# The names between a case pattern's parentheses, ending at the `)` — the tokens
-# after it (a `let`'s `=`, `else`) are not binders.
-fn case_binders(toks: str[]) -> str[] {
-    let close = toks.find_index(|t| t == ")").value_or(toks.len());
-    binder_names(toks[..close])
-}
-
 # The fields a struct pattern reads and the names it binds them as, in order —
 # read off the tokens of its braces, which start at `first`. `x` binds `x` and
 # `x as px` binds `px`; either way the field is the one written first.
@@ -2472,11 +2464,6 @@ fn field_binders_of(toks: str[], first: u64) -> FieldBinders {
 })
 
 fn binder_punct() -> str[] { ["let", "mut", "for", "(", ")", "{", "}", ",", "=", ";", ":"] }
-
-fn as_stmt(v: Ast, span: Span) -> Stmt!ParseError {
-    if (let AStmt(st) = v) { return ok(st); };
-    err(wrong_kind("a statement", v, span))
-}
 
 # `let_stmt` — the plain binding, the annotated one, and the three destructuring
 # forms. The token after `let` says which: `(` opens a tuple pattern; after a
@@ -6065,12 +6052,6 @@ pub fn aipl_parse_error(src: str) -> ParseError? {
     // reason there is no program.
     assert(aipl_parse_error("fn f() { let s = #{1, 2: 3}; }").is_some());
 })
-
-# Every interior node's token span under `t`, itself included, depth first.
-fn node_spans(t: Cst) -> u64[] {
-    let own: u64[] = t.token_span().map(|sp| [sp.start, sp.end]).value_or([]);
-    [..own, ..t.parts().children.map(node_spans).join()]
-}
 
 # What this grammar makes of `src`, in one string: empty when it parses *and*
 # its concrete tree reconstructs the source byte for byte, and otherwise a line

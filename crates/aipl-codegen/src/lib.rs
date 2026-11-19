@@ -1937,6 +1937,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/lint_hit.aipl",
     "./lint/squelch.aipl",
     "./lint/unused_imports.aipl",
+    "./lint/unused_functions.aipl",
     "./lint/unused_binding.aipl",
     "./lint/constant_default.aipl",
     "./lint/duplicate_import_source.aipl",

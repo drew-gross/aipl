@@ -193,7 +193,7 @@ fn inline_skips_no_main_program() {
 fn inline_keeps_recursive() {
     // Self-call counts, and the body references its own name → not inlined.
     let names = inlined_names(
-        "fn rec(n: i64) -> i64 { rec(n) }
+        "fn rec(n: i64) -> i64 { rec(n) } #[allow]
          fn main() -> i64 { 0 }",
     );
     assert!(names.contains(&"rec".to_string()));
@@ -457,7 +457,7 @@ fn concrete_arg_gives_the_literal_its_width() {
 #[test]
 fn uninstantiated_generic_is_dropped() {
     let names = mono_names(
-        "fn unused(v: any[]) -> i64 { 0 }
+        "fn unused(v: any[]) -> i64 { 0 } #[allow]
          fn main() -> i64 { 0 }",
     );
     assert_eq!(names, vec!["main"]);

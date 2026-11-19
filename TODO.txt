@@ -117,11 +117,11 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  unused_functions and go-to-def should be able to share some code once the lsp is in aipl
   imported_as shoudln't accept a string name, it should accept a builting variant arm
   hoisting handles lambdas as well?
   Item's function should say it's kind (Fn, Test, Benchmark, maybe Main?) loader can use this to throw out the bits that aren't used (e.g. only write the test when running with --test) and test_body_source_name doesn't need to exist
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
-  in tabulate(), combine headers and right_aligned into a HeaderInfo struct of some sort. Also use array spread syntax, and array maximum function
   optional_of_test looks like it can use string comparison rather than print for assertions
   need a better way to avoid dispatching code on the wrong representation
   split Type into variants that can and cannot be generic, and have the stage the resolves generics transform. This feel more sound than the current patchwork.
@@ -131,12 +131,10 @@ misc cleanup:
   make reserved_names_not_bound into a lint (and also make the assert and trace work a bit more like builtin functions for most purposes so that they can be shadowed. It should fail at lint but work if squelched)
   make should work for perf block and top level text. Unify the "collect all the functions" logic in baking and linting.
   better name for OptionMatch
-  code_bodies and on_functions don't need to exist now that we have collect_case_arms (or we can make something similar, maybe?)
   self.descendants()$kind.filter(|kind| kind.is_case(arm)) stutters
   vec$foo() when foo is a predicate argument should probably only work if there is some indicator that the predicate is a self function
   Shape (only Circle) error would read better as Shape.Circle
   merge the slice from/to lints
-  name.contains("$") is used in destructure_binding, it should be run at a stage where that isn't a possibility. But also there should be a bool on identifiers to flag if they are synthetic or not, checking for $ is jank.
   stop making functions that just pass their arguments directly to a constructor. Don't need a function for that, and it just hides which arguments become which fields.
   source text should be propagated by the parser, not rebuilt later in source_text.aipl
   find a way to make lints work without awkwardly threading the method through to every message() call
@@ -556,11 +554,10 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  lint against unused non-pub functions (e.g. case_binders)
+  make the "unused functions" lint not count .test/.benchmark blocks that don't actually use the function (need to support standalone benchmark, currently many hang off empty fn work () {})
   xs.map(|p| p.name$shout().len()) should hit the "use $" lint
   lint should happend after resolution so that we don't need to check fn.name.starts_with("__builtin_"), it should just be fn.is_builtin
   slots_read_by_field is looking at names - it should know from a flag
-  destructure_binding and destructure_param should be combined, and maybe destructure_slot too? less confident on that one
   arms.all(|arm| arm.body.kind.is_case(Bool)) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early returng123)
   push_array_literal should hit when you push before an op even if you also push after an op (see twice() test)
   lint against unused expressions
@@ -589,19 +586,7 @@ lint:
   lint to use my_opt$foo().value_or(fallback) rather than in if/else
   assert(fn() == ok(val)) should be assert(fn()? == val)
   unused imports should be #[allow] able (generally clean up #[allow] architecture after lint is all aipl)
-  - Lints see the written form of a destructuring parameter. Today the parser
-    lowers `fn f(P { a, b })` to a synthetic `__spat$N` parameter plus a `let`
-    per field at the head of the body, before the lints run, so each lint that
-    cares has to recognise that lowering (`through_parameter_patterns` in
-    lint.rs, `opening_destructure` in destructure_param.rs). Keep the pattern in
-    the AST instead (e.g. a `parameter_patterns` field on `Function`, filled by
-    the lowering in grammar_aipl.aipl from `ParsedParam`'s `fields`/`names`), then
-    delete the recognisers. Wait until the Rust AST bindings have moved into AIPL,
-    since the field would otherwise be added to both sides. Same question applies
-    to the `for (let P { .. } : xs)` and `let P { .. } = v;` lowerings (`__fpat$`,
-    `__spat$` temporaries).
   test that one allow squelches multiple errors on the same line
-  linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)
   lint against unused variables, apparently there are 2 in callers of own_texts
   tok_span should be value_or, with a lint (but also should make sure inlining and code sinking doens't result in the argument being actually evaluated)
   template_segments should maybe accept str[] without []

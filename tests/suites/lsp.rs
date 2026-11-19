@@ -411,7 +411,7 @@ fn a_field_read_in_a_test_block_goes_to_the_field() {
                   \n\
                   struct Pair { name: i64 }\n\
                   \n\
-                  fn name(self: Pair) -> i64 { self.name }\n\
+                  fn name(self: Pair) -> i64 { self.name } #[allow]\n\
                   \n\
                   fn make() -> Pair { name: 1 }.test({\n\
                   \u{20}   let pairs = [make()];\n\

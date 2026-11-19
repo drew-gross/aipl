@@ -87,7 +87,7 @@ fn unreached_functions_are_dropped() {
     // Lazy seeding starts from `main`: a function it never calls (directly or
     // transitively) is dropped before codegen, so its body never lowers. The
     // distinctive constant `12345` marks `dead`'s body in the IR.
-    let comp = compile("fn dead() -> i64 { 12345 } fn main() -> i64 { 7 }");
+    let comp = compile("fn dead() -> i64 { 12345 } #[allow]\nfn main() -> i64 { 7 }");
     let ir = comp.ir();
     assert!(
         !ir.contains("12345"),

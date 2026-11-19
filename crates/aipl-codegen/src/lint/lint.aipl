@@ -49,6 +49,7 @@ import { slice_whole } from "./slice_whole.aipl";
 import { step_by_one } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
+import { unused_functions } from "./unused_functions.aipl";
 import { unused_imports } from "./unused_imports.aipl";
 import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
@@ -64,6 +65,7 @@ pub fn lint(program: Program) -> LintHit[] {
     let functions = program.functions();
     [
         ..unused_imports(program),
+        ..unused_functions(program),
         ..duplicate_import_source(program),
         ..functions.hits(destructure),
         ..functions.hits(unused_binding),

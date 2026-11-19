@@ -846,7 +846,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$73867: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$73851: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1279,20 +1279,6 @@ shim random seeded_with_clock() { body }
 
 
 
-        <section class="item" id="item-case_binders">
-          <h3>
-            <a class="anchor" href="#item-case_binders">case_binders</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn case_binders(toks: str[]) -&#62; str[]</code></pre>
-
-          <div class="doc"><p>The names between a case pattern's parentheses, ending at the <code>)</code> — the tokens after it (a <code>let</code>'s <code>=</code>, <code>else</code>) are not binders.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-field_binders_of">
           <h3>
             <a class="anchor" href="#item-field_binders_of">field_binders_of</a>
@@ -1313,20 +1299,6 @@ shim random seeded_with_clock() { body }
             <span class="kind kind-fn">fn</span>
           </h3>
           <pre class="signature"><code>fn binder_punct() -&#62; str[]</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-as_stmt">
-          <h3>
-            <a class="anchor" href="#item-as_stmt">as_stmt</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn as_stmt(v: Ast, span: Span) -&#62; Stmt!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1484,7 +1456,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$113435: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$112995: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1778,7 +1750,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$130184: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$129744: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -2576,7 +2548,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$173595: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$173155: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2782,20 +2754,6 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn constructor_names(self: Cst[]) -&#62; Span[]</code></pre>
 
           <div class="doc"><p>The names among <code>kids</code> that open a payload: <code>Fn</code> in <code>Fn(Function { body })</code> and <code>Function</code> in <code>Function { body }</code>, a name directly followed by a bracketed group. Trivia between the two does not separate them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-node_spans">
-          <h3>
-            <a class="anchor" href="#item-node_spans">node_spans</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn node_spans(t: Cst) -&#62; u64[]</code></pre>
-
-          <div class="doc"><p>Every interior node's token span under <code>t</code>, itself included, depth first.</p></div>
 
 
         </section>

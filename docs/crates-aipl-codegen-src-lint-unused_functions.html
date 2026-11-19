@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/unused_functions.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/unused_functions.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>unused_functions</code> lint: a function that is not <code>pub</code> and that nothing else in the file mentions. Nothing outside the file can reach it, so it is dead code, and a lint rather than a warning for the reason <code>unused_imports</code> is: it misstates what the file does and outlives whatever once called it.</p><p>&quot;Mentioned&quot; is syntactic, as it is for imports: a call, a method call, a function used as a value, a shim binding, or a mention from a constant or a struct field's default all count. A function's own body does not, so recursion does not keep one alive. A <code>.test</code> or <code>.benchmark</code> block on it does, whether or not the block names it: a function that exists to be tested is used, and only one with neither a caller nor a test is dead. Two functions that mention only each other are not reported.</p><p>Unused means unreachable from the file's entry points, which are <code>main</code> and the <code>pub</code> functions. A file with none is a bag of tests or fixtures with nowhere to start from, and is left alone.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Mentions">
+          <h3>
+            <a class="anchor" href="#item-Mentions">Mentions</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Mentions</code></pre>
+
+          <div class="doc"><p>A function's name and every name its signature and body mention.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unused_functions">
+          <h3>
+            <a class="anchor" href="#item-unused_functions">unused_functions</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unused_functions(program: Program) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each private function nothing else mentions, at its name.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-is_entry_point">
+          <h3>
+            <a class="anchor" href="#item-is_entry_point">is_entry_point</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_entry_point(self: Function) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> can be reached from outside the file: it is <code>pub</code>, or it is <code>main</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_private">
+          <h3>
+            <a class="anchor" href="#item-is_private">is_private</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_private(self: Function) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is a function a lint may report: not <code>pub</code>, not <code>main</code>, and not one the compiler made (a <code>.test</code> or <code>.benchmark</code> block, whose names start <code>__</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-non_function_names">
+          <h3>
+            <a class="anchor" href="#item-non_function_names">non_function_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn non_function_names(self: Item) -&#62; #{str}</code></pre>
+
+          <div class="doc"><p>The names an item other than a function mentions.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-mentions">
+          <h3>
+            <a class="anchor" href="#item-mentions">mentions</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn mentions(self: Function) -&#62; Mentions</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_mention_of">
+          <h3>
+            <a class="anchor" href="#item-is_mention_of">is_mention_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_mention_of(self: Mentions, name: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether the function <code>self</code> describes mentions <code>name</code> in a way that keeps it used.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unused_message">
+          <h3>
+            <a class="anchor" href="#item-unused_message">unused_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unused_message(name: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What is said of the function <code>name</code>.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

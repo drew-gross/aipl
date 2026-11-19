@@ -287,15 +287,6 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
     }
 }
 
-# A group's three parts as one sequence, parenthesized where a sequence would be.
-fn render_nested<K: variant>(
-    open: Rule<K>,
-    body: Rule<K>,
-    close: Rule<K>,
-    names: str[],
-    ctx: Ctx,
-) -> str { render_rule(Then([open, body, close]), names, ctx) }
-
 # `*`, `+`, `?`, or the `{n,}` / `{n,m}` longhand for the bounds EBNF has no
 # operator for.
 #

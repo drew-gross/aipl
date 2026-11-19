@@ -178,6 +178,29 @@ pub fn fn_role(self: str) -> FnRole {
     assert(`{test_fn_name(perf)}$lambda0`.fn_role() == TestHelper("lambda0"));
 })
 
+# The function a hoisted `.test` or `.benchmark` block, or a helper declared in one, was
+# written on, or `none` for any other name.
+pub fn source_function(self: str) -> str? {
+    match (self.after(BENCHMARK_PREFIX)) {
+        some(source) => some(source),
+        none => match (self.after(TEST_PREFIX)) {
+            some(rest) => split_test_owner(rest)$0.map(without_benchmark_prefix),
+            none => none,
+        },
+    }
+}.test({
+    assert("f".source_function() == none);
+    assert(test_fn_name("f").source_function() == some("f"));
+    assert(test_helper_name("f", "h").source_function() == some("f"));
+    assert(benchmark_fn_name("f").source_function() == some("f"));
+    assert(test_fn_name(benchmark_fn_name("f")).source_function() == some("f"));
+    assert(test_helper_name(benchmark_fn_name("f"), "h").source_function() == some("f"));
+    assert(unattached_test_name(1).source_function() == none);
+    assert("__test$".source_function() == none);
+})
+
+fn without_benchmark_prefix(owner: str) -> str { owner.after(BENCHMARK_PREFIX).value_or(owner) }
+
 # What follows the owner in a `__test$` name, or `none` when `self` is not one.
 fn test_tail(self: str) -> str? {
     match (self.after(TEST_PREFIX)) {

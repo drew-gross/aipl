@@ -171,6 +171,20 @@
         </section>
 
 
+
+        <section class="item" id="item-source_function">
+          <h3>
+            <a class="anchor" href="#item-source_function">source_function</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn source_function(self: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The function a hoisted <code>.test</code> or <code>.benchmark</code> block, or a helper declared in one, was written on, or <code>none</code> for any other name.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -257,6 +271,20 @@
           <pre class="signature"><code>fn split_test_owner(rest: str) -&#62; (str, str)?</code></pre>
 
           <div class="doc"><p>What follows <code>__test$</code>, split into the function the test belongs to and whatever was synthesized under it (empty for the body itself, <code>$&lt;..&gt;</code> for anything else). The owner is <code>&lt;f&gt;</code>, or <code>__benchmark$&lt;f&gt;</code> for a <code>.benchmark</code> block; one with no name is no owner.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-without_benchmark_prefix">
+          <h3>
+            <a class="anchor" href="#item-without_benchmark_prefix">without_benchmark_prefix</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn without_benchmark_prefix(owner: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
