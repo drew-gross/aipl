@@ -1,6 +1,7 @@
 # A tuple destructured from a `?` on a result a generic function returned, inside
 # another generic function: the value's type is the tuple template applied to a
-# type variable (`__tuple2<Parts, A[]>`), which is still a tuple.
+# type variable (`__tuple2<Parts, A[]>`), which is still a tuple. A struct pattern nested
+# in it (the form the `destructure` lint recommends) takes the struct apart.
 
 import { equal as ==, wrapping_add as + } from builtins;
 
@@ -9,8 +10,8 @@ struct Parts { n: i64 }
 fn split<A: any>(xs: A[]) -> (Parts, A[])!str { ok((Parts { n: 1 }, xs)) }
 
 fn rest_of<A: any>(xs: A[]) -> (i64, A[])!str {
-    let (parts, rest) = split(xs)?; #[allow]
-    ok((parts.n + 1, rest))
+    let (Parts { n }, rest) = split(xs)?;
+    ok((n + 1, rest))
 }
 
 test({
