@@ -1,0 +1,11 @@
+# A case whose payload is unnamed has no field to read: it is taken apart by position.
+
+variant Shape = Circle(i64) | Square(i64)
+
+pub fn radius(c: Circle) -> i64 { c.r } #[allow]
+--- check --compile ---
+error: field access on non-struct value of type Shape
+ --> ./tests/cases/variants/err_case_field_unnamed.aipl:5:35
+  |
+5 | pub fn radius(c: Circle) -> i64 { c.r } #[allow]
+  |                                   ^

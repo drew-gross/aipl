@@ -1,0 +1,57 @@
+# A value known to be one case of a variant — a `Circle`, the `Shape` less every other case —
+# has that case's named payload slots as fields, as a struct has its own. `c.r` reads one, and
+# so a struct-style pattern naming the case takes the payload apart wherever a tuple-style one
+# does: a parameter, a `let`, a `for`, a lambda parameter.
+
+import {
+    collect_arms,
+    equal as ==,
+    map,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Rect(width: i64, height: i64) | Dot
+
+// `c` is used whole as well, so it stays a plain parameter rather than a pattern.
+fn grown(c: Circle) -> Shape { if (c.r == 0) { c } else { Circle(c.r + 1) } }.test({
+    assert(grown(Circle(3)) == Circle(4));
+    assert(grown(Circle(0)) == Circle(0));
+})
+
+fn corner(Rect { width, height }) -> i64 { width + height }.test({
+    assert(corner(Rect(2, 5)) == 7);
+})
+
+fn radius(Circle { r }) -> i64 { r }.test({
+    assert(radius(Circle(4)) == 4);
+})
+
+fn from_a_call() -> i64 {
+    let Circle { r } = Circle(5);
+    r
+}.test({
+    assert(from_a_call() == 5);
+})
+
+fn total_radius(shapes: Shape[]) -> i64 {
+    mut total = 0;
+    for (let Circle { r } : shapes.collect_arms(Circle)) {
+        set total += r;
+    }
+    total
+}.test({
+    assert(total_radius([Circle(1), Square(9), Circle(2), Dot]) == 3);
+})
+
+// The lambda's parameter is a pattern, which the `map` lint reads as an argument ignored.
+fn radii(shapes: Shape[]) -> i64[] {
+    shapes.collect_arms(Circle).map(|Circle { r }| r) #[allow]
+}.test({
+    assert(radii([Circle(1), Square(9), Circle(2), Dot]) == [1, 2]);
+})
+
+// `$r` is the same read, over every element of an array of them.
+fn radii_by_field(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$r }.test({
+    assert(radii_by_field([Circle(1), Square(9), Circle(2), Dot]) == [1, 2]);
+})

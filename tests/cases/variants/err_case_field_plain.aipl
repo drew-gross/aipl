@@ -1,0 +1,11 @@
+# A `Shape` may be any case, so none of the payload names is a field of it.
+
+variant Shape = Circle(r: i64) | Square(side: i64)
+
+pub fn radius(s: Shape) -> i64 { s.r } #[allow]
+--- check --compile ---
+error: field access on non-struct value of type Shape
+ --> ./tests/cases/variants/err_case_field_plain.aipl:5:34
+  |
+5 | pub fn radius(s: Shape) -> i64 { s.r } #[allow]
+  |                                  ^

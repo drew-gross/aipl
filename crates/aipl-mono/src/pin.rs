@@ -551,6 +551,9 @@ struct Decls {
     structs: HashMap<String, Vec<(String, Type, bool)>>,
     /// Variant name -> its cases and their payload types.
     variants: HashMap<String, Vec<(String, Vec<Type>)>>,
+    /// The declaration of each plain variant, for what the types leave out: the names of a
+    /// case's payload slots.
+    variant_decls: HashMap<String, aipl_syntax::ast::VariantDecl>,
     /// A constructor's loader-qualified name (`Case@Variant`) -> its variant.
     ctors: HashMap<String, String>,
     generic_templates: HashSet<String>,
@@ -733,6 +736,7 @@ pub fn pin_behind(program: &Program, declarations: usize) -> Pinned {
         sigs: HashMap::new(),
         structs: HashMap::new(),
         variants: HashMap::new(),
+        variant_decls: HashMap::new(),
         ctors: HashMap::new(),
         generic_templates: HashSet::new(),
         generic_structs: HashMap::new(),
@@ -790,6 +794,7 @@ pub fn pin_behind(program: &Program, declarations: usize) -> Pinned {
                         .map(|c| (c.name.text.clone(), c.payload_tys()))
                         .collect(),
                 );
+                decls.variant_decls.insert(v.name.text.clone(), v.clone());
             }
             _ => {}
         }
@@ -2708,6 +2713,11 @@ impl Pinner<'_> {
                     }
                 }
                 let owner = self.known(&x.ty, &x.span)?;
+                // A value known to be one case of a variant is read by that case's payload
+                // names, as a struct is by its fields.
+                if let Some((case, slots, index)) = self.case_field(&x.ty, &owner, field) {
+                    return self.read_case_field(x, case, slots, index, e);
+                }
                 if !self.is_struct_like(&owner, &e.span)? {
                     return reject(
                         format!(
@@ -3192,6 +3202,79 @@ impl Pinner<'_> {
 
     /// Whether a value of this type has fields: a struct, an application of a generic one, or a
     /// tuple.
+    /// The payload slot `field` names, when `value` (of the plain variant `owner`) has been refined
+    /// to exactly one case: that case's loader-qualified name, the names of its payload slots and
+    /// the position of `field` among them.
+    fn case_field(
+        &self,
+        value: &It,
+        owner: &It,
+        field: &str,
+    ) -> Option<(String, Vec<Option<String>>, usize)> {
+        use aipl_syntax::ast::Exclusion;
+        let It::Named(variant) = owner else {
+            return None;
+        };
+        let decl = self.decls.variant_decls.get(variant)?;
+        let lacking = self.table.exclusions(value);
+        let mut left = decl
+            .cases
+            .iter()
+            .filter(|c| !excluded_by(&lacking, &Exclusion::NamedCase(c.name.text.clone())));
+        let case = left.next()?;
+        if left.next().is_some() {
+            return None;
+        }
+        let slots: Vec<Option<String>> = case.payload.iter().map(|p| p.name.clone()).collect();
+        let index = slots.iter().position(|n| n.as_deref() == Some(field))?;
+        Some((format!("{}@{variant}", case.name.text), slots, index))
+    }
+
+    /// `value.field` for a value known to be one case: a `match` with that case's one arm, which
+    /// binds the slot and returns it. Nothing after typing sees a field read of a variant.
+    fn read_case_field(
+        &mut self,
+        value: TExpr<It>,
+        case: String,
+        slots: Vec<Option<String>>,
+        index: usize,
+        e: &Expr,
+    ) -> Res<TExpr<It>> {
+        let binder = "__case_field".to_string();
+        let bindings = (0..slots.len())
+            .map(|i| {
+                if i == index {
+                    binder.clone()
+                } else {
+                    "_".to_string()
+                }
+            })
+            .collect();
+        let arm = aipl_syntax::ast::MatchArm {
+            pattern: Pattern::Ctor {
+                name: case,
+                bindings,
+                ignore_payload: false,
+            },
+            body: Expr::new(ExprKind::Ident(binder), e.span.clone()),
+            span: e.span.clone(),
+            written: Default::default(),
+        };
+        self.begin_pattern(&arm);
+        let (pattern, binds) = self.pattern(&arm.pattern, &value.ty, &arm.span)?;
+        let binds = binds.into_iter().map(|(n, t)| (n, t, None)).collect();
+        let scoped = self.scoped(binds, |p| p.expr(&arm.body));
+        let (saved, body) = scoped?;
+        self.restore(saved);
+        let ty = body.ty.clone();
+        let arms = vec![TMatchArm {
+            pattern,
+            body,
+            span: e.span.clone(),
+        }];
+        Ok(self.node(TExprKind::Match(Box::new(value), arms), ty, e))
+    }
+
     fn is_struct_like(&mut self, owner: &It, span: &Span) -> Res<bool> {
         let declared = match owner {
             It::Named(n) => self.decls.structs.contains_key(n),

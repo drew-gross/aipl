@@ -1,0 +1,11 @@
+# `Circle` has no payload slot called `side`; that belongs to `Square`.
+
+variant Shape = Circle(r: i64) | Square(side: i64)
+
+pub fn side(c: Circle) -> i64 { c.side } #[allow]
+--- check --compile ---
+error: field access on non-struct value of type Shape
+ --> ./tests/cases/variants/err_case_field_unknown.aipl:5:33
+  |
+5 | pub fn side(c: Circle) -> i64 { c.side } #[allow]
+  |                                 ^
