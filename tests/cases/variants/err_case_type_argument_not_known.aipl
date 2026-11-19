@@ -1,0 +1,13 @@
+# The type argument is held to: a `Shape` may be a `Square`, so it does not fit a `Circle`.
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+fn same<T: any>(x: T) -> T { x }
+
+pub fn circle_of(s: Shape) -> Circle { same::<Circle>(s) }
+--- check --compile ---
+error: fn "same" arg 0: expected Shape without Square without Dot, got Shape: nothing shows it is not Dot, Square
+ --> ./tests/cases/variants/err_case_type_argument_not_known.aipl:7:55
+  |
+7 | pub fn circle_of(s: Shape) -> Circle { same::<Circle>(s) }
+  |                                                       ^

@@ -3,8 +3,7 @@
 Goal: a case behaves like any other type wherever the language takes a type — a pattern, a
 type argument, a type parameter's range — so `as_case`/`is_case`/`collect_arms` can later take
 their case as a type argument (`xs.collect_arms::<Circle>()`) instead of the constructor
-special case they have now. That migration is **not** part of this plan; this plan makes it
-expressible.
+special case they have now. The language work comes first; the migration is the last stage.
 
 ## Context
 
@@ -21,10 +20,12 @@ What exists today (read from the code and probed with `aipl check`):
   `aipl-mono/src/pin.rs` lowers it to a one-arm `match` (`case_fields.aipl`). A generic variant's
   cases do not have them yet.
 - **A call's type arguments can be written** (`f::<T, U>(x)`, `x.f::<T>()`; case
-  `generics/explicit_type_args.aipl`), but never name a case: a `<X: cases>` parameter is a set of
-  *excluded* cases, only declarable as `T without X` in the signature, and `case_params` is kept
-  apart from `type_vars`, so a call's type-argument list does not count it
-  (`fn "holds" takes 1 type argument(s) (T), got 2`).
+  `generics/explicit_type_args.aipl`), all of them or none, and a case name is accepted as one: it
+  is its arm type (`same::<Circle>(c)`, even for a `T: variant` parameter;
+  `variants/case_type_arguments.aipl`). What a type argument cannot do is range over *which* case:
+  a `<X: cases>` parameter is a set of *excluded* cases, only declarable as `T without X` in the
+  signature, and `case_params` is kept apart from `type_vars`, so a call's type-argument list does
+  not count it (`fn "holds" takes 1 type argument(s) (T), got 2`).
 - **There is no type parameter that ranges over one case of a variant**, so no function accepts
   "one case of any variant". `as_case`/`is_case`/`collect_arms` take `arm: Case<T>` and the
   checker special-cases that argument as a constructor name (`refine_collected_arms`, the
@@ -44,13 +45,17 @@ What exists today (read from the code and probed with `aipl check`):
 
 ## Open questions
 
+- Whether an explicit type-argument list may leave out a parameter another one determines:
+  `A: arm of V` fixes `V`, so `xs.collect_arms::<Circle>()` could name only `A`, at the cost of a
+  rule more than "all or none". The alternative is `collect_arms::<Shape, Circle>()`.
 - Whether `A` can be reflected to a `Case<V>` value in a body (needed to write `collect_arms`
   itself in AIPL: `self.filter(|x| x.is_case(<A as a value>))`). If not, the migration keeps a
   compiler-typed `collect_arms` and only retypes its signature.
 
 ## Stages
 
-Each ends at a green `cargo handoff`. Stage 1 is independent of the others.
+
+Each ends at a green `cargo handoff`. Stage 1 is independent of the others; stage 3 follows stage 2.
 
 ### 1. Fields of a case of a generic variant
 
@@ -65,26 +70,38 @@ for a plain one.
   when a case of it declares the field, say the value has to be known to be that case.
 - [ ] Cases for each under `tests/cases/variants/`.
 
-### 2. Type arguments that name a case
-
-Goal: a normal function can take a case as an explicit type argument.
-
-- [ ] A type argument written as a case name resolves to its arm type (`f::<Shape, Circle>`).
-- [ ] A `cases`-bound parameter counts in the type-argument list instead of being kept apart.
-- Watch: `case_domains`/`case_slots` in `aipl-mono/src/pin.rs` and the loader's explicit-argument
-  arity check.
-
-### 3. A type parameter ranging over one case of a variant
+### 2. A type parameter ranging over one case of a variant
 
 Goal: `fn f<V: variant, A: <new bound>>(x: A) -> ..` accepts any one case of any variant.
 
 - [ ] The bound `A: arm of V`; inferred from an argument's arm type, or given by stage 2.
 - [ ] Inside the body `A` is its variant (the arm type "goes wherever its variant does").
 - [ ] Cases: inferred, explicit, and refused for a value that is not one case.
+- [ ] Explicit type arguments for it: the list is all of a function's type parameters or none, so
+  `xs.collect_arms::<Shape, Circle>()` would have to name the variant as well. See the open question.
+
+### 3. Retype `is_case`, `as_case` and `collect_arms`
+
+Goal: the three builtins take their case as a type argument — `x.is_case::<Circle>()`,
+`x.as_case::<Circle>()`, `xs.collect_arms::<Circle>()` — and the compiler's constructor-name
+special case for their `arm` argument is gone.
+
+- [ ] Signatures use the stage 2 parameter; the `arm: Case<T>` parameter and `refine_collected_arms`'s
+  reading of a constructor reference go, and the result types come from the type argument
+  (`x.as_case::<Circle>()` is a `Circle?`, `xs.collect_arms::<Circle>()` a `Circle[]`).
+- [ ] The "needs the case written as a constructor name" refusal and `err_as_case_value.aipl` go
+  with it: a value in type-argument position is a type error like any other.
+- [ ] Every call site in `crates/`, `tests/cases/`, `examples/`, `projects/` and the docs moves to
+  the new spelling; the lints that quote the old form (`match_case_as_case`, `let_else_as_case`,
+  `case_of_equal_is_case`, `return_loop_find_if`, `return_loop_any_all`, `return_loop_find_index`)
+  advise the new one; the write-aipl skill and the docs say it.
+- [ ] Decide whether the old spelling stays as an alias for one round or goes at once.
+- Watch: this is the one stage that touches the whole corpus, so it is a fanout from the failure
+  list; the `Case<V>` value type and `case_of` stay as they are.
 - Depends on 2.
 
 ## Done when
 
 A function generic over one case of any variant can be written and called with the case
 inferred or named (`::<Circle>`), `|Circle { r }| ..` and `c.r` work on a value known to be that case, and
-nothing about `as_case`/`is_case`/`collect_arms` has changed.
+`as_case`/`is_case`/`collect_arms` take their case as a type argument.

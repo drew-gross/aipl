@@ -1,0 +1,28 @@
+# A case is a type, so it is a type argument like any other: `same::<Circle>(c)` instantiates
+# `T` as the `Circle` arm type, for a plain parameter and for one bounded by `variant`. The
+# argument is held to it — a `Shape` that may be another case does not fit.
+
+import { equal as == } from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+fn same<T: any>(x: T) -> T { x }
+
+fn same_variant<T: variant>(x: T) -> T { x }
+
+fn as_circle(c: Circle) -> Circle { same::<Circle>(c) }.test({
+    assert(as_circle(Circle(1)) == Circle(1));
+})
+
+fn as_circle_bounded(c: Circle) -> Circle { same_variant::<Circle>(c) }.test({
+    assert(as_circle_bounded(Circle(2)) == Circle(2));
+})
+
+// Written as the variant, the same function takes a `Circle` and returns the variant.
+fn as_shape(c: Circle) -> Shape { same::<Shape>(c) }.test({
+    assert(as_shape(Circle(3)) == Circle(3));
+})
+
+fn from_literal() -> Circle { same::<Circle>(Circle(4)) }.test({
+    assert(from_literal() == Circle(4));
+})
