@@ -18,6 +18,7 @@ import {
     FieldDecl,
     Function,
     Param,
+    Private,
     Signature,
     Struct,
     StructDecl,
@@ -45,7 +46,7 @@ pub fn with_source_text(self: WrittenProgram, text: str) -> WrittenProgram {
     // An item's function body is one of them.
     let function = Function {
         name: SpanStr { text: "f", span: 3..4 },
-        is_pub: false,
+        visibility: Private,
         sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
         body: call,
         doc: none,

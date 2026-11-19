@@ -10,9 +10,9 @@
 # that exists to be tested is used, and only one with neither a caller nor a test is dead. Two functions that mention only
 # each other are not reported.
 #
-# Unused means unreachable from the file's entry points, which are `main` and the `pub`
-# functions. A file with none is a bag of tests or fixtures with nowhere to start from, and
-# is left alone.
+# Unused means unreachable from the file's entry points, which are the functions that are
+# not `Private`: `pub` ones, `main`, and the blocks `check` runs. A file with none is a bag of
+# fixtures with nowhere to start from, and is left alone.
 
 import {
     any,
@@ -23,10 +23,17 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
-    starts_with,
 } from builtins;
 import { source_function } from "../fn_names.aipl";
-import { Function, Item, LoweredFn, Program, function_names, item_names } from "../item.aipl";
+import {
+    Function,
+    Item,
+    LoweredFn,
+    Private,
+    Program,
+    function_names,
+    item_names,
+} from "../item.aipl";
 import { LintHit, functions, hit, lint_hits, lint_messages } from "./lint_hit.aipl";
 import { has, union_all } from sets;
 
@@ -36,11 +43,11 @@ struct Mentions { owner: str, names: #{str} }
 # A hit for each private function nothing else mentions, at its name.
 pub fn unused_functions(program: Program) -> LintHit[] {
     let declarations = program.functions();
-    if (!declarations.any(is_entry_point)) { return []; };
+    if (!declarations.any(|function| function.visibility != Private)) { return []; };
     let elsewhere = program.items$non_function_names().union_all();
     let mentions = declarations$mentions();
     declarations
-        .filter(is_private)
+        .filter(|function| function.visibility == Private)
         .filter(|function| !elsewhere.has(function.name.text))
         .filter(|function| !mentions.any(|m| m.is_mention_of(function.name.text)))
         .map(|function| hit(unused_message(function.name.text), function.name.span))
@@ -100,15 +107,6 @@ pub fn unused_functions(program: Program) -> LintHit[] {
         )? == [],
     );
 })
-
-# Whether `self` can be reached from outside the file: it is `pub`, or it is `main`.
-fn is_entry_point(self: Function) -> bool { self.is_pub || self.name.text == "main" }
-
-# Whether `self` is a function a lint may report: not `pub`, not `main`, and not one the
-# compiler made (a `.test` or `.benchmark` block, whose names start `__`).
-fn is_private(self: Function) -> bool {
-    !self.is_entry_point() && !self.name.text.starts_with("__")
-}
 
 # The names an item other than a function mentions.
 fn non_function_names(self: Item) -> #{str} {

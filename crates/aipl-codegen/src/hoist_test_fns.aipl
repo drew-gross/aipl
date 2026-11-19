@@ -33,10 +33,12 @@ import {
 } from "./fn_names.aipl";
 import {
     Attributes,
+    EntryPoint,
     Function,
     Item,
     LoweredFn,
     Program,
+    Public,
     Signature,
     SuperProgram,
     WrittenFn,
@@ -74,7 +76,7 @@ fn function_items(self: Function, Attributes { test_body, test_fns, benchmark })
 # function itself points.
 fn benchmark_function(self: Function, span: Span) -> Function {
     name: SpanStr { text: benchmark_fn_name(self.name.text), span },
-    is_pub: false,
+    visibility: EntryPoint,
     sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
     body: at(Unit, span),
     doc: none,
@@ -111,7 +113,7 @@ fn with_test_function(self: Function, test_body: Expr?) -> Function[] {
     };
     let test = Function {
         name: SpanStr { ..self.name, text: test_fn_name(self.name.text) },
-        is_pub: true,
+        visibility: Public,
         sig: Signature { type_vars: [], params: [], effects, return_ty: none },
         body: block,
         doc: none,

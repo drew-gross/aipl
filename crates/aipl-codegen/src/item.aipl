@@ -169,6 +169,11 @@ pub fn arity_marker(self: Arity) -> str {
 
 struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
 
+# How a function is reached. `Public` is written `pub` and may be imported; `EntryPoint` is
+# reached by whatever runs the file — `main`, and the blocks `check` runs — without being
+# importable; `Private` is reached only by a call from inside the file.
+variant Visibility = Public | Private | EntryPoint
+
 # A function with nothing attached: what hoisting leaves, and every helper declared inside
 # a block. Its `.test` and `.benchmark` attributes, as written, are an [`Attributes`].
 #
@@ -177,7 +182,7 @@ struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], retu
 # `Construct`.
 struct Function {
     name: SpanStr,
-    is_pub: bool,
+    visibility: Visibility,
     sig: Signature,
     body: Expr,
     shorthand_body: bool = false,
@@ -319,7 +324,10 @@ pub fn show_item(self: SuperItem) -> str {
 })
 
 fn show_fn(self: Function) -> str {
-    let vis = if (self.is_pub) { "pub " } else { "" };
+    let vis = match (self.visibility) {
+        Public => "pub ",
+        Private | EntryPoint => "",
+    };
     let sig = self.sig;
     let ret = sig.return_ty.map(|t| ` -> {t.show_ty()}`).value_or("");
     let effects = sig.effects$effect_marker().join();

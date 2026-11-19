@@ -261,6 +261,7 @@ import {
     CaseParam,
     Const as ItemConst,
     ConstDecl,
+    EntryPoint,
     FieldDecl,
     Function,
     Import as ItemImport,
@@ -271,7 +272,9 @@ import {
     OneOrMore,
     Param,
     Path,
+    Private,
     Program,
+    Public,
     Refinement as ItemRefinement,
     RefinementDecl,
     Signature,
@@ -3957,7 +3960,7 @@ fn lower_test_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     if (let AFunction(f, attributes) = kid(kids, 0, sp)?) {
         // The refusals point at the declaration — the first child node.
         let fn_span = node.children.first()$child_span().value_or(sp);
-        if (f.is_pub) {
+        if (f.visibility == Public) {
             return err(ParseError {
                 message: `a function inside a \`.test\` block cannot be \`pub\`: "{f.name.text}" exists only for that test`,
                 span: fn_span,
@@ -4020,7 +4023,7 @@ fn lower_test_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AFunction(
         Function {
             name: SpanStr { text: unattached_test_name(0), span: at },
-            is_pub: false,
+            visibility: EntryPoint,
             sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
             body: at(Unit, sp),
             shorthand_body: false,
@@ -4044,7 +4047,7 @@ fn lower_benchmark_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AFunction(
         Function {
             name: SpanStr { text: unattached_benchmark_name(0), span: at },
-            is_pub: false,
+            visibility: EntryPoint,
             sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
             body: at(Unit, sp),
             shorthand_body: false,
@@ -4260,7 +4263,13 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AFunction(
         Function {
             name,
-            is_pub,
+            visibility: if (is_pub) {
+                Public
+            } else if (name.text == "main") {
+                EntryPoint
+            } else {
+                Private
+            },
             sig: Signature { type_vars, params, effects, return_ty },
             body: resolved,
             shorthand_body: body.is_case(PConstruct),

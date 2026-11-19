@@ -4,20 +4,20 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 849 str -> str?
-; entry strip_test_sections 907 str -> str
-; entry split_test_sections 906 str -> __tuple$str$str
-; entry source_loc 898 str __builtin_Span -> str
+; entry parse_test_section_header 847 str -> str?
+; entry strip_test_sections 905 str -> str
+; entry split_test_sections 904 str -> __tuple$str$str
+; entry source_loc 896 str __builtin_Span -> str
 ; entry caret_block 91 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 219 str #{str:str} -> unit!Error
-; entry normalize_output 821 str -> str
+; entry normalize_output 819 str -> str
 ; entry int_fits 501 i64 str -> bool
 ; entry is_operator_name 502 str -> bool
 ; entry aipl_token_scopes 553 str -> __m19__ScopeSpan[]!__m19__LexError
 ; entry find_files 220 str str -> str[]!Error
 ; entry companion_files 93 str -> __m25__Companion[]!str
-; entry parse_spec 842 str -> __m26__Spec!str
-; entry parse_and_partial_load 840 str -> __m111__PartialLoad!__m27__ParseFailure
+; entry parse_spec 840 str -> __m26__Spec!str
+; entry parse_and_partial_load 838 str -> __m111__PartialLoad!__m27__ParseFailure
 ; entry fn_role 233 str -> __m44__FnRole
 ; entry test_fn_name 224 str -> str
 ; entry format_source 254 str u64 -> str!__m114__FmtError
@@ -32,8 +32,9 @@
 ; struct __m111__PartialLoad 104 program@0:__m36__SuperProgram lints@56:__m50__LintHit[] type_uses@80:__builtin_Span[]
 ; struct __m36__SuperProgram 56 items@0:__m36__SuperItem[] doc@24:str?
 ; variant __m36__SuperItem 288 WrittenFn(8:__m36__Function,192:__m36__Attributes) LoweredFn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Refinement(8:__m36__RefinementDecl) Import(8:__m36__ImportDecl) Const(8:__m36__ConstDecl)
-; struct __m36__Function 184 name@0:__m19__SpanStr is_pub@40:bool sig@48:__m36__Signature body@136:__m31__Expr shorthand_body@144:bool doc@152:str?
+; struct __m36__Function 184 name@0:__m19__SpanStr visibility@40:__m36__Visibility sig@48:__m36__Signature body@136:__m31__Expr shorthand_body@144:bool doc@152:str?
 ; struct __m19__SpanStr 40 text@0:str span@24:__builtin_Span
+; variant __m36__Visibility 8 Public Private EntryPoint
 ; struct __m36__Signature 88 type_vars@0:__m36__TypeParam[] params@24:__m36__Param[] effects@48:str[] return_ty@72:__m30__Ty?
 ; struct __m36__TypeParam 64 name@0:str bound@24:__m35__Bound default@32:__m30__Ty? name_span@48:__builtin_Span
 ; variant __m35__Bound 8 Any Ord Int Variant Cases
@@ -489,4 +490,4 @@
 ; data 335 __tostr_lit_101 66616c7365
 
 ; __builtin_int_parse
-; source-fingerprint 13049942787845406567
+; source-fingerprint 6891932551590945781

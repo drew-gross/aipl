@@ -8,8 +8,8 @@ fn double(n: i64) -> i64 { four() + n }.test({
     assert(double(2) == 6);
 })
 --- check --compile ---
-error: call to undefined fn "four"
- --> ./tests/cases/tests/err_fn_in_test_unreachable.aipl:6:28
+error: unused function "__test$double$four": nothing in this file mentions it; delete it, or make it pub (or append #[allow] to this line to keep it)
+ --> ./tests/cases/tests/err_fn_in_test_unreachable.aipl:7:8
   |
-6 | fn double(n: i64) -> i64 { four() + n }.test({
-  |                            ^^^^^^
+7 |     fn four() -> i64 { 4 }
+  |        ^^^^

@@ -148,6 +148,12 @@ fn const_decl(v: &FfiValue) -> R<ast::ConstDecl> {
     })
 }
 
+/// Whether a function is `pub`. The AIPL side says more (`Visibility`), but only `Public`
+/// is importable: `main` and the test blocks are found by name here.
+fn function_is_pub(v: &FfiValue) -> R<bool> {
+    Ok(variant(field(v, "visibility")?)?.0 == "Public")
+}
+
 fn function(v: &FfiValue) -> R<ast::Function> {
     let sig = field(v, "sig")?;
     // A refinement parameter (`<X: cases>`) is not a type variable: it is kept apart.
@@ -157,7 +163,7 @@ fn function(v: &FfiValue) -> R<ast::Function> {
     let case_params: Vec<String> = case_vars.into_iter().map(|p| p.name).collect();
     Ok(ast::Function {
         name: span_str(field(v, "name")?)?,
-        is_pub: flag(field(v, "is_pub")?)?,
+        is_pub: function_is_pub(v)?,
         sig: ast::Signature {
             type_vars,
             case_params,
