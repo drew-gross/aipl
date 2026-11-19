@@ -2,13 +2,14 @@
 //!
 //! A builtin the compiler expands itself is declared in a table, not written in a file, so
 //! "go to definition" has nowhere to land. Rather than answer with an error, the server writes
-//! the builtin's signature and documentation to a small file of comments and sends the editor
-//! there: the same two parts a hover shows, in a place that can be opened, read and searched like
-//! the source of a builtin written in AIPL.
+//! the builtin's declaration and documentation to a small file and sends the editor there: the
+//! same two parts a hover shows, in a place that can be opened, read and searched like the source
+//! of a builtin written in AIPL.
 //!
-//! The file is only comments (one block, detached so that it documents the file), so it parses to
-//! nothing and carries no diagnostics, and it is written read-only because editing it changes
-//! nothing.
+//! The file is AIPL, so the editor highlights it as such: a detached comment saying what the
+//! file is, then the builtin's signature as a function whose body is a comment, with its
+//! documentation above it. It is not a program (the body is not the builtin), so nothing is
+//! checked in it, and it is written read-only because editing it changes nothing.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -45,14 +46,10 @@ pub(crate) fn document(symbol: &Symbol) -> Option<(PathBuf, String, Span)> {
     let mut text = format!(
         "# `{}` is a builtin the compiler expands itself: there is no source to show, so this is\n\
          # its signature and documentation.\n\
-         #\n",
+         \n",
         symbol.name
     );
-    let signature = format!("# {}\n", symbol.detail);
-    let name_at = text.len() + 2 + symbol.detail.find(&symbol.name)?;
-    text.push_str(&signature);
     if let Some(doc) = &symbol.doc {
-        text.push_str("#\n");
         for line in doc.lines() {
             if line.is_empty() {
                 text.push_str("#\n");
@@ -61,9 +58,9 @@ pub(crate) fn document(symbol: &Symbol) -> Option<(PathBuf, String, Span)> {
             }
         }
     }
-    // A blank line under the block makes it the file's own docs, rather than the docs of a
-    // declaration that is not there.
-    text.push('\n');
+    let name_at = text.len() + symbol.detail.find(&symbol.name)?;
+    text.push_str(&symbol.detail);
+    text.push_str(" {\n    // Implemented by the compiler.\n}\n");
     let path = directory().join(format!("{}.aipl", symbol.name));
     write_once(&path, &text)?;
     Some((path, text, name_at..name_at + symbol.name.len()))

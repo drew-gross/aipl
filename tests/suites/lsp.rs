@@ -1668,26 +1668,28 @@ fn a_builtin_with_no_source_goes_to_a_file_documenting_it() {
             documented.ends_with("/aipl-builtin-docs/len.aipl"),
             "from {snippet:?}: {documented}"
         );
-        // The name in the signature line: after the header's two lines and the empty one.
-        assert_eq!(
-            found["range"]["start"],
-            json!({ "line": 3, "character": 5 }),
-            "from {snippet:?}"
-        );
         let text = fs::read_to_string(documented.trim_start_matches("file://"))
             .expect("the documentation file exists");
         assert!(
             text.starts_with(
                 "# `len` is a builtin the compiler expands itself: there is no source to show, so this is\n\
                  # its signature and documentation.\n\
-                 #\n\
-                 # fn len<T: any>(self: T[]) -> u64\n"
+                 \n"
             ),
             "{text}"
         );
+        // The declaration follows its documentation, and the name in it is where the editor lands.
+        let declaration = text
+            .lines()
+            .position(|line| line.starts_with("fn len<T: any>(self: T[]) -> u64 {"))
+            .expect("a declaration");
+        assert_eq!(
+            found["range"]["start"],
+            json!({ "line": declaration, "character": 3 }),
+            "from {snippet:?}"
+        );
         assert!(
-            text.lines()
-                .all(|line| line.is_empty() || line.starts_with('#')),
+            text.ends_with("{\n    // Implemented by the compiler.\n}\n"),
             "{text}"
         );
         // Opened in the editor, it is documentation and not a program: no diagnostics.
