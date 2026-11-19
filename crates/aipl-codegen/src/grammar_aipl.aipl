@@ -1069,10 +1069,13 @@ fn statements() -> Production<AiplTok, Ast>[] {
             Named("loop_body"),
         ]),
     ]);
-    let while_stmt: Rule<AiplTok> = Then([
-        Lit("while"),
-        one(Named("expr"), nested_in=parens()),
-        Named("loop_body"),
+    let while_stmt: Rule<AiplTok> = OneOf([
+        Then([
+            Lit("while"),
+            one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens()),
+            Named("loop_body"),
+        ]),
+        Then([Lit("while"), one(Named("expr"), nested_in=parens()), Named("loop_body")]),
     ]);
     let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Expect(Lit(";"))]);
 
@@ -2950,10 +2953,36 @@ fn for_chain(
 # choice `for` makes with its loop variable.
 fn lower_while_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
+    if (node.own_texts(src).contains("let")) { return lower_while_let(src, node, kids); };
     let cond = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
     let span = join_spans(cond.span, body.span);
     ok(AStmt(SWhile(cond, body, span)))
+}
+
+# `while (let p = e) { body }` runs `body` for as long as `e` matches `p`. There is no
+# `break`, so the loop is spelled with a flag that the non-matching case clears:
+# `mut more = true; while (more) { if (let p = e) { body } else { set more = false; } }`.
+# The flag's name cannot be written in source, and a nested loop's flag shadows the
+# outer one only inside the inner loop, where the outer one is never read.
+fn lower_while_let(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let tsp = node.tok_span();
+    let subs = node.children;
+    let scrutinee = kid_expr(kids, 1, sp)?;
+    let body = kid_expr(kids, 2, sp)?;
+    let span = join_spans(scrutinee.span, body.span);
+    let arm = MatchArm {
+        pattern: as_pat(kid(kids, 0, sp)?, sp)?,
+        body,
+        span: sub_span(subs, 0, tsp),
+        written: some(sub_written(subs, 0, src, true)),
+    };
+    let flag = "__while_let_more";
+    let stop = at(Assign(at(Ident(flag), tsp), at(Bool(false), tsp), at(Num(0), tsp)), tsp);
+    let step = at(IfLet(arm, scrutinee, stop), span);
+    let looped = seq(at(While(at(Ident(flag), tsp), step), span), at(Unit, tsp), span);
+    ok(AStmt(SEffect(at(LetMut(flag, none, at(Bool(true), tsp), looped), span), span)))
 }
 
 fn lower_return_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
@@ -5014,6 +5043,11 @@ pub fn lower_aipl_block_surface(src: str) -> Expr!ParseError {
     // synthetic `0` — the loop expression's result.
     assert(block_dump("{ return 1; }") == "Seq(Return(1), ())");
     assert(block_dump("{ while (b) { } }") == "Seq(While(b, 0), ())");
+    assert(
+        block_dump(
+            "{ while (let some(c) = f()) { g(c); } }",
+        ) == "Seq(Mut(__while_let_more, true, Seq(While(__while_let_more, IfLet(some(c) => Seq(g(c), 0), f(), Assign(__while_let_more, false, 0))), ())), ())",
+    );
     assert(block_dump("{ while (b) { f(); } }") == "Seq(While(b, Seq(f(), 0)), ())");
     assert(block_dump("{ for (let x : xs) { f(x); } }") == "Seq(For(x, xs, Seq(f(x), 0)), ())");
 

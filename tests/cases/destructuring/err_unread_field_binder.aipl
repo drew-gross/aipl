@@ -1,0 +1,13 @@
+struct P { a: i64, b: i64 }
+
+fn f(p: P) -> i64 {
+    let P { a, b as _ } = p;
+    a
+}
+
+--- check --compile ---
+error: a struct pattern names only the fields it reads; leave this field out instead of binding it to `_`
+ --> ./tests/cases/destructuring/err_unread_field_binder.aipl:4:21
+  |
+4 |     let P { a, b as _ } = p;
+  |                     ^

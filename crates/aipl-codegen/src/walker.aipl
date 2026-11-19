@@ -1964,7 +1964,17 @@ fn tuple_binder(self: W) -> WStr {
 }
 
 fn while_stmt(self: W) -> WDoc!FmtError {
-    let cond = self.bump().w.expect("(")?.w.expr()?;
+    let opened = self.bump().w.expect("(")?.w;
+    // `while (let PATTERN = EXPR) { .. }`: the `let` lookahead picks the form, as in `if`.
+    if (opened.peek_text() == "let") {
+        let clause = opened.bump().w.if_let_clause()?;
+        let body = clause.w.block()?;
+        return ok(WDoc {
+            w: body.w,
+            doc: Concat([Text("while (let "), clause.doc, Text(") "), body.doc]),
+        });
+    };
+    let cond = opened.expr()?;
     let body = cond.w.expect(")")?.w.block()?;
     ok(WDoc { w: body.w, doc: Concat([Text("while ("), cond.doc, Text(") "), body.doc]) })
 }

@@ -1,0 +1,30 @@
+import { drop_last, equal as ==, last, wrapping_add as +, wrapping_add_assign as += } from builtins;
+
+fn drain(xs: i64[]) -> i64 {
+    mut rest = xs;
+    mut total = 0;
+    while (let some(x) = rest.last()) {
+        set total += x;
+        set rest = rest.drop_last();
+    }
+    total
+}.test({
+    assert(drain([1, 2, 3]) == 6);
+    assert(drain([]) == 0);
+})
+
+fn pairs(xs: i64[]) -> i64 {
+    mut outer = xs;
+    mut count = 0;
+    while (let some(a) = outer.last()) {
+        mut inner = xs;
+        while (let some(b) = inner.last()) {
+            set count += a + b;
+            set inner = inner.drop_last();
+        }
+        set outer = outer.drop_last();
+    }
+    count
+}.test({
+    assert(pairs([1, 2]) == 12);
+})

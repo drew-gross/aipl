@@ -99,7 +99,6 @@ mtg_metagame workarounds:
   `sort_by` is a quadratic insertion sort; no native sort by key/comparator (card_counts sorts ~500-3000 entries with it)
   `to_array` needs an ordered set: `let s: #<{str} = xs.to_set()` just to get sorted unique values (a `sorted_unique`/`distinct` builtin?)
   no `break` in loops: `while (true)` + `return` in a match arm, with an unreachable trailing `err("unreachable")`
-  `while (let some(c) = ..)` doesn't parse
   lambdas need a braced body even for a struct literal: `|n| { Card { .. } }`
   `ok(Struct { f: x? })` is required: a bare field-list body can't be a `T!E` return, and `?` on `T?` in a `T!E` fn needs value_or_err
   maybe: `fn f(self: Json) -> Card!str ok({ name: .., count: .. })` as the struct-body shorthand for a `T!E` return (the `ok(..)` stays written, the `Card { }` is dropped); Drew is not convinced yet, and no implicit ok-wrapping
