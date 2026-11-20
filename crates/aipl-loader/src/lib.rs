@@ -1576,7 +1576,7 @@ fn rewrite_item(
             sig: Signature {
                 // Generic type-var names are local type variables, not global
                 // items — leave them untouched when rewriting signature types.
-                type_vars: f.sig.type_vars.clone(),
+                type_vars: rewrite_type_params(&f.sig.type_vars, view),
                 case_params: f.sig.case_params.clone(),
                 arm_params: f.sig.arm_params.clone(),
                 params: {
@@ -1636,7 +1636,7 @@ fn rewrite_item(
             ),
             // Documentation is plain text — no global references to rewrite.
             doc: s.doc.clone(),
-            type_vars: s.type_vars.clone(),
+            type_vars: rewrite_type_params(&s.type_vars, view),
             // Field types may reference the struct's own type variables (`T`);
             // pass them so they're left un-rewritten.
             fields: s
@@ -1663,7 +1663,7 @@ fn rewrite_item(
                     .unwrap_or_else(|| v.name.text.clone()),
             ),
             doc: v.doc.clone(),
-            type_vars: v.type_vars.clone(),
+            type_vars: rewrite_type_params(&v.type_vars, view),
             cases: v
                 .cases
                 .iter()
@@ -1709,7 +1709,7 @@ fn rewrite_item(
                     .unwrap_or_else(|| r.name.text.clone()),
             ),
             doc: r.doc.clone(),
-            type_vars: r.type_vars.clone(),
+            type_vars: rewrite_type_params(&r.type_vars, view),
             target: rewrite_type(&r.target, view, &r.type_vars),
         }),
         // A constant's own name becomes the global it stands for, and its
@@ -1730,6 +1730,19 @@ fn rewrite_item(
         }),
         Item::Import(_) => unreachable!("imports stripped during load"),
     })
+}
+
+/// `params` with each default type resolved through `view`, as every other type a declaration
+/// names is: a default may name a type the declaring file imports or declares, which the file
+/// that uses the default does not see under that name.
+fn rewrite_type_params(params: &[TypeParam], view: &HashMap<String, String>) -> Vec<TypeParam> {
+    params
+        .iter()
+        .map(|p| TypeParam {
+            default: p.default.as_ref().map(|d| rewrite_type(d, view, params)),
+            ..p.clone()
+        })
+        .collect()
 }
 
 fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam]) -> Type {

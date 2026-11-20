@@ -2272,6 +2272,14 @@ impl Pinner<'_> {
                 }
                 self.agree(r1, r2)
             }
+            // The same generic applied to arguments: each argument agrees, so one that is
+            // written as an application and one that is the instance it names meet.
+            (It::Gen(b1, x), It::Gen(b2, y)) if b1 == b2 && x.len() == y.len() => {
+                for (p, q) in x.iter().zip(y) {
+                    self.agree(p, q)?;
+                }
+                Ok(())
+            }
             _ => self.table.unify(&a, &e),
         }
     }

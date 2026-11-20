@@ -743,6 +743,34 @@ fn ty_has_var(t: &Type) -> bool {
     }
 }
 
+/// `t` with each application of a generic to concrete arguments (`Expr<ExprKind>`) named as the
+/// instance it is (`Expr$ExprKind`), the form `lower_generics` gives a signature's types. A tuple
+/// written in a body (`(Expr, Expr)[]`) is lowered to a struct whose fields are its elements, and
+/// a field has to name a type, not an application.
+fn instance_named(t: &Type) -> Type {
+    let go = |i: &Type| Box::new(instance_named(i));
+    match t {
+        Type::Generic(base, args) => {
+            let args: Vec<Type> = args.iter().map(instance_named).collect();
+            if args.iter().any(ty_has_var) {
+                Type::Generic(base.clone(), args)
+            } else {
+                Type::Named(typing::generic_instance_name(base, &args))
+            }
+        }
+        Type::Case(i) => Type::Case(go(i)),
+        Type::Optional(i) => Type::Optional(go(i)),
+        Type::Array(i) => Type::Array(go(i)),
+        Type::Set(i, o) => Type::Set(go(i), *o),
+        Type::Without(i, x) => Type::Without(go(i), x.clone()),
+        Type::Dict(k, v) => Type::Dict(go(k), go(v)),
+        Type::Result(a, b) => Type::Result(go(a), go(b)),
+        Type::Fn(ps, r) => Type::Fn(ps.iter().map(instance_named).collect(), go(r)),
+        Type::Tuple(es) => Type::Tuple(es.iter().map(instance_named).collect()),
+        other => other.clone(),
+    }
+}
+
 /// Lower a type, registering any new synthetic tuple-struct in `fields_map`/`order`.
 fn lt_ty(
     t: &Type,
@@ -780,12 +808,14 @@ fn lt_ty(
             let name = typing::tuple_struct_name(&lowered);
             if !fields_map.contains_key(&name) {
                 order.push(name.clone());
+                // The struct is named for its elements as written, but a field names the
+                // instance an application of a generic is.
                 let fs: Vec<FieldDecl> = lowered
                     .iter()
                     .enumerate()
                     .map(|(i, ty)| FieldDecl {
                         name: aipl_syntax::SpanStr::synthetic(format!("_{i}")),
-                        ty: ty.clone(),
+                        ty: instance_named(ty),
                         default: None,
                     })
                     .collect();

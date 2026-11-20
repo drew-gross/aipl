@@ -30,7 +30,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/desugar | 646 | 74352 | 36664 | 66092 | 279128 |
 | crates/aipl-codegen/src/doc | 296 | 20907 | 4595 | 43435 | 32592 |
 | crates/aipl-codegen/src/ebnf | 1410 | 137216 | 19328 | 344290 | 157452 |
-| crates/aipl-codegen/src/expr | 1119 | 121469 | 26040 | 100227 | 386576 |
+| crates/aipl-codegen/src/expr | 1154 | 123957 | 26040 | 106907 | 394568 |
 | crates/aipl-codegen/src/fill_or_add_sections | 151 | 12356 | 7146 | 56421 | 17564 |
 | crates/aipl-codegen/src/fill_or_add_sections_file | 21 | 1474 | 900 | 5493 | 16104 |
 | crates/aipl-codegen/src/find_files | 23 | 1424 | 1040 | 2862 | 10884 |

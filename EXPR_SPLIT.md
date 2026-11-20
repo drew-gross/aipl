@@ -33,7 +33,8 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 ## Committed decisions
 
-- `Expr<K>` with `kind: K`; a bare `Expr` means `Expr<ExprKind>`, so the existing code is unchanged.
+- `Expr<K = ExprKind>` with `kind: K`; a bare `Expr` means `Expr<ExprKind>`, so the existing code is unchanged.
+- `descendants_of_kind(self: Expr, arm: Case<ExprKind>)` is in `expr.aipl`; `body.descendants_of_kind::<Assign>()` is an `Expr<Assign>[]`.
 - `descendants_of_kind::<A>()` is spelled with the case as a type argument, like `collect_arms`.
 
 ## Open questions
@@ -45,15 +46,6 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 Each ends at a green `cargo handoff`.
 
-### 3. `Expr<K>` and `descendants_of_kind`
-
-Goal: `Expr` is generic over its kind and the function exists.
-
-- [ ] `struct Expr<K = ExprKind>` with `kind: K`; the places that rebuild a node with another kind
-  (`Expr { ..e, kind }`) and `ffi_ast.rs`'s decoding of the instance.
-- [ ] `descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr<ExprKind>[]`, called as
-  `::<Assign>` and so typed `Expr<Assign>[]`, with tests; `collect_expr_cases` goes if nothing wants kinds alone.
-- 
 ### 4. Move the lints
 
 Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?` use
@@ -61,6 +53,7 @@ Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?
 
 - [ ] One lint at a time (each is its own `.aipl` file with its own tests); the hit spans and
   messages do not change.
+- [ ] `collect_expr_cases` (kinds alone) goes once nothing wants kinds without their node.
 
 ## Done when
 

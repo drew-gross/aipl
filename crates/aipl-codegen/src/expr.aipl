@@ -76,8 +76,12 @@ import { to_array } from sets;
 # them into bindings that carry the places.
 #
 # The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
-struct Expr {
-    kind: ExprKind,
+#
+# `K` is what `kind` is known to be. A bare `Expr` is `Expr<ExprKind>`, a node of any kind;
+# `Expr<Assign>` is one known to be an `Assign`, as `descendants_of_kind` returns, so its
+# kind is taken apart with no other case to handle. It goes wherever an `Expr` does.
+struct Expr<K = ExprKind> {
+    kind: K,
     span: Span,
     value_span: Span,
     name_span: Span,
@@ -854,6 +858,23 @@ pub fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants(
     assert(ident("x").descendants() == [ident("x")]);
     let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
     assert(call.descendants()$show_expr() == ["f(a, Neg(b))", "a", "Neg(b)", "b"]);
+})
+
+# `self` and every expression under it whose kind is the case `arm`, outermost first. The case
+# is written as a type argument, as `collect_arms` takes it, and the result is typed as that
+# case alone: `body.descendants_of_kind::<Slice>()` is a list of `Expr<Slice>`.
+pub fn descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr[] {
+    self.descendants().filter(|node| node.kind.is_case(arm))
+}.test({
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    assert(call.descendants_of_kind::<Ident>()$show_expr() == ["a", "b"]);
+    assert(call.descendants_of_kind::<Neg>()$show_expr() == ["Neg(b)"]);
+    assert(call.descendants_of_kind::<Num>() == []);
+    // The kind of each is taken apart as the one case.
+    let Expr { kind, source } = call.descendants_of_kind::<Neg>()[0]?;
+    let Neg(inner) = kind;
+    assert(inner.show_expr() == "b");
+    assert(source == "");
 })
 
 # The kind of `self` and of every expression under it that is the case `arm`,
