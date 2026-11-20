@@ -39,7 +39,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
         .map(|Match(scrutinee, arms)| {
             let [case_arm, other_arm] = arms else { return none; };
             let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
-            let Call("some", wrapped, _) = case_arm.body.kind else { return none; };
+            let Call("some", wrapped, _, _) = case_arm.body.kind else { return none; };
             if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) {
                 return none;
             };

@@ -45,7 +45,7 @@ pub fn value_or_compare_names(self: Item[]) -> Names {
 # The hit for the comparison `self`, when it compares a `value_or` of one literal with a different
 # literal.
 pub fn value_or_compare(
-    self: Call(op, args, _),
+    self: Call(op, args, _, _),
     Names { equal, not_equal, value_or as spelled },
 ) -> LintHit? {
     let some(value_or) = spelled else { return none; };
@@ -111,7 +111,7 @@ pub fn value_or_compare(
 
 # `(optional, default)` when `self` is a call to `value_or`.
 fn fill(self: Expr, value_or: str) -> (Expr, Expr)? {
-    let Call(callee, args, _) = self.kind.as_case::<Call>()?;
+    let Call(callee, args, _, _) = self.kind.as_case::<Call>()?;
     if (callee != value_or) { return none; };
     let [optional, default] = args else { return none; };
     some((optional, default))

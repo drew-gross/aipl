@@ -10,15 +10,15 @@ import { Call, Expr, Num, expr, ident, num, show_expr } from "../expr.aipl";
 # be the same expression, not merely equal when run.
 pub fn is_len_of(self: Expr, receiver: Expr) -> bool {
     match (self.kind) {
-        Call("len", arguments, _) => arguments$show_expr() == [receiver.show_expr()],
+        Call("len", arguments, _, _) => arguments$show_expr() == [receiver.show_expr()],
         _ => false,
     }
 }.test({
     let xs = ident("xs");
-    assert(expr(Call("len", [xs], true)).is_len_of(xs));
-    assert(!expr(Call("len", [xs], true)).is_len_of(ident("ys")));
-    assert(!expr(Call("size", [xs], true)).is_len_of(xs));
-    assert(!expr(Call("len", [xs, xs], false)).is_len_of(xs));
+    assert(expr(Call("len", [xs], true, none)).is_len_of(xs));
+    assert(!expr(Call("len", [xs], true, none)).is_len_of(ident("ys")));
+    assert(!expr(Call("size", [xs], true, none)).is_len_of(xs));
+    assert(!expr(Call("len", [xs, xs], false, none)).is_len_of(xs));
     assert(!xs.is_len_of(xs));
 })
 

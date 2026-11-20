@@ -140,7 +140,7 @@ fn long_step(self: Expr, steps: Written[]) -> LintHit? {
 
     // An operator use is a call whose callee is the spelling that was written, which is what this
     // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
-    let Call(written, args, _) = value.kind.as_case::<Call>()?;
+    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
     let [left, right] = args else { return none; };
     let step = steps.find_if(|candidate| candidate.operator == written)$step?;
     let stepped = if (left.is_same_place(target)) {

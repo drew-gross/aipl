@@ -65,7 +65,7 @@ pub fn map_constant_repeat(Function { body }, items: Item[]) -> UnfilledHit[] {
         .descendants()
         .map(
             |call| {
-                let Call(callee, arguments, _) = call.kind else { return none; };
+                let Call(callee, arguments, _, _) = call.kind else { return none; };
                 let [receiver, lambda] = arguments else { return none; };
                 let Lambda(parameters, constant) = lambda.kind else { return none; };
                 let [parameter] = parameters else { return none; };

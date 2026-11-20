@@ -89,7 +89,7 @@ pub fn return_loop_any_all(Function { body }, items: Item[]) -> UnfilledHit[] {
             // `return true` / `false` is `any` of the condition as written; `return
             // false` / `true` is `all` of it with the negation lifted off.
             if (!returned) {
-                let Call("!", operands, _) = found.condition.kind else { return none; };
+                let Call("!", operands, _, _) = found.condition.kind else { return none; };
                 if (!negation || operands.len() != 1) { return none; };
             };
             let what = if (returned) {

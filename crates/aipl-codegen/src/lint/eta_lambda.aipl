@@ -185,7 +185,7 @@ struct MapAdvice { hit: LintHit, lambda: Span? }
 # `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
 fn map_advice(self: Expr, map_name: str?, methods: str[]) -> MapAdvice? {
     let name = map_name?;
-    let Call(callee, arguments, _) = self.kind.as_case::<Call>()?;
+    let Call(callee, arguments, _, _) = self.kind.as_case::<Call>()?;
     if (callee != name) { return none; };
     let [receiver, argument] = arguments else { return none; };
     let items = receiver.quote("<items>");
@@ -222,7 +222,7 @@ fn chain(self: Expr, parameter: str, methods: str[]) -> str[]? {
         let steps = inner.chain(parameter, methods)?;
         return some([..steps, `${name.slot_shown()}`]);
     };
-    let Call(name, arguments, method_style) = self.kind.as_case::<Call>()?;
+    let Call(name, arguments, method_style, _) = self.kind.as_case::<Call>()?;
     let target = arguments.first()?;
     let rest = arguments.drop_first();
 
@@ -265,7 +265,7 @@ fn forwarded(self: Expr, advised: Span[]) -> LintHit? {
     )) {
         return none;
     };
-    let Call(name, arguments, _) = body.kind.as_case::<Call>()?;
+    let Call(name, arguments, _, _) = body.kind.as_case::<Call>()?;
     if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
         |parameter| parameter.synthesized_name() == name,
     )) {

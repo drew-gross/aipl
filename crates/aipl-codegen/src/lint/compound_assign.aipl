@@ -121,7 +121,7 @@ fn long_accumulate(self: Expr, compounds: Compound[], stepped: str[]) -> LintHit
     let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
     if (!target.spans_its_text()) { return none; };
     // An operator use is a call named for the spelling written.
-    let Call(written, args, _) = value.kind.as_case::<Call>()?;
+    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
     let [left, right] = args else { return none; };
     let Compound { operator, spelling, missing } = compounds.find_if(
         |candidate| candidate.operator == written,

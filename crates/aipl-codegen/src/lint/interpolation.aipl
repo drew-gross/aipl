@@ -2,7 +2,7 @@
 # the value each `{..}` of a template renders.
 
 import { collect_ok, equal as ==, first, map } from builtins;
-import { Call, Expr, collect_expr_cases } from "../expr.aipl";
+import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { hit, lint_function_messages } from "./lint_hit.aipl";
 
 # The expression inside each template interpolation in `self` and under it,
@@ -10,8 +10,9 @@ import { hit, lint_function_messages } from "./lint_hit.aipl";
 # renders `e` as text, so these are the `e`s.
 pub fn interpolated_values(self: Expr) -> Expr[] {
     self
-        .collect_expr_cases(Call)
-        .map(|Call(name, arguments, _)| {
+        .descendants_of_kind::<Call>()
+        .map(|call| {
+            let Call(name, arguments, _, _) = call.kind;
             if (name == "__template_interp") { arguments.first() } else { none }
         })
         .collect_ok()

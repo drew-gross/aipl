@@ -22,9 +22,9 @@ pub fn case_of_equal_is_case(Function { body }) -> UnfilledHit[] {
     body
         .descendants()
         .map(|comparison| {
-            let Call("==", operands, _) = comparison.kind else { return none; };
+            let Call("==", operands, _, _) = comparison.kind else { return none; };
             if (operands.count_if(|operand| match (operand.kind) {
-                Call("case_of", arguments, _) => arguments.len() == 1,
+                Call("case_of", arguments, _, _) => arguments.len() == 1,
                 _ => false,
             }) == 1) {
                 some(advice(comparison.span))

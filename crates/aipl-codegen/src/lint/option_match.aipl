@@ -127,7 +127,7 @@ pub fn default_text(self: Expr) -> str {
 fn takes_a_method(self: Expr) -> bool {
     match (self.kind) {
         Ident(..) | Field(..) | Index(..) | Slice(..) => true,
-        Call(name, _, _) => !name.is_operator_name(),
+        Call(name, _, _, _) => !name.is_operator_name(),
         _ => false,
     }
 }

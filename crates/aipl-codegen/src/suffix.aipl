@@ -50,14 +50,22 @@ variant Suffix =
 pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     match (suf) {
         Field(name) => at(FieldExpr(recv, name.text), span).named_at(name.span),
-        Method(name, args) => at(Call(name.text, [recv, ..args], true), span).named_at(name.span),
+        Method(name, args) => at(Call(name.text, [recv, ..args], true, none), span).named_at(
+            name.span,
+        ),
         MethodTyped(name, tys, args) => at(
-            TypeArgs(at(Call(name.text, [recv, ..args], true), span).named_at(name.span), tys),
+            TypeArgs(
+                at(Call(name.text, [recv, ..args], true, none), span).named_at(name.span),
+                tys,
+            ),
             span,
         ),
         Index(index) => index_or_slice(recv, index, span),
         // `recv[row, column]` reads one cell of a grid; the builtin answers `none` off the grid.
-        Index2(row, column) => at(Call("__builtin_grid_get", [recv, row, column], false), span),
+        Index2(row, column) => at(
+            Call("__builtin_grid_get", [recv, row, column], false, none),
+            span,
+        ),
         SliceFrom(lo) => at(Slice(recv, some(lo), none), span),
         SliceTo(hi) => at(Slice(recv, none, some(hi)), span),
         Try => at(TryExpr(recv), span),
@@ -71,7 +79,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         MapMethod(name, args) => mapped(
             recv,
             at(
-                Call(name.text, [at(Ident(mapped_element(span)), name.span), ..args], true),
+                Call(name.text, [at(Ident(mapped_element(span)), name.span), ..args], true, none),
                 span,
             ).named_at(name.span),
             span,
@@ -119,7 +127,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     assert(apply_suffix(p, Field(at_5), 0..6).name_span == 5..6);
     assert(apply_suffix(p, Method(at_5, []), 0..8).name_span == 5..6);
     match (apply_suffix(p, MapField(at_5), 0..6).kind) {
-        Call(_, args, _) => match (args[1].value_or(p).kind) {
+        Call(_, args, _, _) => match (args[1].value_or(p).kind) {
             Lambda(_, step) => assert(step.name_span == 5..6),
             _ => assert(false),
         },
@@ -129,7 +137,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     // The element a step reads sits where the step's name is written, so an error
     // about it points at the name.
     match (apply_suffix(p, MapField(at_5), 0..6).kind) {
-        Call(_, args, _) => match (args[1].value_or(p).kind) {
+        Call(_, args, _, _) => match (args[1].value_or(p).kind) {
             Lambda(_, step) => match (step.kind) {
                 FieldExpr(element, _) => assert(element.span == 5..6),
                 _ => assert(false),
@@ -160,7 +168,7 @@ fn mapped_element(Span { start, end }) -> str { `__map${start}_{end}` }
 
 fn mapped(recv: Expr, step: Expr, span: Span) -> Expr {
     let element = LambdaParam { binding: Binding.Name(mapped_element(span)), ty: none, span };
-    at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true), span)
+    at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true, none), span)
 }
 
 # `recv[a..b]` — a range literal written *as* an index is the closed slice form,

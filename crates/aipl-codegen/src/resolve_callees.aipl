@@ -1,0 +1,234 @@
+# Which builtin each call is to, for the lints.
+#
+# A call names a function as the file spells it, and a file may import a builtin under any name
+# (`import { len as length } from builtins;`), so what a call is to is a fact about the file's
+# imports and not about the text. This fills in the `callee` of every call to a name the file
+# imported from a builtins library, leaving `none` for a call to anything else: a function of the
+# file's own, a constructor, or a local that holds a function and so hides the import.
+#
+# Only the lints read the result. The program the rest of the compiler gets is the one before it.
+
+import {
+    collect_arms,
+    collect_ok,
+    contains,
+    equal as ==,
+    get,
+    join,
+    map,
+    to_dict,
+    value_or,
+} from builtins;
+import { BuiltinEntry, Callee, builtin_imported, builtin_table } from "./builtin_table.aipl";
+import {
+    Call,
+    Expr,
+    For,
+    ForPattern,
+    IfLet,
+    Lambda,
+    Let,
+    LetMut,
+    LetPattern,
+    Match,
+    MatchArm,
+    binders,
+    descendants_of_kind,
+    map_subexprs,
+} from "./expr.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
+import { hoist_test_fns } from "./hoist_test_fns.aipl";
+import {
+    Builtins,
+    Function,
+    Import,
+    ImportDecl,
+    ImportName,
+    ImportSource,
+    Item,
+    LoweredFn,
+    Program,
+    SuperProgram,
+    local,
+} from "./item.aipl";
+import { pat_bindings } from "./pat.aipl";
+
+# `self` with the `callee` of each call in it filled in.
+pub fn resolve_callees(self: Program) -> Program {
+    let imported = self.items.imported_callees();
+    SuperProgram { items: self.items$resolved_item(imported), doc: self.doc }
+}.test({
+    fn called(source: str) -> Callee?[]!ParseFailure {
+        let Program { items } = aipl_parse_surface_file(source)?.program
+            .hoist_test_fns()
+            .resolve_callees();
+        ok(items.callees_called())
+    }
+
+    // A builtin imported under another name is still that builtin; the name it is called by does
+    // not matter.
+    assert(called(
+        "import { len as length } from builtins; fn f(x: i64[]) -> u64 { x.length() }",
+    )? == [some(Callee.Len)]);
+    // A library's builtin, by the name that library gives it.
+    assert(called("import { union } from sets; fn f(a: #{i64}) -> #{i64} { union(a, a) }")? == [
+        some(Callee.Union),
+    ]);
+
+    // A local that holds a function hides the import, and the file's own function or an import from
+    // another file of the same name is no builtin.
+    assert(called(
+        "import { len } from builtins; fn f(len: (i64[]) -> u64, x: i64[]) -> u64 { len(x) }",
+    )? == [none]);
+    assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [none]);
+    assert(called("""import { len } from "./a.aipl"; fn f(x: i64[]) -> u64 { len(x) }""")? == [
+        none,
+    ]);
+})
+
+# The callee of each call in the program's functions, outermost first.
+fn callees_called(self: Item[]) -> Callee?[] {
+    self
+        .collect_arms::<LoweredFn>()
+        $function_body()
+        .map(|body| body.descendants_of_kind::<Call>())
+        .join()
+        .map(|call| {
+            let Call(_, _, _, callee) = call.kind;
+            callee
+        })
+}
+
+# The body of the function `self` is.
+fn function_body(self: LoweredFn(Function { body })) -> Expr { body }
+
+# The functions of `self`, resolved against `imported`.
+fn resolved_item(self: Item, imported: #{str: Callee}) -> Item {
+    match (self) {
+        LoweredFn(f) => LoweredFn(Function {
+            ..f,
+            body: f.body.resolved(imported, f.sig.params$binding.map(binders).join()),
+        }),
+        _ => self,
+    }
+}
+
+# What each import from a builtins library brings, by the name the file calls it.
+fn imported_callees(self: Item[]) -> #{str: Callee} {
+    let table = builtin_table();
+    self.collect_arms::<Import>()$imported_pairs(table).join().to_dict()
+}
+
+# The builtins `self` imports, as `(local name, callee)`.
+fn imported_pairs(self: Import(ImportDecl { names, source }), table: BuiltinEntry[]) -> (
+    str,
+    Callee
+)[] {
+    source
+        .builtin_library()
+        .map(|library| names$imported_pair(library, table).collect_ok())
+        .value_or([])
+}
+
+fn builtin_library(self: ImportSource) -> str? {
+    match (self) {
+        Builtins => some("builtins"),
+        Library(name) => some(name),
+        Path(..) => none,
+    }
+}
+
+fn imported_pair(self: ImportName, library: str, table: BuiltinEntry[]) -> (str, Callee)? {
+    let BuiltinEntry { arm } = table.builtin_imported(library, self.name)?;
+    some((self.local(), arm))
+}
+
+# `self` with every call resolved: against `imported`, except where a name in `locals` hides it.
+# A name is hidden by the binders in scope, which a construct that binds adds for the part it binds
+# over.
+fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -> Expr {
+    match (self.kind) {
+        Call(name, args, method_style, _) => Expr {
+            ..self,
+            kind: Call(
+                name,
+                args$resolved(imported, locals),
+                method_style,
+                if (locals.contains(name)) { none } else { imported.get(name) },
+            ),
+        },
+        Let(name, ty, value, body) => Expr {
+            ..self,
+            kind: Let(
+                name,
+                ty,
+                value.resolved(imported, locals),
+                body.resolved(imported, [..locals, name]),
+            ),
+        },
+        LetMut(name, ty, value, body) => Expr {
+            ..self,
+            kind: LetMut(
+                name,
+                ty,
+                value.resolved(imported, locals),
+                body.resolved(imported, [..locals, name]),
+            ),
+        },
+        LetPattern(binding, value, body) => Expr {
+            ..self,
+            kind: LetPattern(
+                binding,
+                value.resolved(imported, locals),
+                body.resolved(imported, [..locals, ..binding.binders()]),
+            ),
+        },
+        For(name, iterable, body, index) => Expr {
+            ..self,
+            kind: For(
+                name,
+                iterable.resolved(imported, locals),
+                body.resolved(imported, [..locals, name, ..index.bound()]),
+                index=index,
+            ),
+        },
+        ForPattern(binding, iterable, body, index) => Expr {
+            ..self,
+            kind: ForPattern(
+                binding,
+                iterable.resolved(imported, locals),
+                body.resolved(imported, [..locals, ..binding.binders(), ..index.bound()]),
+                index=index,
+            ),
+        },
+        Lambda(params, body) => Expr {
+            ..self,
+            kind: Lambda(
+                params,
+                body.resolved(imported, [..locals, ..params$binding.map(binders).join()]),
+            ),
+        },
+        Match(scrutinee, arms) => Expr {
+            ..self,
+            kind: Match(scrutinee.resolved(imported, locals), arms$resolved_arm(imported, locals)),
+        },
+        IfLet(arm, scrutinee, else_branch) => Expr {
+            ..self,
+            kind: IfLet(
+                arm.resolved_arm(imported, locals),
+                scrutinee.resolved(imported, locals),
+                else_branch.resolved(imported, locals),
+            ),
+        },
+        _ => self.map_subexprs(|child| child.resolved(imported, locals)),
+    }
+}
+
+# The names an optional loop index binds.
+fn bound(self: str?) -> str[] { if (let some(name) = self) { [name] } else { [] } }
+
+# `self` with its body resolved where the names its pattern binds are in scope.
+fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -> MatchArm {
+    ..self,
+    body: self.body.resolved(imported, [..locals, ..self.pattern.pat_bindings()]),
+}

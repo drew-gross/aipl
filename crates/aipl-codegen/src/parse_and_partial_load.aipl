@@ -35,6 +35,7 @@ import { lint } from "./lint/lint.aipl";
 import { LintHit } from "./lint/lint_hit.aipl";
 import { squelch } from "./lint/squelch.aipl";
 import { promote_type_vars } from "./promote_type_vars.aipl";
+import { resolve_callees } from "./resolve_callees.aipl";
 
 # A file as far as the loader has been ported: the program, and the lint errors it
 # has: the hits no `#[allow]` squelches, and the markers that squelch nothing.
@@ -47,7 +48,7 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let hoisted = program.hoist_test_fns();
     ok(PartialLoad {
         program: hoisted.promote_type_vars().desugar(),
-        lints: squelch(src, allows, lint(hoisted)),
+        lints: squelch(src, allows, lint(hoisted.resolve_callees())),
         type_uses,
     })
 }.test({

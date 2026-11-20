@@ -45,9 +45,9 @@ pub fn with_value_or_self(Function { body }, items: Item[]) -> UnfilledHit[] {
     body
         .descendants()
         .map(|call| {
-            let Call(callee, arguments, _) = call.kind else { return none; };
+            let Call(callee, arguments, _, _) = call.kind else { return none; };
             let [replaced, fallback] = arguments else { return none; };
-            let Call(inner, with_arguments, _) = replaced.kind else { return none; };
+            let Call(inner, with_arguments, _, _) = replaced.kind else { return none; };
             let [receiver, _, _] = with_arguments else { return none; };
             if (callee != value_or || inner != with_name || !receiver.same_place(fallback)) {
                 return none;

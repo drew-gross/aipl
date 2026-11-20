@@ -83,7 +83,7 @@
             <a class="anchor" href="#item-name_at">name_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5512: Span) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5559: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
 
@@ -241,7 +241,9 @@
 
             </li>
 
-            <li id="item-Call"><code>Call(name: str, args: Expr[], method_style: bool)</code>
+            <li id="item-Call"><code>Call(name: str, args: Expr[], method_style: bool, callee: Callee?)</code>
+
+              <div class="doc"><p><code>callee</code> is the builtin the name resolves to in the file's imports, filled in by <code>resolve_callees.aipl</code> for the lints and <code>none</code> everywhere else (and for a call that is not to a builtin). It is last so an artifact built before it decodes as it always did. It has no default because a case with a keyword parameter cannot be a <code>Case&lt;..&gt;</code> argument.</p></div>
 
 
             </li>

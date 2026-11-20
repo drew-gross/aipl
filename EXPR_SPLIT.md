@@ -52,25 +52,20 @@ Goal: a lint matches the callee it calls (`Len`, `Map`, ..) and not the spelling
 it under, so `import { len as length }` and a local named `len` change nothing. Runs before the
 remaining lint ports in stage 4, which then need no `Names`.
 
-Why in the parser: the loader's resolution (`rewrite_expr`, Rust) is whole-program and runs after
-baking and the per-file lints, on a tree without the source forms the lints read, and there is no
-Rust-to-AIPL encoder. Resolution needs only the file's own imports (a path import is "not a
-builtin"), so a per-file AIPL pass between parse and lint suffices.
+`resolve_callees.aipl` fills the `callee: Callee?` slot of every `Call` from the file's builtin
+imports (and the locals in scope) between hoisting and the lints, in `parse_and_partial_load` and in
+`lint_hits`; the program the rest of the compiler gets is the one before it. `Callee` is the variant
+in `builtin_table.aipl`, whose arms are the Rust enum's (`Callee::IMPORTABLE`); `Call`'s slot has no
+default because a case with a keyword parameter cannot be a `Case<..>` argument. A lint reads the
+slot as `callee == some(Len)`.
 
-- [ ] AIPL `variant Callee` with an arm per importable builtin (`builtin_table.aipl` lists them; the
-  Rust enum's list is `Callee::IMPORTABLE`), plus `User(str)` and `Local(str)`, with a test that fails
-  when the AIPL variant, the table and the Rust enum drift. Check compile time and that
-  a nested `Call(Len, args, _)` param pattern works; if not, lints compare with `==` or `is_case`.
-- [ ] A trailing defaulted slot on `ExprKind::Call` (the slot-at-end bootstrap trick, as `For.index`);
-  `ffi_ast.rs` reads or ignores it.
-- [ ] `resolve_callees(program)` fills it from the file's builtin imports and local scope (let, params,
-  lambda params, pattern and loop binders), ported from `rewrite_expr`; runs in `lint` before the
-  function lints. Tests: aliased import, shadowing local, own function of the same name, path import.
 - [ ] Port the five moved lints off `Names` and `bound_to`/`imported_as` matching (`value_or_compare`,
   `len_gt_zero`, `is_empty_longhand`, and the other users of those two functions); `filled` keeps
-  the import spelling for advice text only.
-- [ ] Bootstrap: the `Expr` shape change needs `fill_staged_ir` -> validate -> promote (one handoff)
-  before any lint uses the slot.
+  the import spelling for advice text only. The lint drivers in `lint_hit.aipl` that call a lint
+  directly (`lint_function_messages` and its siblings) resolve before they do.
+- [ ] After the artifact carrying `arm` is promoted: `builtin_table()` in `aipl-codegen/src/lib.rs`
+  requires `arm` (it tolerates its absence for one round), and `the_builtins_table_lists_the_importable_callees`
+  stops skipping an empty one.
 
 ### 4. Move the lints
 

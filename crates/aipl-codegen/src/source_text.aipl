@@ -39,7 +39,7 @@ pub fn with_source_text(self: WrittenProgram, text: str) -> WrittenProgram {
 }.test({
     // Each expression holds what was written for it, children included.
     let text = "fn f() { g(a) }";
-    let call = at(Call("g", [at(Ident("a"), 11..12)], false), 9..13);
+    let call = at(Call("g", [at(Ident("a"), 11..12)], false, none), 9..13);
     assert(call.sourced(text).source == "g(a)");
     assert(call.sourced(text).subexprs()$source == ["a"]);
 

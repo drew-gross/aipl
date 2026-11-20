@@ -51,6 +51,8 @@ pub enum Definition {
 /// [`Builtin`], with the callee as its canonical name and owned text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableRow {
+    /// The name of the `Callee` case the AIPL side knows it as (`Len`).
+    pub arm: String,
     pub callee: String,
     pub definition: RowDefinition,
     pub exports: Vec<String>,

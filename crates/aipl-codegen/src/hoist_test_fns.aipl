@@ -149,21 +149,26 @@ fn renamed(self: str, renames: #{str: str}) -> str { renames.get(self).value_or(
 fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     let kind = match (self.kind) {
         Ident(name) => Ident(name.renamed(renames)),
-        Call(name, args, method_style) => Call(name.renamed(renames), args, method_style),
+        Call(name, args, method_style, _) => Call(name.renamed(renames), args, method_style, none),
         _ => self.kind,
     };
     Expr { ..self, kind }.map_subexprs(|child| child.rename_uses(renames))
 }.test({
     let renames = #{"four": "__test$f$four"};
     // A call, a value use, and a use nested in both.
-    let used = expr(Call("four", [ident("four"), expr(Call("g", [ident("four")], false))], false));
+    let used = expr(Call(
+        "four",
+        [ident("four"), expr(Call("g", [ident("four")], false, none))],
+        false,
+        none,
+    ));
     assert(
         used.rename_uses(renames).show_expr() == "__test$f$four(__test$f$four, g(__test$f$four))",
     );
     // A name that is not renamed, and a method-style call's receiver.
     assert(ident("other").rename_uses(renames).show_expr() == "other");
     assert(
-        expr(Call("four", [ident("x")], true))
+        expr(Call("four", [ident("x")], true, none))
             .rename_uses(renames)
             .show_expr() == "x.__test$f$four()",
     );

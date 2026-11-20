@@ -32,7 +32,9 @@ pub fn is_constant_default(self: Expr) -> bool {
             |pair| pair.0.is_constant_default() && pair.1.is_constant_default(),
         ),
         Field(inner, _) | Neg(inner) => inner.is_constant_default(),
-        Call(name, arguments, _) => name.is_operator_name() && arguments.all(is_constant_default),
+        Call(name, arguments, _, _) => name.is_operator_name() && arguments.all(
+            is_constant_default,
+        ),
         _ => false,
     }
 }.test({

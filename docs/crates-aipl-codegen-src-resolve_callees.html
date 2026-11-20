@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/resolve_callees.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/resolve_callees.aipl</code></h1>
+
+      <div class="module-doc"><p>Which builtin each call is to, for the lints.</p><p>A call names a function as the file spells it, and a file may import a builtin under any name (<code>import { len as length } from builtins;</code>), so what a call is to is a fact about the file's imports and not about the text. This fills in the <code>callee</code> of every call to a name the file imported from a builtins library, leaving <code>none</code> for a call to anything else: a function of the file's own, a constructor, or a local that holds a function and so hides the import.</p><p>Only the lints read the result. The program the rest of the compiler gets is the one before it.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-resolve_callees">
+          <h3>
+            <a class="anchor" href="#item-resolve_callees">resolve_callees</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn resolve_callees(self: Program) -&#62; Program</code></pre>
+
+          <div class="doc"><p><code>self</code> with the <code>callee</code> of each call in it filled in.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-callees_called">
+          <h3>
+            <a class="anchor" href="#item-callees_called">callees_called</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn callees_called(self: Item[]) -&#62; Callee?[]</code></pre>
+
+          <div class="doc"><p>The callee of each call in the program's functions, outermost first.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-function_body">
+          <h3>
+            <a class="anchor" href="#item-function_body">function_body</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn function_body(self: LoweredFn) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>The body of the function <code>self</code> is.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_item">
+          <h3>
+            <a class="anchor" href="#item-resolved_item">resolved_item</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_item(self: Item, imported: #{str: Callee}) -&#62; Item</code></pre>
+
+          <div class="doc"><p>The functions of <code>self</code>, resolved against <code>imported</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-imported_callees">
+          <h3>
+            <a class="anchor" href="#item-imported_callees">imported_callees</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn imported_callees(self: Item[]) -&#62; #{str: Callee}</code></pre>
+
+          <div class="doc"><p>What each import from a builtins library brings, by the name the file calls it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-imported_pairs">
+          <h3>
+            <a class="anchor" href="#item-imported_pairs">imported_pairs</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn imported_pairs(self: Import, table: BuiltinEntry[]) -&#62; (str, Callee)[]</code></pre>
+
+          <div class="doc"><p>The builtins <code>self</code> imports, as <code>(local name, callee)</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-builtin_library">
+          <h3>
+            <a class="anchor" href="#item-builtin_library">builtin_library</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn builtin_library(self: ImportSource) -&#62; str?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-imported_pair">
+          <h3>
+            <a class="anchor" href="#item-imported_pair">imported_pair</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn imported_pair(self: ImportName, library: str, table: BuiltinEntry[]) -&#62; (str, Callee)?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved">
+          <h3>
+            <a class="anchor" href="#item-resolved">resolved</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -&#62; Expr</code></pre>
+
+          <div class="doc"><p><code>self</code> with every call resolved: against <code>imported</code>, except where a name in <code>locals</code> hides it. A name is hidden by the binders in scope, which a construct that binds adds for the part it binds over.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bound">
+          <h3>
+            <a class="anchor" href="#item-bound">bound</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bound(self: str?) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names an optional loop index binds.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_arm">
+          <h3>
+            <a class="anchor" href="#item-resolved_arm">resolved_arm</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -&#62; MatchArm</code></pre>
+
+          <div class="doc"><p><code>self</code> with its body resolved where the names its pattern binds are in scope.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

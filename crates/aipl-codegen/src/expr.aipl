@@ -23,6 +23,7 @@ import {
     value_or,
     zip_with,
 } from builtins;
+import { Callee } from "./builtin_table.aipl";
 import { Ctor, Pat, Wildcard, pat_bindings, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
 import {
@@ -237,7 +238,11 @@ variant ExprKind =
     | Str(str)
     | Char(char)
     | Ident(str)
-    | Call(name: str, args: Expr[], method_style: bool)
+    # `callee` is the builtin the name resolves to in the file's imports, filled in by
+    # `resolve_callees.aipl` for the lints and `none` everywhere else (and for a call that is not
+    # to a builtin). It is last so an artifact built before it decodes as it always did. It has no
+    # default because a case with a keyword parameter cannot be a `Case<..>` argument.
+    | Call(name: str, args: Expr[], method_style: bool, callee: Callee?)
     | Neg(Expr)
     | If(Expr, Expr, Expr)
     | Construct(str, FieldInit[])
@@ -350,7 +355,7 @@ pub fn show_expr(self: Expr) -> str {
         Str(s) => `Str({s})`,
         Char(c) => `Char({c})`,
         Ident(n) => n,
-        Call(name, args, method_style) => show_call(name, args, method_style),
+        Call(name, args, method_style, _) => show_call(name, args, method_style),
         Neg(e) => `Neg({e.show_expr()})`,
         If(c, t, f) => `If({c.show_expr()}, {t.show_expr()}, {f.show_expr()})`,
         Construct(name, fields) => `Construct({name}, [{show_field_inits(fields)}])`,
@@ -405,9 +410,9 @@ pub fn show_expr(self: Expr) -> str {
     assert(expr(Unit).show_expr() == "()");
     assert(expr(Neg(three)).show_expr() == "Neg(3)");
     // The two call spellings, which is what `method_style` is for.
-    assert(expr(Call("+", [three, three], false)).show_expr() == "+(3, 3)");
-    assert(expr(Call("f", [ident("xs"), three], true)).show_expr() == "xs.f(3)");
-    assert(expr(Call("f", [ident("xs")], true)).show_expr() == "xs.f()");
+    assert(expr(Call("+", [three, three], false, none)).show_expr() == "+(3, 3)");
+    assert(expr(Call("f", [ident("xs"), three], true, none)).show_expr() == "xs.f(3)");
+    assert(expr(Call("f", [ident("xs")], true, none)).show_expr() == "xs.f()");
     assert(expr(Field(ident("p"), "x")).show_expr() == "p.x");
     assert(expr(Spread(ident("xs"))).show_expr() == "..xs");
     assert(expr(ArrayLit([three, three])).show_expr() == "[3, 3]");
@@ -424,7 +429,7 @@ pub fn show_expr(self: Expr) -> str {
     let i64_ty: Ty = Primitive(I64);
     assert(
         expr(TypeArgs(
-            expr(Call("f", [three], false)),
+            expr(Call("f", [three], false, none)),
             [i64_ty],
         )).show_expr() == "TypeArgs(f(3), [i64])",
     );
@@ -588,7 +593,7 @@ pub fn mapped<X: cases>(
         Ident(name) => Ident(name),
         None => None,
         Unit => Unit,
-        Call(name, args, method_style) => Call(name, args.map(f), method_style),
+        Call(name, args, method_style, callee) => Call(name, args.map(f), method_style, callee),
         Neg(x) => Neg(f(x)),
         If(cond, then_branch, else_branch) => If(f(cond), f(then_branch), f(else_branch)),
         Construct(name, written) => {
@@ -674,12 +679,13 @@ pub fn map_subexprs(self: Expr, f: (Expr) -> Expr) -> Expr {
     // A leaf has nothing to map.
     assert(ident("x").map_subexprs(wrap).show_expr() == "x");
     // Only the direct children are wrapped, not their children.
-    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false, none));
     assert(
         call.map_subexprs(wrap).show_expr() == show_expr(expr(Call(
             "f",
             [expr(Neg(ident("a"))), expr(Neg(expr(Neg(ident("b")))))],
             false,
+            none,
         ))),
     );
     // A binder's name and type are not sub-expressions; its value and body are.
@@ -754,7 +760,7 @@ pub fn is_spread(self: Expr) -> bool {
 pub fn subexprs(self: Expr) -> Expr[] {
     match (self.kind) {
         Num(..) | FloatLit(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => [],
-        Call(_, args, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
+        Call(_, args, _, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
         ProviderShim(_, args, body) => [..args, body],
         Neg(x)
         | Field(x, _)
@@ -786,7 +792,7 @@ pub fn subexprs(self: Expr) -> Expr[] {
     }
 }.test({
     assert(ident("x").subexprs() == []);
-    let call = expr(Call("f", [ident("a"), num(1)], false));
+    let call = expr(Call("f", [ident("a"), num(1)], false, none));
     assert(call.subexprs() == [ident("a"), num(1)]);
     // A binder's name and type are not sub-expressions; its value and body are.
     assert(expr(Let("v", none, ident("a"), ident("b"))).subexprs() == [ident("a"), ident("b")]);
@@ -858,7 +864,7 @@ struct Read { field: str, base: str }
 # `self` and every expression under it, outermost first.
 pub fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants().join()] }.test({
     assert(ident("x").descendants() == [ident("x")]);
-    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false, none));
     assert(call.descendants()$show_expr() == ["f(a, Neg(b))", "a", "Neg(b)", "b"]);
 })
 
@@ -868,7 +874,7 @@ pub fn descendants(self: Expr) -> Expr[] { [self, ..self.subexprs()$descendants(
 pub fn descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr[] {
     self.descendants().filter(|node| node.kind.is_case(arm))
 }.test({
-    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false, none));
     assert(call.descendants_of_kind::<Ident>()$show_expr() == ["a", "b"]);
     assert(call.descendants_of_kind::<Neg>()$show_expr() == ["Neg(b)"]);
     assert(call.descendants_of_kind::<Num>() == []);
@@ -886,7 +892,7 @@ pub fn descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr[] {
 pub fn collect_expr_cases(self: Expr, arm: Case<ExprKind>) -> ExprKind[] {
     self.descendants()$kind.filter(|kind| kind.is_case(arm))
 }.test({
-    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false));
+    let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false, none));
     assert(call.collect_expr_cases(Ident) == [Ident("a"), Ident("b")]);
     assert(call.collect_expr_cases(Neg).len() == 1);
     assert(call.collect_expr_cases(Num) == []);

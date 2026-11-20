@@ -73,7 +73,7 @@ pub fn match_map_value_or(Function { body }) -> UnfilledHit[] {
             // `some(v) => some(..), none => none`: a `map` with nothing to default. Any other
             // `some` arm over `none` yields an optional of its own, a bind that `map` would nest.
             if (none_body.kind == None) {
-                let wraps = if (let Call("some", wrapped, _) = some_body.kind) {
+                let wraps = if (let Call("some", wrapped, _, _) = some_body.kind) {
                     wrapped.len() == 1
                 } else {
                     false

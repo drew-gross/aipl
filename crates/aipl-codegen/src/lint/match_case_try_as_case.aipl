@@ -37,7 +37,7 @@ pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
             let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
             if (!other_arm.is_give_up()) { return none; };
             // `K(..) => some(x)` of the matched value is `match_case_as_case`'s.
-            if (let Call("some", wrapped, _) = case_arm.body.kind) {
+            if (let Call("some", wrapped, _, _) = case_arm.body.kind) {
                 if (wrapped$show_expr() == [scrutinee.show_expr()]) { return none; };
             };
             some(unfilled(

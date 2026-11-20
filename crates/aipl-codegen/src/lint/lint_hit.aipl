@@ -29,6 +29,7 @@ import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { Function, Import, ImportDecl, Item, LoweredFn, Program, local } from "../item.aipl";
+import { resolve_callees } from "../resolve_callees.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -129,7 +130,7 @@ pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
 # What `lint` reports for the program `src` parses to. The one way the lints'
 # `.test` blocks run a lint over source text: pass the lint function itself.
 pub fn lint_hits(src: str, lint: (Program) -> LintHit[]) -> LintHit[]!ParseFailure {
-    ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns()))
+    ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees()))
 }.test({
     assert(lint_hits("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == [
         hit("found", 0..1),
@@ -161,8 +162,8 @@ pub fn spans_its_text(self: Expr) -> bool {
 }.test({
     assert(ident("x").spans_its_text());
     assert(expr(Field(ident("p"), "x")).spans_its_text());
-    assert(!expr(Call("f", [ident("x")], false)).spans_its_text());
-    assert(!expr(Field(expr(Call("f", [], false)), "x")).spans_its_text());
+    assert(!expr(Call("f", [ident("x")], false, none)).spans_its_text());
+    assert(!expr(Field(expr(Call("f", [], false, none)), "x")).spans_its_text());
 })
 
 # What advice quotes for the expression `self`: its source where that spells it exactly
@@ -190,7 +191,9 @@ pub fn quote(self: Expr, placeholder: str) -> str {
 
     // A literal with no text of its own, a call and a multi-line string are not quoted.
     assert(num(5).quote("<element>") == "<element>");
-    assert(Expr { ..expr(Call("f", [], false)), source: "f(" }.quote("<element>") == "<element>");
+    assert(
+        Expr { ..expr(Call("f", [], false, none)), source: "f(" }.quote("<element>") == "<element>",
+    );
     assert(Expr { ..expr(Str("a\nb")), source: `"a\nb"` }.quote("<element>") == "<element>");
 })
 

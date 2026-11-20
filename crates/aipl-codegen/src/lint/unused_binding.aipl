@@ -25,7 +25,15 @@ import {
     map,
     not_equal as !=,
 } from builtins;
-import { Call, Expr, Let, LetMut, Shim, collect_expr_cases } from "../expr.aipl";
+import {
+    Call,
+    Expr,
+    Let,
+    LetMut,
+    Shim,
+    collect_expr_cases,
+    descendants_of_kind,
+} from "../expr.aipl";
 import { ParseError } from "../grammar.aipl";
 import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
@@ -41,8 +49,11 @@ fn message(name: str) -> str {
 # without an `Ident`), or as the function a `shim` binds an operation to.
 fn is_mentioned(self: Expr, name: str) -> bool {
     self.uses_of(name).mentions != 0 || self
-        .collect_expr_cases(Call)
-        .any(|Call(callee, _, _)| callee == name) || self
+        .descendants_of_kind::<Call>()
+        .any(|call| {
+            let Call(callee, _, _, _) = call.kind;
+            callee == name
+        }) || self
         .collect_expr_cases(Shim)
         .any(|Shim(_, bindings, _)| bindings.any(|(_, bound)| bound == name))
 }.test({

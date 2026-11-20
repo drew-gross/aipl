@@ -417,7 +417,7 @@ pub fn ty_and_default_names(ty: Ty, default: Expr?) -> #{str} {
 pub fn names_in(self: Expr) -> #{str} {
     #{..self.own_names(), ..self.subexprs()$names_in().union_all()}
 }.test({
-    assert(expr(Call("f", [ident("x")], false)).names_in() == #{"f", "x"});
+    assert(expr(Call("f", [ident("x")], false, none)).names_in() == #{"f", "x"});
     assert(expr(Neg(ident("x"))).names_in() == #{"-", "x"});
     assert(expr(TypeArgs(ident("f"), [Named("Circle")])).names_in() == #{"f", "Circle"});
     assert(expr(LetPattern(
@@ -430,7 +430,7 @@ pub fn names_in(self: Expr) -> #{str} {
 # The names `e` itself mentions, not those of its sub-expressions.
 pub fn own_names(self: Expr) -> #{str} {
     match (self.kind) {
-        Ident(name) | ExprKind.Construct(name, _) | Call(name, _, _) => #{name},
+        Ident(name) | ExprKind.Construct(name, _) | Call(name, _, _, _) => #{name},
         // Unary `-` is the one operator with no named builtin behind it, so it
         // stays a node; every other operator use is a `Call` on its spelling.
         Neg(..) => #{"-"},

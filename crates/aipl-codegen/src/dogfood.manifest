@@ -4,79 +4,80 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 851 str -> str?
-; entry strip_test_sections 909 str -> str
-; entry split_test_sections 908 str -> __tuple$str$str
-; entry source_loc 900 str __builtin_Span -> str
-; entry caret_block 92 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 221 str #{str:str} -> unit!Error
-; entry normalize_output 823 str -> str
-; entry int_fits 504 i64 str -> bool
-; entry is_operator_name 505 str -> bool
-; entry builtin_table 91 -> __m19__BuiltinEntry[]
-; entry aipl_token_scopes 556 str -> __m20__ScopeSpan[]!__m20__LexError
-; entry find_files 222 str str -> str[]!Error
-; entry companion_files 94 str -> __m26__Companion[]!str
-; entry parse_spec 844 str -> __m27__Spec!str
-; entry parse_and_partial_load 842 str -> __m112__PartialLoad!__m28__ParseFailure
-; entry fn_role 235 str -> __m45__FnRole
-; entry test_fn_name 226 str -> str
-; entry format_source 256 str u64 -> str!__m115__FmtError
+; entry parse_test_section_header 853 str -> str?
+; entry strip_test_sections 922 str -> str
+; entry split_test_sections 921 str -> __tuple$str$str
+; entry source_loc 913 str __builtin_Span -> str
+; entry caret_block 94 str __builtin_Span str -> str
+; entry fill_or_add_sections_file 223 str #{str:str} -> unit!Error
+; entry normalize_output 825 str -> str
+; entry int_fits 506 i64 str -> bool
+; entry is_operator_name 507 str -> bool
+; entry builtin_table 93 -> __m19__BuiltinEntry[]
+; entry aipl_token_scopes 558 str -> __m21__ScopeSpan[]!__m21__LexError
+; entry find_files 224 str str -> str[]!Error
+; entry companion_files 96 str -> __m27__Companion[]!str
+; entry parse_spec 846 str -> __m28__Spec!str
+; entry parse_and_partial_load 844 str -> __m113__PartialLoad!__m29__ParseFailure
+; entry fn_role 237 str -> __m46__FnRole
+; entry test_fn_name 228 str -> str
+; entry format_source 258 str u64 -> str!__m116__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
-; struct __m19__BuiltinEntry 160 callee@0:str definition@24:__m19__BuiltinDefinition exports@80:str[] library@104:str public_name@128:str?
+; struct __m19__BuiltinEntry 168 arm@0:__m19__Callee callee@8:str definition@32:__m19__BuiltinDefinition exports@88:str[] library@112:str public_name@136:str?
+; variant __m19__Callee 8 Print Put Split SplitLen Join Intersperse TupleWindows SameCase CaseName CaseOf CountIsLessThan CountIsAtMost CountIsGreaterThan CountIsAtLeast CountIsEqual CountIsNotEqual CountIfIsLessThan CountIfIsAtMost CountIfIsGreaterThan CountIfIsAtLeast CountIfIsEqual CountIfIsNotEqual First GridGet GridFrom GridOf GridTrySet Width SeededWithInt SeededWithClock Height IsInBoundsOf GridIsInBoundsOf Last NonemptyFirst NonemptyLast EnsureNonempty AssumeNonempty DropFirst DropLast DropN DropLastN ToStr ToStrLen Map TryMap Filter FilterMap All Any LeftFold RightFold OptLeftFold OptRightFold ZipWith Zip Trim HeapStr RopeStr InlineStr PackInline InlineCapacity Measure MeasureBegin MeasureConsume MeasureEnd MeasureRead IsAllWhitespace StartsWith StartsWithAt EndsWith Len Range IsNonempty IsEmpty Push Extend ExtendOptional ExtendMap ExtendFilter ExtendFilterMap Reserve IsSome IsSomeAnd IsErrAnd MapErr MapOk IntParse IntParseUnsigned IsSpace IsWhitespace IsDigit ToDigit Narrow TrimWhile Words CartesianProduct Count CountWhile CountIf FindIf CollectArms AsCase IsCase CollectOk MapFindIf MapJoin JoinIsNonempty JoinIsEmpty Reduce MapReduce FilterMapReduce SplitMap FindMap ReverseFindMap FindIndex ValueOr ValueOrErr Contains Has ToArray ToSet ReadFileToString WriteStringToFile ListFiles ReadLine ReadByte ClearTerminal MoveTo EnterAlternateScreen LeaveAlternateScreen ShimCellGet ShimCellSet ReadKey ParseJson RandomU64 NowNanos MonotonicNow ExecuteProgram HttpGet Union UnionAll SetMap Difference Intersection Insert Get ContainsKey RemoveKey InsertKey ToDict MapToDict Hash Min Max Minimum Maximum Reverse Sort SortBy Repeat With TrySet WrappingAdd SaturatingAdd WrappingSub SaturatingSub WrappingMul SaturatingDivide SaturatingRemainder ToFloat Render Distinct Pad Tabulate ToFixed FloatAdd FloatSub FloatMul FloatDivide FloatEqual FloatNotEqual FloatLessThan FloatGreaterThan FloatLessThanOrEqual FloatGreaterThanOrEqual Equal NotEqual LessThan GreaterThan LessThanOrEqual GreaterThanOrEqual LogicalAnd LogicalOr LogicalNot
 ; variant __m19__BuiltinDefinition 56 Written(8:str) Declared Described(8:str,32:str)
-; struct __m20__ScopeSpan 40 span@0:__builtin_Span scope@16:str
-; struct __m20__LexError 40 message@0:str span@24:__builtin_Span
-; struct __m26__Companion 48 path@0:str contents@24:str
-; struct __m27__Spec 232 source@0:str extra_files@24:__m27__Entry[] expect_files@48:__m27__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? report@152:str? cli@184:str[] checks@208:__m27__Check[]
-; struct __m27__Entry 48 path@0:str contents@24:str
-; struct __m27__Check 48 projection@0:str body@24:str
-; struct __m112__PartialLoad 104 program@0:__m37__SuperProgram lints@56:__m51__LintHit[] type_uses@80:__builtin_Span[]
-; struct __m37__SuperProgram 56 items@0:__m37__SuperItem[] doc@24:str?
-; variant __m37__SuperItem 288 WrittenFn(8:__m37__Function,192:__m37__Attributes) LoweredFn(8:__m37__Function) Struct(8:__m37__StructDecl) Variant(8:__m37__VariantDecl) Refinement(8:__m37__RefinementDecl) Import(8:__m37__ImportDecl) Const(8:__m37__ConstDecl)
-; struct __m37__Function 184 name@0:__m20__SpanStr visibility@40:__m37__Visibility sig@48:__m37__Signature body@136:__m32__Expr$__m32__ExprKind shorthand_body@144:bool doc@152:str?
-; struct __m20__SpanStr 40 text@0:str span@24:__builtin_Span
-; variant __m37__Visibility 8 Public Private EntryPoint Test Benchmark
-; struct __m37__Signature 88 type_vars@0:__m37__TypeParam[] params@24:__m37__Param[] effects@48:str[] return_ty@72:__m31__Ty?
-; struct __m37__TypeParam 88 name@0:str bound@24:__m36__Bound default@56:__m31__Ty? name_span@72:__builtin_Span
-; variant __m36__Bound 32 Any Ord Int Variant Cases Arm(8:str)
-; variant __m31__Ty 56 boxed Unit Primitive(8:__m30__Prim) Named(8:str) Case(8:__m31__Ty) TypeVar(8:str) Optional(8:__m31__Ty) Array(8:__m31__Ty) Set(8:__m31__Ty,16:__m31__SetOrder) Dict(8:__m31__Ty,16:__m31__Ty) Result(8:__m31__Ty,16:__m31__Ty) Fn(8:__m31__Ty[],32:__m31__Ty) Tuple(8:__m31__Ty[]) Generic(8:str,32:__m31__Ty[]) Any Without(8:__m31__Ty,16:__m31__Exclusion)
-; variant __m30__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
-; variant __m31__SetOrder 8 Unordered Desc Asc
-; variant __m31__Exclusion 32 EmptyArray NamedCase(8:str) Throughout(8:str)
-; struct __m37__Param 152 binding@0:__m32__Binding ty@8:__m31__Ty mutable@16:bool arity@24:__m37__Arity default@32:__m32__Expr$__m32__ExprKind? implicit_some@48:bool written@56:__m32__WrittenNames? name_span@136:__builtin_Span
-; variant __m32__Binding 88 boxed Name(8:str) ByTuple(8:str[]) ByCase(8:str,32:str[]) ByStruct(8:str,32:str[],56:str[],80:bool) ByPattern(8:__m33__Pat) Alias(8:str,32:__m32__Binding)
-; variant __m33__Pat 80 boxed Ctor(8:str,32:str[],56:bool) Str(8:str) Char(8:char) Array(8:__m33__PatElement[]) ArrayRest(8:__m33__PatElement[]) ArrayNested(8:__m33__Pat[]) Wildcard Tuple(8:__m33__Pat[]) Nested(8:str,32:__m33__Pat[]) Int(8:i64) Struct(8:str,32:str[],56:str[])
-; struct __m33__PatElement 48 kind@0:__m33__ElementKind span@32:__builtin_Span
-; variant __m33__ElementKind 32 Binder(8:str) Text(8:str) Letter(8:char) Number(8:i64)
-; variant __m37__Arity 8 One ZeroOrMore OneOrMore
-; struct __m32__Expr$__m32__ExprKind 160 boxed kind@0:__m32__ExprKind span@8:__builtin_Span value_span@24:__builtin_Span name_span@40:__builtin_Span source@56:str written@80:__m32__WrittenNames?
-; variant __m32__ExprKind 80 boxed Num(8:i64) Bool(8:bool) Str(8:str) Char(8:char) Ident(8:str) Call(8:str,32:__m32__Expr$__m32__ExprKind[],56:bool) Neg(8:__m32__Expr$__m32__ExprKind) If(8:__m32__Expr$__m32__ExprKind,16:__m32__Expr$__m32__ExprKind,24:__m32__Expr$__m32__ExprKind) Construct(8:str,32:__m32__FieldInit[]) Field(8:__m32__Expr$__m32__ExprKind,16:str) Let(8:str,32:__m31__Ty?,48:__m32__Expr$__m32__ExprKind,56:__m32__Expr$__m32__ExprKind) LetMut(8:str,32:__m31__Ty?,48:__m32__Expr$__m32__ExprKind,56:__m32__Expr$__m32__ExprKind) Assign(8:__m32__Expr$__m32__ExprKind,16:__m32__Expr$__m32__ExprKind,24:__m32__Expr$__m32__ExprKind) For(8:str,32:__m32__Expr$__m32__ExprKind,40:__m32__Expr$__m32__ExprKind,48:str?) While(8:__m32__Expr$__m32__ExprKind,16:__m32__Expr$__m32__ExprKind) Shim(8:str,32:__tuple$str$str[],56:__m32__Expr$__m32__ExprKind) None Match(8:__m32__Expr$__m32__ExprKind,16:__m32__MatchArm[]) IfLet(8:__m32__MatchArm,16:__m32__Expr$__m32__ExprKind,24:__m32__Expr$__m32__ExprKind) ArrayLit(8:__m32__Expr$__m32__ExprKind[]) Spread(8:__m32__Expr$__m32__ExprKind) SetLit(8:__m32__Expr$__m32__ExprKind[],32:__m31__SetOrder) DictLit(8:__tuple$__m32__Expr___m32__ExprKind$__m32__Expr___m32__ExprKind[]) Index(8:__m32__Expr$__m32__ExprKind,16:__m32__Expr$__m32__ExprKind) Slice(8:__m32__Expr$__m32__ExprKind,16:__m32__Expr$__m32__ExprKind?,32:__m32__Expr$__m32__ExprKind?) Try(8:__m32__Expr$__m32__ExprKind) Unit Seq(8:__m32__Expr$__m32__ExprKind,16:__m32__Expr$__m32__ExprKind) Return(8:__m32__Expr$__m32__ExprKind) Lambda(8:__m32__LambdaParam[],32:__m32__Expr$__m32__ExprKind) TupleLit(8:__m32__Expr$__m32__ExprKind[]) KwArg(8:str,32:__m32__Expr$__m32__ExprKind,40:bool) TypeArgs(8:__m32__Expr$__m32__ExprKind,16:__m31__Ty[]) LetPattern(8:__m32__Binding,16:__m32__Expr$__m32__ExprKind,24:__m32__Expr$__m32__ExprKind) ForPattern(8:__m32__Binding,16:__m32__Expr$__m32__ExprKind,24:__m32__Expr$__m32__ExprKind,32:str?) ProviderShim(8:str,32:__m32__Expr$__m32__ExprKind[],56:__m32__Expr$__m32__ExprKind) FloatLit(8:str)
-; struct __m32__FieldInit 56 boxed name@0:str value@24:__m32__Expr$__m32__ExprKind name_span@32:__builtin_Span shorthand@48:bool
-; struct __m32__MatchArm 112 boxed pattern@0:__m33__Pat body@8:__m32__Expr$__m32__ExprKind span@16:__builtin_Span written@32:__m32__WrittenNames?
-; struct __m32__WrittenNames 72 cases@0:__m32__WrittenName[] binders@24:__m32__WrittenName[] structs@48:__m32__WrittenStruct[]
-; struct __m32__WrittenName 40 text@0:str span@24:__builtin_Span
-; struct __m32__WrittenStruct 48 fields@0:__m32__WrittenName[] binders@24:__m32__WrittenName[]
-; struct __tuple$__m32__Expr___m32__ExprKind$__m32__Expr___m32__ExprKind 16 boxed _0@0:__m32__Expr$__m32__ExprKind _1@8:__m32__Expr$__m32__ExprKind
-; struct __m32__LambdaParam 120 binding@0:__m32__Binding ty@8:__m31__Ty? span@24:__builtin_Span written@40:__m32__WrittenNames?
-; struct __m37__Attributes 96 test_body@0:__m32__Expr$__m32__ExprKind? test_fns@16:__m37__Function[] benchmark@40:__m37__BenchmarkBlock?
-; struct __m37__BenchmarkBlock 48 body@0:__m32__Expr$__m32__ExprKind fns@8:__m37__Function[] span@32:__builtin_Span
-; struct __m37__StructDecl 120 name@0:__m20__SpanStr doc@40:str? type_vars@72:__m37__TypeParam[] fields@96:__m37__FieldDecl[]
-; struct __m37__FieldDecl 64 name@0:__m20__SpanStr ty@40:__m31__Ty default@48:__m32__Expr$__m32__ExprKind?
-; struct __m37__VariantDecl 120 name@0:__m20__SpanStr doc@40:str? type_vars@72:__m37__TypeParam[] cases@96:__m37__VariantCase[]
-; struct __m37__VariantCase 96 name@0:__m20__SpanStr doc@40:str? payload@72:__m37__CaseParam[]
-; struct __m37__CaseParam 96 name@0:str? ty@32:__m31__Ty default@40:__m32__Expr$__m32__ExprKind? implicit_some@56:bool doc@64:str?
-; struct __m37__RefinementDecl 104 name@0:__m20__SpanStr doc@40:str? type_vars@72:__m37__TypeParam[] target@96:__m31__Ty
-; struct __m37__ImportDecl 72 names@0:__m37__ImportName[] source@24:__m37__ImportSource source_span@56:__builtin_Span
-; struct __m37__ImportName 72 name@0:str alias@24:str? span@56:__builtin_Span
-; variant __m37__ImportSource 32 Path(8:str) Builtins Library(8:str)
-; struct __m37__ConstDecl 104 name@0:__m20__SpanStr is_pub@40:bool ty@48:__m31__Ty? value@64:__m32__Expr$__m32__ExprKind doc@72:str?
-; struct __m51__LintHit 40 message@0:str span@24:__builtin_Span
-; struct __m28__ParseFailure 24 errors@0:__m40__ParseError[]
-; struct __m40__ParseError 40 message@0:str span@24:__builtin_Span
-; variant __m45__FnRole 32 Plain TestBody TestHelper(8:str) Benchmark(8:str)
-; struct __m115__FmtError 40 message@0:str span@24:__builtin_Span
+; struct __m21__ScopeSpan 40 span@0:__builtin_Span scope@16:str
+; struct __m21__LexError 40 message@0:str span@24:__builtin_Span
+; struct __m27__Companion 48 path@0:str contents@24:str
+; struct __m28__Spec 232 source@0:str extra_files@24:__m28__Entry[] expect_files@48:__m28__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? report@152:str? cli@184:str[] checks@208:__m28__Check[]
+; struct __m28__Entry 48 path@0:str contents@24:str
+; struct __m28__Check 48 projection@0:str body@24:str
+; struct __m113__PartialLoad 104 program@0:__m38__SuperProgram lints@56:__m52__LintHit[] type_uses@80:__builtin_Span[]
+; struct __m38__SuperProgram 56 items@0:__m38__SuperItem[] doc@24:str?
+; variant __m38__SuperItem 288 WrittenFn(8:__m38__Function,192:__m38__Attributes) LoweredFn(8:__m38__Function) Struct(8:__m38__StructDecl) Variant(8:__m38__VariantDecl) Refinement(8:__m38__RefinementDecl) Import(8:__m38__ImportDecl) Const(8:__m38__ConstDecl)
+; struct __m38__Function 184 name@0:__m21__SpanStr visibility@40:__m38__Visibility sig@48:__m38__Signature body@136:__m33__Expr$__m33__ExprKind shorthand_body@144:bool doc@152:str?
+; struct __m21__SpanStr 40 text@0:str span@24:__builtin_Span
+; variant __m38__Visibility 8 Public Private EntryPoint Test Benchmark
+; struct __m38__Signature 88 type_vars@0:__m38__TypeParam[] params@24:__m38__Param[] effects@48:str[] return_ty@72:__m32__Ty?
+; struct __m38__TypeParam 88 name@0:str bound@24:__m37__Bound default@56:__m32__Ty? name_span@72:__builtin_Span
+; variant __m37__Bound 32 Any Ord Int Variant Cases Arm(8:str)
+; variant __m32__Ty 56 boxed Unit Primitive(8:__m31__Prim) Named(8:str) Case(8:__m32__Ty) TypeVar(8:str) Optional(8:__m32__Ty) Array(8:__m32__Ty) Set(8:__m32__Ty,16:__m32__SetOrder) Dict(8:__m32__Ty,16:__m32__Ty) Result(8:__m32__Ty,16:__m32__Ty) Fn(8:__m32__Ty[],32:__m32__Ty) Tuple(8:__m32__Ty[]) Generic(8:str,32:__m32__Ty[]) Any Without(8:__m32__Ty,16:__m32__Exclusion)
+; variant __m31__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
+; variant __m32__SetOrder 8 Unordered Desc Asc
+; variant __m32__Exclusion 32 EmptyArray NamedCase(8:str) Throughout(8:str)
+; struct __m38__Param 152 binding@0:__m33__Binding ty@8:__m32__Ty mutable@16:bool arity@24:__m38__Arity default@32:__m33__Expr$__m33__ExprKind? implicit_some@48:bool written@56:__m33__WrittenNames? name_span@136:__builtin_Span
+; variant __m33__Binding 88 boxed Name(8:str) ByTuple(8:str[]) ByCase(8:str,32:str[]) ByStruct(8:str,32:str[],56:str[],80:bool) ByPattern(8:__m34__Pat) Alias(8:str,32:__m33__Binding)
+; variant __m34__Pat 80 boxed Ctor(8:str,32:str[],56:bool) Str(8:str) Char(8:char) Array(8:__m34__PatElement[]) ArrayRest(8:__m34__PatElement[]) ArrayNested(8:__m34__Pat[]) Wildcard Tuple(8:__m34__Pat[]) Nested(8:str,32:__m34__Pat[]) Int(8:i64) Struct(8:str,32:str[],56:str[])
+; struct __m34__PatElement 48 kind@0:__m34__ElementKind span@32:__builtin_Span
+; variant __m34__ElementKind 32 Binder(8:str) Text(8:str) Letter(8:char) Number(8:i64)
+; variant __m38__Arity 8 One ZeroOrMore OneOrMore
+; struct __m33__Expr$__m33__ExprKind 160 boxed kind@0:__m33__ExprKind span@8:__builtin_Span value_span@24:__builtin_Span name_span@40:__builtin_Span source@56:str written@80:__m33__WrittenNames?
+; variant __m33__ExprKind 80 boxed Num(8:i64) Bool(8:bool) Str(8:str) Char(8:char) Ident(8:str) Call(8:str,32:__m33__Expr$__m33__ExprKind[],56:bool,64:__m19__Callee?) Neg(8:__m33__Expr$__m33__ExprKind) If(8:__m33__Expr$__m33__ExprKind,16:__m33__Expr$__m33__ExprKind,24:__m33__Expr$__m33__ExprKind) Construct(8:str,32:__m33__FieldInit[]) Field(8:__m33__Expr$__m33__ExprKind,16:str) Let(8:str,32:__m32__Ty?,48:__m33__Expr$__m33__ExprKind,56:__m33__Expr$__m33__ExprKind) LetMut(8:str,32:__m32__Ty?,48:__m33__Expr$__m33__ExprKind,56:__m33__Expr$__m33__ExprKind) Assign(8:__m33__Expr$__m33__ExprKind,16:__m33__Expr$__m33__ExprKind,24:__m33__Expr$__m33__ExprKind) For(8:str,32:__m33__Expr$__m33__ExprKind,40:__m33__Expr$__m33__ExprKind,48:str?) While(8:__m33__Expr$__m33__ExprKind,16:__m33__Expr$__m33__ExprKind) Shim(8:str,32:__tuple$str$str[],56:__m33__Expr$__m33__ExprKind) None Match(8:__m33__Expr$__m33__ExprKind,16:__m33__MatchArm[]) IfLet(8:__m33__MatchArm,16:__m33__Expr$__m33__ExprKind,24:__m33__Expr$__m33__ExprKind) ArrayLit(8:__m33__Expr$__m33__ExprKind[]) Spread(8:__m33__Expr$__m33__ExprKind) SetLit(8:__m33__Expr$__m33__ExprKind[],32:__m32__SetOrder) DictLit(8:__tuple$__m33__Expr___m33__ExprKind$__m33__Expr___m33__ExprKind[]) Index(8:__m33__Expr$__m33__ExprKind,16:__m33__Expr$__m33__ExprKind) Slice(8:__m33__Expr$__m33__ExprKind,16:__m33__Expr$__m33__ExprKind?,32:__m33__Expr$__m33__ExprKind?) Try(8:__m33__Expr$__m33__ExprKind) Unit Seq(8:__m33__Expr$__m33__ExprKind,16:__m33__Expr$__m33__ExprKind) Return(8:__m33__Expr$__m33__ExprKind) Lambda(8:__m33__LambdaParam[],32:__m33__Expr$__m33__ExprKind) TupleLit(8:__m33__Expr$__m33__ExprKind[]) KwArg(8:str,32:__m33__Expr$__m33__ExprKind,40:bool) TypeArgs(8:__m33__Expr$__m33__ExprKind,16:__m32__Ty[]) LetPattern(8:__m33__Binding,16:__m33__Expr$__m33__ExprKind,24:__m33__Expr$__m33__ExprKind) ForPattern(8:__m33__Binding,16:__m33__Expr$__m33__ExprKind,24:__m33__Expr$__m33__ExprKind,32:str?) ProviderShim(8:str,32:__m33__Expr$__m33__ExprKind[],56:__m33__Expr$__m33__ExprKind) FloatLit(8:str)
+; struct __m33__FieldInit 56 boxed name@0:str value@24:__m33__Expr$__m33__ExprKind name_span@32:__builtin_Span shorthand@48:bool
+; struct __m33__MatchArm 112 boxed pattern@0:__m34__Pat body@8:__m33__Expr$__m33__ExprKind span@16:__builtin_Span written@32:__m33__WrittenNames?
+; struct __m33__WrittenNames 72 cases@0:__m33__WrittenName[] binders@24:__m33__WrittenName[] structs@48:__m33__WrittenStruct[]
+; struct __m33__WrittenName 40 text@0:str span@24:__builtin_Span
+; struct __m33__WrittenStruct 48 fields@0:__m33__WrittenName[] binders@24:__m33__WrittenName[]
+; struct __tuple$__m33__Expr___m33__ExprKind$__m33__Expr___m33__ExprKind 16 boxed _0@0:__m33__Expr$__m33__ExprKind _1@8:__m33__Expr$__m33__ExprKind
+; struct __m33__LambdaParam 120 binding@0:__m33__Binding ty@8:__m32__Ty? span@24:__builtin_Span written@40:__m33__WrittenNames?
+; struct __m38__Attributes 96 test_body@0:__m33__Expr$__m33__ExprKind? test_fns@16:__m38__Function[] benchmark@40:__m38__BenchmarkBlock?
+; struct __m38__BenchmarkBlock 48 body@0:__m33__Expr$__m33__ExprKind fns@8:__m38__Function[] span@32:__builtin_Span
+; struct __m38__StructDecl 120 name@0:__m21__SpanStr doc@40:str? type_vars@72:__m38__TypeParam[] fields@96:__m38__FieldDecl[]
+; struct __m38__FieldDecl 64 name@0:__m21__SpanStr ty@40:__m32__Ty default@48:__m33__Expr$__m33__ExprKind?
+; struct __m38__VariantDecl 120 name@0:__m21__SpanStr doc@40:str? type_vars@72:__m38__TypeParam[] cases@96:__m38__VariantCase[]
+; struct __m38__VariantCase 96 name@0:__m21__SpanStr doc@40:str? payload@72:__m38__CaseParam[]
+; struct __m38__CaseParam 96 name@0:str? ty@32:__m32__Ty default@40:__m33__Expr$__m33__ExprKind? implicit_some@56:bool doc@64:str?
+; struct __m38__RefinementDecl 104 name@0:__m21__SpanStr doc@40:str? type_vars@72:__m38__TypeParam[] target@96:__m32__Ty
+; struct __m38__ImportDecl 72 names@0:__m38__ImportName[] source@24:__m38__ImportSource source_span@56:__builtin_Span
+; struct __m38__ImportName 72 name@0:str alias@24:str? span@56:__builtin_Span
+; variant __m38__ImportSource 32 Path(8:str) Builtins Library(8:str)
+; struct __m38__ConstDecl 104 name@0:__m21__SpanStr is_pub@40:bool ty@48:__m32__Ty? value@64:__m33__Expr$__m33__ExprKind doc@72:str?
+; struct __m52__LintHit 40 message@0:str span@24:__builtin_Span
+; struct __m29__ParseFailure 24 errors@0:__m41__ParseError[]
+; struct __m41__ParseError 40 message@0:str span@24:__builtin_Span
+; variant __m46__FnRole 32 Plain TestBody TestHelper(8:str) Benchmark(8:str)
+; struct __m116__FmtError 40 message@0:str span@24:__builtin_Span
 ; import 0 aipl_arr_drop_opt_str
 ; import 1 aipl_arr_drop_str
 ; import 2 aipl_arr_drop_warr
@@ -666,4 +667,4 @@
 ; data 508 __tostr_lit_101 66616c7365
 
 ; __builtin_int_parse
-; source-fingerprint 5591729947906173262
+; source-fingerprint 16874995851208149523

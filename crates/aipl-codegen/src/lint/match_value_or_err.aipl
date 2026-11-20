@@ -111,7 +111,7 @@ pub fn match_value_or_err(Function { body, sig, name }) -> UnfilledHit[] {
                     .descendants()
                     .any(|e| match (e.kind) {
                         Try(..) | Return(..) | Assign(..) | For(..) | While(..) => true,
-                        Call("assert", _, _) => true,
+                        Call("assert", _, _, _) => true,
                         _ => false,
                     });
                 if (stays || sig.effects.is_nonempty() || name.text.is_test_code()) {

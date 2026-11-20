@@ -51,7 +51,7 @@ pub fn is_empty_longhand_names(self: Item[]) -> Names {
 # The hit for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
 # equality.
 pub fn is_empty_longhand(self: Expr<Call> { kind }, names: Names) -> UnfilledHit? {
-    let Call(op, args, _) = kind;
+    let Call(op, args, _, _) = kind;
     let receiver = if (args.len() == 1) {
         args.negated_nonempty(op, names)?
     } else {
@@ -124,7 +124,7 @@ pub fn is_empty_longhand(self: Expr<Call> { kind }, names: Names) -> UnfilledHit
 # The receiver of the test the one argument `self` negates, when it is `!x.is_nonempty()`.
 fn negated_nonempty(self: Expr[], op: str, Names { logical_not, nonempty }) -> Expr? {
     if (op != "!" || !logical_not) { return none; };
-    let Call(callee, args, _) = self[0]?.kind.as_case::<Call>()?;
+    let Call(callee, args, _, _) = self[0]?.kind.as_case::<Call>()?;
     if (args.len() != 1 || some(callee) != nonempty) { return none; };
     args[0]
 }
@@ -142,7 +142,7 @@ fn length_equal_zero(self: Expr[], op: str, Names { equal, len }) -> Expr? {
 # The receiver of the call `self` when it is a call of `len`, however it was spelled: `x.len()` is the
 # free call `len(x)`.
 fn length_receiver(self: Expr, len_name: str) -> Expr? {
-    let Call(callee, args, _) = self.kind.as_case::<Call>()?;
+    let Call(callee, args, _, _) = self.kind.as_case::<Call>()?;
     if (callee != len_name || args.len() != 1) { return none; };
     args[0]
 }
