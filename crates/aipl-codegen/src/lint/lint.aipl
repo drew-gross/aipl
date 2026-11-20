@@ -120,11 +120,11 @@ pub fn lint(program: Program) -> LintHit[] {
 # The lints over the struct literals of `function`, which are found once for all of them.
 fn construct_lints(Function { body }) -> LintHit[] {
     let constructs = body.descendants_of_kind::<Construct>();
-    constructs$field_init_shorthand().join()
+    constructs$kind$field_init_shorthand().join()
 }
 
 # The lints over the assignments of `function`, which are found once for all of them.
 fn assign_lints(Function { body }) -> LintHit[] {
     let assigns = body.descendants_of_kind::<Assign>();
-    assigns$set_spread_field().collect_ok()
+    assigns$kind$set_spread_field().collect_ok()
 }

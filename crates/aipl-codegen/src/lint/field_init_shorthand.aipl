@@ -11,13 +11,12 @@
 # The hit points at the value.
 
 import { as_case, collect_ok, equal as ==, join, not_equal as !=, starts_with } from builtins;
-import { Construct, Expr, FieldInit, Ident, descendants_of_kind } from "../expr.aipl";
+import { Construct, FieldInit, Ident, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 
-# A hit for each field of the struct literal `self` that is set to a name it shares.
-pub fn field_init_shorthand(self: Expr<Construct>) -> LintHit[] {
-    let Construct(name, inits) = self.kind;
+# A hit for each field of the struct literal `self` (its kind) that is set to a name it shares.
+pub fn field_init_shorthand(self: Construct(name, inits)) -> LintHit[] {
     if (name.starts_with("__builtin_")) { return []; };
     inits$spelled_out().collect_ok()
 }.test({
@@ -25,7 +24,7 @@ pub fn field_init_shorthand(self: Expr<Construct>) -> LintHit[] {
         lint_function_messages(
             src,
             |function| {
-                function.body.descendants_of_kind::<Construct>()$field_init_shorthand().join()
+                function.body.descendants_of_kind::<Construct>()$kind$field_init_shorthand().join()
             },
         )
     }

@@ -28,7 +28,7 @@ import {
     map_join,
     value_or,
 } from builtins;
-import { Assign, Construct, Expr, Spread, descendants_of_kind } from "../expr.aipl";
+import { Assign, Construct, Spread, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
@@ -36,8 +36,7 @@ import { is_same_place, root_name } from "./places.aipl";
 
 # The hit for the `set` `self`, when it sets a place to a literal that starts from the same place
 # and replaces fields.
-pub fn set_spread_field(self: Expr<Assign>) -> LintHit? {
-    let Assign(target, value, _) = self.kind;
+pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
     let Construct(_, inits) = value.kind.as_case::<Construct>()?;
     let root = target.root_name()?;
     let spread = inits.first()?;
@@ -66,7 +65,7 @@ pub fn set_spread_field(self: Expr<Assign>) -> LintHit? {
         lint_function_messages(
             src,
             |function| {
-                function.body.descendants_of_kind::<Assign>()$set_spread_field().collect_ok()
+                function.body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
             },
         )
     }

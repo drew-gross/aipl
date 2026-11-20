@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  collect_ok should probably be collect_some()
   expr.aipl->mapped->Construct use ..i syntax. Also consider a lint for this?
   printable_without_blank in char_set_literal lint needs some cleanup
   tests/cases/variants/err_as_case_value.aipl doens't need to exist, is_case &co can use the regular type checker errors
