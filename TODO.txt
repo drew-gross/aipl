@@ -377,6 +377,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  syntax (and lint) that says you should not explicitly name a type argument if it's only used once, just use a bound directly in the non-type args or body
   support removing multiple arms via throughout at once
   spread optionals into arrays to make tabulate's widths computation simpler
   arr$[i] syntax for getting all items at specified index
@@ -554,6 +555,9 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  move descendants_of_kind to fn lint()
+  why is field_init_shorthand excluding builtins? Also it shoudn't do name comparisons
+  make FieldInit say whether it's in shorthand, for field_init_shorthand
   collect_expressions wrapper of collect_arms that lets you iterate over all expressions of one type. Should simplify many lints.
   make the "unused functions" lint not count .test/.benchmark blocks that don't actually use the function (need to support standalone benchmark, currently many hang off empty fn work () {})
   xs.map(|p| p.name$shout().len()) should hit the "use $$" lint to be xs$name$$shout()$len() after we have $$ operator
@@ -920,6 +924,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  lets not actually store the project compilers in git, handoff can recreate them and we can .gitignore them, that way project development still works
   dynamic work queue for running tests to balance work across shards better
   have some progress report type thingy
   maybe: fewer executables per case (reuse instrumented, or test behaviour in JIT). Need to decide if I actually want this.

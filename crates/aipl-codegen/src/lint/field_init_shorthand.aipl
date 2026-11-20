@@ -20,17 +20,28 @@ import {
     equal as ==,
     join,
     logical_not as !,
+    map,
     not_equal as !=,
     starts_with,
     trim,
 } from builtins;
-import { Construct, Expr, FieldInit, Ident, descendants } from "../expr.aipl";
+import { Construct, Expr, FieldInit, Ident, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_messages, text_before } from "./lint_hit.aipl";
 
 # A hit for each field of a struct literal in the function that is set to a name it shares.
 pub fn field_init_shorthand(Function { body }) -> LintHit[] {
-    body.descendants()$spelled_out().join()
+    body
+        .descendants_of_kind::<Construct>()
+        .map(|literal| {
+            let Construct(name, inits) = literal.kind;
+            if (name.starts_with("__builtin_")) {
+                []
+            } else {
+                inits$spelled_out_in(literal).collect_ok()
+            }
+        })
+        .join()
 }.test({
     assert(lint_function_messages("fn f(x: i64) -> P { P { x: x } }", field_init_shorthand)? == [
         message("x"),
@@ -64,13 +75,6 @@ pub fn field_init_shorthand(Function { body }) -> LintHit[] {
         )? == [],
     );
 })
-
-# The hits for the fields of `self` that are written `name: name`, when it is a struct literal.
-fn spelled_out(self: Expr) -> LintHit[] {
-    let Construct(name, inits) = self.kind else { return []; };
-    if (name.starts_with("__builtin_")) { return []; };
-    inits$spelled_out_in(self).collect_ok()
-}
 
 # The hit for the field `self` of the literal `within`, if it is written out in full.
 fn spelled_out_in(self: FieldInit, within: Expr) -> LintHit? {

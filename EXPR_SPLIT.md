@@ -51,6 +51,7 @@ Each ends at a green `cargo handoff`.
 Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?` use
 `descendants_of_kind::<C>()` and destructure the kind in the parameter.
 
+- [ ] Moved: `field_init_shorthand`, `set_spread_field`. A helper cannot annotate `Expr<C>` (see CLAUDE_TODO), so the lambda destructures `node.kind` and passes the payload on.
 - [ ] One lint at a time (each is its own `.aipl` file with its own tests); the hit spans and
   messages do not change.
 - [ ] `collect_expr_cases` (kinds alone) goes once nothing wants kinds without their node.
