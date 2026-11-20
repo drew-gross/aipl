@@ -651,6 +651,9 @@ struct Pinner<'a> {
     calls: Vec<CallRecord>,
     /// Generic struct constructions, whose type arguments must be pinned by their fields.
     constructions: Vec<(String, Vec<It>, Span)>,
+    /// The arm parameters of the calls made so far, which must have been settled by the end:
+    /// the function called, the parameter, its slot and the call.
+    arm_slots: Vec<(String, String, String, Span)>,
     /// Generic variant constructions, whose type arguments must come from their payload, the
     /// expected type or an annotation.
     variant_constructions: Vec<(String, Vec<It>, Span)>,
@@ -1058,6 +1061,7 @@ fn pinner_for<'a>(
         linking: HashSet::new(),
         calls: Vec::new(),
         constructions: Vec::new(),
+        arm_slots: Vec::new(),
         variant_constructions: Vec::new(),
         own_bounds: type_vars
             .iter()
@@ -1502,6 +1506,18 @@ impl Pinner<'_> {
                     "\"narrow\" takes the integer type it converts to from where its value \
                      goes, and nothing here says which — bind it with one, as in \
                      `let b: u8? = n.narrow();`",
+                    span,
+                ));
+            }
+        }
+        for (callee, arm, slot, span) in std::mem::take(&mut self.arm_slots) {
+            if matches!(self.table.case_slots.get(&slot), Some(None)) && self.errors.is_empty() {
+                self.errors.push(Error::at(
+                    format!(
+                        "cannot infer which case {arm:?} stands for in a call of {callee:?} — an \
+                         argument of that case would say, or write it as a type argument, as in \
+                         `{callee}::<Circle>(..)`"
+                    ),
                     span,
                 ));
             }
@@ -3596,6 +3612,14 @@ impl Pinner<'_> {
                 let slot = format!("${param}#{}", self.table.case_slots.len());
                 self.table.case_slots.insert(slot.clone(), None);
                 self.domains.insert(slot.clone(), variant);
+                if sig.arm_params.iter().any(|(arm, _)| *arm == param) {
+                    self.arm_slots.push((
+                        display(name).to_string(),
+                        param.clone(),
+                        slot.clone(),
+                        span.clone(),
+                    ));
+                }
                 names.insert(param, slot);
             }
             // `f::<Circle>`: a case written for an arm parameter is its arm type. Its base is
@@ -3627,7 +3651,9 @@ impl Pinner<'_> {
                 if !one_case {
                     return reject(
                         format!(
-                            "the type argument for {arm:?} must be one case of {of:?}, not {}",
+                            "{arm:?} stands for one case of {}, so the type argument has to be a single \
+                             case, not {}",
+                            self.table.show(&base),
                             self.table.show(&ty)
                         ),
                         span,

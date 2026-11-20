@@ -1,0 +1,13 @@
+# A parameter only the result names has nothing to say which case it stands for: write it.
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+fn none_of<V: variant, A: arm of V>(self: V[]) -> A[] { [] }
+
+pub fn some_of(shapes: Shape[]) -> Shape[] { shapes.none_of() }
+--- check --compile ---
+error: cannot infer which case "A" stands for in a call of "none_of" — an argument of that case would say, or write it as a type argument, as in `none_of::<Circle>(..)`
+ --> ./tests/cases/variants/err_arm_parameter_not_inferred.aipl:7:46
+  |
+7 | pub fn some_of(shapes: Shape[]) -> Shape[] { shapes.none_of() }
+  |                                              ^^^^^^^^^^^^^^^^

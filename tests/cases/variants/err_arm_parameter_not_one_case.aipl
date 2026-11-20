@@ -6,7 +6,7 @@ fn none_of<V: variant, A: arm of V>(self: V[]) -> A[] { [] }
 
 pub fn all_of(shapes: Shape[]) -> Shape[] { shapes.none_of::<Shape>() }
 --- check --compile ---
-error: the type argument for "A" must be one case of "V", not Shape
+error: "A" stands for one case of Shape, so the type argument has to be a single case, not Shape
  --> ./tests/cases/variants/err_arm_parameter_not_one_case.aipl:7:45
   |
 7 | pub fn all_of(shapes: Shape[]) -> Shape[] { shapes.none_of::<Shape>() }

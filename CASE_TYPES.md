@@ -56,20 +56,7 @@ What exists today (read from the code and probed with `aipl check`):
 ## Stages
 
 
-Each ends at a green `cargo handoff`. Stage 3 follows stage 2.
-
-### 2. Finishing the arm parameter
-
-Goal: the rough edges of `<V: variant, A: arm of V>` (`variants/arm_parameter.aipl`).
-
-- [ ] An arm parameter nothing infers (a result-only one with no `::<Case>`) stays unsettled, and the
-  message names the parameter (`body returns (Shape without A)[] ..`) instead of saying it has to be
-  written. Inferring it from where the result goes is not done: `agree` only settles a slot from the
-  value given, not from the type wanted.
-- [ ] The explicit-argument refusal says `one case of "V"` with the parameter's name; say the variant.
-- [ ] A body cannot yet produce an `A` from a `V` (it is `V` less cases it cannot see), so
-  `collect_arms` itself needs a compiler hook or a way to reflect `A` to a `Case<V>` value (see the
-  open question); stage 3 decides.
+Each ends at a green `cargo handoff`.
 
 ### 3. Retype `is_case`, `as_case` and `collect_arms`
 
@@ -87,6 +74,12 @@ special case for their `arm` argument is gone.
   `case_of_equal_is_case`, `return_loop_find_if`, `return_loop_any_all`, `return_loop_find_index`)
   advise the new one; the write-aipl skill and the docs say it.
 - [ ] Decide whether the old spelling stays as an alias for one round or goes at once.
+- [ ] Decide how the bodies work. A body cannot produce an `A` from a `V` (`A` is `V` less cases it
+  cannot see), and `collect_arms`/`as_case` need the tag of the case `A` stands for at run time.
+  Either a compiler hook keeps their result types (the signature changes, the body stays
+  compiler-typed), or `A` can be reflected to a `Case<V>` value in a body. See the open question.
+- [ ] An arm parameter is not inferred from where a result goes (`agree` settles a slot from the
+  value given, not the type wanted); a call that needs it written says so.
 - Watch: this is the one stage that touches the whole corpus, so it is a fanout from the failure
   list; the `Case<V>` value type and `case_of` stay as they are.
 - Depends on 2.

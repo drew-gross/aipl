@@ -890,6 +890,7 @@ case_tests! {
     cases_variants_ctor_as_fn_value = "cases/variants/ctor_as_fn_value",
     cases_variants_err_arm_of_not_a_variant_parameter = "cases/variants/err_arm_of_not_a_variant_parameter",
     cases_variants_err_arm_parameter_arity = "cases/variants/err_arm_parameter_arity",
+    cases_variants_err_arm_parameter_not_inferred = "cases/variants/err_arm_parameter_not_inferred",
     cases_variants_err_arm_parameter_not_one_case = "cases/variants/err_arm_parameter_not_one_case",
     cases_variants_err_arm_parameter_wrong_case = "cases/variants/err_arm_parameter_wrong_case",
     cases_variants_err_arm_types = "cases/variants/err_arm_types",
