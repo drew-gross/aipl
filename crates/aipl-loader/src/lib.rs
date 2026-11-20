@@ -1018,7 +1018,7 @@ impl Loader {
             }
         }
         let root_index = self.files.get(root).map_or(0, |file| file.index);
-        kwargs::expand_keyword_args(
+        let mut program = kwargs::expand_keyword_args(
             &Program {
                 items: merged,
                 sources,
@@ -1027,7 +1027,9 @@ impl Loader {
                 doc: None,
             },
             root_index,
-        )
+        )?;
+        aipl_syntax::fill_type_defaults(&mut program);
+        Ok(program)
     }
 }
 

@@ -347,6 +347,7 @@ case_tests! {
     cases_generics_return_only_type_param = "cases/generics/return_only_type_param",
     cases_generics_same_length_distinct_types = "cases/generics/same_length_distinct_types",
     cases_generics_str_as_char_array = "cases/generics/str_as_char_array",
+    cases_generics_struct_type_parameter_defaults = "cases/generics/struct_type_parameter_defaults",
     cases_generics_two_param_variant = "cases/generics/two_param_variant",
     cases_generics_type_parameter_defaults = "cases/generics/type_parameter_defaults",
     cases_generics_value_or = "cases/generics/value_or",

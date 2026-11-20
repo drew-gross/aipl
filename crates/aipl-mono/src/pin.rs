@@ -814,18 +814,16 @@ pub fn pin_behind(program: &Program, declarations: usize) -> Pinned {
                 Ok(t) => items.push(TItem::Fn(t)),
                 Err(es) => failures.extend(es.into_iter().map(|e| (f.name.text.clone(), e))),
             },
-            Item::Struct(s) if s.type_vars.iter().any(|tp| tp.default.is_some()) => {
+            Item::Struct(s) if !crate::typing::defaults_trail(&s.type_vars) => {
                 failures.push((
                     s.name.text.clone(),
-                    Failure::Rejected(crate::typing::defaults_only_on_functions("struct", &s.name)),
+                    Failure::Rejected(crate::typing::defaults_must_trail("struct", &s.name)),
                 ));
             }
-            Item::Variant(v) if v.type_vars.iter().any(|tp| tp.default.is_some()) => {
+            Item::Variant(v) if !crate::typing::defaults_trail(&v.type_vars) => {
                 failures.push((
                     v.name.text.clone(),
-                    Failure::Rejected(crate::typing::defaults_only_on_functions(
-                        "variant", &v.name,
-                    )),
+                    Failure::Rejected(crate::typing::defaults_must_trail("variant", &v.name)),
                 ));
             }
             Item::Struct(s) if !s.is_generic() && declaration_error(&decls, item).is_some() => {

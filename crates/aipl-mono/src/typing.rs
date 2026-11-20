@@ -366,13 +366,19 @@ impl<'a> TypeValidator<'a> {
     }
 }
 
-/// The refusal of a default on the type parameter of a declaration other than a
-/// function: only a call has an inference for a default to stand in for.
-pub(crate) fn defaults_only_on_functions(kind: &str, name: &aipl_syntax::SpanStr) -> Error {
+/// Whether the defaults of a declaration's type parameters come last: a parameter after one
+/// with a default has a default too, so a use can leave out a tail of them and nothing else.
+pub(crate) fn defaults_trail(params: &[aipl_syntax::ast::TypeParam]) -> bool {
+    let first = params.iter().position(|p| p.default.is_some());
+    first.is_none_or(|i| params[i..].iter().all(|p| p.default.is_some()))
+}
+
+/// The refusal of a declaration whose type parameters have a default before one without.
+pub(crate) fn defaults_must_trail(kind: &str, name: &aipl_syntax::SpanStr) -> Error {
     Error::at(
         format!(
-            "{kind} {:?}: a type parameter's default is for a function, where a call can leave \
-             the type for inference; a {kind}'s type arguments are always written",
+            "{kind} {:?}: a type parameter without a default follows one with a default; a use \
+             may leave out only the last ones",
             name.text
         ),
         name.span.clone(),

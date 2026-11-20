@@ -4774,6 +4774,74 @@ fn expand_refinement_ty(
     })
 }
 
+/// Write out the type arguments a struct's or variant's defaults supply: a bare `Expr` is
+/// `Expr<ExprKind>` when `struct Expr<K = ExprKind>` is declared, and `Pair<i64>` is
+/// `Pair<i64, str>` when the second parameter defaults to `str`. Only a name whose omitted
+/// parameters all have defaults is filled in; any other bare use of a generic name is left as it
+/// is, for the checker to report.
+///
+/// Run after the passes that read a bare generic name on purpose — the loader drops the
+/// annotation a struct pattern's temporary carries when the struct is generic, so the temporary
+/// takes its type from the value and keeps what the value is known to be.
+pub fn fill_type_defaults(program: &mut ast::Program) {
+    let mut defaults: HashMap<String, Vec<Option<Type>>> = HashMap::new();
+    for item in &program.items {
+        let (name, params) = match item {
+            ast::Item::Struct(s) => (&s.name.text, &s.type_vars),
+            ast::Item::Variant(v) => (&v.name.text, &v.type_vars),
+            _ => continue,
+        };
+        if params.iter().any(|p| p.default.is_some()) {
+            defaults.insert(
+                name.clone(),
+                params.iter().map(|p| p.default.clone()).collect(),
+            );
+        }
+    }
+    if defaults.is_empty() {
+        return;
+    }
+    each_type_mut(program, &mut |t| fill_defaults_in(t, &defaults));
+}
+
+fn fill_defaults_in(t: &mut Type, defaults: &HashMap<String, Vec<Option<Type>>>) {
+    use ast::Type as T;
+    match t {
+        T::Case(i) | T::Optional(i) | T::Array(i) | T::Set(i, _) | T::Without(i, _) => {
+            fill_defaults_in(i, defaults)
+        }
+        T::Dict(a, b) | T::Result(a, b) => {
+            fill_defaults_in(a, defaults);
+            fill_defaults_in(b, defaults);
+        }
+        T::Fn(ps, r) => {
+            ps.iter_mut().for_each(|p| fill_defaults_in(p, defaults));
+            fill_defaults_in(r, defaults);
+        }
+        T::Tuple(es) | T::Generic(_, es) => {
+            es.iter_mut().for_each(|e| fill_defaults_in(e, defaults))
+        }
+        _ => {}
+    }
+    let (name, given) = match t {
+        T::Named(n) => (n.clone(), 0),
+        T::Generic(n, args) => (n.clone(), args.len()),
+        _ => return,
+    };
+    let Some(declared) = defaults.get(&name) else {
+        return;
+    };
+    if given >= declared.len() || declared[given..].iter().any(Option::is_none) {
+        return;
+    }
+    let mut args = match t {
+        T::Generic(_, args) => std::mem::take(args),
+        _ => Vec::new(),
+    };
+    args.extend(declared[given..].iter().flatten().cloned());
+    *t = T::Generic(name, args);
+}
+
 /// Every type written or recorded in `program`, mutably: signatures, field and
 /// payload declarations, and the annotations inside bodies, plus each
 /// expression's stamped [`Expr::ty`].

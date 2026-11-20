@@ -1,0 +1,34 @@
+# A struct's or a variant's type parameter may have a default, which a use that leaves the
+# argument out takes: a bare `Node` is `Node<Shape>`, `Pair<i64>` is `Pair<i64, str>`, and a bare
+# `Opt` is `Opt<i64>`. A name with a parameter that has no default is still written in full.
+
+import { equal as ==, wrapping_add as + } from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64)
+
+struct Node<K = Shape> { kind: K, span: i64 }
+
+struct Pair<A, B = str> { first: A, second: B }
+
+variant Opt<T = i64> = Has(value: T) | Nothing
+
+fn span_of(Node { span }) -> i64 { span }
+
+fn explicit(n: Node<Circle>) -> i64 { span_of(n) }
+
+fn second(p: Pair<i64>) -> str { p.second }
+
+fn value_or_zero(o: Opt) -> i64 {
+    match (o) {
+        Has(v) => v,
+        Nothing => 0,
+    }
+}
+
+pub fn run() -> i64 {
+    let n: Node = Node { kind: Circle(1), span: 4 };
+    span_of(n) + explicit(Node { kind: Circle(2), span: 5 }) + value_or_zero(Has(3))
+}.test({
+    assert(run() == 12);
+    assert(second(Pair { first: 1, second: "y" }) == "y");
+})

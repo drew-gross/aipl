@@ -473,6 +473,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/generics/return_only_type_param | 11 | 688 | 688 | 2234 | 7596 |
 | tests/cases/generics/same_length_distinct_types | 0 | 0 | 0 | 195 | 688 |
 | tests/cases/generics/str_as_char_array | 0 | 0 | 0 | 942 | 1184 |
+| tests/cases/generics/struct_type_parameter_defaults | 0 | 0 | 0 | 149 | 724 |
 | tests/cases/generics/two_param_variant | 13 | 867 | 867 | 2343 | 6436 |
 | tests/cases/generics/type_parameter_defaults | 26 | 1770 | 1770 | 3930 | 9524 |
 | tests/cases/generics/value_or | 0 | 0 | 0 | 61 | 316 |

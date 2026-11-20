@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  printable_without_blank in char_set_literal lint needs some cleanup
   tests/cases/variants/err_as_case_value.aipl doens't need to exist, is_case &co can use the regular type checker errors
   unused_functions and go-to-def should be able to share some code once the lsp is in aipl
   imported_as shoudln't accept a string name, it should accept a builting variant arm
