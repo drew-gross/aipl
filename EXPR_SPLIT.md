@@ -46,6 +46,31 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 Each ends at a green `cargo handoff`.
 
+### 3.5. Resolve callees before the lints
+
+Goal: a lint matches the callee it calls (`Len`, `Map`, ..) and not the spelling the file imported
+it under, so `import { len as length }` and a local named `len` change nothing. Runs before the
+remaining lint ports in stage 4, which then need no `Names`.
+
+Why in the parser: the loader's resolution (`rewrite_expr`, Rust) is whole-program and runs after
+baking and the per-file lints, on a tree without the source forms the lints read, and there is no
+Rust-to-AIPL encoder. Resolution needs only the file's own imports (a path import is "not a
+builtin"), so a per-file AIPL pass between parse and lint suffices.
+
+- [ ] AIPL `variant Callee` generated from the Rust `BUILTINS` table (about 224 arms, plus `User(str)`
+  and `Local(str)`), with a test that fails when the two tables drift. Check compile time and that
+  a nested `Call(Len, args, _)` param pattern works; if not, lints compare with `==` or `is_case`.
+- [ ] A trailing defaulted slot on `ExprKind::Call` (the slot-at-end bootstrap trick, as `For.index`);
+  `ffi_ast.rs` reads or ignores it.
+- [ ] `resolve_callees(program)` fills it from the file's builtin imports and local scope (let, params,
+  lambda params, pattern and loop binders), ported from `rewrite_expr`; runs in `lint` before the
+  function lints. Tests: aliased import, shadowing local, own function of the same name, path import.
+- [ ] Port the five moved lints off `Names` and `bound_to`/`imported_as` matching (`value_or_compare`,
+  `len_gt_zero`, `is_empty_longhand`, and the other users of those two functions); `filled` keeps
+  the import spelling for advice text only.
+- [ ] Bootstrap: the `Expr` shape change needs `fill_staged_ir` -> validate -> promote (one handoff)
+  before any lint uses the slot.
+
 ### 4. Move the lints
 
 Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?` use
