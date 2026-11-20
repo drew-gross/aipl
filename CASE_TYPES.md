@@ -17,8 +17,8 @@ What exists today (read from the code and probed with `aipl check`):
   case's tuple pattern (`|Circle(r)| r` over `xs.collect_arms(Circle)` checks).
 - **A value typed as one case of a plain variant has that case's named payload slots as fields**
   (`c.r`, `Circle { r }` in a `let`, `for`, parameter or lambda parameter): `ExprKind::Field` in
-  `aipl-mono/src/pin.rs` lowers it to a one-arm `match` (`case_fields.aipl`). A generic variant's
-  cases do not have them yet.
+  `aipl-mono/src/pin.rs` lowers it to a one-arm `match` (`case_fields.aipl`, and
+  `generic_case_fields.aipl` for a generic variant).
 - **A call's type arguments can be written** (`f::<T, U>(x)`, `x.f::<T>()`; case
   `generics/explicit_type_args.aipl`), all of them or none, and a case name is accepted as one: it
   is its arm type (`same::<Circle>(c)`, even for a `T: variant` parameter;
@@ -56,20 +56,7 @@ What exists today (read from the code and probed with `aipl check`):
 ## Stages
 
 
-Each ends at a green `cargo handoff`. Stage 1 is independent of the others; stage 3 follows stage 2.
-
-### 1. Fields of a case of a generic variant
-
-Goal: `h.value` and `Has { value }` work for a case of a generic variant (`Has<i64>`), as they do
-for a plain one.
-
-- [ ] `case_field` in `aipl-mono/src/pin.rs` only handles an owner that is a plain named variant; an
-  `It::Gen` owner needs the case's payload types with the variant's type arguments substituted, and
-  the struct-pattern desugaring annotates its temporary with the bare case name, which a generic
-  case refuses (`"Has@Opt" takes 1 type argument(s), but 0 given`).
-- [ ] The refusal for a plain variant says only `field access on non-struct value of type Shape`;
-  when a case of it declares the field, say the value has to be known to be that case.
-- [ ] Cases for each under `tests/cases/variants/`.
+Each ends at a green `cargo handoff`. Stage 3 follows stage 2.
 
 ### 2. Finishing the arm parameter
 

@@ -1,0 +1,30 @@
+# The fields of a known case work for a case of a generic variant too: `Has<i64>` is `Opt<i64>`
+# less `Nothing`, so `h.value` is an `i64` and `Has { value }` takes it apart. Written without
+# its argument, as the pattern is, the case takes them from the value.
+
+import { equal as ==, wrapping_add as +, wrapping_add_assign as += } from builtins;
+
+variant Opt<T> = Has(value: T) | Nothing
+
+// `h` is used whole as well, so it stays a plain parameter.
+fn bumped(h: Has<i64>) -> Opt<i64> { if (h.value == 0) { h } else { Has(h.value + 1) } }.test({
+    assert(bumped(Has(3)) == Has(4));
+    assert(bumped(Has(0)) == Has(0));
+})
+
+fn from_let(h: Has<i64>) -> i64 {
+    let Has { value } = h;
+    value
+}.test({
+    assert(from_let(Has(5)) == 5);
+})
+
+fn total(options: Has<i64>[]) -> i64 {
+    mut sum = 0;
+    for (let Has { value } : options) {
+        set sum += value;
+    }
+    sum
+}.test({
+    assert(total([Has(1), Has(2)]) == 3);
+})

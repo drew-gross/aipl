@@ -869,6 +869,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/variants/ctor_as_fn_value | 13 | 944 | 448 | 2395 | 6500 |
 | tests/cases/variants/fn_payload | 0 | 0 | 0 | 50 | 268 |
 | tests/cases/variants/fn_value_returns_boxed | 18 | 1053 | 1053 | 1719 | 5772 |
+| tests/cases/variants/generic_case_fields | 1 | 48 | 48 | 266 | 988 |
 | tests/cases/variants/generic_multi_instance | 10 | 738 | 738 | 1948 | 6564 |
 | tests/cases/variants/generic_option | 5 | 298 | 298 | 985 | 4688 |
 | tests/cases/variants/heap_payload | 4 | 210 | 210 | 513 | 2944 |

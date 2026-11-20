@@ -6,7 +6,7 @@ variant Shape = Circle(r: i64) | Square(s: i64) | Dot
 
 fn radii(shapes: (Shape without Dot)[]) -> i64[] { shapes$r }
 --- check --compile ---
-error: field access on non-struct value of type Shape
+error: field access on non-struct value of type Shape — "r" is a field of Circle, which the value is not known to be
  --> ./tests/cases/structs/err_field_of_refined_variant.aipl:7:59
   |
 7 | fn radii(shapes: (Shape without Dot)[]) -> i64[] { shapes$r }

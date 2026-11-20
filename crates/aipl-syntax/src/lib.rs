@@ -4716,6 +4716,12 @@ fn expand_refinement_ty(
                 _ => Vec::new(),
             };
             let fail = |message: String| (n.clone(), Error::at(message, decl.name.span.clone()));
+            // A case of a generic variant written bare, as a struct pattern's temporary is
+            // (`let Has { value } = h`), has its type arguments inferred: the checker settles
+            // them from the value.
+            if matches!(t, T::Named(_)) && n.contains('@') && !decl.type_vars.is_empty() {
+                return Ok(t.clone());
+            }
             if args.len() != decl.type_vars.len() {
                 return Err(fail(format!(
                     "{:?} takes {} type argument(s), but {} given",

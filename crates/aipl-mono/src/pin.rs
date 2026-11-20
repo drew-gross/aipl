@@ -1575,6 +1575,18 @@ impl Pinner<'_> {
             Type::Unit => It::Unit,
             Type::Primitive(p) => It::Prim(*p),
             Type::ConcatStr => It::Prim(Primitive::Str),
+            // A case of a generic variant written without arguments: the variant applied to
+            // variables the value settles, less every other case.
+            Type::Named(n) if self.bare_generic_case(n).is_some() => {
+                let (variant, others) = self.bare_generic_case(n).expect("checked above");
+                let arity = self.decls.generic_variants[&variant].type_vars.len();
+                let vars = (0..arity).map(|_| self.fresh()).collect();
+                others
+                    .into_iter()
+                    .fold(It::Gen(variant, vars), |acc, case| {
+                        It::Without(Box::new(acc), aipl_syntax::ast::Exclusion::NamedCase(case))
+                    })
+            }
             Type::Named(n) => {
                 if self.decls.generic_templates.contains(n) {
                     return gap("a generic template used as a type", span);
@@ -2719,9 +2731,17 @@ impl Pinner<'_> {
                     return self.read_case_field(x, case, slots, index, e);
                 }
                 if !self.is_struct_like(&owner, &e.span)? {
+                    let named_by = self.cases_naming(&owner, field);
+                    let hint = match named_by.as_slice() {
+                        [] => String::new(),
+                        cases => format!(
+                            " — {field:?} is a field of {}, which the value is not known to be",
+                            cases.join(" and ")
+                        ),
+                    };
                     return reject(
                         format!(
-                            "field access on non-struct value of type {}",
+                            "field access on non-struct value of type {}{hint}",
                             self.table.show(&owner)
                         ),
                         &x.span,
@@ -3244,10 +3264,14 @@ impl Pinner<'_> {
         field: &str,
     ) -> Option<(String, Vec<Option<String>>, usize)> {
         use aipl_syntax::ast::Exclusion;
-        let It::Named(variant) = owner else {
+        let (It::Named(variant) | It::Gen(variant, _)) = owner else {
             return None;
         };
-        let decl = self.decls.variant_decls.get(variant)?;
+        let decl = self
+            .decls
+            .variant_decls
+            .get(variant)
+            .or_else(|| self.decls.generic_variants.get(variant))?;
         let lacking = self.table.exclusions(value);
         let mut left = decl
             .cases
@@ -3305,6 +3329,39 @@ impl Pinner<'_> {
             span: e.span.clone(),
         }];
         Ok(self.node(TExprKind::Match(Box::new(value), arms), ty, e))
+    }
+
+    /// The cases of the variant `owner` whose payload has a slot called `field`.
+    fn cases_naming(&self, owner: &It, field: &str) -> Vec<String> {
+        let (It::Named(variant) | It::Gen(variant, _)) = owner else {
+            return Vec::new();
+        };
+        let Some(decl) = self
+            .decls
+            .variant_decls
+            .get(variant)
+            .or_else(|| self.decls.generic_variants.get(variant))
+        else {
+            return Vec::new();
+        };
+        decl.cases
+            .iter()
+            .filter(|c| c.payload.iter().any(|p| p.name.as_deref() == Some(field)))
+            .map(|c| c.name.text.clone())
+            .collect()
+    }
+
+    /// The variant and the other cases of `Case@Variant` when it is a case of a generic variant.
+    fn bare_generic_case(&self, name: &str) -> Option<(String, Vec<String>)> {
+        let (case, variant) = name.split_once('@')?;
+        let decl = self.decls.generic_variants.get(variant)?;
+        let others = decl
+            .cases
+            .iter()
+            .map(|c| c.name.text.clone())
+            .filter(|c| c != case)
+            .collect();
+        Some((variant.to_string(), others))
     }
 
     fn is_struct_like(&mut self, owner: &It, span: &Span) -> Res<bool> {

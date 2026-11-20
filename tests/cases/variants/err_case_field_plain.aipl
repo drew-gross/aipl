@@ -4,7 +4,7 @@ variant Shape = Circle(r: i64) | Square(side: i64)
 
 pub fn radius(s: Shape) -> i64 { s.r } #[allow]
 --- check --compile ---
-error: field access on non-struct value of type Shape
+error: field access on non-struct value of type Shape — "r" is a field of Circle, which the value is not known to be
  --> ./tests/cases/variants/err_case_field_plain.aipl:5:34
   |
 5 | pub fn radius(s: Shape) -> i64 { s.r } #[allow]

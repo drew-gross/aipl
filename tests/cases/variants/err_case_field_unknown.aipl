@@ -4,7 +4,7 @@ variant Shape = Circle(r: i64) | Square(side: i64)
 
 pub fn side(c: Circle) -> i64 { c.side } #[allow]
 --- check --compile ---
-error: field access on non-struct value of type Shape
+error: field access on non-struct value of type Shape — "side" is a field of Square, which the value is not known to be
  --> ./tests/cases/variants/err_case_field_unknown.aipl:5:33
   |
 5 | pub fn side(c: Circle) -> i64 { c.side } #[allow]

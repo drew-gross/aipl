@@ -295,6 +295,13 @@ impl<'a> TypeValidator<'a> {
         self.structs.contains_key(name)
     }
 
+    /// Whether `name` is a case of a generic variant written without its type arguments
+    /// (`Has@Opt`), which the checker infers from the value.
+    fn is_bare_generic_case(&self, name: &str) -> bool {
+        name.split_once('@')
+            .is_some_and(|(_, variant)| self.generic_variants.contains_key(variant))
+    }
+
     /// The cases of a variant-typed value: a concrete named variant, or an
     /// (abstract) generic-variant application `Emit<K>` (template cases with its
     /// type variables substituted). Lets a `match` on such a value resolve.
@@ -445,6 +452,7 @@ impl TypeValidator<'_> {
                 let ok = n == "Error"
                     || self.has_struct(n)
                     || self.variants.contains_key(n)
+                    || self.is_bare_generic_case(n)
                     || type_params.iter().any(|tp| tp == n);
                 if ok {
                     Ok(())
@@ -672,6 +680,7 @@ impl TypeValidator<'_> {
                 if type_params.iter().any(|tp| tp == n)
                     || self.has_struct(n)
                     || self.variants.contains_key(n)
+                    || self.is_bare_generic_case(n)
                 {
                     Ok(()) // arrays and optionals of structs/variants are supported
                 } else {

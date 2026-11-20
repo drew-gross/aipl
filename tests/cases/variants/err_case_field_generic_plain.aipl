@@ -1,0 +1,11 @@
+# `Opt<i64>` may be `Nothing`, so `value` is not a field of it; it belongs to `Has`.
+
+variant Opt<T> = Has(value: T) | Nothing
+
+pub fn value_of(o: Opt<i64>) -> i64 { o.value }
+--- check --compile ---
+error: field access on non-struct value of type Opt<i64> — "value" is a field of Has, which the value is not known to be
+ --> ./tests/cases/variants/err_case_field_generic_plain.aipl:5:39
+  |
+5 | pub fn value_of(o: Opt<i64>) -> i64 { o.value }
+  |                                       ^
