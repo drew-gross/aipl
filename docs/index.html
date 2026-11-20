@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">224 files, 1977 items.</p>
+      <p class="summary">224 files, 1978 items.</p>
 
       <ul class="files">
 
@@ -2435,7 +2435,7 @@
           <p class="file-summary">The <code>is_empty_longhand</code> lint: <code>!x.is_nonempty()</code> and <code>x.len() == 0</code> — emptiness asked the long way. <code>x.is_empty()</code> asks it directly.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-is_empty_longhand.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-is_empty_longhand.html#private">3 private</a></span>
 
 
           <ul class="items">
@@ -2443,6 +2443,11 @@
             <li>
               <a href="crates-aipl-codegen-src-lint-is_empty_longhand.html#item-Names"><code>Names</code></a>
               <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-is_empty_longhand.html#item-is_empty_longhand_names"><code>is_empty_longhand_names</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
@@ -2460,7 +2465,7 @@
           <p class="file-summary">The <code>len_gt_zero</code> lint: <code>0 &lt; x.len()</code> / <code>x.len() &gt; 0</code>, and <code>!x.is_empty()</code> — non-emptiness asked the long way. <code>x.is_nonempty()</code> asks the question directly: it says what the test means rather than leaving the reader to recognize the idiom (or to hold a negation), and it is the one spelling that reads the same for every receiver <code>len</code> takes.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-len_gt_zero.html#private">4 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-len_gt_zero.html#private">3 private</a></span>
 
 
           <ul class="items">
@@ -2468,6 +2473,11 @@
             <li>
               <a href="crates-aipl-codegen-src-lint-len_gt_zero.html#item-Names"><code>Names</code></a>
               <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-len_gt_zero.html#item-len_gt_zero_names"><code>len_gt_zero_names</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
@@ -2505,7 +2515,7 @@
           <p class="file-summary">The lints, run over a parsed file.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint.html#private">3 private</a></span>
 
 
           <ul class="items">
@@ -3520,7 +3530,7 @@
           <p class="file-summary">The <code>value_or_compare</code> lint: <code>x.value_or(' ') == '.'</code> — an optional compared against a literal by first filling its <code>none</code> with a <em>second</em> literal, chosen only so the comparison rejects it. <code>x == some('.')</code> asks the question directly: <code>none</code> fails the comparison on its own, so there is no made-up value to invent, and no reader has to confirm that the two literals differ. Same for <code>!=</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-value_or_compare.html#private">3 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-value_or_compare.html#private">2 private</a></span>
 
 
           <ul class="items">
@@ -3528,6 +3538,11 @@
             <li>
               <a href="crates-aipl-codegen-src-lint-value_or_compare.html#item-Names"><code>Names</code></a>
               <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-value_or_compare.html#item-value_or_compare_names"><code>value_or_compare_names</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
             <li>

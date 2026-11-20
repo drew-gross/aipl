@@ -17,7 +17,6 @@
 
 import {
     as_case,
-    collect_ok,
     equal as ==,
     is_case,
     logical_and as &&,
@@ -27,115 +26,29 @@ import {
     to_str,
     value_or,
 } from builtins;
-import { Bool, Call, Char, Expr, Num, Str, descendants } from "../expr.aipl";
+import { Bool, Call, Char, Expr, Num, Str } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import { LintHit, bound_to, hit, imported_as, lint_in_messages } from "./lint_hit.aipl";
+import { Item } from "../item.aipl";
+import { lint_str } from "./lint.aipl";
+import { LintHit, bound_to, hit, imported_as } from "./lint_hit.aipl";
 
 # What the file's imports make of the comparisons and `value_or` this lint reads.
-struct Names { equal: bool, not_equal: bool, value_or: str }
+struct Names { equal: bool, not_equal: bool, value_or: str? }
 
-# A hit for each optional in the program that is filled with a literal only to be compared with another.
-pub fn value_or_compare(Function { body }, items: Item[]) -> LintHit[] {
-    let some(value_or) = items.imported_as("value_or") else { return []; };
-    let names = Names {
-        equal: items.bound_to("==") == some("equal"),
-        not_equal: items.bound_to("!=") == some("not_equal"),
-        value_or,
-    };
-    body.descendants()$filled_to_reject(names).collect_ok()
-}.test({
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_messages(
-            `import \{ {imports} } from builtins; fn f(x: char?) -> bool \{ {body} }`,
-            value_or_compare,
-        )
-    }
-    let all = "value_or, equal as ==, not_equal as !=";
-    assert(messages(all, "x.value_or(' ') == '.'")? == [
-        "`value_or` here only supplies a value for the comparison to reject; compare the optional directly: `x == some('.')`",
-    ]);
-    assert(messages(all, "'.' != x.value_or(' ')")? == [
-        "`value_or` here only supplies a value for the comparison to reject; compare the optional directly: `x != some('.')`",
-    ]);
+# What the file's `items` make of the comparisons and `value_or` this lint reads.
+pub fn value_or_compare_names(self: Item[]) -> Names {
+    equal: self.bound_to("==") == some("equal"),
+    not_equal: self.bound_to("!=") == some("not_equal"),
+    value_or: self.imported_as("value_or"),
+}
 
-    // The file's name for `value_or` is the one the advice uses.
-    assert(messages("value_or as or_else, equal as ==", "x.or_else(' ') == '.'")? == [
-        "`or_else` here only supplies a value for the comparison to reject; compare the optional directly: `x == some('.')`",
-    ]);
-
-    // The same literal is a genuine "none or that" test; a name is not a literal; `!=` needs its import.
-    assert(messages(all, "x.value_or('.') == '.'")? == []);
-    assert(messages(all, "x.value_or(y) == '.'")? == []);
-    assert(messages("value_or, equal as ==", "x.value_or(' ') != '.'")? == []);
-    assert(messages("equal as ==", "x == '.'")? == []);
-
-    // Shapes the lint flags, and what it says of them.
-    assert(
-        lint_in_messages(
-            "fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' }",
-            value_or_compare,
-        )? == [],
-    );
-    assert(
-        lint_in_messages(
-            "fn dot_first(c: char?) -> bool { '.' == c.value_or(' ') }",
-            value_or_compare,
-        )? == [],
-    );
-    assert(
-        lint_in_messages(
-            "fn not_dot(c: char?) -> bool { c.value_or(' ') != '.' }",
-            value_or_compare,
-        )? == [],
-    );
-    assert(
-        lint_in_messages(
-            "fn free_form(c: char?) -> bool { value_or(c, ' ') == '.' }",
-            value_or_compare,
-        )? == [],
-    );
-
-    // Not flagged: the default and the compared value agree, so this is a genuine
-    // "none or dot" test that `c == some('.')` would answer differently.
-    assert(
-        lint_in_messages(
-            "fn dot_or_none(c: char?) -> bool { c.value_or('.') == '.' }",
-            value_or_compare,
-        )? == [],
-    );
-    assert(
-        lint_in_messages(
-            """
-                fn subject() !prints {
-                    print(is_dot(some('.')).to_str());
-                    print(dot_first(some('.')).to_str());
-                    print(not_dot(some('.')).to_str());
-                    print(free_form(some('.')).to_str());
-                    print(dot_or_none(none).to_str());
-                }
-            """,
-            value_or_compare,
-        )? == [],
-    );
-
-    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
-    fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' } #[allow]
-
-    // The rewrite the lint asks for, so the two spellings are checked side by
-    // side and proven to agree.
-    fn is_dot_short(c: char?) -> bool { c == some('.') }
-    assert(is_dot(some('.')).to_str() == "true");
-    assert(is_dot_short(some('.')).to_str() == "true");
-    assert(is_dot(some('x')).to_str() == "false");
-    assert(is_dot_short(some('x')).to_str() == "false");
-    assert(is_dot(none).to_str() == "false");
-    assert(is_dot_short(none).to_str() == "false");
-})
-
-# The hit for `self`, when it compares a `value_or` of one literal with a different literal.
-fn filled_to_reject(self: Expr, Names { equal, not_equal, value_or }) -> LintHit? {
-    let Call(op, args, _) = self.kind.as_case::<Call>()?;
+# The hit for the comparison `self`, when it compares a `value_or` of one literal with a different
+# literal.
+pub fn value_or_compare(
+    self: Call(op, args, _),
+    Names { equal, not_equal, value_or as spelled },
+) -> LintHit? {
+    let some(value_or) = spelled else { return none; };
     if (!(op == "==" && equal || op == "!=" && not_equal)) { return none; };
     let [left, right] = args else { return none; };
     // Whichever side is the `value_or` call; the other must be a literal.
@@ -151,7 +64,50 @@ fn filled_to_reject(self: Expr, Names { equal, not_equal, value_or }) -> LintHit
         `\`{value_or}\` here only supplies a value for the comparison to reject; compare the optional directly: \`{optional.source} {op} some({literal.source})\``,
         default.span,
     ))
-}
+}.test({
+    // `lint_str` runs every lint, so each snippet imports exactly the names it uses.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_str(`import \{ {imports} } from builtins; fn f(x: char?) -> bool \{ {body} }`)
+    }
+    assert(messages("value_or, equal as ==", "x.value_or(' ') == '.'")? == [
+        "`value_or` here only supplies a value for the comparison to reject; compare the optional directly: `x == some('.')`",
+    ]);
+    assert(messages("value_or, not_equal as !=", "'.' != x.value_or(' ')")? == [
+        "`value_or` here only supplies a value for the comparison to reject; compare the optional directly: `x != some('.')`",
+    ]);
+
+    // The file's name for `value_or` is the one the advice uses.
+    assert(messages("value_or as or_else, equal as ==", "x.or_else(' ') == '.'")? == [
+        "`or_else` here only supplies a value for the comparison to reject; compare the optional directly: `x == some('.')`",
+    ]);
+
+    // The call form is the same hit.
+    assert(messages("value_or, equal as ==", "value_or(x, ' ') == '.'")? == [
+        "`value_or` here only supplies a value for the comparison to reject; compare the optional directly: `x == some('.')`",
+    ]);
+
+    // The same literal is a genuine "none or that" test; a name is not a literal; `!=` needs its import.
+    assert(messages("value_or, equal as ==", "x.value_or('.') == '.'")? == []);
+    assert(messages("value_or, equal as ==", "x.value_or(y) == '.'")? == []);
+    assert(messages("value_or, equal as ==", "x.value_or(' ') != '.' && x == y")? == []);
+    assert(messages("equal as ==", "x == '.'")? == []);
+
+    // Without the import the lint cannot tell what `==` or `value_or` mean.
+    assert(lint_str("fn f(c: char?) -> bool { c.value_or(' ') == '.' }")? == []);
+
+    // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
+    fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' } #[allow]
+
+    // The rewrite the lint asks for, so the two spellings are checked side by
+    // side and proven to agree.
+    fn is_dot_short(c: char?) -> bool { c == some('.') }
+    assert(is_dot(some('.')).to_str() == "true");
+    assert(is_dot_short(some('.')).to_str() == "true");
+    assert(is_dot(some('x')).to_str() == "false");
+    assert(is_dot_short(some('x')).to_str() == "false");
+    assert(is_dot(none).to_str() == "false");
+    assert(is_dot_short(none).to_str() == "false");
+})
 
 # `(optional, default)` when `self` is a call to `value_or`.
 fn fill(self: Expr, value_or: str) -> (Expr, Expr)? {

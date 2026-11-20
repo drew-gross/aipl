@@ -21,7 +21,6 @@
 
 import {
     as_case,
-    collect_ok,
     equal as ==,
     is_some_and,
     len,
@@ -31,89 +30,28 @@ import {
     not_equal as !=,
     starts_with,
 } from builtins;
-import { Call, Expr, descendants } from "../expr.aipl";
+import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import {
-    UnfilledHit,
-    bound_to,
-    imported_as,
-    lint_in_unfilled_messages,
-    text_after,
-    unfilled,
-} from "./lint_hit.aipl";
+import { Item } from "../item.aipl";
+import { lint_str } from "./lint.aipl";
+import { UnfilledHit, bound_to, imported_as, text_after, unfilled } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
 # What the file's imports make of the operators and builtins this lint reads.
 struct Names { less_than: bool, greater_than: bool, logical_not: bool, len: str?, empty: str? }
 
-# A hit for each length compared against zero, or negated emptiness test, in the program.
-pub fn len_gt_zero(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let names = Names {
-        less_than: items.bound_to("<") == some("less_than"),
-        greater_than: items.bound_to(">") == some("greater_than"),
-        logical_not: items.bound_to("!") == some("logical_not"),
-        len: items.imported_as("len"),
-        empty: items.imported_as("is_empty"),
-    };
-    body.descendants()$nonempty_test(names).collect_ok()
-}.test({
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(x: i64[]) -> bool \{ {body} }`,
-            len_gt_zero,
-        )
-    }
-    let all = "len, is_empty, is_nonempty, greater_than as >, less_than as <, logical_not as !";
-    assert(messages(all, "x.len() > 0")? == [
-        `a length compared against 0 — use "x.is_nonempty()"`,
-    ]);
-    assert(messages(all, "0 < x.len()")? == [
-        `a length compared against 0 — use "x.is_nonempty()"`,
-    ]);
-    assert(messages(all, "!x.is_empty()")? == [
-        `a negated emptiness test — use "x.is_nonempty()"`,
-    ]);
+# What the file's `items` make of the operators and builtins this lint reads.
+pub fn len_gt_zero_names(self: Item[]) -> Names {
+    less_than: self.bound_to("<") == some("less_than"),
+    greater_than: self.bound_to(">") == some("greater_than"),
+    logical_not: self.bound_to("!") == some("logical_not"),
+    len: self.imported_as("len"),
+    empty: self.imported_as("is_empty"),
+}
 
-    // A receiver that is not spelled by its text is a placeholder, and a missing import is named.
-    assert(messages(all, "len(x) > 0")? == [
-        `a length compared against 0 — use "is_nonempty" on the receiver`,
-    ]);
-    assert(messages("len, greater_than as >", "x.len() > 0")? == [
-        """a length compared against 0 — use "x.is_nonempty()", importing `is_nonempty` from builtins""",
-    ]);
-
-    // Other comparisons, or an operator that is not the builtin one, are not this.
-    assert(messages(all, "x.len() != 0")? == []);
-    assert(messages(all, "0 > x.len()")? == []);
-    assert(messages("len", "x.len() > 0")? == []);
-
-    // A different bound is a different question. `>= 1` and `!= 0` mean the same thing but are not
-    // the two idioms the lint rewrites, and inventing a third spelling to flag would make the rule
-    // harder to state than to follow.
-    assert(messages(all, "1 < x.len()")? == []);
-    assert(messages(all, "x.len() > 1")? == []);
-    assert(messages(all, "x.len() >= 1")? == []);
-
-    // Zero compared against anything that isn't a length; the spelling the lint asks for, which must
-    // not then flag itself; and the other question, an un-negated `is_empty`.
-    assert(messages(all, "0 < x")? == []);
-    assert(messages(all, "!(0 < x)")? == []);
-    assert(messages(all, "x.is_nonempty()")? == []);
-    assert(messages(all, "x.is_empty()")? == []);
-
-    // An operator the file binds to a function of its own is a call to that function, not a length test.
-    assert(
-        lint_in_unfilled_messages(
-            """import { len } from builtins; import { my_lt as < } from "./myord.aipl"; fn f(x: i64[]) -> bool { 0 < x.len() }""",
-            len_gt_zero,
-        )? == [],
-    );
-})
-
-# The hit for `self`, when it is a comparison of a length with zero, or a negated `is_empty`.
-fn nonempty_test(self: Expr, names: Names) -> UnfilledHit? {
-    let Call(op, args, _) = self.kind.as_case::<Call>()?;
+# The hit for the call `self`, when it is a comparison of a length with zero, or a negated `is_empty`.
+pub fn len_gt_zero(self: Expr<Call> { kind }, names: Names) -> UnfilledHit? {
+    let Call(op, args, _) = kind;
     let (receiver, what) = match (args.len()) {
         1 => (args.negated_emptiness(op, names)?, "a negated emptiness test"),
         2 => (args.length_against_zero(op, names)?, "a length compared against 0"),
@@ -131,7 +69,56 @@ fn nonempty_test(self: Expr, names: Names) -> UnfilledHit? {
     } else {
         unfilled("is_nonempty", `{what} — use "`, `" on the receiver`, self.span)
     })
-}
+}.test({
+    // `lint_str` runs every lint, so each snippet imports exactly the names it uses; the ones that
+    // need `is_nonempty` imported say so by calling it.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_str(`import \{ {imports} } from builtins; fn f(x: i64[]) -> bool \{ {body} }`)
+    }
+    let long = "len, is_nonempty, greater_than as >";
+    assert(messages(long, "x.len() > 0 && x.is_nonempty()")? == [
+        `a length compared against 0 — use "x.is_nonempty()"`,
+    ]);
+    assert(messages("len, is_nonempty, less_than as <", "0 < x.len() && x.is_nonempty()")? == [
+        `a length compared against 0 — use "x.is_nonempty()"`,
+    ]);
+    assert(messages(
+        "is_empty, is_nonempty, logical_not as !",
+        "!x.is_empty() && x.is_nonempty()",
+    )? == [`a negated emptiness test — use "x.is_nonempty()"`]);
+
+    // A receiver that is not spelled by its text is a placeholder, and a missing import is named.
+    assert(messages(long, "len(x) > 0 && x.is_nonempty()")? == [
+        `a length compared against 0 — use "is_nonempty" on the receiver`,
+    ]);
+    assert(messages("len, greater_than as >", "x.len() > 0")? == [
+        """a length compared against 0 — use "x.is_nonempty()", importing `is_nonempty` from builtins""",
+    ]);
+
+    // Other comparisons, or an operator that is not the builtin one, are not this.
+    assert(messages("len, greater_than as >", "x.len() != 0 && x.len() > 1")? == []);
+    assert(messages("len, greater_than as >", "0 > x.len()")? == []);
+    assert(messages("len", "x.len() > 0")? == []);
+
+    // A different bound is a different question. `>= 1` and `!= 0` mean the same thing but are not
+    // the two idioms the lint rewrites, and inventing a third spelling to flag would make the rule
+    // harder to state than to follow.
+    assert(messages("len, less_than as <", "1 < x.len()")? == []);
+    assert(messages("len, greater_than_or_equal as >=", "x.len() >= 1")? == []);
+
+    // Zero compared against anything that isn't a length; the spelling the lint asks for, which must
+    // not then flag itself; and the other question, an un-negated `is_empty`.
+    assert(messages("less_than as <, logical_not as !", "!(0 < x)")? == []);
+    assert(messages("is_nonempty", "x.is_nonempty()")? == []);
+    assert(messages("is_empty", "x.is_empty()")? == []);
+
+    // An operator the file binds to a function of its own is a call to that function, not a length test.
+    assert(
+        lint_str(
+            """import { len } from builtins; import { my_lt as < } from "./myord.aipl"; fn f(x: i64[]) -> bool { 0 < x.len() }""",
+        )? == [],
+    );
+})
 
 # The receiver of the emptiness test the one argument `self` negates, when it is `!x.is_empty()` with the builtin `!`.
 fn negated_emptiness(self: Expr[], op: str, Names { logical_not, empty }) -> Expr? {

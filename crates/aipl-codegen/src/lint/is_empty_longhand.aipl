@@ -24,94 +24,34 @@
 
 import {
     as_case,
-    collect_ok,
     equal as ==,
     len,
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Call, Expr, descendants } from "../expr.aipl";
+import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import {
-    UnfilledHit,
-    bound_to,
-    imported_as,
-    lint_in_unfilled_messages,
-    spans_its_text,
-    unfilled,
-} from "./lint_hit.aipl";
+import { Item } from "../item.aipl";
+import { lint_str } from "./lint.aipl";
+import { UnfilledHit, bound_to, imported_as, spans_its_text, unfilled } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
 # What the file's imports make of the operators and builtins this lint reads.
 struct Names { equal: bool, logical_not: bool, nonempty: str?, len: str? }
 
-# A hit for each emptiness test in the program that is asked the long way.
-pub fn is_empty_longhand(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let names = Names {
-        equal: items.bound_to("==") == some("equal"),
-        logical_not: items.bound_to("!") == some("logical_not"),
-        nonempty: items.imported_as("is_nonempty"),
-        len: items.imported_as("len"),
-    };
-    body.descendants()$long_way(names).collect_ok()
-}.test({
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(x: i64[]) -> bool \{ {body} }`,
-            is_empty_longhand,
-        )
-    }
-    let all = "len, is_empty, is_nonempty, equal as ==, logical_not as !";
-    assert(messages(all, "x.len() == 0")? == [
-        `emptiness asked the long way — use "x.is_empty()"`,
-    ]);
-    assert(messages(all, "0 == x.len()")? == [
-        `emptiness asked the long way — use "x.is_empty()"`,
-    ]);
-    assert(messages(all, "!x.is_nonempty()")? == [
-        `emptiness asked the long way — use "x.is_empty()"`,
-    ]);
+# What the file's `items` make of the operators and builtins this lint reads.
+pub fn is_empty_longhand_names(self: Item[]) -> Names {
+    equal: self.bound_to("==") == some("equal"),
+    logical_not: self.bound_to("!") == some("logical_not"),
+    nonempty: self.imported_as("is_nonempty"),
+    len: self.imported_as("len"),
+}
 
-    // A receiver that is not a name or a field path is a placeholder, and a missing import is named.
-    assert(messages(all, "f(x).len() == 0")? == [
-        `emptiness asked the long way — use "is_empty" on the receiver`,
-    ]);
-    assert(messages("len, equal as ==", "x.len() == 0")? == [
-        """emptiness asked the long way — use "x.is_empty()", importing `is_empty` from builtins""",
-    ]);
-
-    // `!= 0`, another number, an operator that is not the builtin one, and a `len` of the
-    // file's own are not this.
-    assert(messages(all, "x.len() != 0")? == []);
-    assert(messages(all, "x.len() == 1")? == []);
-    assert(messages("len, is_empty", "x.len() == 0")? == []);
-
-    // The free-call spelling of `len` is the same AST, so it is the same hit.
-    assert(messages(all, "len(x) == 0")? == [
-        `emptiness asked the long way — use "x.is_empty()"`,
-    ]);
-
-    // A `len` of the file's own is a different function answering a different question, and
-    // `is_empty` does not even accept what it takes, so advising it would advise code that does not
-    // compile. (A file cannot both define `len` and import the builtin one.)
-    assert(
-        lint_in_unfilled_messages(
-            """
-                import { equal as == } from builtins;
-                variant List = Nil | Cons(i64)
-                fn len(self: List) -> i64 { match (self) { Nil => 0, Cons(..) => 1 } }
-                fn is_nil(xs: List) -> bool { xs.len() == 0 }
-            """,
-            is_empty_longhand,
-        )? == [],
-    );
-})
-
-# The hit for `self`, when it is a negated `is_nonempty` or a length compared with zero for equality.
-fn long_way(self: Expr, names: Names) -> UnfilledHit? {
-    let Call(op, args, _) = self.kind.as_case::<Call>()?;
+# The hit for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
+# equality.
+pub fn is_empty_longhand(self: Expr<Call> { kind }, names: Names) -> UnfilledHit? {
+    let Call(op, args, _) = kind;
     let receiver = if (args.len() == 1) {
         args.negated_nonempty(op, names)?
     } else {
@@ -132,7 +72,54 @@ fn long_way(self: Expr, names: Names) -> UnfilledHit? {
             self.span,
         )
     })
-}
+}.test({
+    // `lint_str` runs every lint, so each snippet imports exactly the names it uses; the ones that
+    // need `is_empty` imported say so by calling it.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_str(`import \{ {imports} } from builtins; fn f(x: i64[]) -> bool \{ {body} }`)
+    }
+    let long = "len, is_empty, equal as ==";
+    assert(messages(long, "x.len() == 0 && x.is_empty()")? == [
+        `emptiness asked the long way — use "x.is_empty()"`,
+    ]);
+    assert(messages(long, "0 == x.len() && x.is_empty()")? == [
+        `emptiness asked the long way — use "x.is_empty()"`,
+    ]);
+    assert(messages(
+        "is_empty, is_nonempty, logical_not as !",
+        "!x.is_nonempty() && x.is_empty()",
+    )? == [`emptiness asked the long way — use "x.is_empty()"`]);
+
+    // A receiver that is not a name or a field path is a placeholder, and a missing import is named.
+    assert(messages(long, "f(x).len() == 0 && x.is_empty()")? == [
+        `emptiness asked the long way — use "is_empty" on the receiver`,
+    ]);
+    assert(messages("len, equal as ==", "x.len() == 0")? == [
+        """emptiness asked the long way — use "x.is_empty()", importing `is_empty` from builtins""",
+    ]);
+
+    // `!= 0`, another number, an operator that is not the builtin one, and a `len` of the
+    // file's own are not this.
+    assert(messages(long, "x.len() != 0 && x.len() == 1 && x.is_empty()")? == []);
+    assert(messages("len, is_empty", "x.len() == 0 && x.is_empty()")? == []);
+
+    // The free-call spelling of `len` is the same AST, so it is the same hit.
+    assert(messages(long, "len(x) == 0 && x.is_empty()")? == [
+        `emptiness asked the long way — use "x.is_empty()"`,
+    ]);
+
+    // A `len` of the file's own is a different function answering a different question, and
+    // `is_empty` does not even accept what it takes, so advising it would advise code that does not
+    // compile. (A file cannot both define `len` and import the builtin one.)
+    assert(
+        lint_str("""
+            import { equal as == } from builtins;
+            variant List = Nil | Cons(i64)
+            fn len(self: List) -> i64 { match (self) { Nil => 0, Cons(..) => 1 } }
+            fn is_nil(xs: List) -> bool { xs.len() == 0 }
+        """)? == [],
+    );
+})
 
 # The receiver of the test the one argument `self` negates, when it is `!x.is_nonempty()`.
 fn negated_nonempty(self: Expr[], op: str, Names { logical_not, nonempty }) -> Expr? {

@@ -36,14 +36,28 @@
 
 
 
+        <section class="item" id="item-len_gt_zero_names">
+          <h3>
+            <a class="anchor" href="#item-len_gt_zero_names">len_gt_zero_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn len_gt_zero_names(self: Item[]) -&#62; Names</code></pre>
+
+          <div class="doc"><p>What the file's <code>items</code> make of the operators and builtins this lint reads.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-len_gt_zero">
           <h3>
             <a class="anchor" href="#item-len_gt_zero">len_gt_zero</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn len_gt_zero(__spat$2395: Function, items: Item[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn len_gt_zero(self: Expr&#60;Call&#62;, names: Names) -&#62; UnfilledHit?</code></pre>
 
-          <div class="doc"><p>A hit for each length compared against zero, or negated emptiness test, in the program.</p></div>
+          <div class="doc"><p>The hit for the call <code>self</code>, when it is a comparison of a length with zero, or a negated <code>is_empty</code>.</p></div>
 
 
         </section>
@@ -57,26 +71,12 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-nonempty_test">
-          <h3>
-            <a class="anchor" href="#item-nonempty_test">nonempty_test</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn nonempty_test(self: Expr, names: Names) -&#62; UnfilledHit?</code></pre>
-
-          <div class="doc"><p>The hit for <code>self</code>, when it is a comparison of a length with zero, or a negated <code>is_empty</code>.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-negated_emptiness">
           <h3>
             <a class="anchor" href="#item-negated_emptiness">negated_emptiness</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn negated_emptiness(self: Expr[], op: str, __spat$6377: Names) -&#62; Expr?</code></pre>
+          <pre class="signature"><code>fn negated_emptiness(self: Expr[], op: str, __spat$6405: Names) -&#62; Expr?</code></pre>
 
           <div class="doc"><p>The receiver of the emptiness test the one argument <code>self</code> negates, when it is <code>!x.is_empty()</code> with the builtin <code>!</code>.</p></div>
 
@@ -90,7 +90,7 @@
             <a class="anchor" href="#item-length_against_zero">length_against_zero</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn length_against_zero(self: Expr[], op: str, __spat$6791: Names) -&#62; Expr?</code></pre>
+          <pre class="signature"><code>fn length_against_zero(self: Expr[], op: str, __spat$6819: Names) -&#62; Expr?</code></pre>
 
           <div class="doc"><p>The receiver of the length that the two arguments <code>self</code> compare with zero as <code>0 &lt; x.len()</code> or <code>x.len() &gt; 0</code>.</p></div>
 
