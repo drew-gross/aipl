@@ -75,7 +75,7 @@ parser cannot express in one body). When you do that:
 **A lint's tests are `.test` assertions in its own file.** Each assertion runs the lint's driver
 (`lint_function_messages`, `lint_function_unfilled_messages`, `lint_messages`, ...) on one small source
 string and checks the messages, so the flagged shape, the near-miss and the message text sit beside the
-code that produces them and run in-process with the file's other tests. The three kinds:
+code that produces them and run in-process with the file's other tests. A lint over one kind of expression (a function of one node, run by a helper in `lint.aipl`) is tested with `lint_str(src)` from `lint.aipl`, which runs every lint and returns the messages, so its snippets must be ones no other lint objects to. The three kinds:
 
 - **Flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [message(..)])`, what the lint says of the shape.
 - **Not flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [])` for every near-miss, each with a comment

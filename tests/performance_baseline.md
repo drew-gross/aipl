@@ -65,7 +65,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/duplicate_import_source | 20779 | 3117008 | 837776 | 7976901 | 7616108 |
 | crates/aipl-codegen/src/lint/eta_lambda | 63220 | 7356991 | 862200 | 60173689 | 7704124 |
 | crates/aipl-codegen/src/lint/extend_loop_map_join | 50019 | 6280977 | 875750 | 40188683 | 7756644 |
-| crates/aipl-codegen/src/lint/field_init_shorthand | 26203 | 3681384 | 838544 | 14424882 | 7631744 |
+| crates/aipl-codegen/src/lint/field_init_shorthand | 28411 | 3835640 | 838544 | 15005456 | 8887128 |
 | crates/aipl-codegen/src/lint/field_uses | 91401 | 22480370 | 632048 | 36987826 | 7882992 |
 | crates/aipl-codegen/src/lint/fn_body_type_stutter | 27875 | 3927720 | 840048 | 16319821 | 7640104 |
 | crates/aipl-codegen/src/lint/interp_literal | 22462 | 3313328 | 833168 | 9632358 | 7630536 |
@@ -74,7 +74,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/is_empty_longhand | 31956 | 4338527 | 863110 | 21279624 | 7677260 |
 | crates/aipl-codegen/src/lint/len_gt_zero | 39704 | 5320977 | 849040 | 29998226 | 7685776 |
 | crates/aipl-codegen/src/lint/let_else_as_case | 42082 | 5498066 | 853464 | 32038899 | 7684220 |
-| crates/aipl-codegen/src/lint/lint | 46 | 3944 | 3944 | 11095 | 1311252 |
+| crates/aipl-codegen/src/lint/lint | 19564 | 2932960 | 828560 | 6058565 | 8879116 |
 | crates/aipl-codegen/src/lint/lint_hit | 23416 | 3580933 | 829808 | 10902387 | 7791592 |
 | crates/aipl-codegen/src/lint/loop_shape | 80087 | 18903248 | 648728 | 36983522 | 7886348 |
 | crates/aipl-codegen/src/lint/map_constant_repeat | 38899 | 5020555 | 847869 | 30102339 | 7682300 |
@@ -99,7 +99,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/return_loop_any_all | 58577 | 7216745 | 864006 | 49667697 | 7756680 |
 | crates/aipl-codegen/src/lint/return_loop_find_if | 42231 | 5436125 | 863020 | 30614569 | 7707508 |
 | crates/aipl-codegen/src/lint/return_loop_find_index | 56050 | 6907208 | 864702 | 46256889 | 7720232 |
-| crates/aipl-codegen/src/lint/set_spread_field | 31926 | 4349692 | 870170 | 19845580 | 7662580 |
+| crates/aipl-codegen/src/lint/set_spread_field | 40000 | 4852412 | 870170 | 21846936 | 8890224 |
 | crates/aipl-codegen/src/lint/set_spread_insert | 60282 | 6990999 | 883854 | 56569144 | 7698268 |
 | crates/aipl-codegen/src/lint/set_spread_push | 44945 | 5723340 | 902377 | 35319382 | 7696996 |
 | crates/aipl-codegen/src/lint/slice_bounds | 26 | 2936 | 2128 | 2767 | 73648 |

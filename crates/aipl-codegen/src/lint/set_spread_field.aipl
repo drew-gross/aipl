@@ -15,7 +15,6 @@
 import {
     any,
     as_case,
-    collect_ok,
     drop_first,
     equal as ==,
     first,
@@ -28,10 +27,10 @@ import {
     map_join,
     value_or,
 } from builtins;
-import { Assign, Construct, Spread, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
+import { Assign, Construct, Spread } from "../expr.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
+import { lint_str } from "./lint.aipl";
+import { LintHit, hit, quote } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 
 # The hit for the `set` `self`, when it sets a place to a literal that starts from the same place
@@ -61,37 +60,28 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
         spread.value.span,
     ))
 }.test({
-    fn messages(src: str) -> str[]!ParseFailure {
-        lint_function_messages(
-            src,
-            |function| {
-                function.body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
-            },
-        )
-    }
-
-    assert(messages("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1 }; q }")? == [
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1 }; q }")? == [
         `this "set" rebuilds "q" from itself only to replace "x" — assign the field directly: "set q.x = 1;"`,
     ]);
-    assert(messages(
+    assert(lint_str(
         "fn f(p: P) -> P { mut q = p; set q.inner = Inner { ..q.inner, n: 2 }; q }",
     )? == [
         `this "set" rebuilds "q.inner" from itself only to replace "n" — assign the field directly: "set q.inner.n = 2;"`,
     ]);
 
     // Several fields are one store each, quoted where they can be and a placeholder where not.
-    assert(messages("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1, y: g(2) }; q }")? == [
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1, y: g(2) }; q }")? == [
         `this "set" rebuilds "q" from itself only to replace some fields — assign each field directly: "set q.x = 1; set q.y = ..;"`,
     ]);
 
     // A swap reads the target, so it cannot be split; a different base or no replacement is no
     // field store either.
-    assert(messages("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: q.y, y: q.x }; q }")? == []);
-    assert(messages("fn f(p: P) -> P { mut q = p; set q = P { ..p, x: 1 }; q }")? == []);
-    assert(messages("fn f(p: P) -> P { mut q = p; set q = P { ..q }; q }")? == []);
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: q.y, y: q.x }; q }")? == []);
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..p, x: 1 }; q }")? == []);
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q }; q }")? == []);
 
     // Shapes the lint flags, and what it says of them.
-    assert(messages("""
+    assert(lint_str("""
         fn bump(mut self: Point) {
             set self = Point { ..self, x: 1 };
             set self.inner = Inner { ..self.inner, n: self.inner.n + 1 };
@@ -106,14 +96,14 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
     // Not flagged: the base is a different value, and a multi-field replacement
     // that reads the target would not survive being split into two stores.
     assert(
-        messages("""
+        lint_str("""
             fn swap(mut self: Point) {
                 set self = Point { ..self, x: self.y, y: self.x };
             }
         """)? == [],
     );
     assert(
-        messages("""
+        lint_str("""
             fn subject() !prints {
                 mut p = Point { x: 0, y: 0 };
                 set p.bump();

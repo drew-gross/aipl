@@ -10,39 +10,32 @@
 #
 # The hit points at the value.
 
-import { as_case, collect_ok, equal as ==, join, not_equal as !=, starts_with } from builtins;
-import { Construct, FieldInit, Ident, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
-import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+import { as_case, collect_ok, equal as ==, not_equal as !=, starts_with } from builtins;
+import { Construct, FieldInit, Ident } from "../expr.aipl";
+import { lint_str } from "./lint.aipl";
+import { LintHit, hit } from "./lint_hit.aipl";
 
 # A hit for each field of the struct literal `self` (its kind) that is set to a name it shares.
 pub fn field_init_shorthand(self: Construct(name, inits)) -> LintHit[] {
     if (name.starts_with("__builtin_")) { return []; };
     inits$spelled_out().collect_ok()
 }.test({
-    fn messages(src: str) -> str[]!ParseFailure {
-        lint_function_messages(
-            src,
-            |function| {
-                function.body.descendants_of_kind::<Construct>()$kind$field_init_shorthand().join()
-            },
-        )
-    }
-
-    assert(messages("fn f(x: i64) -> P { P { x: x } }")? == [message("x")]);
+    // `lint_str` runs every lint, so the snippets return a type other than the literal's: `-> P { P { .. } }`
+    // is `fn_body_type_stutter`'s.
+    assert(lint_str("fn f(x: i64) -> Q { P { x: x } }")? == [message("x")]);
 
     // Each field that repeats its name, and only those.
-    assert(messages("fn f(x: i64, y: i64) -> P { P { x: x, y: y + 1, z: y } }")? == [message("x")]);
+    assert(lint_str("fn f(x: i64, y: i64) -> Q { P { x: x, y: y + 1, z: y } }")? == [message("x")]);
 
     // The shorthand itself, a different name, a spread and a range are not flagged.
-    assert(messages("fn f(x: i64) -> P { P { x } }")? == []);
-    assert(messages("fn f(x: i64) -> P { P { x: y } }")? == []);
-    assert(messages("fn f(p: P) -> P { P { ..p, x: 1 } }")? == []);
-    assert(messages("fn f(a: u64, b: u64) -> u64[] { a..b }")? == []);
+    assert(lint_str("fn f(x: i64) -> Q { P { x } }")? == []);
+    assert(lint_str("fn f(x: i64) -> Q { P { x: y } }")? == []);
+    assert(lint_str("fn f(p: P) -> Q { P { ..p, x: 1 } }")? == []);
+    assert(lint_str("fn f(a: u64, b: u64) -> u64[] { a..b }")? == []);
 
     // A range inside a struct body desugars to a `Span` whose bound names match its fields, and the
     // value's preceding source character is the outer `span:` colon; neither is a written `field: field`.
-    assert(messages("fn tok(start: i64, end: i64) -> Tok { span: start..end }")? == []);
+    assert(lint_str("fn tok(start: i64, end: i64) -> Tok { span: start..end }")? == []);
 })
 
 # The hit for the field `self`, if it is written out in full.

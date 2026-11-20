@@ -35,6 +35,20 @@
         </section>
 
 
+
+        <section class="item" id="item-lint_str">
+          <h3>
+            <a class="anchor" href="#item-lint_str">lint_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_str(src: str) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>The messages every lint reports for the program <code>src</code> parses to, which is how a lint's own tests read what it says: they run all the lints, so a snippet must be one no other lint objects to.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -48,7 +62,7 @@
             <a class="anchor" href="#item-construct_lints">construct_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn construct_lints(__spat$7278: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn construct_lints(__spat$7371: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the struct literals of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -62,7 +76,7 @@
             <a class="anchor" href="#item-assign_lints">assign_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn assign_lints(__spat$7529: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn assign_lints(__spat$7622: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the assignments of <code>function</code>, which are found once for all of them.</p></div>
 
