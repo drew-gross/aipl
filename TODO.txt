@@ -556,6 +556,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  lint test helper so messages doesn't need to keep getting reimplemented
   set_spread_field: inline rebuild since it only has 1 caller
   allow declaring types in tests, and require a type to be declared in the test if it's only used in the test
   move descendants_of_kind to fn lint()
@@ -974,6 +975,7 @@ formatting:
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 
 docs:
+  return_loop_find_if docs are showing internal __spat name
   puts some tree structure in the generated docs that mirrors the fs hierarchy tree structure
   write some aipl syntax docs
   need better docs for builtins so we don't reimplement stuff

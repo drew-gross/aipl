@@ -27,36 +27,16 @@
             <a class="anchor" href="#item-set_spread_field">set_spread_field</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn set_spread_field(__spat$1635: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn set_spread_field(self: Expr&#60;Assign&#62;) -&#62; LintHit?</code></pre>
 
-          <div class="doc"><p>A hit for each <code>set</code> in the function that rebuilds a place from itself to replace fields.</p></div>
-
-
-        </section>
-
-
-      </section>
-
-
-      <section class="group private">
-        <h2 id="private">Private</h2>
-        <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-rebuild">
-          <h3>
-            <a class="anchor" href="#item-rebuild">rebuild</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn rebuild(self: Expr&#60;Assign&#62;) -&#62; LintHit?</code></pre>
-
-          <div class="doc"><p>The hit for a <code>set</code> of a place to a literal that starts from the same place.</p></div>
+          <div class="doc"><p>The hit for the <code>set</code> <code>self</code>, when it sets a place to a literal that starts from the same place and replaces fields.</p></div>
 
 
         </section>
 
 
       </section>
+
 
 
     </main>

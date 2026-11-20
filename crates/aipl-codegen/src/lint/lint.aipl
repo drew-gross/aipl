@@ -4,8 +4,9 @@
 # covers and says how to keep the rest. A lint is added by giving it its own file and
 # a line in `lint`; the hits come back in the order the lints are listed.
 
-import { equal as == } from builtins;
-import { Program, SuperProgram } from "../item.aipl";
+import { collect_ok, equal as ==, join } from builtins;
+import { Assign, Construct, descendants_of_kind } from "../expr.aipl";
+import { Function, Program, SuperProgram } from "../item.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
@@ -102,8 +103,8 @@ pub fn lint(program: Program) -> LintHit[] {
         ..functions.hits(slice_from_zero),
         ..functions.unfilled_hits(char_set_literal).filled(items),
         ..functions.hits(arm_block_value),
-        ..functions.hits(field_init_shorthand),
-        ..functions.hits(set_spread_field),
+        ..functions.hits(construct_lints),
+        ..functions.hits(assign_lints),
         ..functions.unfilled_hits(set_spread_insert).filled(items),
         ..functions.unfilled_hits(set_spread_push).filled(items),
         ..functions.hits(|function| step_by_one(function, items)),
@@ -115,3 +116,15 @@ pub fn lint(program: Program) -> LintHit[] {
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }) == []);
 })
+
+# The lints over the struct literals of `function`, which are found once for all of them.
+fn construct_lints(Function { body }) -> LintHit[] {
+    let constructs = body.descendants_of_kind::<Construct>();
+    constructs$field_init_shorthand().join()
+}
+
+# The lints over the assignments of `function`, which are found once for all of them.
+fn assign_lints(Function { body }) -> LintHit[] {
+    let assigns = body.descendants_of_kind::<Assign>();
+    assigns$set_spread_field().collect_ok()
+}
