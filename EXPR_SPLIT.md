@@ -15,11 +15,13 @@ arm type `A` of `ExprKind` is a node known to be that case.
 - `descendants(self: Expr) -> Expr[]` is every node under `self`, outermost first.
   `collect_expr_cases(self, arm: Case<ExprKind>) -> ExprKind[]` returns the kinds of one case,
   typed as that case alone, but drops the spans.
-- A function with a parameter `arm: Case<T>` and a result `T[]` or `T?` has the result's `T`
-  refined to the one case written for `arm` (`refine_collected_arms` in `aipl-mono/src/pin.rs`);
-  that is how `collect_expr_cases(Slice)` works. Only `is_case`/`as_case`/`collect_arms` can be
-  called as `x.f::<Case>()`: the loader (`aipl-loader/src/kwargs.rs`, `takes_case`) rewrites a
-  type argument into the constructor argument, for those three callees only.
+- A function with a parameter `arm: Case<T>` is called as `f::<Case>(..)` or `xs.f::<Case>()`
+  (the loader's `kwargs.rs` puts the case back as the argument at the parameter's position), and a
+  result that is `T[]`, `T?`, `S<T>[]` or `S<T>?` is refined to that one case
+  (`refine_collected_arms` in `aipl-mono/src/pin.rs`; `variants/case_parameter.aipl`). A concrete
+  `S<T>` is an instance named for its arguments (`Tagged$Shape`), so the refined result is rebuilt
+  as the application, read back from the name when every argument is the variant (one parameter, as
+  `Expr<K>` has). The refinement inside an argument is not checked against the instance.
 - A generic struct instance widens over a refined argument: `Node<Circle>` is accepted where
   `Node<Shape>` is wanted (probed). So an `Expr<A>` goes wherever an `Expr<ExprKind>` does.
 - A struct's or variant's type parameter may have a default (`struct Expr<K = ExprKind>`, trailing
@@ -43,29 +45,15 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 Each ends at a green `cargo handoff`.
 
-### 2. A `Case<T>` parameter takes its case as a type argument
-
-Goal: any function whose signature has a `Case<T>` parameter is called as `f::<Case>(..)`, with the
-parameter left out of the written arguments, and a `T` inside a generic struct of an array or
-optional result (`Expr<T>[]`) is refined like a bare `T` is.
-
-- [ ] `kwargs.rs`: `takes_case` is read off the callee's signature (a parameter of type `Case<..>`)
-  instead of three `Callee`s; user functions are in the table the Expander already holds.
-- [ ] `refine_collected_arms` refines the `T` in `S<T>[]` and `S<T>?` as well as `T[]`/`T?`.
-- [ ] Cases: a user function with an `arm: Case<T>` parameter called with `::<Circle>`; a generic
-  struct result; refusals for a function with no `Case` parameter and for two.
-- Watch: the old form (a constructor argument) is refused only for the three builtins today.
-
 ### 3. `Expr<K>` and `descendants_of_kind`
 
 Goal: `Expr` is generic over its kind and the function exists.
 
 - [ ] `struct Expr<K = ExprKind>` with `kind: K`; the places that rebuild a node with another kind
   (`Expr { ..e, kind }`) and `ffi_ast.rs`'s decoding of the instance.
-- [ ] `descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr<ExprKind>[]`, retyped at the
-  call to `Expr<A>[]` by stage 2, with tests; `collect_expr_cases` goes if nothing wants kinds alone.
-- Depends on 2.
-
+- [ ] `descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr<ExprKind>[]`, called as
+  `::<Assign>` and so typed `Expr<Assign>[]`, with tests; `collect_expr_cases` goes if nothing wants kinds alone.
+- 
 ### 4. Move the lints
 
 Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?` use

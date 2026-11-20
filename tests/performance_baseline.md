@@ -864,6 +864,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/variants/boxed_match_arm_payload | 25 | 1800 | 1448 | 3342 | 11072 |
 | tests/cases/variants/case_fields | 6 | 480 | 192 | 1630 | 4148 |
 | tests/cases/variants/case_name | 26 | 2090 | 2090 | 5252 | 16952 |
+| tests/cases/variants/case_parameter | 3 | 272 | 280 | 866 | 3228 |
 | tests/cases/variants/case_type | 31 | 2151 | 2183 | 3627 | 11864 |
 | tests/cases/variants/case_type_arguments | 0 | 0 | 0 | 166 | 828 |
 | tests/cases/variants/collect_arms | 20 | 1303 | 1303 | 4309 | 10172 |

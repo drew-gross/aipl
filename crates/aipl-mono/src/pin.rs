@@ -3918,12 +3918,65 @@ impl Pinner<'_> {
 
     /// The type of `xs.collect_arms::<Circle>()` or `x.as_case::<Circle>()`: the array (or optional) of
     /// the variant less every case but the one named, so a `match` on it needs that arm alone.
-    fn refine_collected_arms(&mut self, ret: It, arm: &Expr, builtin: &str) -> Res<It> {
+    /// When `element` is a generic struct holding `variant` as a type argument: the struct's
+    /// template, its arguments and which of them is the variant. A concrete application is an
+    /// instance named for the template and its arguments (`Tagged$Shape`), which is read back
+    /// here when every argument is the variant, the one case an instance name says in full.
+    fn holds_variant(&self, element: &It, variant: &It) -> Option<(String, Vec<It>, usize)> {
+        let wanted = self.table.resolve(variant);
+        match self.table.shallow(element) {
+            It::Gen(name, args) => {
+                let i = args.iter().position(|a| self.table.resolve(a) == wanted)?;
+                Some((name, args, i))
+            }
+            It::Named(inst) => {
+                let (template, parts) = inst.split_once('$')?;
+                let declared = self.decls.generic_structs.get(template)?;
+                let It::Named(plain) = self.table.shallow(variant) else {
+                    return None;
+                };
+                let parts: Vec<&str> = parts.split('$').collect();
+                if parts.len() != declared.type_vars.len() || parts.iter().any(|p| *p != plain) {
+                    return None;
+                }
+                let args = vec![It::Named(plain); parts.len()];
+                Some((template.to_string(), args, 0))
+            }
+            _ => None,
+        }
+    }
+
+    fn refine_collected_arms(
+        &mut self,
+        ret: It,
+        arm: &Expr,
+        builtin: &str,
+        variant: &It,
+    ) -> Res<It> {
         let shallow = self.table.shallow(&ret);
-        let (elem, wrap): (It, fn(It) -> It) = match &shallow {
+        let (element, wrap): (It, fn(It) -> It) = match &shallow {
             It::Arr(elem) => ((**elem).clone(), |t| It::Arr(Box::new(t))),
             It::Opt(elem) => ((**elem).clone(), |t| It::Opt(Box::new(t))),
             _ => return Ok(ret),
+        };
+        // The element is the variant, or a generic struct holding it as a type argument
+        // (`Expr<ExprKind>`), whose argument is what is refined.
+        let wanted = self.table.resolve(variant);
+        let (elem, rebuild): (It, Box<dyn Fn(It) -> It>) = if self.table.resolve(&element) == wanted
+        {
+            (element, Box::new(|t| t))
+        } else if let Some((name, args, i)) = self.holds_variant(&element, variant) {
+            let slot = args[i].clone();
+            (
+                slot,
+                Box::new(move |t| {
+                    let mut args = args.clone();
+                    args[i] = t;
+                    It::Gen(name.clone(), args)
+                }),
+            )
+        } else {
+            return Ok(ret);
         };
         let elem_ty = self.table.resolve(&elem).to_type();
         let view = TypeView::new(self.decls);
@@ -3961,7 +4014,7 @@ impl Pinner<'_> {
                     aipl_syntax::ast::Exclusion::NamedCase(c.clone()),
                 )
             });
-        Ok(wrap(refined))
+        Ok(wrap(rebuild(refined)))
     }
 
     /// A `match` is a statement or an expression by what its arms produce, and must sit where its
@@ -4816,6 +4869,9 @@ impl Pinner<'_> {
             let got = self
                 .lower(&instance_ty, &HashMap::new(), &span)
                 .map_err(|_| "a field type".to_string())?;
+            // An instance is laid out for the plain types; what an argument is refined to is the
+            // application's own, so it is not held against the instance's fields.
+            let want = self.unrefined(&want);
             self.agree(&got, &want)?;
         }
         Ok(())
@@ -5619,10 +5675,16 @@ impl Pinner<'_> {
             else {
                 return false;
             };
-            self.table.resolve(&v) == self.table.resolve(&e)
+            let wanted = self.table.resolve(&v);
+            self.table.resolve(&e) == wanted || self.holds_variant(&e, &v).is_some()
         });
         let ret = match case_param {
-            Some(i) => self.refine_collected_arms(ret, &args[i], name)?,
+            Some(i) => {
+                let It::Case(variant) = self.table.shallow(&ptys[i]) else {
+                    unreachable!("found as a `Case` above")
+                };
+                self.refine_collected_arms(ret, &args[i], name, &variant)?
+            }
             None => ret,
         };
         Ok(self.node(

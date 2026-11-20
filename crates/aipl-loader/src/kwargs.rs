@@ -100,7 +100,27 @@ pub(crate) fn expand_keyword_args(program: &Program, root_index: u32) -> Result<
             _ => None,
         })
         .collect();
+    let case_params = program
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Fn(f) => {
+                let mut at = f
+                    .sig
+                    .params
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| matches!(p.ty, Type::Case(_)));
+                match (at.next(), at.next()) {
+                    (Some((i, _)), None) => Some((f.name.text.clone(), i)),
+                    _ => None,
+                }
+            }
+            _ => None,
+        })
+        .collect();
     let mut cx = Expander {
+        case_params,
         case_from_type_argument: false,
         variants,
         fns,
@@ -385,6 +405,9 @@ fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
 }
 
 struct Expander {
+    /// The position of the `Case<..>` parameter of each function that has one: the parameter
+    /// a case written as a type argument stands for.
+    case_params: HashMap<String, usize>,
     /// Set while the call a case written as a type argument became is expanded.
     case_from_type_argument: bool,
     /// Every declared variant, by name: which case a case written as a type argument is.
@@ -1375,6 +1398,12 @@ impl Expander {
     /// The constructor a case written as a type argument names: `Circle` is the arm type of
     /// `Shape` (the variant less every other case), so what is left of the variant after the
     /// exclusions is the case, spelled as a constructor is.
+    /// Where the `Case<..>` parameter of `callee` is, when it is a function that has exactly
+    /// one: the builtins that take a case, and any function written with an `arm: Case<T>`.
+    fn case_index(&self, callee: &Callee) -> Option<usize> {
+        self.case_params.get(callee.name()).copied()
+    }
+
     fn case_written_as_type(
         &self,
         callee: &Callee,
@@ -1702,7 +1731,7 @@ impl Expander {
             ExprKind::Try(x) => ExprKind::Try(Box::new(self.expand_expr(x, locals)?)),
             // `x.is_case::<Circle>()`: the case written as a type argument is the constructor the
             // builtin has been taking as an argument.
-            ExprKind::TypeArgs(x, tys) if matches!(&x.kind, ExprKind::Call(c, ..) if takes_case(c)) =>
+            ExprKind::TypeArgs(x, tys) if matches!(&x.kind, ExprKind::Call(c, ..) if self.case_index(c).is_some()) =>
             {
                 let ExprKind::Call(callee, args, method_style) = &x.kind else {
                     unreachable!("matched above")
@@ -1719,7 +1748,11 @@ impl Expander {
                 };
                 let case = self.case_written_as_type(callee, ty, &x.span)?;
                 let mut with_case = args.clone();
-                with_case.push(Expr::new(ExprKind::Ident(case), x.span.clone()));
+                let at = self
+                    .case_index(callee)
+                    .unwrap_or(args.len())
+                    .min(with_case.len());
+                with_case.insert(at, Expr::new(ExprKind::Ident(case), x.span.clone()));
                 let call = Expr {
                     kind: ExprKind::Call(callee.clone(), with_case, *method_style),
                     ..(**x).clone()

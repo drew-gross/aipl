@@ -1,0 +1,17 @@
+# The case written for a `Case<T>` parameter has to be one case of a variant.
+
+import { filter, is_case } from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+pub fn of_kind(self: Shape[], arm: Case<Shape>) -> Shape[] {
+    self.filter(|shape| shape.is_case(arm))
+}
+
+pub fn all_of(shapes: Shape[]) -> Shape[] { shapes.of_kind::<Shape>() }
+--- check --compile ---
+error: of_kind takes one case of a variant as its type argument, as in `of_kind::<Circle>(..)`
+  --> ./tests/cases/variants/err_case_parameter_not_one_case.aipl:11:45
+   |
+11 | pub fn all_of(shapes: Shape[]) -> Shape[] { shapes.of_kind::<Shape>() }
+   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^

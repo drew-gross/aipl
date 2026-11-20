@@ -1,0 +1,29 @@
+# A function with a `Case<T>` parameter takes its case as a type argument, `f::<Circle>(..)` or
+# `xs.f::<Circle>()`, as `is_case`, `as_case` and `collect_arms` do: the written case stands for
+# the parameter, in its place among the arguments. A result that is an array or an optional of
+# `T`, or of a generic struct holding `T` as its argument (`Tagged<Shape>[]`), is refined to the
+# one case, so its kind is taken apart without the others.
+
+import { equal as ==, filter, is_case, is_empty, len } from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+struct Tagged<K> { kind: K, label: str }
+
+pub fn of_kind(self: Tagged<Shape>[], arm: Case<Shape>) -> Tagged<Shape>[] {
+    self.filter(|t| t.kind.is_case(arm))
+}.test({
+    let items = [
+        Tagged { kind: Circle(1), label: "a" },
+        Tagged { kind: Dot, label: "b" },
+        Tagged { kind: Circle(2), label: "c" },
+    ];
+    assert(items.of_kind::<Circle>().len() == 2);
+    assert(items.of_kind::<Dot>().len() == 1);
+    assert(of_kind::<Square>(items).is_empty());
+    // The element is a `Tagged<Circle>`: its kind is taken apart as the one case.
+    let Tagged { kind, label } = items.of_kind::<Circle>()[0]?;
+    let Circle(r) = kind;
+    assert(r == 1);
+    assert(label == "a");
+})
