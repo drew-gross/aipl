@@ -64,6 +64,7 @@ import {
     extend,
     filter,
     find_if,
+    find_index,
     first,
     greater_than as >,
     int_parse,
@@ -577,6 +578,14 @@ fn items() -> Production<AiplTok, Ast>[] {
         // the `{` unparsed. The same goes for `self: Import(decl)`, which takes
         // apart a value that can only be the one case.
         aliased_pattern(),
+        // `self: Expr<Assign> { kind }` — the same, with the type's arguments.
+        Then([
+            Term(Name),
+            Lit(":"),
+            Term(Name),
+            Many(Named("ty"), min=1, sep=Lit(","), trailing_sep=false, nested_in=angles()),
+            field_binders(),
+        ]),
         Then([Term(Name), Lit(":"), Named("ty"), variadic, Lit("="), Named("expr")]),
         // `k?: T = none` — a parameter that may be *omitted*, as against `k: T?`
         // whose type is optional. Ordered choice makes this an ordinary
@@ -590,6 +599,13 @@ fn items() -> Production<AiplTok, Ast>[] {
         // the same pattern `let Point { x, y } = v;` writes. It names no
         // parameter, so there is no `: T` to follow.
         Then([Term(Name), field_binders()]),
+        // `Expr<Assign> { kind }` — the same, with the type arguments the parameter's type
+        // takes: `kind` is read off a value known to be an `Assign`.
+        Then([
+            Term(Name),
+            Many(Named("ty"), min=1, sep=Lit(","), trailing_sep=false, nested_in=angles()),
+            field_binders(),
+        ]),
         // `Import(decl)` — the same for a parameter that can only be one case. Its
         // slots are patterns, so `Import(ImportDecl { names })` nests.
         Then([Term(Name), case_payload()]),
@@ -3700,6 +3716,10 @@ fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # recognised by the `{` or `(` after a type name rather than by their shape.
 fn pattern_param(src: str, node: Parts, kids: Ast[], sp: Span) -> Param?!ParseError {
     let toks = node.own_texts(src);
+    if (toks[1] == some("<")) { return ok(some(generic_pattern_param(src, node, kids, sp, 0)?)); };
+    if (toks[1] == some(":") && toks[3] == some("<")) {
+        return ok(some(generic_pattern_param(src, node, kids, sp, 2)?));
+    };
     let some(WrittenBinding { binding, type_name, type_at }) = written_binding(
         toks,
         0,
@@ -3718,6 +3738,35 @@ fn pattern_param(src: str, node: Parts, kids: Ast[], sp: Span) -> Param?!ParseEr
         written: some(written_in(node, src, type_at, "", false)),
         name_span: node.first_tok(node.tok_span()),
     }))
+}
+
+# The parameter `T<A, B> { x, y }` makes: a struct pattern over a type that takes arguments, which
+# are the node's children. Without them the pattern's type would be the bare name, and the
+# arguments a bare name defaults to would be what the fields are read off.
+fn generic_pattern_param(
+    src: str,
+    node: Parts,
+    kids: Ast[],
+    sp: Span,
+    type_at: u64,
+) -> Param!ParseError {
+    let toks = node.own_texts(src);
+    let type_name = toks[type_at].value_or("");
+    let FieldBinders { fields, names } = field_binders_of(
+        toks,
+        toks.find_index(|tok| tok == "{").value_or(0) + 1,
+    );
+    let binding = ByStruct(type_name, fields, names, false);
+    ok(Param {
+        binding: if (type_at == 0) { binding } else { Alias(toks[0].value_or(""), binding) },
+        ty: TyGeneric(type_name, kids.try_map(|k| as_ty(k, sp))?),
+        mutable: false,
+        arity: One,
+        default: none,
+        implicit_some: false,
+        written: some(written_in(node, src, type_at, "", false)),
+        name_span: node.first_tok(node.tok_span()),
+    })
 }
 
 # The pattern `case_name(..slots..)` writes: its `payload` child holds the slots, or
@@ -5493,6 +5542,20 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         program_dump(
             "fn f(Point { x, y }) -> i64 { x }",
         ) == "fn f(__spat$5: Point) -> i64 = Let(x, __spat$5.x, Let(y, __spat$5.y, x))",
+    );
+
+    // The type's arguments go before the fields.
+    assert(
+        program_dump(
+            "fn f(Node<Circle> { kind }) -> i64 { kind }",
+        ) == "fn f(__spat$5: Generic(Node, Circle)) -> i64 = Let(kind, __spat$5.kind, kind)",
+    );
+
+    // Named too: `self: Node<Circle> { kind }`.
+    assert(
+        program_dump(
+            "fn f(self: Node<Circle> { kind }) -> i64 { kind }",
+        ) == "fn f(self: Generic(Node, Circle)) -> i64 = Let(kind, self.kind, kind)",
     );
 
     // `self: Span { start, end }` is the same, with the parameter named: the

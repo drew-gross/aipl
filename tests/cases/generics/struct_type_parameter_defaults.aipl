@@ -14,7 +14,7 @@ variant Opt<T = i64> = Has(value: T) | Nothing
 
 fn span_of(Node { span }) -> i64 { span }
 
-fn explicit(n: Node<Circle>) -> i64 { span_of(n) }
+fn explicit(n: Node<Shape>) -> i64 { span_of(n) }
 
 fn second(p: Pair<i64>) -> str { p.second }
 

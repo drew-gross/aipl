@@ -25,7 +25,6 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
-    map,
     map_join,
     value_or,
 } from builtins;
@@ -37,13 +36,7 @@ import { is_same_place, root_name } from "./places.aipl";
 
 # A hit for each `set` in the function that rebuilds a place from itself to replace fields.
 pub fn set_spread_field(Function { body }) -> LintHit[] {
-    body
-        .descendants_of_kind::<Assign>()
-        .map(|assignment| {
-            let Assign(target, value, _) = assignment.kind;
-            rebuild(target, value)
-        })
-        .collect_ok()
+    body.descendants_of_kind::<Assign>()$rebuild().collect_ok()
 }.test({
     assert(lint_function_messages(
         "fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1 }; q }",
@@ -131,9 +124,10 @@ pub fn set_spread_field(Function { body }) -> LintHit[] {
     );
 })
 
-# The hit for a `set` of the place `target` to `value`, when that is a literal that starts from the same place.
-fn rebuild(target: Expr, Expr { kind }) -> LintHit? {
-    let Construct(_, inits) = kind.as_case::<Construct>()?;
+# The hit for a `set` of a place to a literal that starts from the same place.
+fn rebuild(self: Expr<Assign>) -> LintHit? {
+    let Assign(target, value, _) = self.kind;
+    let Construct(_, inits) = value.kind.as_case::<Construct>()?;
     let root = target.root_name()?;
     let spread = inits.first()?;
     let Spread(base) = spread.value.kind.as_case::<Spread>()?;

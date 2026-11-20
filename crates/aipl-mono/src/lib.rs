@@ -723,6 +723,20 @@ pub(crate) fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
 
 /// Whether `t` mentions a type variable anywhere — the question that decides
 /// whether a tuple has a layout yet.
+/// Whether `t` is refined anywhere inside it (`Shape without Square`).
+fn ty_has_refinement(t: &Type) -> bool {
+    match t {
+        Type::Without(..) => true,
+        Type::Case(i) | Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => {
+            ty_has_refinement(i)
+        }
+        Type::Dict(a, b) | Type::Result(a, b) => ty_has_refinement(a) || ty_has_refinement(b),
+        Type::Fn(ps, r) => ps.iter().any(ty_has_refinement) || ty_has_refinement(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_refinement),
+        _ => false,
+    }
+}
+
 fn ty_has_var(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
@@ -1059,7 +1073,12 @@ impl GenericLowerer {
                 if args.iter().any(|a| mentions_var(a, &self.abstract_vars)) {
                     Type::Generic(base.clone(), args)
                 } else {
-                    Type::Named(self.instantiate(base, &args)?)
+                    let instance = self.instantiate(base, &args)?;
+                    if args.iter().any(ty_has_refinement) {
+                        Type::Generic(base.clone(), args)
+                    } else {
+                        Type::Named(instance)
+                    }
                 }
             }
             Type::Optional(i) => Type::Optional(Box::new(self.lower_ty(i)?)),

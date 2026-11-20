@@ -1,0 +1,29 @@
+# A parameter written `Tagged<Circle>` holds a `Tagged` whose kind is known to be a `Circle`,
+# so its kind is taken apart as that one case. A value of that type is what a function with a
+# `Case<T>` parameter returns (`of_kind::<Circle>()`), and it goes wherever a `Tagged<Shape>` does.
+
+import { equal as ==, filter, is_case } from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+struct Tagged<K = Shape> { kind: K, label: str }
+
+fn of_kind(self: Tagged[], arm: Case<Shape>) -> Tagged[] { self.filter(|t| t.kind.is_case(arm)) }
+
+fn radius(self: Tagged<Circle>) -> i64 {
+    let Circle(r) = self.kind;
+    r
+}.test({
+    let items = [
+        Tagged { kind: Circle(1), label: "a" },
+        Tagged { kind: Dot, label: "b" },
+        Tagged { kind: Circle(2), label: "c" },
+    ];
+    assert(items.of_kind::<Circle>()$radius() == [1, 2]);
+})
+
+fn describe(self: Tagged { label }) -> str { label }.test({
+    // A `Tagged<Circle>` is accepted where a `Tagged<Shape>` is wanted.
+    let circles = [Tagged { kind: Circle(1), label: "a" }].of_kind::<Circle>();
+    assert(circles$describe() == ["a"]);
+})

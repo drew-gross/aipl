@@ -937,6 +937,7 @@ case_tests! {
     cases_variants_recursive_list = "cases/variants/recursive_list",
     cases_variants_recursive_mut_accumulator = "cases/variants/recursive_mut_accumulator",
     cases_variants_recursive_through_array = "cases/variants/recursive_through_array",
+    cases_variants_refined_argument_parameter = "cases/variants/refined_argument_parameter",
     cases_variants_same_case = "cases/variants/same_case",
     cases_variants_to_str = "cases/variants/to_str",
     cases_variants_variant_in_variant_payload = "cases/variants/variant_in_variant_payload",

@@ -1371,13 +1371,21 @@ fn one_param(self: W) -> WDoc!FmtError {
     } else {
         WDocs { w: l.w, docs: [l.doc] }
     };
-    let n = m.w.bump();
+    let written = m.w.bump();
+    // `Expr<Assign> { kind }`: the type's arguments sit between the name and the fields.
+    let arguments = written.w.angle_arguments_if_any()?;
+    let n = WStr { w: arguments.w, text: written.text };
     if (n.w.peek_text() == "{") {
         let ids = n.w.bump().w.field_binder_list();
         let closed = ids.w.expect("}")?.w;
         return ok(WDoc {
             w: closed,
-            doc: Concat([..m.docs, Text(`{n.text} \{ {ids.names.join(sep=", ")} }`)]),
+            doc: Concat([
+                ..m.docs,
+                Text(n.text),
+                arguments.doc,
+                Text(` \{ {ids.names.join(sep=", ")} }`),
+            ]),
         });
     };
     if (n.w.peek_text() == "(") {
@@ -2184,6 +2192,15 @@ fn turbofish_if_any(self: W) -> WDoc!FmtError {
     let WDocs { w, docs } = self.bump().w.expect("<")?.w.ty_list(">", [])?;
     let closed = w.expect(">")?.w;
     ok(WDoc { w: closed, doc: Concat([Text("::"), comma_list_docs(docs, Angles)]) })
+}
+
+# The `<A, B>` after a type's name, when there is one, and nothing when there is not. It glues to
+# the name on its left and lays its types out as any angle list.
+fn angle_arguments_if_any(self: W) -> WDoc!FmtError {
+    if (self.peek_text() != "<") { return ok(WDoc { w: self, doc: Concat([]) }); };
+    let WDocs { w, docs } = self.bump().w.ty_list(">", [])?;
+    let closed = w.expect(">")?.w;
+    ok(WDoc { w: closed, doc: comma_list_docs(docs, Angles) })
 }
 
 # `[i]`, `[a..b]`, `[a..]`, `[..b]`, `[row, column]` — indexing and the slice forms.
@@ -3634,6 +3651,16 @@ fn walker_of(src: str) -> W!FmtError {
         walker_of("fn f ( Point { x  as  px , y } ) -> i64 { px }")?
             .fn_item()
             .rendered(100)? == "fn f(Point { x as px, y }) -> i64 { px }",
+    );
+    assert(
+        walker_of("fn f ( Node < Circle , i64 > { kind  as  k } ) -> i64 { 0 }")?
+            .fn_item()
+            .rendered(100)? == "fn f(Node<Circle, i64> { kind as k }) -> i64 { 0 }",
+    );
+    assert(
+        walker_of("fn f ( self : Node < Circle > { kind } ) -> i64 { 0 }")?
+            .fn_item()
+            .rendered(100)? == "fn f(self: Node<Circle> { kind }) -> i64 { 0 }",
     );
     assert(
         walker_of("fn f ( Import ( decl ) , n : i64 ) -> i64 { n }")?

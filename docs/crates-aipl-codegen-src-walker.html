@@ -1623,7 +1623,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$61698: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$62008: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -2018,6 +2018,20 @@
           <pre class="signature"><code>fn turbofish_if_any(self: W) -&#62; WDoc!FmtError</code></pre>
 
           <div class="doc"><p>The <code>::&lt;T, U&gt;</code> after a callee's name, when there is one, and nothing when there is not. It glues to the name on its left and lays its types out as any angle list.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-angle_arguments_if_any">
+          <h3>
+            <a class="anchor" href="#item-angle_arguments_if_any">angle_arguments_if_any</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn angle_arguments_if_any(self: W) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p>The <code>&lt;A, B&gt;</code> after a type's name, when there is one, and nothing when there is not. It glues to the name on its left and lays its types out as any angle list.</p></div>
 
 
         </section>
