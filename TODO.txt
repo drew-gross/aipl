@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  expr.aipl->mapped->Construct use ..i syntax. Also consider a lint for this?
   printable_without_blank in char_set_literal lint needs some cleanup
   tests/cases/variants/err_as_case_value.aipl doens't need to exist, is_case &co can use the regular type checker errors
   unused_functions and go-to-def should be able to share some code once the lsp is in aipl
@@ -561,7 +562,6 @@ lint:
   allow declaring types in tests, and require a type to be declared in the test if it's only used in the test
   move descendants_of_kind to fn lint()
   why is field_init_shorthand excluding builtins? Also it shoudn't do name comparisons
-  make FieldInit say whether it's in shorthand, for field_init_shorthand
   collect_expressions wrapper of collect_arms that lets you iterate over all expressions of one type. Should simplify many lints.
   make the "unused functions" lint not count .test/.benchmark blocks that don't actually use the function (need to support standalone benchmark, currently many hang off empty fn work () {})
   xs.map(|p| p.name$shout().len()) should hit the "use $$" lint to be xs$name$$shout()$len() after we have $$ operator

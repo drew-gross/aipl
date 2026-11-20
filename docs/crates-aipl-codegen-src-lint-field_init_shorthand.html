@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/field_init_shorthand.aipl</code></h1>
 
-      <div class="module-doc"><p>The <code>field_init_shorthand</code> lint: <code>Point { x: x }</code> — a field initialized with the bare identifier of the same name; <code>Point { x }</code> is the same literal.</p><p>The shorthand lowers to exactly the tree the explicit form builds, so the two are indistinguishable by shape alone: the explicit form is recognized from the source, by a <code>:</code> right before the value (the shorthand's value <em>is</em> the field name, with no colon before it). A comment between the <code>:</code> and the value leaves the field alone, the conservative choice that never mis-flags a shorthand.</p><p>A literal the parser synthesizes from other syntax carries a <code>__builtin_</code>-prefixed name a user cannot write — a range <code>start..end</code> is <code>__builtin_Span { start: start, end: end }</code> — and its bound identifiers are not a written <code>field: field</code>, so those are skipped.</p><p>The hit points at the value.</p></div>
+      <div class="module-doc"><p>The <code>field_init_shorthand</code> lint: <code>Point { x: x }</code> — a field initialized with the bare identifier of the same name; <code>Point { x }</code> is the same literal.</p><p>The parser records which fields are written as the shorthand (<code>FieldInit.shorthand</code>), so a field whose value is the identifier it is named for is flagged unless it is one.</p><p>A literal the parser synthesizes from other syntax carries a <code>__builtin_</code>-prefixed name a user cannot write — a range <code>start..end</code> is <code>__builtin_Span { start: start, end: end }</code> — and its bound identifiers are not a written <code>field: field</code>, so those are skipped.</p><p>The hit points at the value.</p></div>
 
 
 
@@ -43,14 +43,14 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-spelled_out_in">
+        <section class="item" id="item-spelled_out">
           <h3>
-            <a class="anchor" href="#item-spelled_out_in">spelled_out_in</a>
+            <a class="anchor" href="#item-spelled_out">spelled_out</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn spelled_out_in(self: FieldInit, within: Expr) -&#62; LintHit?</code></pre>
+          <pre class="signature"><code>fn spelled_out(self: FieldInit) -&#62; LintHit?</code></pre>
 
-          <div class="doc"><p>The hit for the field <code>self</code> of the literal <code>within</code>, if it is written out in full.</p></div>
+          <div class="doc"><p>The hit for the field <code>self</code>, if it is written out in full.</p></div>
 
 
         </section>

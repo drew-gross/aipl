@@ -94,8 +94,9 @@ struct Expr<K = ExprKind> {
 # exactly as an array-literal spread is identified by being a spread element.
 #
 # `name_span` is where the field name is written in `T { name: v }` or the
-# shorthand `T { name }`; empty for a spread and for a synthesized init.
-struct FieldInit { name: str, value: Expr, name_span: Span = 0..0 }
+# shorthand `T { name }`; empty for a spread and for a synthesized init. `shorthand` is
+# whether it is written as the shorthand, whose value is the identifier the field is named for.
+struct FieldInit { name: str, value: Expr, name_span: Span = 0..0, shorthand: bool = false }
 
 # One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
 # for the bare `|x| ..` form.
@@ -597,6 +598,7 @@ pub fn mapped<X: cases>(
                     name: i.name,
                     value: f(i.value),
                     name_span: i.name_span,
+                    shorthand: i.shorthand,
                 });
             }
             Construct(name, inits)

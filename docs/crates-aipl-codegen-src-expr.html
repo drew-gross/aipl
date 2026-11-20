@@ -43,7 +43,7 @@
           </h3>
           <pre class="signature"><code>struct FieldInit</code></pre>
 
-          <div class="doc"><p>One field of a struct literal. A <code>..base</code> spread rides as an init with an empty name whose <em>value</em> is the <code>Spread</code> — the value is what identifies it, exactly as an array-literal spread is identified by being a spread element.</p><p><code>name_span</code> is where the field name is written in <code>T { name: v }</code> or the shorthand <code>T { name }</code>; empty for a spread and for a synthesized init.</p></div>
+          <div class="doc"><p>One field of a struct literal. A <code>..base</code> spread rides as an init with an empty name whose <em>value</em> is the <code>Spread</code> — the value is what identifies it, exactly as an array-literal spread is identified by being a spread element.</p><p><code>name_span</code> is where the field name is written in <code>T { name: v }</code> or the shorthand <code>T { name }</code>; empty for a spread and for a synthesized init. <code>shorthand</code> is whether it is written as the shorthand, whose value is the identifier the field is named for.</p></div>
 
 
         </section>
@@ -83,7 +83,7 @@
             <a class="anchor" href="#item-name_at">name_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5376: Span) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5512: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
 

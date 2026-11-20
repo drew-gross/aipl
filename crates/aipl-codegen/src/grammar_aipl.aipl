@@ -2267,6 +2267,7 @@ fn lower_field_init(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 name,
                 value: at(Ident(name), span).named_at(span),
                 name_span: span,
+                shorthand: true,
             }))
         },
         _ => err(ParseError { message: "a field initialiser matched no alternative", span: sp }),
@@ -3947,6 +3948,7 @@ fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError 
                 name: head,
                 value: at(Ident(head), name_span).named_at(name_span),
                 name_span,
+                shorthand: true,
             };
             ok(AFieldInits([first, ..kids.try_map(|k| as_field_init(k, sp))?]))
         },

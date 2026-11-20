@@ -245,15 +245,6 @@ pub fn text_after(self: Expr, container: Expr) -> str {
     assert(inner.text_after(outer) == ".len() ");
 })
 
-# The text of `container` before `self` starts.
-pub fn text_before(self: Expr, container: Expr) -> str {
-    container.source[..self.span.start - container.span.start]
-}.test({
-    let inner = Expr { ..ident("x"), span: 6..7, source: "x" };
-    let outer = Expr { ..ident("x"), span: 4..12, source: "{ x: x }" };
-    assert(inner.text_before(outer) == "{ ");
-})
-
 # Every name a file's `items` import from builtins, as the file spells it.
 pub fn imported_locals(self: Item[]) -> str[] {
     self.collect_arms::<Import>()$builtin_names().join()
