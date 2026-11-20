@@ -1894,6 +1894,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./int_fits.aipl",
     "./operator_named_forms.aipl",
     "./is_operator_name.aipl",
+    "./builtin_table.aipl",
     "./lexer.aipl",
     "./lex_aipl.aipl",
     "./unescape.aipl",
@@ -2063,6 +2064,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "normalize_output",
     "int_fits",
     "is_operator_name",
+    "builtin_table",
     "aipl_token_scopes",
     "find_files",
     "companion_files",
@@ -2729,6 +2731,62 @@ fn is_operator_name(s: &str) -> bool {
     })
 }
 
+/// The table of importable builtins, from the dogfooded AIPL `builtin_table`. No native fallback;
+/// panics if it can't be built or called.
+pub fn builtin_table() -> Vec<aipl_syntax::builtin::TableRow> {
+    use aipl_syntax::builtin::{RowDefinition, TableRow};
+    fn text(value: &FfiValue) -> String {
+        match value {
+            FfiValue::Str(s) => s.clone(),
+            other => panic!("dogfooded builtin_table() text: {other:?}"),
+        }
+    }
+    fn field<'a>(fields: &'a [(String, FfiValue)], name: &str) -> &'a FfiValue {
+        match fields.iter().find(|(n, _)| n == name) {
+            Some((_, value)) => value,
+            None => panic!("dogfooded builtin_table() BuiltinEntry has no `{name}`"),
+        }
+    }
+    DOGFOOD_ENGINE.with(|comp| match comp.call_values("builtin_table", &[]) {
+        Ok(FfiValue::Array(rows)) => rows
+            .iter()
+            .map(|row| {
+                let FfiValue::Struct(fields) = row else {
+                    panic!("dogfooded builtin_table() row: {row:?}")
+                };
+                let definition = match field(fields, "definition") {
+                    FfiValue::Variant(case, payload) => match (case.as_str(), payload.as_slice()) {
+                        ("Written", [file]) => RowDefinition::Written { file: text(file) },
+                        ("Declared", []) => RowDefinition::Declared,
+                        ("Described", [signature, doc]) => RowDefinition::Described {
+                            signature: text(signature),
+                            doc: text(doc),
+                        },
+                        other => panic!("dogfooded builtin_table() definition: {other:?}"),
+                    },
+                    other => panic!("dogfooded builtin_table() definition: {other:?}"),
+                };
+                let exports = match field(fields, "exports") {
+                    FfiValue::Array(names) => names.iter().map(text).collect(),
+                    other => panic!("dogfooded builtin_table() exports: {other:?}"),
+                };
+                let public_name = match field(fields, "public_name") {
+                    FfiValue::Opt(name) => name.as_deref().map(text),
+                    other => panic!("dogfooded builtin_table() public_name: {other:?}"),
+                };
+                TableRow {
+                    callee: text(field(fields, "callee")),
+                    definition,
+                    exports,
+                    library: text(field(fields, "library")),
+                    public_name,
+                }
+            })
+            .collect(),
+        other => panic!("dogfooded builtin_table() call: {other:?}"),
+    })
+}
+
 /// The function-name hook (see [`aipl_syntax::set_fn_names_hooks`]): what `name`
 /// says its function is, from the dogfooded AIPL `fn_role`. The `FnRole` variant
 /// crosses the FFI as its case name and payload. No native fallback; panics if it
@@ -2872,6 +2930,7 @@ pub fn install_parser_hooks() {
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);
     aipl_syntax::set_fn_names_hooks(fn_role, test_fn_name);
+    aipl_syntax::builtin::set_table_hook(builtin_table);
 }
 
 /// What [`frontend`] produces: a program that has passed the type checker, plus

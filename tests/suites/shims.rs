@@ -56,6 +56,7 @@ fn linker_runtime_reserves_every_slot() {
 /// as a confusing "unknown function" much later.
 #[test]
 fn every_operation_is_a_builtin() {
+    aipl::codegen::install_parser_hooks();
     for (effect, op) in shim_operations() {
         assert!(
             aipl_syntax::builtin::Builtin::all()

@@ -21,6 +21,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/ast | 3 | 392 | 392 | 265 | 5540 |
 | crates/aipl-codegen/src/bound | 0 | 0 | 0 | 729 | 3904 |
 | crates/aipl-codegen/src/brace_entry | 71 | 7245 | 6720 | 7831 | 81356 |
+| crates/aipl-codegen/src/builtin_table | 204 | 503008 | 49048 | 443135 | 310896 |
 | crates/aipl-codegen/src/caret_block | 155 | 11936 | 11936 | 12266 | 7048 |
 | crates/aipl-codegen/src/clean_trailing_whitespace | 17 | 1306 | 178 | 13023 | 6040 |
 | crates/aipl-codegen/src/common_space_prefix | 0 | 0 | 0 | 1266 | 1948 |

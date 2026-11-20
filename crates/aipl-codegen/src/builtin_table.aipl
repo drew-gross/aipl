@@ -1,0 +1,615 @@
+# Every importable builtin: which callee it is, where its signature and documentation come from,
+# what else its source exports, and the library an import takes it from.
+#
+# A builtin is one of three kinds. `Written` is an ordinary AIPL file in `aipl-mono/src/`, whose
+# `pub fn` and `# ..` block are its signature and documentation. `Declared` is expanded or generated
+# by the compiler and typed by a declaration named `__builtin_<name>`. `Described` is typed by a rule
+# in the checker with nothing to read, so its signature and prose are written here.
+#
+# The table is in the order the arms of `Callee` list the importable builtins. Rust reads it through
+# the embedding FFI.
+
+import { distinct, equal as == } from builtins;
+
+variant BuiltinDefinition = Written(file: str) | Declared | Described(signature: str, doc: str)
+
+# `callee` is the canonical name (`__builtin_len`); `exports` are the other names its source makes
+# importable; `library` is the namespace an import names; `public_name` is the spelling inside the
+# library when it is not the callee's own (`parse` for `__builtin_parse_json`).
+struct BuiltinEntry {
+    callee: str,
+    definition: BuiltinDefinition,
+    exports: str[] = [],
+    library: str = "builtins",
+    public_name: str? = none,
+}
+
+# The whole table.
+pub fn builtin_table() -> BuiltinEntry[] {
+    [
+        BuiltinEntry { callee: "__builtin_print", definition: Declared },
+        BuiltinEntry { callee: "__builtin_put", definition: Declared },
+        BuiltinEntry { callee: "__builtin_split", definition: Declared },
+        BuiltinEntry { callee: "__builtin_split_len", definition: Declared },
+        BuiltinEntry { callee: "__builtin_join", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_intersperse",
+            definition: Written("builtin_intersperse.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_tuple_windows",
+            definition: Written("builtin_tuple_windows.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_same_case", definition: Declared },
+        BuiltinEntry { callee: "__builtin_case_name", definition: Declared },
+        BuiltinEntry { callee: "__builtin_case_of", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_count_is_less_than",
+            definition: Written("builtin_count_is_less_than.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_is_at_most",
+            definition: Written("builtin_count_is_at_most.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_is_greater_than",
+            definition: Written("builtin_count_is_greater_than.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_is_at_least",
+            definition: Written("builtin_count_is_at_least.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_is_equal",
+            definition: Written("builtin_count_is_equal.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_is_not_equal",
+            definition: Written("builtin_count_is_not_equal.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_if_is_less_than",
+            definition: Written("builtin_count_if_is_less_than.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_if_is_at_most",
+            definition: Written("builtin_count_if_is_at_most.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_if_is_greater_than",
+            definition: Written("builtin_count_if_is_greater_than.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_if_is_at_least",
+            definition: Written("builtin_count_if_is_at_least.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_if_is_equal",
+            definition: Written("builtin_count_if_is_equal.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_count_if_is_not_equal",
+            definition: Written("builtin_count_if_is_not_equal.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_first", definition: Written("builtin_first.aipl") },
+        BuiltinEntry { callee: "__builtin_grid_get", definition: Written("builtin_grid_get.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_grid_from",
+            definition: Written("builtin_grid_from.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_grid_of", definition: Written("builtin_grid_of.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_grid_try_set",
+            definition: Written("builtin_grid_try_set.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_width", definition: Written("builtin_width.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_seeded_with_int",
+            definition: Written("builtin_seeded_with_int.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_seeded_with_clock",
+            definition: Written("builtin_seeded_with_clock.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_height", definition: Written("builtin_height.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_is_in_bounds_of",
+            definition: Written("builtin_is_in_bounds_of.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_grid_is_in_bounds_of",
+            definition: Written("builtin_grid_is_in_bounds_of.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_last", definition: Written("builtin_last.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_nonempty_first",
+            definition: Written("builtin_nonempty_first.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_nonempty_last",
+            definition: Written("builtin_nonempty_last.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_ensure_nonempty",
+            definition: Written("builtin_ensure_nonempty.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_assume_nonempty", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_drop_first",
+            definition: Written("builtin_drop_first.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_drop_last",
+            definition: Written("builtin_drop_last.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_drop_n", definition: Written("builtin_drop_n.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_drop_last_n",
+            definition: Written("builtin_drop_last_n.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_to_str", definition: Declared },
+        BuiltinEntry { callee: "__builtin_to_str_len", definition: Declared },
+        BuiltinEntry { callee: "__builtin_map", definition: Declared },
+        BuiltinEntry { callee: "__builtin_try_map", definition: Written("builtin_try_map.aipl") },
+        BuiltinEntry { callee: "__builtin_filter", definition: Declared },
+        BuiltinEntry { callee: "__builtin_filter_map", definition: Declared },
+        BuiltinEntry { callee: "__builtin_all", definition: Written("builtin_all.aipl") },
+        BuiltinEntry { callee: "__builtin_any", definition: Written("builtin_any.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_left_fold",
+            definition: Written("builtin_left_fold.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_right_fold",
+            definition: Written("builtin_right_fold.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_opt_left_fold",
+            definition: Written("builtin_opt_left_fold.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_opt_right_fold",
+            definition: Written("builtin_opt_right_fold.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_zip_with", definition: Declared },
+        BuiltinEntry { callee: "__builtin_zip", definition: Written("builtin_zip.aipl") },
+        BuiltinEntry { callee: "__builtin_trim", definition: Declared },
+        BuiltinEntry { callee: "__builtin_heap_str", definition: Declared },
+        BuiltinEntry { callee: "__builtin_rope_str", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_inline_str",
+            definition: Written("builtin_inline_str.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_pack_inline", definition: Declared },
+        BuiltinEntry { callee: "__builtin_inline_capacity", definition: Declared },
+        BuiltinEntry { callee: "__builtin_measure", definition: Written("builtin_measure.aipl") },
+        BuiltinEntry { callee: "__builtin_measure_begin", definition: Declared },
+        BuiltinEntry { callee: "__builtin_measure_consume", definition: Declared },
+        BuiltinEntry { callee: "__builtin_measure_end", definition: Declared },
+        BuiltinEntry { callee: "__builtin_measure_read", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_is_all_whitespace",
+            definition: Written("builtin_is_all_whitespace.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_starts_with", definition: Declared },
+        BuiltinEntry { callee: "__builtin_starts_with_at", definition: Declared },
+        BuiltinEntry { callee: "__builtin_ends_with", definition: Declared },
+        BuiltinEntry { callee: "__builtin_len", definition: Declared },
+        BuiltinEntry { callee: "__builtin_range", definition: Written("builtin_range.aipl") },
+        BuiltinEntry { callee: "__builtin_is_nonempty", definition: Declared },
+        BuiltinEntry { callee: "__builtin_is_empty", definition: Declared },
+        BuiltinEntry { callee: "__builtin_push", definition: Declared },
+        BuiltinEntry { callee: "__builtin_extend", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_extend_optional",
+            definition: Written("builtin_extend_optional.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_extend_map",
+            definition: Written("builtin_extend_map.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_extend_filter",
+            definition: Written("builtin_extend_filter.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_extend_filter_map",
+            definition: Written("builtin_extend_filter_map.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_reserve", definition: Declared },
+        BuiltinEntry { callee: "__builtin_is_some", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_is_some_and",
+            definition: Written("builtin_is_some_and.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_is_err_and",
+            definition: Written("builtin_is_err_and.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_map_err", definition: Written("builtin_map_err.aipl") },
+        BuiltinEntry { callee: "__builtin_map_ok", definition: Written("builtin_map_ok.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_int_parse",
+            definition: Written("builtin_int_parse.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_int_parse_unsigned",
+            definition: Written("builtin_int_parse_unsigned.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_is_space", definition: Declared },
+        BuiltinEntry { callee: "__builtin_is_whitespace", definition: Declared },
+        BuiltinEntry { callee: "__builtin_is_digit", definition: Declared },
+        BuiltinEntry { callee: "__builtin_to_digit", definition: Declared },
+        BuiltinEntry { callee: "__builtin_narrow", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_trim_while",
+            definition: Written("builtin_trim_while.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_words", definition: Written("builtin_words.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_cartesian_product",
+            definition: Written("builtin_cartesian_product.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_count", definition: Written("builtin_count.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_count_while",
+            definition: Written("builtin_count_while.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_count_if", definition: Written("builtin_count_if.aipl") },
+        BuiltinEntry { callee: "__builtin_find_if", definition: Written("builtin_find_if.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_collect_arms",
+            definition: Written("builtin_collect_arms.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_as_case", definition: Written("builtin_as_case.aipl") },
+        BuiltinEntry { callee: "__builtin_is_case", definition: Written("builtin_is_case.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_collect_ok",
+            definition: Written("builtin_collect_ok.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_map_find_if",
+            definition: Written("builtin_map_find_if.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_map_join", definition: Written("builtin_map_join.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_join_is_nonempty",
+            definition: Written("builtin_join_is_nonempty.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_join_is_empty",
+            definition: Written("builtin_join_is_empty.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_reduce", definition: Written("builtin_reduce.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_map_reduce",
+            definition: Written("builtin_map_reduce.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_filter_map_reduce",
+            definition: Written("builtin_filter_map_reduce.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_split_map",
+            definition: Written("builtin_split_map.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_find_map", definition: Written("builtin_find_map.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_reverse_find_map",
+            definition: Written("builtin_reverse_find_map.aipl"),
+        },
+        BuiltinEntry {
+            callee: "__builtin_find_index",
+            definition: Written("builtin_find_index.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_value_or", definition: Written("builtin_value_or.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_value_or_err",
+            definition: Written("builtin_value_or_err.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_contains", definition: Declared },
+        BuiltinEntry { callee: "__builtin_has", definition: Declared, library: "sets" },
+        BuiltinEntry { callee: "__builtin_to_array", definition: Declared, library: "sets" },
+        BuiltinEntry { callee: "__builtin_to_set", definition: Declared, library: "sets" },
+        BuiltinEntry { callee: "__builtin_read_file_to_string", definition: Declared },
+        BuiltinEntry { callee: "__builtin_write_string_to_file", definition: Declared },
+        BuiltinEntry { callee: "__builtin_list_files", definition: Declared },
+        BuiltinEntry { callee: "__builtin_read_line", definition: Declared },
+        BuiltinEntry { callee: "__builtin_read_byte", definition: Declared },
+        BuiltinEntry { callee: "__builtin_clear_terminal", definition: Declared },
+        BuiltinEntry { callee: "__builtin_move_to", definition: Declared },
+        BuiltinEntry { callee: "__builtin_enter_alternate_screen", definition: Declared },
+        BuiltinEntry { callee: "__builtin_leave_alternate_screen", definition: Declared },
+        BuiltinEntry { callee: "__builtin_shim_cell_get", definition: Declared },
+        BuiltinEntry { callee: "__builtin_shim_cell_set", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_read_key",
+            definition: Written("builtin_read_key.aipl"),
+            exports: ["Key", "UpArrow", "DownArrow", "LeftArrow", "RightArrow", "Other"],
+        },
+        BuiltinEntry {
+            callee: "__builtin_parse_json",
+            definition: Written("builtin_parse_json.aipl"),
+            exports: ["Json", "Member", "Null", "Bool", "Number", "String", "Array", "Object"],
+            library: "json",
+            public_name: some("parse"),
+        },
+        BuiltinEntry { callee: "__builtin_random_u64", definition: Declared },
+        BuiltinEntry { callee: "__builtin_now_nanos", definition: Declared },
+        BuiltinEntry { callee: "__builtin_monotonic_now", definition: Declared },
+        BuiltinEntry { callee: "__builtin_execute_program", definition: Declared },
+        BuiltinEntry { callee: "__builtin_http_get", definition: Declared, library: "network" },
+        BuiltinEntry { callee: "__builtin_union", definition: Declared, library: "sets" },
+        BuiltinEntry {
+            callee: "__builtin_union_all",
+            definition: Written("builtin_union_all.aipl"),
+            library: "sets",
+        },
+        BuiltinEntry {
+            callee: "__builtin_set_map",
+            definition: Written("builtin_set_map.aipl"),
+            library: "sets",
+        },
+        BuiltinEntry {
+            callee: "__builtin_difference",
+            definition: Written("builtin_difference.aipl"),
+            library: "sets",
+        },
+        BuiltinEntry {
+            callee: "__builtin_intersection",
+            definition: Written("builtin_intersection.aipl"),
+            library: "sets",
+        },
+        BuiltinEntry {
+            callee: "__builtin_insert",
+            definition: Written("builtin_insert.aipl"),
+            library: "sets",
+        },
+        BuiltinEntry { callee: "__builtin_get", definition: Declared },
+        BuiltinEntry { callee: "__builtin_contains_key", definition: Declared },
+        BuiltinEntry { callee: "__builtin_remove_key", definition: Declared },
+        BuiltinEntry { callee: "__builtin_insert_key", definition: Declared },
+        BuiltinEntry { callee: "__builtin_to_dict", definition: Written("builtin_to_dict.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_map_to_dict",
+            definition: Written("builtin_map_to_dict.aipl"),
+        },
+        BuiltinEntry { callee: "__builtin_hash", definition: Declared },
+        BuiltinEntry { callee: "__builtin_min", definition: Declared },
+        BuiltinEntry { callee: "__builtin_max", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_minimum",
+            definition: Described(
+                "fn minimum<T: ord>(self: T[]) -> T?",
+                "The smallest element, or `none` if the array is empty.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_maximum",
+            definition: Described(
+                "fn maximum<T: ord>(self: T[]) -> T?",
+                "The largest element, or `none` if the array is empty.",
+            ),
+        },
+        BuiltinEntry { callee: "__builtin_reverse", definition: Declared },
+        BuiltinEntry { callee: "__builtin_sort", definition: Declared },
+        BuiltinEntry { callee: "__builtin_sort_by", definition: Written("builtin_sort_by.aipl") },
+        BuiltinEntry { callee: "__builtin_repeat", definition: Written("builtin_repeat.aipl") },
+        BuiltinEntry { callee: "__builtin_with", definition: Declared },
+        BuiltinEntry { callee: "__builtin_try_set", definition: Declared },
+        BuiltinEntry {
+            callee: "__builtin_wrapping_add",
+            definition: Described(
+                "fn wrapping_add<T: int>(a: T, b: T) -> T",
+                "Addition that wraps around on overflow. Import it as the operator: `wrapping_add as +`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_saturating_add",
+            definition: Described(
+                "fn saturating_add<T: int>(a: T, b: T) -> T",
+                "Addition that stops at the type's largest value on overflow. Import it as the operator: `saturating_add as +`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_wrapping_sub",
+            definition: Described(
+                "fn wrapping_sub<T: int>(a: T, b: T) -> T",
+                "Subtraction that wraps around on overflow. Import it as the operator: `wrapping_sub as -`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_saturating_sub",
+            definition: Described(
+                "fn saturating_sub<T: int>(a: T, b: T) -> T",
+                "Subtraction that stops at the type's smallest value on overflow. Import it as the operator: `saturating_sub as -`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_wrapping_mul",
+            definition: Described(
+                "fn wrapping_mul<T: int>(a: T, b: T) -> T",
+                "Multiplication that wraps around on overflow. Import it as the operator: `wrapping_mul as *`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_saturating_divide",
+            definition: Described(
+                "fn saturating_divide<T: int>(a: T, b: T) -> T",
+                "Division that never traps: it saturates where the result would not fit. Import it as the operator: `saturating_divide as /`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_saturating_remainder",
+            definition: Described(
+                "fn saturating_remainder<T: int>(a: T, b: T) -> T",
+                "The remainder of division, never trapping. Import it as the operator: `saturating_remainder as %`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_to_float",
+            definition: Described(
+                "fn to_float<T: int>(self: T) -> F",
+                "The integer as the nearest float: exact up to 2^53 for `IEEE754Float64` and 2^24 for `IEEE754Float32`, rounded to the nearest representable value beyond that, and never failing. Which float it is comes from where the call sits, as for a float literal: an annotation, a parameter, or the other operand of a float operation. With nothing to say, it is `IEEE754Float64`.",
+            ),
+        },
+        BuiltinEntry { callee: "__builtin_render", definition: Written("builtin_render.aipl") },
+        BuiltinEntry { callee: "__builtin_distinct", definition: Written("builtin_distinct.aipl") },
+        BuiltinEntry {
+            callee: "__builtin_pad",
+            definition: Written("builtin_pad.aipl"),
+            exports: ["Direction", "Left", "Right"],
+        },
+        BuiltinEntry {
+            callee: "__builtin_tabulate",
+            definition: Written("builtin_tabulate.aipl"),
+            exports: ["Column"],
+            library: "tabulate",
+        },
+        BuiltinEntry {
+            callee: "__builtin_to_fixed",
+            definition: Described(
+                "fn to_fixed<F>(self: F, digits: u64) -> str",
+                "A float with exactly `digits` digits after the point, correctly rounded from its exact value (halves to even). The unchecked half of `render`, which is the spelling.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_add",
+            definition: Described(
+                "fn float_add<T: float>(a: T, b: T) -> T",
+                "Addition of IEEE 754 floats of one type; floats and integers never mix. Import it as the operator: `float_add as +`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_sub",
+            definition: Described(
+                "fn float_sub<T: float>(a: T, b: T) -> T",
+                "Subtraction of IEEE 754 floats of one type; floats and integers never mix. Import it as the operator: `float_sub as -`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_mul",
+            definition: Described(
+                "fn float_mul<T: float>(a: T, b: T) -> T",
+                "Multiplication of IEEE 754 floats of one type; floats and integers never mix. Import it as the operator: `float_mul as *`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_div",
+            definition: Described(
+                "fn float_div<T: float>(a: T, b: T) -> T",
+                "Division of IEEE 754 floats of one type; floats and integers never mix. Import it as the operator: `float_div as /`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_equal",
+            definition: Described(
+                "fn float_equal<T: float>(a: T, b: T) -> bool",
+                "Whether the two floats are equal (false when either is NaN). Import it as the operator: `float_equal as ==`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_not_equal",
+            definition: Described(
+                "fn float_not_equal<T: float>(a: T, b: T) -> bool",
+                "Whether the two floats differ (true when either is NaN). Import it as the operator: `float_not_equal as !=`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_less_than",
+            definition: Described(
+                "fn float_less_than<T: float>(a: T, b: T) -> bool",
+                "Whether `a` is less than `b` (false when either is NaN). Import it as the operator: `float_less_than as <`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_greater_than",
+            definition: Described(
+                "fn float_greater_than<T: float>(a: T, b: T) -> bool",
+                "Whether `a` is greater than `b` (false when either is NaN). Import it as the operator: `float_greater_than as >`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_less_than_or_equal",
+            definition: Described(
+                "fn float_less_than_or_equal<T: float>(a: T, b: T) -> bool",
+                "Whether `a` is less than or equal to `b` (false when either is NaN). Import it as the operator: `float_less_than_or_equal as <=`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_float_greater_than_or_equal",
+            definition: Described(
+                "fn float_greater_than_or_equal<T: float>(a: T, b: T) -> bool",
+                "Whether `a` is greater than or equal to `b` (false when either is NaN). Import it as the operator: `float_greater_than_or_equal as >=`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_equal",
+            definition: Described(
+                "fn equal<T: any>(a: T, b: T) -> bool",
+                "Whether the two values are equal. Import it as the operator: `equal as ==`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_not_equal",
+            definition: Described(
+                "fn not_equal<T: any>(a: T, b: T) -> bool",
+                "Whether the two values differ. Import it as the operator: `not_equal as !=`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_less_than",
+            definition: Described(
+                "fn less_than<T: ord>(a: T, b: T) -> bool",
+                "Whether `a` is less than `b`. Import it as the operator: `less_than as <`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_greater_than",
+            definition: Described(
+                "fn greater_than<T: ord>(a: T, b: T) -> bool",
+                "Whether `a` is greater than `b`. Import it as the operator: `greater_than as >`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_less_than_or_equal",
+            definition: Described(
+                "fn less_than_or_equal<T: ord>(a: T, b: T) -> bool",
+                "Whether `a` is less than or equal to `b`. Import it as the operator: `less_than_or_equal as <=`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_greater_than_or_equal",
+            definition: Described(
+                "fn greater_than_or_equal<T: ord>(a: T, b: T) -> bool",
+                "Whether `a` is greater than or equal to `b`. Import it as the operator: `greater_than_or_equal as >=`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_logical_and",
+            definition: Described(
+                "fn logical_and(a: bool, b: bool) -> bool",
+                "Whether both are true; `b` is not evaluated when `a` is false. Import it as the operator: `logical_and as &&`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_logical_or",
+            definition: Described(
+                "fn logical_or(a: bool, b: bool) -> bool",
+                "Whether either is true; `b` is not evaluated when `a` is true. Import it as the operator: `logical_or as ||`.",
+            ),
+        },
+        BuiltinEntry {
+            callee: "__builtin_logical_not",
+            definition: Described(
+                "fn logical_not(a: bool) -> bool",
+                "Whether `a` is false. Import it as the operator: `logical_not as !`.",
+            ),
+        },
+    ]
+}.test({
+    let table = builtin_table();
+    // Each builtin is listed once.
+    assert(table$callee.distinct() == table$callee);
+    assert(table[0]? == BuiltinEntry { callee: "__builtin_print", definition: Declared });
+})

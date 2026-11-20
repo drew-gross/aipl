@@ -1332,3 +1332,92 @@ fn surfaces_compile_errors() {
     let err = Engine::compile("pub fn f() -> i64 { \"oops\" }");
     assert!(err.is_err());
 }
+
+/// The importable builtins are the AIPL table's, and `Callee` has an arm for each, in the table's order.
+#[test]
+fn the_builtins_table_lists_the_importable_callees() {
+    aipl::codegen::install_parser_hooks();
+    use aipl_syntax::ast::Callee;
+    use aipl_syntax::builtin::Builtin;
+    let listed: Vec<&Callee> = Builtin::all().iter().map(|b| &b.callee).collect();
+    let arms: Vec<&Callee> = Callee::IMPORTABLE.iter().collect();
+    assert_eq!(listed, arms);
+}
+
+#[test]
+fn a_builtin_is_found_by_callee_and_by_name() {
+    aipl::codegen::install_parser_hooks();
+    use aipl_syntax::ast::Callee;
+    use aipl_syntax::ast::SeqShape;
+    use aipl_syntax::builtin::Builtin;
+    let len = Builtin::named("len").expect("`len` is a builtin");
+    assert_eq!(len.callee, Callee::Len);
+    assert_eq!(Builtin::of(&Callee::Len), Some(len));
+    assert_eq!(Builtin::named("__builtin_len"), None);
+    assert_eq!(Builtin::of(&Callee::User("len".into())), None);
+    assert_eq!(Builtin::of(&Callee::Some), None);
+    // A shape-variadic builtin is found whatever shape was decided.
+    let decided = Callee::StartsWith(SeqShape::Elem);
+    assert_eq!(Builtin::of(&decided).map(|b| b.name()), Some("starts_with"));
+    // An import spelling, not a canonical name.
+    assert_eq!(Callee::importable("len"), Some(Callee::Len));
+    assert_eq!(Callee::importable("__builtin_len"), None);
+    assert_eq!(
+        Callee::importable("wrapping_add"),
+        Some(Callee::WrappingAdd)
+    );
+    assert_eq!(Callee::Len.display_name(), "len");
+}
+
+#[test]
+fn a_description_declares_the_function_it_describes() {
+    aipl::codegen::install_parser_hooks();
+    use aipl_syntax::builtin::{Builtin, Definition};
+    for b in Builtin::all() {
+        if let Definition::Described { signature, doc } = b.definition {
+            assert!(
+                signature.starts_with(&format!("fn {}", b.name())),
+                "`{}`: signature `{signature}`",
+                b.name()
+            );
+            assert!(!doc.is_empty(), "`{}` has no documentation", b.name());
+        }
+    }
+}
+
+/// The kind a builtin is filed under has to be the kind it is: a "declared" one with no declaration
+/// would show nothing, and a "described" one with a declaration would say something the declaration
+/// does not.
+#[test]
+fn declared_builtins_are_exactly_those_with_a_declaration() {
+    aipl::codegen::install_parser_hooks();
+    use aipl_syntax::builtin::{Builtin, Definition};
+    for b in Builtin::all() {
+        let declaration = format!("\nfn __builtin_{}", b.name());
+        let has_one =
+            aipl_syntax::BUILTIN_SIGNATURES.contains(&declaration) && !b.is_aipl_implemented();
+        assert_eq!(
+            has_one,
+            b.definition == Definition::Declared,
+            "`{}` is filed as {:?}",
+            b.name(),
+            b.definition
+        );
+    }
+}
+
+#[test]
+fn an_aipl_source_is_named_for_its_builtin_and_exists() {
+    aipl::codegen::install_parser_hooks();
+    use aipl_syntax::builtin::Builtin;
+    for b in Builtin::all() {
+        let Some(path) = b.source_path() else {
+            continue;
+        };
+        assert!(path.is_file(), "`{}`: {path:?} is missing", b.name());
+        assert_eq!(
+            Builtin::implemented_at(&path).map(|found| &found.callee),
+            Some(&b.callee)
+        );
+    }
+}

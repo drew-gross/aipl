@@ -46,35 +46,6 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 Each ends at a green `cargo handoff`.
 
-### 3.1. The builtins table in AIPL
-
-Goal: the table of importable builtins (`BUILTINS` in `aipl-syntax/src/builtin.rs`: callee, where
-its signature comes from, exports, library, public name, and the signature and prose of a
-described one) is AIPL data, and Rust reads it through the embedding FFI. It is stage 3.5's
-`Callee` variant's home, so there is one table and not a Rust copy and an AIPL copy to keep equal.
-
-The Rust `Callee` enum stays: mono matches its arms exhaustively, which is the point of it. What
-moves is the metadata, and `Callee`'s name <-> arm mapping becomes the one thing Rust keeps beside
-the enum (one macro-generated list of arm and canonical name, replacing the 224-arm `name()` match
-and `from_canonical`'s walk over `BUILTINS`). A test fails when the AIPL table and the enum disagree.
-
-- [ ] `builtin_table.aipl` in `aipl-codegen/src/`: `struct BuiltinEntry` and a `builtin_table()` entry
-  (small constructor functions `declared`, `written_in`, `described`, as the Rust ones), in
-  `DOGFOOD_SOURCE_FILES` and `DOGFOOD_ENTRIES`; `.test` blocks for lookups and for the invariants the
-  Rust `builtin.rs` tests check today (unique names, every written one has a file, ..).
-- [ ] The Rust `Builtin` API (`all`, `of`, `named`, `named_in`, `exporting_name`, `library_of`,
-  `import_statement`, `is_library`, `libraries`, `implemented_by`, `implemented_at`) is unchanged
-  for its ~37 callers outside `builtin.rs`: a hook installed by `install_parser_hooks` fetches the
-  table once into a `OnceLock<Vec<Builtin>>` (strings leaked, so `&'static` holds) and the
-  functions scan it as they scan the const now.
-- [ ] Rust unit tests under `aipl-syntax` and `aipl-loader` that reach the table (`builtin.rs`'s,
-  `callee.rs`'s reduction-step tests, `lib.rs:3768`) cannot install the hook from there; they move to
-  the `compiler` test target.
-- [ ] Bootstrap, in this order: (1) add the AIPL table beside the Rust one, with a Rust test comparing
-  them, and hand off so the live artifact carries it; (2) switch the Rust side to the hook and delete
-  the const table. The loader reads this table when it compiles the compiler's own sources, so the
-  live artifact must hold it before step 2.
-
 ### 3.5. Resolve callees before the lints
 
 Goal: a lint matches the callee it calls (`Len`, `Map`, ..) and not the spelling the file imported
@@ -86,8 +57,9 @@ baking and the per-file lints, on a tree without the source forms the lints read
 Rust-to-AIPL encoder. Resolution needs only the file's own imports (a path import is "not a
 builtin"), so a per-file AIPL pass between parse and lint suffices.
 
-- [ ] AIPL `variant Callee` generated from the Rust `BUILTINS` table (about 224 arms, plus `User(str)`
-  and `Local(str)`), with a test that fails when the two tables drift. Check compile time and that
+- [ ] AIPL `variant Callee` with an arm per importable builtin (`builtin_table.aipl` lists them; the
+  Rust enum's list is `Callee::IMPORTABLE`), plus `User(str)` and `Local(str)`, with a test that fails
+  when the AIPL variant, the table and the Rust enum drift. Check compile time and that
   a nested `Call(Len, args, _)` param pattern works; if not, lints compare with `==` or `is_case`.
 - [ ] A trailing defaulted slot on `ExprKind::Call` (the slot-at-end bootstrap trick, as `For.index`);
   `ffi_ast.rs` reads or ignores it.

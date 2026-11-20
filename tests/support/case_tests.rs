@@ -951,6 +951,7 @@ case_tests! {
     crates_aipl_codegen_src_ast = "crates/aipl-codegen/src/ast",
     crates_aipl_codegen_src_bound = "crates/aipl-codegen/src/bound",
     crates_aipl_codegen_src_brace_entry = "crates/aipl-codegen/src/brace_entry",
+    crates_aipl_codegen_src_builtin_table = "crates/aipl-codegen/src/builtin_table",
     crates_aipl_codegen_src_caret_block = "crates/aipl-codegen/src/caret_block",
     crates_aipl_codegen_src_clean_trailing_whitespace = "crates/aipl-codegen/src/clean_trailing_whitespace",
     crates_aipl_codegen_src_common_space_prefix = "crates/aipl-codegen/src/common_space_prefix",
