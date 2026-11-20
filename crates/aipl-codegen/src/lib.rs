@@ -2775,12 +2775,8 @@ pub fn builtin_table() -> Vec<aipl_syntax::builtin::TableRow> {
                     FfiValue::Opt(name) => name.as_deref().map(text),
                     other => panic!("dogfooded builtin_table() public_name: {other:?}"),
                 };
-                // An artifact built before the table named each callee's case has no `arm`.
-                let arm = match fields.iter().find(|(n, _)| n == "arm") {
-                    Some((_, FfiValue::Variant(case, payload))) if payload.is_empty() => {
-                        case.clone()
-                    }
-                    None => String::new(),
+                let arm = match field(fields, "arm") {
+                    FfiValue::Variant(case, payload) if payload.is_empty() => case.clone(),
                     other => panic!("dogfooded builtin_table() arm: {other:?}"),
                 };
                 TableRow {

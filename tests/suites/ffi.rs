@@ -1345,9 +1345,7 @@ fn the_builtins_table_lists_the_importable_callees() {
     // The AIPL `Callee` case of each row is the Rust arm of the same name.
     for (row, arm) in aipl::codegen::builtin_table().iter().zip(arms) {
         let debug = format!("{arm:?}");
-        if !row.arm.is_empty() {
-            assert_eq!(row.arm, debug.split('(').next().unwrap(), "{}", row.callee);
-        }
+        assert_eq!(row.arm, debug.split('(').next().unwrap(), "{}", row.callee);
     }
 }
 

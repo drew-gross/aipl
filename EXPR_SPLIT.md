@@ -35,6 +35,7 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 - `Expr<K = ExprKind>` with `kind: K`; a bare `Expr` means `Expr<ExprKind>`, so the existing code is unchanged.
 - `descendants_of_kind(self: Expr, arm: Case<ExprKind>)` is in `expr.aipl`; `body.descendants_of_kind::<Assign>()` is an `Expr<Assign>[]`.
+- A lint matches what a call is to by `Call`'s `callee: Callee?` slot (`callee == some(Callee.Len)`), filled by `resolve_callees.aipl` from the file's builtin imports and the locals in scope before the lints run; it never compares an imported spelling. `Callee` is the variant in `builtin_table.aipl`, one arm per importable builtin as the Rust enum has them. The slot has no default because a case with a keyword parameter cannot be a `Case<..>` argument. The advice a lint gives still spells a builtin as the file does (`filled`), and a lint of a call that is not yet ported may still use `bound_to`/`imported_as`.
 - `descendants_of_kind::<A>()` is spelled with the case as a type argument, like `collect_arms`.
 
 ## Open questions
@@ -46,35 +47,14 @@ arm type `A` of `ExprKind` is a node known to be that case.
 
 Each ends at a green `cargo handoff`.
 
-### 3.5. Resolve callees before the lints
-
-Goal: a lint matches the callee it calls (`Len`, `Map`, ..) and not the spelling the file imported
-it under, so `import { len as length }` and a local named `len` change nothing. Runs before the
-remaining lint ports in stage 4, which then need no `Names`.
-
-`resolve_callees.aipl` fills the `callee: Callee?` slot of every `Call` from the file's builtin
-imports (and the locals in scope) between hoisting and the lints, in `parse_and_partial_load` and in
-`lint_hits`; the program the rest of the compiler gets is the one before it. `Callee` is the variant
-in `builtin_table.aipl`, whose arms are the Rust enum's (`Callee::IMPORTABLE`); `Call`'s slot has no
-default because a case with a keyword parameter cannot be a `Case<..>` argument. A lint reads the
-slot as `callee == some(Len)`.
-
-- [ ] Port the five moved lints off `Names` and `bound_to`/`imported_as` matching (`value_or_compare`,
-  `len_gt_zero`, `is_empty_longhand`, and the other users of those two functions); `filled` keeps
-  the import spelling for advice text only. The lint drivers in `lint_hit.aipl` that call a lint
-  directly (`lint_function_messages` and its siblings) resolve before they do.
-- [ ] After the artifact carrying `arm` is promoted: `builtin_table()` in `aipl-codegen/src/lib.rs`
-  requires `arm` (it tolerates its absence for one round), and `the_builtins_table_lists_the_importable_callees`
-  stops skipping an empty one.
-
 ### 4. Move the lints
 
 Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?` use
 `descendants_of_kind::<C>()` and destructure the kind in the parameter.
 
-- [ ] Moved: `field_init_shorthand`, `set_spread_field`, `value_or_compare`, `len_gt_zero`, `is_empty_longhand` (the last three share `call_lints`, which builds each one's `Names` from the file's imports once per function). A lint over one kind is a function of one node (`self: Expr<C>`, destructured in place or read as `self.kind`) with no helper of its own unless it is shared; `lint.aipl` finds the nodes of a kind once per function (`construct_lints`, `assign_lints`) and maps each lint over them. A lint over a new kind adds a helper there. The named in-place form `self: Expr<C> { kind }` is parsed but not yet used by any lint.
+- [ ] Moved: `field_init_shorthand`, `set_spread_field`, `value_or_compare`, `len_gt_zero`, `is_empty_longhand` (the last three share `call_lints`). A lint over one kind is a function of one node (`self: Expr<C>`, destructured in place or read as `self.kind`) with no helper of its own unless it is shared; `lint.aipl` finds the nodes of a kind once per function (`construct_lints`, `assign_lints`) and maps each lint over them. A lint over a new kind adds a helper there. `self: Expr<C> { kind }` is the form for a lint that also needs the node's span.
 - [ ] One lint at a time (each is its own `.aipl` file with its own tests); the hit spans and
-  messages do not change.
+  messages do not change. A lint that matched imported names moves to `callee` matching as it moves.
 - [ ] `collect_expr_cases` (kinds alone) goes once nothing wants kinds without their node.
 
 ## Done when

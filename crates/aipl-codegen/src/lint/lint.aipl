@@ -20,8 +20,8 @@ import { field_init_shorthand } from "./field_init_shorthand.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
-import { is_empty_longhand, is_empty_longhand_names } from "./is_empty_longhand.aipl";
-import { len_gt_zero, len_gt_zero_names } from "./len_gt_zero.aipl";
+import { is_empty_longhand } from "./is_empty_longhand.aipl";
+import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
 import {
     LintHit,
@@ -61,7 +61,7 @@ import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
 import { unused_functions } from "./unused_functions.aipl";
 import { unused_imports } from "./unused_imports.aipl";
-import { value_or_compare, value_or_compare_names } from "./value_or_compare.aipl";
+import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
 import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 
@@ -130,17 +130,13 @@ fn construct_lints(Function { body }) -> LintHit[] {
     constructs$kind$field_init_shorthand().join()
 }
 
-# The lints over the calls of `function`, which are found once for all of them, with what the
-# file's imports make of the names they read.
+# The lints over the calls of `function`, which are found once for all of them.
 fn call_lints(Function { body }, items: Item[]) -> LintHit[] {
     let calls = body.descendants_of_kind::<Call>();
-    let value_or_names = items.value_or_compare_names();
-    let length_names = items.len_gt_zero_names();
-    let emptiness_names = items.is_empty_longhand_names();
     [
-        ..calls$kind$value_or_compare(value_or_names).collect_ok(),
-        ..calls$len_gt_zero(length_names).collect_ok().filled(items),
-        ..calls$is_empty_longhand(emptiness_names).collect_ok().filled(items),
+        ..calls$kind$value_or_compare().collect_ok(),
+        ..calls$len_gt_zero().collect_ok().filled(items),
+        ..calls$is_empty_longhand().collect_ok().filled(items),
     ]
 }
 
