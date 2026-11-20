@@ -1,0 +1,13 @@
+# The list names every type parameter and arm parameter, or all but the ones a case determines.
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+fn none_of<V: variant, A: arm of V>(self: V[]) -> A[] { [] }
+
+pub fn circles(shapes: Shape[]) -> Circle[] { shapes.none_of::<Shape, Circle, Dot>() }
+--- check --compile ---
+error: fn "none_of" takes type arguments (V, A), got 3; name all of them, or all but the ones a case determines (V)
+ --> ./tests/cases/variants/err_arm_parameter_arity.aipl:7:47
+  |
+7 | pub fn circles(shapes: Shape[]) -> Circle[] { shapes.none_of::<Shape, Circle, Dot>() }
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

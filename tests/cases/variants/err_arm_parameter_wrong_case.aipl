@@ -1,0 +1,13 @@
+# `A` is the case written, so a result declared as another case does not match it.
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+fn none_of<V: variant, A: arm of V>(self: V[]) -> A[] { [] }
+
+pub fn squares(shapes: Shape[]) -> Square[] { shapes.none_of::<Circle>() }
+--- check --compile ---
+error: fn "squares": body returns (Shape without Dot without Square)[], but the declared return type is (Shape without Circle without Dot)[]
+ --> ./tests/cases/variants/err_arm_parameter_wrong_case.aipl:7:47
+  |
+7 | pub fn squares(shapes: Shape[]) -> Square[] { shapes.none_of::<Circle>() }
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^

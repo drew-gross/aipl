@@ -2847,6 +2847,38 @@ impl Pinner<'_> {
                     .iter()
                     .take_while(|tp| tp.default.is_none())
                     .count();
+                if !sig.arm_params.is_empty() {
+                    // The list is every type parameter and then every arm parameter, or the
+                    // same without the type parameters the arm parameters determine.
+                    let lengths = explicit_lengths(&sig);
+                    if !lengths.contains(&tys.len()) {
+                        let listed: Vec<String> = sig
+                            .type_vars
+                            .iter()
+                            .map(|tp| tp.name.clone())
+                            .chain(sig.arm_params.iter().map(|(arm, _)| arm.clone()))
+                            .collect();
+                        return reject(
+                            format!(
+                                "fn {:?} takes type arguments ({}), got {}; name all of them, \
+                                 or all but the ones a case determines ({})",
+                                display(callee.name()),
+                                listed.join(", "),
+                                tys.len(),
+                                sig.arm_params
+                                    .iter()
+                                    .map(|(_, of)| of.clone())
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
+                            &call.span,
+                        );
+                    }
+                    self.explicit_args = Some(tys.clone());
+                    let typed = self.expr_at(call, pos);
+                    self.explicit_args = None;
+                    return typed;
+                }
                 if tys.len() < required || tys.len() > sig.type_vars.len() {
                     let declared: Vec<String> =
                         sig.type_vars.iter().map(|tp| tp.name.clone()).collect();
@@ -3460,15 +3492,38 @@ impl Pinner<'_> {
             });
         }
         // `f::<u8>(x)`: the written type arguments are the variables' types.
+        let mut written_arms: Vec<(String, It)> = Vec::new();
         if let Some(written) = self.explicit_args.take() {
             let mut given = written;
-            for tp in &sig.type_vars[given.len()..] {
-                given.push(tp.default.clone().expect("the rest have defaults"));
+            if sig.arm_params.is_empty() {
+                for tp in &sig.type_vars[given.len()..] {
+                    given.push(tp.default.clone().expect("the rest have defaults"));
+                }
             }
-            for (var, ty) in type_args.iter().zip(&given) {
+            // With arm parameters the list is the type parameters (less the ones a case
+            // determines, when the list is the short one), then the arm parameters.
+            let determined: Vec<&String> = sig.arm_params.iter().map(|(_, of)| of).collect();
+            let all = given.len() == sig.type_vars.len() + sig.arm_params.len();
+            let listed: Vec<usize> = (0..sig.type_vars.len())
+                .filter(|i| {
+                    sig.arm_params.is_empty()
+                        || all
+                        || !determined.contains(&&sig.type_vars[*i].name)
+                })
+                .collect();
+            for (slot, ty) in given.iter().enumerate() {
                 let ty = self.lower(ty, &HashMap::new(), span)?;
-                self.agree(var, &ty)
-                    .or_else(|m| reject(format!("the type argument does not fit ({m})"), span))?;
+                match listed.get(slot) {
+                    Some(i) if sig.arm_params.is_empty() || slot < listed.len() => {
+                        self.agree(&type_args[*i], &ty).or_else(|m| {
+                            reject(format!("the type argument does not fit ({m})"), span)
+                        })?;
+                    }
+                    _ => {
+                        let arm = &sig.arm_params[slot - listed.len()];
+                        written_arms.push((arm.0.clone(), ty));
+                    }
+                }
             }
         }
         // Each refinement parameter is a name of its own at this call, settled by the arguments.
@@ -3485,6 +3540,50 @@ impl Pinner<'_> {
                 self.table.case_slots.insert(slot.clone(), None);
                 self.domains.insert(slot.clone(), variant);
                 names.insert(param, slot);
+            }
+            // `f::<Circle>`: a case written for an arm parameter is its arm type. Its base is
+            // the variant the parameter's type parameter stands for, and the cases it excludes
+            // are what the parameter stands for.
+            for (arm, ty) in std::mem::take(&mut written_arms) {
+                let of = &sig
+                    .arm_params
+                    .iter()
+                    .find(|(a, _)| *a == arm)
+                    .expect("an arm parameter")
+                    .1;
+                let members: Vec<String> = self
+                    .table
+                    .exclusions(&ty)
+                    .into_iter()
+                    .filter_map(|x| match x {
+                        aipl_syntax::ast::Exclusion::NamedCase(c) => Some(c),
+                        _ => None,
+                    })
+                    .collect();
+                let base = self.unrefined(&ty);
+                let one_case = match &base {
+                    It::Named(v) => self.decls.variants.get(v.as_str()).is_some_and(|cases| {
+                        cases.iter().filter(|(c, _)| !members.contains(c)).count() == 1
+                    }),
+                    _ => false,
+                };
+                if !one_case {
+                    return reject(
+                        format!(
+                            "the type argument for {arm:?} must be one case of {of:?}, not {}",
+                            self.table.show(&ty)
+                        ),
+                        span,
+                    );
+                }
+                if let Some(i) = sig.type_vars.iter().position(|tp| tp.name == *of) {
+                    self.agree(&type_args[i], &base).or_else(|m| {
+                        reject(format!("the type argument does not fit ({m})"), span)
+                    })?;
+                }
+                self.table
+                    .case_slots
+                    .insert(names[&arm].clone(), Some(members));
             }
             Some(std::mem::replace(&mut self.case_names, names))
         };
@@ -5650,43 +5749,67 @@ fn typed_pattern_case(p: &TPattern<It>) -> Option<&str> {
 }
 
 /// The variant each refinement parameter of `sig` takes its cases from: the base of a
+/// How many type arguments a call of a function with arm parameters may write: all of its type
+/// parameters and arm parameters, or all but the type parameters its arm parameters determine.
+fn explicit_lengths(sig: &aipl_syntax::ast::Signature) -> Vec<usize> {
+    let all = sig.type_vars.len() + sig.arm_params.len();
+    let mut determined: Vec<&String> = sig.arm_params.iter().map(|(_, of)| of).collect();
+    determined.sort();
+    determined.dedup();
+    vec![all, all - determined.len()]
+}
+
 /// `T without X` written in the signature, which has to be a named type.
 fn case_domains(sig: &aipl_syntax::ast::Signature) -> Result<HashMap<String, String>, String> {
-    fn walk(t: &Type, params: &[String], out: &mut HashMap<String, String>) {
+    fn walk(
+        t: &Type,
+        params: &[String],
+        arms: &[(String, String)],
+        out: &mut HashMap<String, String>,
+    ) {
         match t {
             Type::Without(base, aipl_syntax::ast::Exclusion::NamedCase(n))
                 if params.contains(n) =>
             {
-                if let Type::Named(v) = aipl_syntax::unrefined(base) {
-                    out.entry(n.clone()).or_insert_with(|| v.clone());
+                match aipl_syntax::unrefined(base) {
+                    Type::Named(v) => {
+                        out.entry(n.clone()).or_insert_with(|| v.clone());
+                    }
+                    // An arm parameter's variant is a type parameter, so the domain is not a
+                    // declared variant: it is named for the parameter, which no declaration
+                    // reaches.
+                    Type::TypeVar(v) if arms.iter().any(|(arm, of)| arm == n && of == v) => {
+                        out.entry(n.clone()).or_insert_with(|| format!("<{v}>"));
+                    }
+                    _ => {}
                 }
-                walk(base, params, out);
+                walk(base, params, arms, out);
             }
             Type::Without(i, _)
             | Type::Case(i)
             | Type::Optional(i)
             | Type::Array(i)
-            | Type::Set(i, _) => walk(i, params, out),
+            | Type::Set(i, _) => walk(i, params, arms, out),
             Type::Dict(a, b) | Type::Result(a, b) => {
-                walk(a, params, out);
-                walk(b, params, out);
+                walk(a, params, arms, out);
+                walk(b, params, arms, out);
             }
             Type::Generic(_, args) | Type::Tuple(args) => {
-                args.iter().for_each(|a| walk(a, params, out))
+                args.iter().for_each(|a| walk(a, params, arms, out))
             }
             Type::Fn(ps, r) => {
-                ps.iter().for_each(|p| walk(p, params, out));
-                walk(r, params, out);
+                ps.iter().for_each(|p| walk(p, params, arms, out));
+                walk(r, params, arms, out);
             }
             _ => {}
         }
     }
     let mut out = HashMap::new();
     for p in &sig.params {
-        walk(&p.ty, &sig.case_params, &mut out);
+        walk(&p.ty, &sig.case_params, &sig.arm_params, &mut out);
     }
     if let Some(r) = &sig.return_ty {
-        walk(r, &sig.case_params, &mut out);
+        walk(r, &sig.case_params, &sig.arm_params, &mut out);
     }
     for name in &sig.case_params {
         if !out.contains_key(name) {

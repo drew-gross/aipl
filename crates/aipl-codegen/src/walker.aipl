@@ -863,6 +863,11 @@ fn type_param_list(self: W, acc0: Doc[]) -> WDocs!FmtError {
 # `T: ord` — the `: bound` half of a type parameter.
 fn param_bound(self: W, name: str) -> WDoc {
     let WStr { w, text } = self.bump().w.bump();
+    // `A: arm of V`: the bound is three tokens.
+    if (text == "arm" && w.peek_text() == "of") {
+        let WStr { w as after, text as of } = w.bump().w.bump();
+        return WDoc { w: after, doc: Text(`{name}: arm of {of}`) };
+    };
     WDoc { w, doc: Text(`{name}: {text}`) }
 }
 

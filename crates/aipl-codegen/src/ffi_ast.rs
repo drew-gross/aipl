@@ -160,24 +160,78 @@ fn function_is_pub(v: &FfiValue) -> R<bool> {
 
 fn function(v: &FfiValue) -> R<ast::Function> {
     let sig = field(v, "sig")?;
-    // A refinement parameter (`<X: cases>`) is not a type variable: it is kept apart.
-    let (case_vars, type_vars): (Vec<_>, Vec<_>) = each(field(sig, "type_vars")?, type_param)?
+    // A refinement parameter (`<X: cases>`) is not a type variable: it is kept apart. So is an
+    // arm parameter (`<A: arm of V>`), which is one that stands for every case of `V` but one.
+    let mut arms: Vec<(String, String)> = Vec::new();
+    let mut declared = Vec::new();
+    let FfiValue::Array(written) = field(sig, "type_vars")? else {
+        return Err("expected an array of type parameters".to_string());
+    };
+    for tp in written {
+        match variant(field(tp, "bound")?)? {
+            ("Arm", payload) => {
+                arms.push((text(field(tp, "name")?)?, text(at(payload, 0, "Arm")?)?))
+            }
+            _ => declared.push(type_param(tp)?),
+        }
+    }
+    let (case_vars, type_vars): (Vec<_>, Vec<_>) = declared
         .into_iter()
         .partition(|p| p.bound == ast::Bound::Cases);
-    let case_params: Vec<String> = case_vars.into_iter().map(|p| p.name).collect();
+    let mut case_params: Vec<String> = case_vars.into_iter().map(|p| p.name).collect();
+    case_params.extend(arms.iter().map(|(arm, _)| arm.clone()));
+    let mut params: Vec<ast::Param> = each(field(sig, "params")?, param)?;
+    let mut return_ty = maybe(field(sig, "return_ty")?, ty)?;
+    for (arm, of) in &arms {
+        let stands_for = ast::Type::Without(
+            Box::new(ast::Type::TypeVar(of.clone())),
+            ast::Exclusion::NamedCase(arm.clone()),
+        );
+        for p in &mut params {
+            replace_type_var(&mut p.ty, arm, &stands_for);
+        }
+        if let Some(r) = &mut return_ty {
+            replace_type_var(r, arm, &stands_for);
+        }
+    }
     Ok(ast::Function {
         name: span_str(field(v, "name")?)?,
         is_pub: function_is_pub(v)?,
         sig: ast::Signature {
             type_vars,
             case_params,
-            params: each(field(sig, "params")?, param)?,
+            arm_params: arms,
+            params,
             effects: each(field(sig, "effects")?, text)?,
-            return_ty: maybe(field(sig, "return_ty")?, ty)?,
+            return_ty,
         },
         body: expr(field(v, "body")?)?,
         doc: maybe(field(v, "doc")?, text)?,
     })
+}
+
+/// `t` with every use of the type variable `name` written as `with`.
+fn replace_type_var(t: &mut ast::Type, name: &str, with: &ast::Type) {
+    use ast::Type as T;
+    match t {
+        T::TypeVar(n) if n == name => *t = with.clone(),
+        T::Case(i) | T::Optional(i) | T::Array(i) | T::Set(i, _) | T::Without(i, _) => {
+            replace_type_var(i, name, with)
+        }
+        T::Dict(a, b) | T::Result(a, b) => {
+            replace_type_var(a, name, with);
+            replace_type_var(b, name, with);
+        }
+        T::Fn(ps, r) => {
+            ps.iter_mut().for_each(|p| replace_type_var(p, name, with));
+            replace_type_var(r, name, with);
+        }
+        T::Tuple(es) | T::Generic(_, es) => {
+            es.iter_mut().for_each(|e| replace_type_var(e, name, with))
+        }
+        T::Unit | T::Primitive(_) | T::Named(_) | T::TypeVar(_) | T::Any => {}
+        _ => {}
+    }
 }
 
 fn param(v: &FfiValue) -> R<ast::Param> {

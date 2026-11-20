@@ -1,0 +1,12 @@
+# `arm of V` needs `V` to be a `variant` type parameter of the same list.
+
+fn widen<A: arm of V>(x: A) -> A { x }
+
+pub fn id(n: i64) -> i64 { n }
+
+--- check --compile ---
+error: "A" is a case of "V", which is not a `variant` type parameter of this list
+ --> ./tests/cases/variants/err_arm_of_not_a_variant_parameter.aipl:3:10
+  |
+3 | fn widen<A: arm of V>(x: A) -> A { x }
+  |          ^

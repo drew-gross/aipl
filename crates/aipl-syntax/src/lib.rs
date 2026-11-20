@@ -696,6 +696,10 @@ pub mod ast {
         /// The refinement parameters (`<X: cases>`): sets of case names a `without X` clause
         /// in the signature leaves out. Not types, so they are not in `type_vars`.
         pub case_params: Vec<String>,
+        /// The refinement parameters that stand for one case of a variant (`<A: arm of V>`),
+        /// each with the type parameter naming the variant: `(A, V)`. Every one is also in
+        /// `case_params`, and its uses in the signature are written `V without A`.
+        pub arm_params: Vec<(String, String)>,
         pub params: Vec<Param>,
         /// Effects declared in the signature, e.g. `!prints`. Callers of this
         /// function must declare at least these effects themselves.
@@ -3790,6 +3794,7 @@ pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
             sig: ast::Signature {
                 type_vars: decl.sig.type_vars.clone(),
                 case_params: decl.sig.case_params.clone(),
+                arm_params: decl.sig.arm_params.clone(),
                 params: vec![ast::Param {
                     name_span: Default::default(),
                     name: "self".to_string(),

@@ -1809,6 +1809,7 @@ fn synthesize_driver(program: &Program, kind: TestKind) -> Program {
         sig: AstSignature {
             type_vars: Vec::new(),
             case_params: Vec::new(),
+            arm_params: Vec::new(),
             params: Vec::new(),
             effects: all_effects(),
             return_ty: Some(Type::Primitive(Primitive::I64)),

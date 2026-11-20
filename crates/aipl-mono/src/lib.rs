@@ -330,6 +330,7 @@ fn ctor_wrapper_fn(w: &CtorWrapper, ctor: &str) -> Function {
         sig: Signature {
             type_vars: Vec::new(),
             case_params: Vec::new(),
+            arm_params: Vec::new(),
             params,
             effects: Vec::new(),
             return_ty: Some(Type::Named(w.variant.clone())),
@@ -3871,6 +3872,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
         sig: Signature {
             type_vars,
             case_params: f.sig.case_params.clone(),
+            arm_params: f.sig.arm_params.clone(),
             params,
             return_ty: f.sig.return_ty.clone(),
             effects: f.sig.effects.clone(),

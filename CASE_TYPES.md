@@ -26,10 +26,13 @@ What exists today (read from the code and probed with `aipl check`):
   a `<X: cases>` parameter is a set of *excluded* cases, only declarable as `T without X` in the
   signature, and `case_params` is kept apart from `type_vars`, so a call's type-argument list does
   not count it (`fn "holds" takes 1 type argument(s) (T), got 2`).
-- **There is no type parameter that ranges over one case of a variant**, so no function accepts
-  "one case of any variant". `as_case`/`is_case`/`collect_arms` take `arm: Case<T>` and the
-  checker special-cases that argument as a constructor name (`refine_collected_arms`, the
-  "needs the case written as a constructor name" refusal pinned by `err_as_case_value.aipl`).
+- **`<V: variant, A: arm of V>` is a type parameter that ranges over one case of a variant**: lowered
+  at the FFI boundary into a refinement parameter standing for the other cases, with `A` written
+  `V without A` in the signature; inferred from an argument's arm type or written as a type
+  argument, which may leave `V` out (`variants/arm_parameter.aipl`).
+- `as_case`/`is_case`/`collect_arms` still take `arm: Case<T>` and the checker special-cases that
+  argument as a constructor name (`refine_collected_arms`, the "needs the case written as a
+  constructor name" refusal pinned by `err_as_case_value.aipl`).
 - `Case<V>` (the tag as a value, `Type::Case`) is a different thing from the arm type and stays.
 
 ## Committed decisions
@@ -38,16 +41,14 @@ What exists today (read from the code and probed with `aipl check`):
 - A case-kinded type parameter is a *type* parameter: it is passed and inferred like `T`, and
   an explicit call may name it. `cases` (the excluded set, used with `without`) is untouched.
 - The new bound is spelled `<V: variant, A: arm of V>`: it names the variant, so a signature can
-  relate `A` to `V` (`(xs: V[]) -> A[]`).
+  relate `A` to `V` (`(xs: V[]) -> A[]`). An explicit type-argument list may leave out `V`, which
+  `A` determines: `xs.collect_arms::<Circle>()`.
 - A case with named payload is struct-like once its case is known: a value typed as the arm type has
   the payload slots as fields, and a struct-style pattern naming the case follows from that.
   A value of the plain variant has no such fields, as it has no `Circle(r)` pattern in a `let`.
 
 ## Open questions
 
-- Whether an explicit type-argument list may leave out a parameter another one determines:
-  `A: arm of V` fixes `V`, so `xs.collect_arms::<Circle>()` could name only `A`, at the cost of a
-  rule more than "all or none". The alternative is `collect_arms::<Shape, Circle>()`.
 - Whether `A` can be reflected to a `Case<V>` value in a body (needed to write `collect_arms`
   itself in AIPL: `self.filter(|x| x.is_case(<A as a value>))`). If not, the migration keeps a
   compiler-typed `collect_arms` and only retypes its signature.
@@ -70,15 +71,18 @@ for a plain one.
   when a case of it declares the field, say the value has to be known to be that case.
 - [ ] Cases for each under `tests/cases/variants/`.
 
-### 2. A type parameter ranging over one case of a variant
+### 2. Finishing the arm parameter
 
-Goal: `fn f<V: variant, A: <new bound>>(x: A) -> ..` accepts any one case of any variant.
+Goal: the rough edges of `<V: variant, A: arm of V>` (`variants/arm_parameter.aipl`).
 
-- [ ] The bound `A: arm of V`; inferred from an argument's arm type, or given by stage 2.
-- [ ] Inside the body `A` is its variant (the arm type "goes wherever its variant does").
-- [ ] Cases: inferred, explicit, and refused for a value that is not one case.
-- [ ] Explicit type arguments for it: the list is all of a function's type parameters or none, so
-  `xs.collect_arms::<Shape, Circle>()` would have to name the variant as well. See the open question.
+- [ ] An arm parameter nothing infers (a result-only one with no `::<Case>`) stays unsettled, and the
+  message names the parameter (`body returns (Shape without A)[] ..`) instead of saying it has to be
+  written. Inferring it from where the result goes is not done: `agree` only settles a slot from the
+  value given, not from the type wanted.
+- [ ] The explicit-argument refusal says `one case of "V"` with the parameter's name; say the variant.
+- [ ] A body cannot yet produce an `A` from a `V` (it is `V` less cases it cannot see), so
+  `collect_arms` itself needs a compiler hook or a way to reflect `A` to a `Case<V>` value (see the
+  open question); stage 3 decides.
 
 ### 3. Retype `is_case`, `as_case` and `collect_arms`
 

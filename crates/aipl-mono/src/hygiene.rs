@@ -371,6 +371,7 @@ mod tests {
             sig: Signature {
                 type_vars: Vec::new(),
                 case_params: Vec::new(),
+                arm_params: Vec::new(),
                 params: Vec::new(),
                 effects: Vec::new(),
                 return_ty: None,

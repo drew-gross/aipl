@@ -1,0 +1,28 @@
+# `A: arm of V` is a type parameter that stands for one case of the variant `V`: the type is
+# `V` less every other case. The case is inferred from an argument, or written as a type
+# argument; written, it determines `V`, so the list may leave `V` out.
+
+import { equal as == } from builtins;
+
+variant Shape = Circle(r: i64) | Square(side: i64) | Dot
+
+// Inferred from the argument's arm type. In the body `A` goes wherever `V` does.
+fn widen<V: variant, A: arm of V>(x: A) -> V { x }.test({
+    assert(widen(Circle(1)) == Circle(1));
+    assert(widen(Dot) == Dot);
+})
+
+// Only the result names `A`, so a call has to write it.
+fn none_of<V: variant, A: arm of V>(self: V[]) -> A[] { [] }.test({
+    let shapes = [Circle(1), Square(2)];
+    // With the variant written and with it left out.
+    let circles: Circle[] = shapes.none_of::<Shape, Circle>();
+    assert(circles == []);
+    assert(shapes.none_of::<Square>() == []);
+    assert(none_of::<Dot>(shapes) == []);
+})
+
+// What a function says about its result is held to what was written.
+fn squares(shapes: Shape[]) -> Square[] { shapes.none_of::<Square>() }.test({
+    assert(squares([Dot]) == []);
+})

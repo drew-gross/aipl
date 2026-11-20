@@ -144,7 +144,12 @@ import {
     VariantCase as AVariantCase,
     ast_case_name,
 } from "./ast.aipl";
-import { Any as BoundAny, Variant as BoundVariant, bound_from_name } from "./bound.aipl";
+import {
+    Any as BoundAny,
+    Arm as BoundArm,
+    Variant as BoundVariant,
+    bound_from_name,
+} from "./bound.aipl";
 import { BraceEntry, Key, Pair, brace_literal } from "./brace_entry.aipl";
 import {
     Cst,
@@ -554,6 +559,7 @@ fn items() -> Production<AiplTok, Ast>[] {
     // `T`, `T: bound`, and either with a default type after `=`: `T = i64`,
     // `T: ord = u8`. Longest first.
     let type_param: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit(":"), Lit("arm"), Lit("of"), Term(Name)]),
         Then([Term(Name), Lit(":"), OneOf([Term(Name), Lit("variant")]), Lit("="), Named("ty")]),
         Then([Term(Name), Lit(":"), OneOf([Term(Name), Lit("variant")])]),
         Then([Term(Name), Lit("="), Named("ty")]),
@@ -3632,7 +3638,19 @@ fn lower_effect(src: str, node: Parts, kids: Ast[]) -> Ast {
 
 fn lower_type_params(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    ok(ATypeParams(kids.try_map(|k| as_type_param(k, sp))?))
+    let params = kids.try_map(|k| as_type_param(k, sp))?;
+    // `A: arm of V` is a case of `V`, so `V` has to be a variant parameter of the same list.
+    for (let param : params) {
+        if (let BoundArm(of) = param.bound) {
+            if (!params.any(|other| other.name == of && other.bound == BoundVariant)) {
+                return err(ParseError {
+                    message: `"{param.name}" is a case of "{of}", which is not a \`variant\` type parameter of this list`,
+                    span: param.name_span,
+                });
+            };
+        };
+    }
+    ok(ATypeParams(params))
 }
 
 # `type_param` — `name`, `name: bound`, or `name: variant`, with a default type after
@@ -3649,6 +3667,9 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     match (node.own_texts(src)) {
         [name, ":", "variant", ..] => {
             ok(ATypeParam(TypeParam { name, bound: BoundVariant, default, name_span }))
+        },
+        [name, ":", "arm", "of", variant_name] => {
+            ok(ATypeParam(TypeParam { name, bound: BoundArm(variant_name), default, name_span }))
         },
         [name, ":", bound_name, ..] => {
             let bound = bound_from_name(bound_name).value_or_err(ParseError {
@@ -5435,6 +5456,11 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(program_dump("fn f<T = str>(a: T) { }") == "fn f<T: any = str>(a: T) = ()");
     assert(
         program_dump(
+            "fn f<V: variant, A: arm of V>(a: V) { }",
+        ) == "fn f<V: variant, A: arm of V>(a: V) = ()",
+    );
+    assert(
+        program_dump(
             "fn f<T: ord = u8, U>(a: T, b: U) { }",
         ) == "fn f<T: ord = u8, U: any>(a: T, b: U) = ()",
     );
@@ -5913,6 +5939,15 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
             err(f) => f.errors$message,
         }
     }
+
+    // An arm parameter names a `variant` parameter of its own list.
+    assert(messages("fn f<V: variant, A: arm of V>(a: V) { }") == []);
+    assert(messages("fn f<A: arm of V>(a: A) { }") == [
+        ```"A" is a case of "V", which is not a `variant` type parameter of this list```,
+    ]);
+    assert(messages("fn f<V, A: arm of V>(a: V) { }") == [
+        ```"A" is a case of "V", which is not a `variant` type parameter of this list```,
+    ]);
 
     // A program that parses has no errors.
     assert(messages("fn f() { let x = 1; x }") == []);

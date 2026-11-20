@@ -7,8 +7,9 @@ import { equal as == } from builtins;
 # accepts anything, `ord` narrows to the primitives usable with `<`/`>`, `int`
 # to the integer primitives, and `variant` to the tagged types a `match` can
 # inspect. `cases` is not a type bound but a refinement parameter: a set of case names
-# that a `without` clause leaves out.
-variant Bound = Any | Ord | Int | Variant | Cases
+# that a `without` clause leaves out. `arm of V` is one case of the variant `V`, another
+# parameter of the same list: the type is `V` with every other case left out.
+variant Bound = Any | Ord | Int | Variant | Cases | Arm(of: str)
 
 # The bound a keyword names, or `none` when it names none of them. The
 # `variant` bound has a keyword of its own in the grammar and so never reaches
@@ -40,5 +41,6 @@ pub fn show_bound(self: Bound) -> str {
         Int => "int",
         Variant => "variant",
         Cases => "cases",
+        Arm(of) => `arm of {of}`,
     }
 }
