@@ -4595,7 +4595,7 @@ pub fn expand_refinements(
 /// The declarations of the arm types `program` writes: a case's name where a
 /// type goes, which the loader resolves to the case-qualified `Case@Variant` it
 /// resolves a constructor to. An arm type is its variant less every other case —
-/// the type `xs.collect_arms(Case)` has for its elements — so a `match` on a
+/// the type `xs.collect_arms::<Case>()` has for its elements — so a `match` on a
 /// value of it needs that arm and no other, and the value goes wherever its
 /// variant does.
 ///

@@ -92,7 +92,17 @@ pub(crate) fn expand_keyword_args(program: &Program, root_index: u32) -> Result<
         })
         .collect();
 
+    let variants = program
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Variant(v) => Some((v.name.text.clone(), v.clone())),
+            _ => None,
+        })
+        .collect();
     let mut cx = Expander {
+        case_from_type_argument: false,
+        variants,
         fns,
         defaults: HashMap::new(),
         expanding: Vec::new(),
@@ -313,6 +323,19 @@ impl FnKwInfo {
 /// The name a variant case's constructor is called by after loader rewriting:
 /// the variant-qualified `Case@Variant`. Shared so the registration and the
 /// write-back agree on one spelling.
+/// The builtins that take a case: `x.is_case::<Circle>()`, `x.as_case::<Circle>()` and
+/// `xs.collect_arms::<Circle>()`.
+fn short_name(callee: &Callee) -> &str {
+    callee.name().trim_start_matches("__builtin_")
+}
+
+fn takes_case(callee: &Callee) -> bool {
+    matches!(
+        callee,
+        Callee::IsCase | Callee::AsCase | Callee::CollectArms
+    )
+}
+
 fn ctor_name(v: &VariantDecl, c: &VariantCase) -> String {
     format!("{}@{}", c.name, v.name)
 }
@@ -362,6 +385,10 @@ fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
 }
 
 struct Expander {
+    /// Set while the call a case written as a type argument became is expanded.
+    case_from_type_argument: bool,
+    /// Every declared variant, by name: which case a case written as a type argument is.
+    variants: HashMap<String, VariantDecl>,
     /// The function whose body is being expanded, and the keyword arguments
     /// written in the program so far: in which function, where the name is
     /// written, which function it was passed to and for which parameter.
@@ -1345,6 +1372,52 @@ impl Expander {
     /// Structurally expand `e`: rewrite every call as [`expand_call_args`]
     /// describes, tracking `locals` so a call through (or a reference to) a
     /// local binding is never confused with a global function of the same name.
+    /// The constructor a case written as a type argument names: `Circle` is the arm type of
+    /// `Shape` (the variant less every other case), so what is left of the variant after the
+    /// exclusions is the case, spelled as a constructor is.
+    fn case_written_as_type(
+        &self,
+        callee: &Callee,
+        ty: &Type,
+        span: &Span,
+    ) -> Result<String, Error> {
+        // A case of a generic variant written without its arguments is left as its name.
+        if let Type::Named(n) | Type::Generic(n, _) = ty {
+            if n.contains('@') {
+                return Ok(n.clone());
+            }
+        }
+        let mut excluded: Vec<&str> = Vec::new();
+        let mut base = ty;
+        while let Type::Without(inner, aipl_syntax::ast::Exclusion::NamedCase(c)) = base {
+            excluded.push(c);
+            base = inner;
+        }
+        let variant = match base {
+            Type::Named(n) | Type::Generic(n, _) => self.variants.get(n),
+            _ => None,
+        };
+        let left: Vec<&VariantCase> = variant
+            .map(|v| {
+                v.cases
+                    .iter()
+                    .filter(|c| !excluded.contains(&&*c.name.text))
+                    .collect()
+            })
+            .unwrap_or_default();
+        match (variant, left.as_slice()) {
+            (Some(v), [case]) => Ok(ctor_name(v, case)),
+            _ => Err(Error::at(
+                format!(
+                    "{} takes one case of a variant as its type argument, as in `{}::<Circle>(..)`",
+                    short_name(callee),
+                    short_name(callee)
+                ),
+                span.clone(),
+            )),
+        }
+    }
+
     fn expand_expr(&mut self, e: &Expr, locals: &HashSet<String>) -> Result<Expr, Error> {
         let with = |name: &str| -> HashSet<String> {
             let mut s = locals.clone();
@@ -1404,6 +1477,31 @@ impl Expander {
                 ));
             }
             ExprKind::Call(name, args, method_style) => {
+                let from_type_argument = std::mem::take(&mut self.case_from_type_argument);
+                // The constructor as an argument (`x.is_case::<Circle>()`) is what a case written as a
+                // type argument becomes, and is not a spelling of its own. A variable in that
+                // position (as in the builtins' own bodies) is left to the checker.
+                if takes_case(name)
+                    && !from_type_argument
+                    && matches!(args.get(1).map(|a| &a.kind), Some(ExprKind::Ident(n)) if n.contains('@'))
+                {
+                    return Err(Error::at(
+                        format!(
+                            "write the case of {short} as a type argument, as in `{short}::<Circle>(..)`",
+                            short = short_name(name)
+                        ),
+                        e.span.clone(),
+                    ));
+                }
+                if takes_case(name) && args.len() == 1 {
+                    return Err(Error::at(
+                        format!(
+                            "{short} needs the case as a type argument, as in `{short}::<Circle>(..)`",
+                            short = short_name(name)
+                        ),
+                        e.span.clone(),
+                    ));
+                }
                 // Expand within each argument first (a keyword argument's value
                 // is expanded; the KwArg wrapper itself is handled below).
                 let args: Vec<Expr> = args
@@ -1602,6 +1700,33 @@ impl Expander {
                     .transpose()?,
             ),
             ExprKind::Try(x) => ExprKind::Try(Box::new(self.expand_expr(x, locals)?)),
+            // `x.is_case::<Circle>()`: the case written as a type argument is the constructor the
+            // builtin has been taking as an argument.
+            ExprKind::TypeArgs(x, tys) if matches!(&x.kind, ExprKind::Call(c, ..) if takes_case(c)) =>
+            {
+                let ExprKind::Call(callee, args, method_style) = &x.kind else {
+                    unreachable!("matched above")
+                };
+                let [ty] = tys.as_slice() else {
+                    return Err(Error::at(
+                        format!(
+                            "{} takes the case as its one type argument, as in `{}::<Circle>(..)`",
+                            short_name(callee),
+                            short_name(callee)
+                        ),
+                        x.span.clone(),
+                    ));
+                };
+                let case = self.case_written_as_type(callee, ty, &x.span)?;
+                let mut with_case = args.clone();
+                with_case.push(Expr::new(ExprKind::Ident(case), x.span.clone()));
+                let call = Expr {
+                    kind: ExprKind::Call(callee.clone(), with_case, *method_style),
+                    ..(**x).clone()
+                };
+                self.case_from_type_argument = true;
+                return self.expand_expr(&call, locals);
+            }
             ExprKind::TypeArgs(x, tys) => {
                 ExprKind::TypeArgs(Box::new(self.expand_expr(x, locals)?), tys.clone())
             }

@@ -48,7 +48,8 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 - `return` inside a lambda leaves the lambda.
 - No list patterns inside ctor patterns; `return` not allowed inside a match arm expression; a bare `none` can't be a tuple slot.
 - Struct patterns rename with `as` (`P { x as px }`, `Pushes { elements, rest as end }`), not `x: px`. A struct pattern names only the fields it reads (`let P { x } = p;` ignores the rest); `field as _` is refused. `struct`/`variant` are never `pub`. No `is_none`: write `!o.is_some()`.
-- A case with keyword params (`For`, `Ctor`) can't go through `as_case(Case)` as a function value: destructure with `let Case(..) = x else { return none; };`.
+- The case of `is_case`/`as_case`/`collect_arms` is a type argument: `x.is_case::<Circle>()`, `x.as_case::<Circle>()` (`Circle?`), `xs.collect_arms::<Circle>()` (`Circle[]`); the constructor as an argument is refused. A case is a type, so `c: Circle` takes one, and its named payload slots are fields: `c.r`, `let Circle { r } = c;`.
+- `fn f<V: variant, A: arm of V>(..)` is generic over one case of `V`; write it as a type argument (`xs.f::<Circle>()`, or `::<Shape, Circle>`) when no argument says which.
 - `xs.map(f)` over a named function is flagged: write `xs$f()`. A method call needs the fn's first param named `self`.
 - **A test hangs from the function it covers** (`fn f() {..}.test({ .. })`). A test with no function to cover (a language
   feature, not a function) is a top-level `test({ .. })`: rare, reported as `test block N` (its order among the file's), no `#` docs above it.

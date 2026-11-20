@@ -56,7 +56,7 @@ pub fn with_source_text(self: WrittenProgram, text: str) -> WrittenProgram {
         items: [WrittenFn(function, Attributes { test_body: none })],
         doc: none,
     }.with_source_text(text);
-    assert(items.collect_arms(WrittenFn)$body_source() == ["g(a)"]);
+    assert(items.collect_arms::<WrittenFn>()$body_source() == ["g(a)"]);
 })
 
 fn sourced_item(self: WrittenItem, text: str) -> WrittenItem {

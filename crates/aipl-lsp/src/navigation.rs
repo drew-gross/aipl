@@ -263,6 +263,12 @@ impl Navigation {
                     .get(written.target.as_str())
                     .or_else(|| variants.get(written.target.as_str()))
                     .or_else(|| refinements.get(written.target.as_str()))
+                    // A case written as a type (`Circle`, or `xs.collect_arms::<Circle>()`) is
+                    // named by its constructor's name, `Case@Variant`.
+                    .or_else(|| {
+                        let (case, variant) = written.target.split_once('@')?;
+                        cases.get(&(variant, case))
+                    })
                     .cloned()
                     .map(Found::Declared)
                     .or_else(|| builtin_type(&written.target).map(Found::Native));

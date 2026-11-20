@@ -126,11 +126,11 @@ pub fn set_spread_field(Function { body }) -> LintHit[] {
 
 # The hit for `self`, when it is a `set` of a place to a literal that starts from the same place.
 fn rebuild(self: Expr) -> LintHit? {
-    let Assign(target, value, _) = self.kind.as_case(Assign)?;
-    let Construct(_, inits) = value.kind.as_case(Construct)?;
+    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
+    let Construct(_, inits) = value.kind.as_case::<Construct>()?;
     let root = target.root_name()?;
     let spread = inits.first()?;
-    let Spread(base) = spread.value.kind.as_case(Spread)?;
+    let Spread(base) = spread.value.kind.as_case::<Spread>()?;
     let fields = inits.drop_first();
     if (!base.is_same_place(target) || fields.is_empty()) { return none; };
     if (fields.len() > 1 && fields.any(|field| field.value.mentions_any([root], none))) {

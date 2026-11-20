@@ -148,19 +148,19 @@ pub fn push_loop_zip_with(Function { body }, items: Item[]) -> UnfilledHit[] {
 # `self` as the advice for the loop it is, when it is a loop pairing two arrays by position.
 fn zip_hit(self: SeededLoop, push: str) -> UnfilledHit? {
     let some(position) = self.index else { return none; };
-    let ArrayLit(elements) = self.seed.kind.as_case(ArrayLit)?;
+    let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };
 
     // The body is the `if let` that stops at the shorter array, with nothing else in it.
-    let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case(IfLet)?;
+    let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case::<IfLet>()?;
     if (otherwise.kind != Unit) { return none; };
     let Ctor("some", bindings, _) = arm.pattern else { return none; };
     let [partner] = bindings else { return none; };
 
     // `other[position]`, with `other` a name that is neither the array being built nor one
     // of the loop's own bindings.
-    let Index(array, at) = scrutinee.kind.as_case(Index)?;
-    let Ident(other) = array.kind.as_case(Ident)?;
+    let Index(array, at) = scrutinee.kind.as_case::<Index>()?;
+    let Ident(other) = array.kind.as_case::<Ident>()?;
     if (at.kind != Ident(position) || [self.name, self.variable, position].contains(other)) {
         return none;
     };

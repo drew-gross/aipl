@@ -34,7 +34,7 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
     // base, since `Pair<i64>` is built as `Pair { .. }`.
     let ret = sig.return_ty.literal_name()?;
     let Expr { kind, span } = body;
-    let Construct(name, inits) = kind.as_case(Construct)?;
+    let Construct(name, inits) = kind.as_case::<Construct>()?;
 
     // A construct the parser synthesized from other syntax (a range is
     // `__builtin_Span { .. }`) is not a literal anyone wrote, and its name can't be

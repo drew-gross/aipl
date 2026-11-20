@@ -135,12 +135,12 @@ pub fn step_by_one(Function { body }, items: Item[]) -> LintHit[] {
 
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.
 fn long_step(self: Expr, steps: Written[]) -> LintHit? {
-    let Assign(target, value, _) = self.kind.as_case(Assign)?;
+    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
     if (!target.spans_its_text()) { return none; };
 
     // An operator use is a call whose callee is the spelling that was written, which is what this
     // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
-    let Call(written, args, _) = value.kind.as_case(Call)?;
+    let Call(written, args, _) = value.kind.as_case::<Call>()?;
     let [left, right] = args else { return none; };
     let step = steps.find_if(|candidate| candidate.operator == written)$step?;
     let stepped = if (left.is_same_place(target)) {

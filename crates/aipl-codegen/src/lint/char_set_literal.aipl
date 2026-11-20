@@ -131,8 +131,8 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
 # The hit for `self`, when it is a one-line unordered set of at least three character literals
 # that a string can spell.
 fn spelled_out(self: Expr) -> UnfilledHit? {
-    let SetLit(elements, order) = self.kind.as_case(SetLit)?;
-    if (!order.is_case(Unordered)) { return none; };
+    let SetLit(elements, order) = self.kind.as_case::<SetLit>()?;
+    if (!order.is_case::<Unordered>()) { return none; };
     if (elements.len() < minimum_elements() || self.source.contains('\n')) { return none; };
 
     // Every element a char *literal*: that is what makes this a char set without asking the type
@@ -151,7 +151,7 @@ fn spelled_out(self: Expr) -> UnfilledHit? {
 
 # The character `self` is, when it is a character literal.
 fn character(self: Expr) -> char? {
-    let Char(c) = self.kind.as_case(Char)?;
+    let Char(c) = self.kind.as_case::<Char>()?;
     some(c)
 }
 

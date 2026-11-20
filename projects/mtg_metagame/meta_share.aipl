@@ -26,12 +26,12 @@ pub fn shares(decks: Deck[], identifiers: Identifier[]) -> Counted[]!str {
     let found = decks.try_map(|deck| deck.archetype_of(identifiers))?;
     let named = found
         .distinct()
-        .filter(|archetype| archetype.is_case(Meta))
+        .filter(|archetype| archetype.is_case::<Meta>())
         .map(|archetype| {
             Counted { name: archetype.label(), count: found.count_if(|each| each == archetype) }
         })
         .ranked();
-    let others = found.count_if(|each| each.is_case(Other));
+    let others = found.count_if(|each| each.is_case::<Other>());
     ok(if (0 < others) { [..named, Counted { name: "Other", count: others }] } else { named })
 }.test({
     let landfall = Identifier { name: "Landfall", cards: ["Forest"], not_cards: ["Island"] };

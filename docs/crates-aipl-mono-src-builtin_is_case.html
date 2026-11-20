@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_is_case.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>is_case</code> builtin. The loader names this function by the canonical name <code>__builtin_is_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.is_case(Circle)</code> resolves through the ordinary generic machinery — the in-file name <code>is_case</code> is only for this file's own tests, which read exactly like user code.</p><p>The shorthand for <code>match (shape) { Circle(..) =&gt; true, _ =&gt; false }</code>, which the <code>match_bool_is_case</code> lint asks for.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>is_case</code> builtin. The loader names this function by the canonical name <code>__builtin_is_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.is_case::&lt;Circle&gt;()</code> resolves through the ordinary generic machinery — the in-file name <code>is_case</code> is only for this file's own tests, which read exactly like user code.</p><p>The shorthand for <code>match (shape) { Circle(..) =&gt; true, _ =&gt; false }</code>, which the <code>match_bool_is_case</code> lint asks for.</p></div>
 
 
 
@@ -62,7 +62,7 @@
           </h3>
           <pre class="signature"><code>pub fn is_case&#60;T: variant&#62;(self: T, arm: Case&#60;T&#62;) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether <code>self</code> is the case <code>arm</code>, whatever its payload. <code>arm</code> is a constructor name, payload-carrying or not: <code>shape.is_case(Circle)</code>.</p><p>See <code>as_case</code> for the value itself when it is that case, and <code>case_of</code> for reading which case a single value is.</p></div>
+          <div class="doc"><p>Whether <code>self</code> is the case <code>arm</code>, whatever its payload. <code>arm</code> is a constructor name, payload-carrying or not: <code>shape.is_case::&lt;Circle&gt;()</code>.</p><p>See <code>as_case</code> for the value itself when it is that case, and <code>case_of</code> for reading which case a single value is.</p></div>
 
 
         </section>

@@ -115,7 +115,7 @@ fn seeded_names(src: str) -> str[]!ParseError {
 
 # `self` as a [`SeededLoop`], when it is one.
 fn seeded_loop(self: LetMut(name, annotation, seed, rest)) -> SeededLoop? {
-    let Seq(first, _) = rest.kind.as_case(Seq)?;
+    let Seq(first, _) = rest.kind.as_case::<Seq>()?;
 
     // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
     // from being passed as a function value.
@@ -163,7 +163,7 @@ fn accumulation(self: SeededLoop, adder: str) -> Accumulation? {
     // `mut acc = [];` — the seed. An annotation is allowed (and usual: it is often
     // what gives the empty literal its element type) but says nothing about the
     // iterable, so it is not inspected.
-    let ArrayLit(elements) = self.seed.kind.as_case(ArrayLit)?;
+    let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };
 
     // An else-less `if` around the add is the filter; anything else in the body (an
@@ -238,8 +238,8 @@ fn accumulation(self: SeededLoop, adder: str) -> Accumulation? {
 struct Pushed { element: Expr, rest: Expr }
 
 pub fn pushed(self: Expr, acc: str, adder: str) -> Pushed? {
-    let Assign(target, value, rest) = self.kind.as_case(Assign)?;
-    let Call(callee, arguments, _) = value.kind.as_case(Call)?;
+    let Assign(target, value, rest) = self.kind.as_case::<Assign>()?;
+    let Call(callee, arguments, _) = value.kind.as_case::<Call>()?;
     let [receiver, element] = arguments else { return none; };
     if (target.kind != Ident(acc) || callee != adder || receiver.kind != Ident(acc)) {
         return none;

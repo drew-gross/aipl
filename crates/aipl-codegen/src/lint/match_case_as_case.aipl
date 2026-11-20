@@ -6,7 +6,7 @@
 #     }
 #
 # — a variant value handed back when it is one case and `none` otherwise. That is
-# `shape.as_case(Circle)`, which says so without the second arm, and whose result is
+# `shape.as_case::<Circle>()`, which says so without the second arm, and whose result is
 # typed as the one case it holds.
 #
 # The shape is exact: two arms, the first a variant case's constructor pattern whose
@@ -36,22 +36,20 @@ import { receiver_text } from "./option_match.aipl";
 pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
     body
         .collect_expr_cases(Match)
-        .map(
-            |Match(scrutinee, arms)| {
-                let [case_arm, other_arm] = arms else { return none; };
-                let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
-                let Call("some", wrapped, _) = case_arm.body.kind else { return none; };
-                if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) {
-                    return none;
-                };
-                some(unfilled(
-                    "as_case",
-                    `this match only asks whether the value is {pattern.case} — write "{scrutinee.receiver_text()}.`,
-                    `({pattern.case})" and drop the match`,
-                    other_arm.span,
-                ))
-            },
-        )
+        .map(|Match(scrutinee, arms)| {
+            let [case_arm, other_arm] = arms else { return none; };
+            let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
+            let Call("some", wrapped, _) = case_arm.body.kind else { return none; };
+            if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) {
+                return none;
+            };
+            some(unfilled(
+                "as_case",
+                `this match only asks whether the value is {pattern.case} — write "{scrutinee.receiver_text()}.`,
+                `::<{pattern.case}>()" and drop the match`,
+                other_arm.span,
+            ))
+        })
         .collect_ok()
 }.test({
     // The case, handed back as the value matched, and the hit on the catch-all.
@@ -172,7 +170,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
         """,
         match_case_as_case,
     )? == [
-        """this match only asks whether the value is Circle — write "s.as_case(Circle)" and drop the match, importing `as_case` from builtins""",
+        """this match only asks whether the value is Circle — write "s.as_case::<Circle>()" and drop the match, importing `as_case` from builtins""",
     ]);
     // A case with no payload.
     assert(lint_function_unfilled_messages(
@@ -186,7 +184,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
         """,
         match_case_as_case,
     )? == [
-        """this match only asks whether the value is Empty — write "s.as_case(Empty)" and drop the match, importing `as_case` from builtins""",
+        """this match only asks whether the value is Empty — write "s.as_case::<Empty>()" and drop the match, importing `as_case` from builtins""",
     ]);
     // Binders the body never reads change nothing.
     assert(lint_function_unfilled_messages(
@@ -200,12 +198,12 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
         """,
         match_case_as_case,
     )? == [
-        """this match only asks whether the value is Rect — write "s.as_case(Rect)" and drop the match, importing `as_case` from builtins""",
+        """this match only asks whether the value is Rect — write "s.as_case::<Rect>()" and drop the match, importing `as_case` from builtins""",
     ]);
 })
 
 # What is said of a match over `receiver` that only asks whether it is `case`, for a
 # file that does not import `as_case`, as the tests' sources do not.
 fn message(receiver: str, case: str) -> str {
-    `this match only asks whether the value is {case} — write "{receiver}.as_case({case})" and drop the match, importing \`as_case\` from builtins`
+    `this match only asks whether the value is {case} — write "{receiver}.as_case::<{case}>()" and drop the match, importing \`as_case\` from builtins`
 }

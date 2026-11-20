@@ -18,7 +18,7 @@
     Circle(..) =&gt; some(shape),
     _ =&gt; none,
 }
-</code></pre><p>— a variant value handed back when it is one case and <code>none</code> otherwise. That is <code>shape.as_case(Circle)</code>, which says so without the second arm, and whose result is typed as the one case it holds.</p><p>The shape is exact: two arms, the first a variant case's constructor pattern whose body is <code>some(x)</code> of the very value matched, and the second the catch-all giving <code>none</code>. What the first arm binds is no matter, since the body does not read it. An arm that returns anything but the scrutinee — a payload, a rebuilt value — is a different program, and <code>as_case</code> is not its spelling.</p><p>The hit points at the <code>_ =&gt; none</code> arm, a short line the formatter keeps in place, so <code>#[allow]</code> squelches it.</p></div>
+</code></pre><p>— a variant value handed back when it is one case and <code>none</code> otherwise. That is <code>shape.as_case::&lt;Circle&gt;()</code>, which says so without the second arm, and whose result is typed as the one case it holds.</p><p>The shape is exact: two arms, the first a variant case's constructor pattern whose body is <code>some(x)</code> of the very value matched, and the second the catch-all giving <code>none</code>. What the first arm binds is no matter, since the body does not read it. An arm that returns anything but the scrutinee — a payload, a rebuilt value — is a different program, and <code>as_case</code> is not its spelling.</p><p>The hit points at the <code>_ =&gt; none</code> arm, a short line the formatter keeps in place, so <code>#[allow]</code> squelches it.</p></div>
 
 
 
@@ -31,7 +31,7 @@
             <a class="anchor" href="#item-match_case_as_case">match_case_as_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_case_as_case(__spat$1408: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_case_as_case(__spat$1412: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> in the function that only asks whether a value is one case.</p></div>
 

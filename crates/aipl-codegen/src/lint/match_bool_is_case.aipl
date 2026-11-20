@@ -6,7 +6,7 @@
 #     }
 #
 # — a variant value turned into whether it is one case. That is
-# `shape.is_case(Circle)`, which says so without the other arms and stays right
+# `shape.is_case::<Circle>()`, which says so without the other arms and stays right
 # when the variant gains a case.
 #
 # The shape is exact: every arm's body is a `true` or `false` literal, exactly one
@@ -45,7 +45,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
     body
         .collect_expr_cases(Match)
         .map(|Match(scrutinee, arms)| {
-            if (!arms.all(|arm| arm.body.kind.is_case(Bool))) { return none; };
+            if (!arms.all(|arm| arm.body.kind.is_case::<Bool>())) { return none; };
             let [MatchArm { pattern, span }] = arms.filter(|arm| arm.body.kind == Bool(true)) else {
                 return none;
             };
@@ -198,7 +198,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
         """,
         match_bool_is_case,
     )? == [
-        """this match only asks whether the value is Circle — write "<value>.is_case(Circle)" and drop the match, importing `is_case` from builtins""",
+        """this match only asks whether the value is Circle — write "<value>.is_case::<Circle>()" and drop the match, importing `is_case` from builtins""",
     ]);
     // A catch-all `false`, with the payload bound and ignored.
     assert(lint_function_unfilled_messages(
@@ -212,7 +212,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
         """,
         match_bool_is_case,
     )? == [
-        """this match only asks whether the value is Square — write "<value>.is_case(Square)" and drop the match, importing `is_case` from builtins""",
+        """this match only asks whether the value is Square — write "<value>.is_case::<Square>()" and drop the match, importing `is_case` from builtins""",
     ]);
     // A nullary case, and the `false` arm first.
     assert(lint_function_unfilled_messages(
@@ -226,7 +226,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
         """,
         match_bool_is_case,
     )? == [
-        """this match only asks whether the value is Dot — write "<value>.is_case(Dot)" and drop the match, importing `is_case` from builtins""",
+        """this match only asks whether the value is Dot — write "<value>.is_case::<Dot>()" and drop the match, importing `is_case` from builtins""",
     ]);
 })
 
@@ -236,7 +236,7 @@ fn advice(case: str, span: Span) -> UnfilledHit {
     unfilled(
         "is_case",
         `this match only asks whether the value is {case} — write "<value>.`,
-        `({case})" and drop the match`,
+        `::<{case}>()" and drop the match`,
         span,
     )
 }

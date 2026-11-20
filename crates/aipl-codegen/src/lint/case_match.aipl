@@ -48,7 +48,7 @@ pub fn case_pattern(self: Pat) -> CasePattern? {
     if (let Ctor(case, bindings, ignore_payload) = self) {
         return case.declared_case(if (ignore_payload) { [] } else { bindings });
     };
-    let Nested(case, slots) = self.as_case(Nested)?;
+    let Nested(case, slots) = self.as_case::<Nested>()?;
     let bindings = slots$binder_slot();
     if (!bindings.all(is_some)) { return none; };
     case.declared_case(bindings$value_or("_"))
@@ -155,13 +155,13 @@ fn tails(src: str) -> str[]!ParseFailure {
         src,
         |function| function.body
             .tail_matches()
-            .map(|e| hit(if (e.kind.is_case(Match)) { "Match" } else { "IfLet" }, 0..0)),
+            .map(|e| hit(if (e.kind.is_case::<Match>()) { "Match" } else { "IfLet" }, 0..0)),
     )
 }
 
 # The statement that takes a case apart, as far as it precedes the receiver and as far
 # as it follows the case: `let Circle(r) = ` and `?;`, or nothing before the receiver
-# when the pattern binds nothing. The advice quotes the receiver and `.as_case(Circle)`
+# when the pattern binds nothing. The advice quotes the receiver and `.as_case::<Circle>()`
 # between them.
 pub fn statement_head(self: CasePattern) -> str {
     if (self.bindings.is_empty()) {

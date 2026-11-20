@@ -29,8 +29,8 @@ test({
 
         // A case, from an array narrowed to that one case; and patterns nest.
         let shapes = [Square(5), Dot(Point { x: 7, y: 8 }), Square(6)];
-        print(`{shapes.collect_arms(Square).map(|Square(side)| side + 1)}`);
-        print(`{shapes.collect_arms(Dot).map(|Dot(Point { x, y })| x + y)}`);
+        print(`{shapes.collect_arms::<Square>().map(|Square(side)| side + 1)}`);
+        print(`{shapes.collect_arms::<Dot>().map(|Dot(Point { x, y })| x + y)}`);
 
         // Beside a typed parameter, in a two-parameter lambda.
         print(`{zip_with(points, [10, 20], |Point { x, y }, n: i64| x + y + n)}`);

@@ -1399,7 +1399,7 @@ const CASE_SHAPES: &str = "import { collect_arms } from builtins;\n\
                            \n\
                            fn arm(s: Super) -> i64 { match (s) { Lowered(Fun { name }) => name, Written(Fun { name as other }) => other } }\n\
                            \n\
-                           fn collected(items: Super[]) -> i64[] { items.collect_arms(Lowered)$declared() }\n\
+                           fn collected(items: Super[]) -> i64[] { items.collect_arms::<Lowered>()$declared() }\n\
                            \n\
                            fn declared(self: Lowered(Fun { name })) -> i64 { name }\n";
 
@@ -1417,7 +1417,7 @@ fn a_case_goes_to_its_declaration_wherever_it_is_named() {
         "Lowered) -> i64 { 1 }",
         "Lowered(f) }",
         "Lowered(Fun { name }) =>",
-        "Lowered)$declared",
+        "Lowered>()$declared",
         "Lowered(Fun { name })) ->",
     ] {
         let found = definition_at(&mut server, &uri, cursor_on(CASE_SHAPES, snippet));

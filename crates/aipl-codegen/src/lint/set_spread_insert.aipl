@@ -154,17 +154,17 @@ pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
 
 # The hit for `self`, when it is a `set` of a place to a set literal that starts by spreading it.
 fn rebuild(self: Expr) -> UnfilledHit? {
-    let Assign(target, value, _) = self.kind.as_case(Assign)?;
-    let SetLit(elements, order) = value.kind.as_case(SetLit)?;
+    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
+    let SetLit(elements, order) = value.kind.as_case::<SetLit>()?;
     // `insert` writes back an unordered set, so an ordered literal is left as it is.
-    if (!order.is_case(Unordered)) { return none; };
+    if (!order.is_case::<Unordered>()) { return none; };
     let root = target.root_name()?;
     let spread = elements.first()?;
-    let Spread(base) = spread.kind.as_case(Spread)?;
+    let Spread(base) = spread.kind.as_case::<Spread>()?;
     let added = elements.drop_first();
     if (!base.is_same_place(target) || added.is_empty()) { return none; };
     // A spread in the tail adds a whole set, which `insert` does not.
-    if (added.any(|element| element.kind.is_case(Spread))) { return none; };
+    if (added.any(|element| element.kind.is_case::<Spread>())) { return none; };
     if (added.len() > 1 && added.any(|element| element.mentions_any([root], none))) {
         return none;
     };

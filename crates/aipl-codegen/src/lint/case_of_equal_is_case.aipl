@@ -1,5 +1,5 @@
 # The `case_of_equal_is_case` lint: `shape.case_of() == Circle` — reading which
-# case a value is only to compare it with one. That is `shape.is_case(Circle)`,
+# case a value is only to compare it with one. That is `shape.is_case::<Circle>()`,
 # which asks the same question without the detour through a `Case`.
 #
 # Exactly one side is a `case_of()` call. Two of them, `a.case_of() == b.case_of()`,
@@ -102,14 +102,14 @@ pub fn case_of_equal_is_case(Function { body }) -> UnfilledHit[] {
         "fn is_circle(shape: Shape) -> bool { shape.case_of() == Circle }",
         case_of_equal_is_case,
     )? == [
-        """this compares a value's case — write "<value>.is_case(<case>)" instead of reading it with "case_of()", importing `is_case` from builtins""",
+        """this compares a value's case — write "<value>.is_case::<Case>()" instead of reading it with "case_of()", importing `is_case` from builtins""",
     ]);
     // The case on the left, and the call form.
     assert(lint_function_unfilled_messages(
         "fn is_dot(shape: Shape) -> bool { Dot == case_of(shape) }",
         case_of_equal_is_case,
     )? == [
-        """this compares a value's case — write "<value>.is_case(<case>)" instead of reading it with "case_of()", importing `is_case` from builtins""",
+        """this compares a value's case — write "<value>.is_case::<Case>()" instead of reading it with "case_of()", importing `is_case` from builtins""",
     ]);
 })
 
@@ -120,7 +120,7 @@ fn advice(span: Span) -> UnfilledHit {
     unfilled(
         "is_case",
         `this compares a value's case — write "<value>.`,
-        `(<case>)" instead of reading it with "case_of()"`,
+        `::<Case>()" instead of reading it with "case_of()"`,
         span,
     )
 }

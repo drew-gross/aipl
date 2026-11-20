@@ -545,19 +545,19 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
 
 # `self` as the hit for a set grown by unioning into it, when it is one.
 fn unioned(self: SeededLoop, union: str) -> UnfilledHit? {
-    let SetLit(elements, order) = self.seed.kind.as_case(SetLit)?;
+    let SetLit(elements, order) = self.seed.kind.as_case::<SetLit>()?;
     if (elements.is_nonempty() || order != Unordered) { return none; };
     let ordered = self.annotation.is_some_and(|annotation| match (annotation) {
         Set(_, annotation_order) => annotation_order != Unordered,
         _ => false,
     });
-    let Assign(target, value, _) = self.body.lone_statement()?.kind.as_case(Assign)?;
+    let Assign(target, value, _) = self.body.lone_statement()?.kind.as_case::<Assign>()?;
     if (target.kind != Ident(self.name)) { return none; };
 
     // The expression unioned into the accumulator by `value`, when `value` is a union of
     // the accumulator with exactly one other thing: `out.union(out)` is `out`, and a
     // union of two other things is not a fold onto this binding at all.
-    let Call(callee, operands, _) = value.kind.as_case(Call)?;
+    let Call(callee, operands, _) = value.kind.as_case::<Call>()?;
     let [first, second] = operands else { return none; };
     if (callee != union) { return none; };
     let operand = if (first.kind == Ident(self.name) && second.kind != Ident(self.name)) {

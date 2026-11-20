@@ -135,7 +135,7 @@ pub fn value_or_compare(Function { body }, items: Item[]) -> LintHit[] {
 
 # The hit for `self`, when it compares a `value_or` of one literal with a different literal.
 fn filled_to_reject(self: Expr, Names { equal, not_equal, value_or }) -> LintHit? {
-    let Call(op, args, _) = self.kind.as_case(Call)?;
+    let Call(op, args, _) = self.kind.as_case::<Call>()?;
     if (!(op == "==" && equal || op == "!=" && not_equal)) { return none; };
     let [left, right] = args else { return none; };
     // Whichever side is the `value_or` call; the other must be a literal.
@@ -155,14 +155,14 @@ fn filled_to_reject(self: Expr, Names { equal, not_equal, value_or }) -> LintHit
 
 # `(optional, default)` when `self` is a call to `value_or`.
 fn fill(self: Expr, value_or: str) -> (Expr, Expr)? {
-    let Call(callee, args, _) = self.kind.as_case(Call)?;
+    let Call(callee, args, _) = self.kind.as_case::<Call>()?;
     if (callee != value_or) { return none; };
     let [optional, default] = args else { return none; };
     some((optional, default))
 }
 
 fn is_literal(self: Expr) -> bool {
-    self.kind.is_case(Num) || self.kind.is_case(Bool) || self.kind.is_case(
-        Str,
-    ) || self.kind.is_case(Char)
+    self.kind.is_case::<Num>() || self.kind.is_case::<Bool>() || self.kind.is_case::<
+        Str
+    >() || self.kind.is_case::<Char>()
 }

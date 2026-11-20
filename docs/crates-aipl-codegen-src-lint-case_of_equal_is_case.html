@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/case_of_equal_is_case.aipl</code></h1>
 
-      <div class="module-doc"><p>The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case(Circle)</code>, which asks the same question without the detour through a <code>Case</code>.</p><p>Exactly one side is a <code>case_of()</code> call. Two of them, <code>a.case_of() == b.case_of()</code>, compare the cases of two values, which is <code>same_case(a, b)</code> and not <code>is_case</code>.</p><p>The hit points at the <code>==</code>, a short line the formatter keeps in place.</p></div>
+      <div class="module-doc"><p>The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case::&lt;Circle&gt;()</code>, which asks the same question without the detour through a <code>Case</code>.</p><p>Exactly one side is a <code>case_of()</code> call. Two of them, <code>a.case_of() == b.case_of()</code>, compare the cases of two values, which is <code>same_case(a, b)</code> and not <code>is_case</code>.</p><p>The hit points at the <code>==</code>, a short line the formatter keeps in place.</p></div>
 
 
 
@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-case_of_equal_is_case">case_of_equal_is_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn case_of_equal_is_case(__spat$853: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn case_of_equal_is_case(__spat$857: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each comparison of a value's case with something.</p></div>
 

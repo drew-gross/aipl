@@ -13,7 +13,7 @@ import { has, insert } from sets;
 pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     mut seen: #{ImportSource} = #{};
     mut hits: LintHit[] = [];
-    for (let Import(ImportDecl { source, source_span }) : items.collect_arms(Import)) {
+    for (let Import(ImportDecl { source, source_span }) : items.collect_arms::<Import>()) {
         if (seen.has(source)) { set hits.push(hit(source.message(), source_span)); };
         set seen.insert(source);
     }

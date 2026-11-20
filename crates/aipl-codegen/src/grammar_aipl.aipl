@@ -4293,7 +4293,7 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             },
             sig: Signature { type_vars, params, effects, return_ty },
             body: resolved,
-            shorthand_body: body.is_case(PConstruct),
+            shorthand_body: body.is_case::<PConstruct>(),
             // Documentation comes from the `# ..` lines in front of the
             // declaration, which `item` holds; this never sees them.
             doc: none,

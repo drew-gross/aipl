@@ -419,6 +419,7 @@ pub fn names_in(self: Expr) -> #{str} {
 }.test({
     assert(expr(Call("f", [ident("x")], false)).names_in() == #{"f", "x"});
     assert(expr(Neg(ident("x"))).names_in() == #{"-", "x"});
+    assert(expr(TypeArgs(ident("f"), [Named("Circle")])).names_in() == #{"f", "Circle"});
     assert(expr(LetPattern(
         ByStruct("P", ["x"], ["x"], false),
         ident("v"),
@@ -470,8 +471,9 @@ pub fn own_names(self: Expr) -> #{str} {
         | Seq(..)
         | Return(..)
         | TupleLit(..)
-        | KwArg(..)
-        | TypeArgs(..) => #{},
+        | KwArg(..) => #{},
+        // `f::<Circle>()` names the type it writes.
+        TypeArgs(_, types) => types$ty_names().union_all(),
     }
 }
 

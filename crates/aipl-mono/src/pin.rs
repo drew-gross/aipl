@@ -3918,7 +3918,7 @@ impl Pinner<'_> {
         Ok(())
     }
 
-    /// The type of `xs.collect_arms(Circle)` or `x.as_case(Circle)`: the array (or optional) of
+    /// The type of `xs.collect_arms::<Circle>()` or `x.as_case::<Circle>()`: the array (or optional) of
     /// the variant less every case but the one named, so a `match` on it needs that arm alone.
     fn refine_collected_arms(&mut self, ret: It, arm: &Expr, builtin: &str) -> Res<It> {
         let shallow = self.table.shallow(&ret);
@@ -3936,8 +3936,8 @@ impl Pinner<'_> {
         let Some((case, _)) = aipl_syntax::ctor_ref_case(arm) else {
             return reject(
                 format!(
-                    "{short:?} needs the case written as a constructor name, as in \
-                     `x.{short}(Circle)` — a value of type `Case<..>` does not say \
+                    "{short:?} needs the case written as a type argument, as in \
+                     `x.{short}::<Circle>()` — a value of type `Case<..>` does not say \
                      which case it holds until run time, so the result could not be typed by it",
                     short = builtin.trim_start_matches("__builtin_"),
                 ),
@@ -5585,7 +5585,7 @@ impl Pinner<'_> {
                 );
             }
         }
-        // `xs.collect_arms(Circle)` / `x.as_case(Circle)`: the elements are all that one case, so
+        // `xs.collect_arms::<Circle>()` / `x.as_case::<Circle>()`: the elements are all that one case, so
         // the result is typed as the variant less every other case.
         // A function that hands back the sequence it was given hands back a `str` as a `str`: it
         // is an array of chars to the signature, and only to it.

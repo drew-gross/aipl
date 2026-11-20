@@ -273,9 +273,9 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
 
 # `self` as the hit for an array filled with the answers that exist, when it is one.
 fn collected(self: SeededLoop, push: str) -> UnfilledHit? {
-    let ArrayLit(elements) = self.seed.kind.as_case(ArrayLit)?;
+    let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };
-    let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case(IfLet)?;
+    let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case::<IfLet>()?;
     if (otherwise.kind != Unit || !arm.pattern.names_case("some")) { return none; };
     // `some` binds exactly its payload: `some(..)` binds nothing, and `_` is no name.
     let [bound] = arm.pattern.payload_binders()? else { return none; };

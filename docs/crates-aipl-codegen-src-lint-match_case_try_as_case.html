@@ -18,7 +18,7 @@
     Field(base, field) =&gt; rest,
     _ =&gt; none,
 }
-</code></pre><p>— as the last thing a function does: a variant value taken apart when it is one case, and given up on with <code>none</code> otherwise. That is <code>let Field(base, field) = x.as_case(Field)?;</code> followed by <code>rest</code>, which says the early exit first and leaves the rest of the function at one level instead of inside an arm.</p><p>It has to be the function's <em>tail</em> (see <code>tail_matches</code>): the <code>?</code> returns <code>none</code> from the function, which is only the <code>match</code>'s own answer when the <code>match</code> is what the function returns. The first arm must be a variant case's constructor pattern and the second the catch-all giving <code>none</code>. A first arm that returns the matched value itself, <code>K(..) =&gt; some(x)</code>, is <code>match_case_as_case</code>'s, whose answer is shorter still.</p><p>The hit points at the <code>_ =&gt; none</code> arm, a short line the formatter keeps in place, so <code>#[allow]</code> squelches it.</p></div>
+</code></pre><p>— as the last thing a function does: a variant value taken apart when it is one case, and given up on with <code>none</code> otherwise. That is <code>let Field(base, field) = x.as_case::&lt;Field&gt;()?;</code> followed by <code>rest</code>, which says the early exit first and leaves the rest of the function at one level instead of inside an arm.</p><p>It has to be the function's <em>tail</em> (see <code>tail_matches</code>): the <code>?</code> returns <code>none</code> from the function, which is only the <code>match</code>'s own answer when the <code>match</code> is what the function returns. The first arm must be a variant case's constructor pattern and the second the catch-all giving <code>none</code>. A first arm that returns the matched value itself, <code>K(..) =&gt; some(x)</code>, is <code>match_case_as_case</code>'s, whose answer is shorter still.</p><p>The hit points at the <code>_ =&gt; none</code> arm, a short line the formatter keeps in place, so <code>#[allow]</code> squelches it.</p></div>
 
 
 
@@ -31,7 +31,7 @@
             <a class="anchor" href="#item-match_case_try_as_case">match_case_try_as_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_case_try_as_case(__spat$1526: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_case_try_as_case(__spat$1530: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> that ends the function and gives up with <code>none</code> unless a value is one case.</p></div>
 

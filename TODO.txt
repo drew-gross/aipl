@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  tests/cases/variants/err_as_case_value.aipl doens't need to exist, is_case &co can use the regular type checker errors
   unused_functions and go-to-def should be able to share some code once the lsp is in aipl
   imported_as shoudln't accept a string name, it should accept a builting variant arm
   hoisting handles lambdas as well?
@@ -293,6 +294,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 lsp:
+  "this document does not compile" error should name he document
   warm the cache in the background on start and on edit
   docs hover should work on Error, err, ok, etc.
   go-to-def on a keyword/operator (e.g. `fn`, `$`, `.` should show the docs for that operator)
@@ -440,6 +442,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  need some syntax for type operators so we can e.g. at runtime get the type of the first arg (primarily to call it only if it matches)
   remove concept of "unsettled" types, probably by having a better concept of bounds
   some way to turn a json object into a native object (and error id shape doesn't match)
   refutable function call syntax i.e. fn foo(arg: some(x)) that you can call with an optional and if it's not some, it gives you none back (or something like that)
@@ -550,11 +553,12 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  collect_expressions wrapper of collect_arms that lets you iterate over all expressions of one type. Should simplify many lints.
   make the "unused functions" lint not count .test/.benchmark blocks that don't actually use the function (need to support standalone benchmark, currently many hang off empty fn work () {})
   xs.map(|p| p.name$shout().len()) should hit the "use $$" lint to be xs$name$$shout()$len() after we have $$ operator
   lint should happend after resolution so that we don't need to check fn.name.starts_with("__builtin_"), it should just be fn.is_builtin
   slots_read_by_field is looking at names - it should know from a flag
-  arms.all(|arm| arm.body.kind.is_case(Bool)) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early returng123)
+  arms.all(|arm| arm.body.kind.is_case::<Bool>()) <- lint this to arms$body$kind$is_case(Bool).all() (also make sure it still fuses to a single for loop with early returng123)
   push_array_literal should hit when you push before an op even if you also push after an op (see twice() test)
   lint against unused expressions
   lint against reimplementations of to_set()/distinct()

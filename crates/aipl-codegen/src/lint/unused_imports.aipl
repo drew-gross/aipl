@@ -22,7 +22,7 @@ pub fn unused_imports(Program { items }) -> LintHit[] {
     // the type positions that belong to it rather than to any expression, and the
     // expressions it holds.
     let used = items$item_names().union_all();
-    let imports = items.collect_arms(Import);
+    let imports = items.collect_arms::<Import>();
     let unused = imports$imported().union_all().difference(used);
     imports$unused_in(unused).join()
 }.test({

@@ -198,7 +198,7 @@ pub fn quote(self: Expr, placeholder: str) -> str {
 # lint's advice should use. `none` when the file does not import it, which is when
 # the advice has to say so.
 pub fn imported_as(self: Item[], name: str) -> str? {
-    self.collect_arms(Import)$builtin_locals(name).join().first()
+    self.collect_arms::<Import>()$builtin_locals(name).join().first()
 }.test({
     let program = aipl_parse_surface_file(
         "import { is_case as case_is, len } from builtins;",
@@ -216,7 +216,7 @@ pub fn imported_as(self: Item[], name: str) -> str? {
 # exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
 # when that name is not bound by an import from builtins — unbound, or one of the file's own.
 pub fn bound_to(self: Item[], local: str) -> str? {
-    self.collect_arms(Import)$builtin_bound_to(local).join().first()
+    self.collect_arms::<Import>()$builtin_bound_to(local).join().first()
 }.test({
     let items = aipl_parse_surface_file(
         """import { wrapping_add as +, len } from builtins; import { less_than as < } from "./a.aipl";""",
@@ -256,7 +256,7 @@ pub fn text_before(self: Expr, container: Expr) -> str {
 
 # Every name a file's `items` import from builtins, as the file spells it.
 pub fn imported_locals(self: Item[]) -> str[] {
-    self.collect_arms(Import)$builtin_names().join()
+    self.collect_arms::<Import>()$builtin_names().join()
 }.test({
     let items = aipl_parse_surface_file(
         """import { is_case as case_is, len } from builtins; import { a } from "./a.aipl";""",
@@ -293,7 +293,7 @@ fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[
 #
 # Every function of the program, in the order it is written.
 pub fn functions(self: Program) -> Function[] {
-    self.items.collect_arms(LoweredFn)$declared()
+    self.items.collect_arms::<LoweredFn>()$declared()
 }.test({
     // Each function once, and the function each block is.
     assert(lint_function_messages(

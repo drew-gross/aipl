@@ -36,7 +36,7 @@ fn from_a_call() -> i64 {
 
 fn total_radius(shapes: Shape[]) -> i64 {
     mut total = 0;
-    for (let Circle { r } : shapes.collect_arms(Circle)) {
+    for (let Circle { r } : shapes.collect_arms::<Circle>()) {
         set total += r;
     }
     total
@@ -46,12 +46,12 @@ fn total_radius(shapes: Shape[]) -> i64 {
 
 // The lambda's parameter is a pattern, which the `map` lint reads as an argument ignored.
 fn radii(shapes: Shape[]) -> i64[] {
-    shapes.collect_arms(Circle).map(|Circle { r }| r) #[allow]
+    shapes.collect_arms::<Circle>().map(|Circle { r }| r) #[allow]
 }.test({
     assert(radii([Circle(1), Square(9), Circle(2), Dot]) == [1, 2]);
 })
 
 // `$r` is the same read, over every element of an array of them.
-fn radii_by_field(shapes: Shape[]) -> i64[] { shapes.collect_arms(Circle)$r }.test({
+fn radii_by_field(shapes: Shape[]) -> i64[] { shapes.collect_arms::<Circle>()$r }.test({
     assert(radii_by_field([Circle(1), Square(9), Circle(2), Dot]) == [1, 2]);
 })

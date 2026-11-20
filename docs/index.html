@@ -2103,7 +2103,7 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html">crates/aipl-codegen/src/lint/case_of_equal_is_case.aipl</a>
 
-          <p class="file-summary">The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case(Circle)</code>, which asks the same question without the detour through a <code>Case</code>.</p>
+          <p class="file-summary">The <code>case_of_equal_is_case</code> lint: <code>shape.case_of() == Circle</code> — reading which case a value is only to compare it with one. That is <code>shape.is_case::&lt;Circle&gt;()</code>, which asks the same question without the detour through a <code>Case</code>.</p>
 
 
           <span class="private-count"><a href="crates-aipl-codegen-src-lint-case_of_equal_is_case.html#private">2 private</a></span>
@@ -4434,7 +4434,7 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_as_case.html">crates/aipl-mono/src/builtin_as_case.aipl</a>
 
-          <p class="file-summary">The AIPL implementation of the <code>as_case</code> builtin. The loader names this function by the canonical name <code>__builtin_as_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.as_case(Circle)</code> resolves through the ordinary generic machinery — the in-file name <code>as_case</code> is only for this file's own tests, which read exactly like user code.</p>
+          <p class="file-summary">The AIPL implementation of the <code>as_case</code> builtin. The loader names this function by the canonical name <code>__builtin_as_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.as_case::&lt;Circle&gt;()</code> resolves through the ordinary generic machinery — the in-file name <code>as_case</code> is only for this file's own tests, which read exactly like user code.</p>
 
 
 
@@ -4475,7 +4475,7 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_collect_arms.html">crates/aipl-mono/src/builtin_collect_arms.aipl</a>
 
-          <p class="file-summary">The AIPL implementation of the <code>collect_arms</code> builtin. The loader names this function by the canonical name <code>__builtin_collect_arms</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.collect_arms(Circle)</code> resolves through the ordinary generic machinery — the in-file name <code>collect_arms</code> is only for this file's own tests, which read exactly like user code.</p>
+          <p class="file-summary">The AIPL implementation of the <code>collect_arms</code> builtin. The loader names this function by the canonical name <code>__builtin_collect_arms</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.collect_arms::&lt;Circle&gt;()</code> resolves through the ordinary generic machinery — the in-file name <code>collect_arms</code> is only for this file's own tests, which read exactly like user code.</p>
 
 
 
@@ -5308,7 +5308,7 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_is_case.html">crates/aipl-mono/src/builtin_is_case.aipl</a>
 
-          <p class="file-summary">The AIPL implementation of the <code>is_case</code> builtin. The loader names this function by the canonical name <code>__builtin_is_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.is_case(Circle)</code> resolves through the ordinary generic machinery — the in-file name <code>is_case</code> is only for this file's own tests, which read exactly like user code.</p>
+          <p class="file-summary">The AIPL implementation of the <code>is_case</code> builtin. The loader names this function by the canonical name <code>__builtin_is_case</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>shape.is_case::&lt;Circle&gt;()</code> resolves through the ordinary generic machinery — the in-file name <code>is_case</code> is only for this file's own tests, which read exactly like user code.</p>
 
 
 

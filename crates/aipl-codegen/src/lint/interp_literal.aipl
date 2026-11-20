@@ -33,9 +33,9 @@ pub fn interp_literal(Function { body }) -> LintHit[] {
             // The tree does not record which form a string literal was written in; its
             // first characters do.
             let raw = value.source.starts_with(`"""`);
-            let what = if (value.kind.is_case(Char)) {
+            let what = if (value.kind.is_case::<Char>()) {
                 "char"
-            } else if (value.kind.is_case(Str) && !raw) {
+            } else if (value.kind.is_case::<Str>() && !raw) {
                 "string"
             } else {
                 return none;

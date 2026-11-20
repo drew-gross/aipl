@@ -1,7 +1,7 @@
 # Every case of a variant is also a type: `Circle` written where a type goes is
 # `Shape` with every other case left out, so a value of it can only be a `Circle`
 # and its payload is there to read without handling the rest. It is what
-# `shapes.collect_arms(Circle)` has for its elements, and it goes wherever its
+# `shapes.collect_arms::<Circle>()` has for its elements, and it goes wherever its
 # variant does — at run time they are the same `Shape`.
 #
 # Since the one case is known, a `let`, a `for` and a parameter may take the
@@ -20,7 +20,7 @@ variant Shape = Circle(i64) | Square(i64) | Dot | Rect(i64, i64)
 
 variant Opt<T> = Has(T) | Nothing
 
-fn circles(shapes: Shape[]) -> Circle[] { shapes.collect_arms(Circle) }
+fn circles(shapes: Shape[]) -> Circle[] { shapes.collect_arms::<Circle>() }
 
 // An arm type is a `Shape`, so it goes where one is wanted, singly or in an array.
 fn as_shape(c: Circle) -> Shape { c }
@@ -75,7 +75,7 @@ test({
         };
         print(`{as_shapes(found)}`);
 
-        let rects = shapes.collect_arms(Rect);
+        let rects = shapes.collect_arms::<Rect>();
         for (let r : rects) {
             print(`{r.height()} {r.area()}`);
         }

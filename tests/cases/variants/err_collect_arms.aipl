@@ -8,7 +8,7 @@ variant Shape = Circle(i64) | Square(i64) | Dot
 
 fn other_arm(shapes: Shape[]) -> i64 {
     mut sum = 0;
-    for (let c : shapes.collect_arms(Circle)) {
+    for (let c : shapes.collect_arms::<Circle>()) {
         set sum = match (c) {
             Circle(r) => r,
             Square(w) => w,

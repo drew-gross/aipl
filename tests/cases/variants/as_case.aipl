@@ -1,4 +1,4 @@
-# `shape.as_case(Circle)` is the shape as a `Circle` when it is one, else `none`.
+# `shape.as_case::<Circle>()` is the shape as a `Circle` when it is one, else `none`.
 # The result is typed as the one case it holds, so the `some` branch takes its
 # payload with no `match` and no arm for any other case.
 
@@ -7,7 +7,7 @@ import { as_case, equal as ==, print } from builtins;
 variant Shape = Circle(i64) | Rect(i64, i64) | Empty
 
 fn radius(s: Shape) -> i64 {
-    if (let some(c) = s.as_case(Circle)) {
+    if (let some(c) = s.as_case::<Circle>()) {
         let Circle(r) = c;
         r
     } else {
@@ -16,7 +16,7 @@ fn radius(s: Shape) -> i64 {
 }
 
 fn describe(s: Shape) -> str {
-    match (s.as_case(Rect)) {
+    match (s.as_case::<Rect>()) {
         some(Rect(w, h)) => `rect {w}x{h}`,
         none => "not a rect",
     }

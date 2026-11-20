@@ -183,11 +183,11 @@ pub fn set_spread_push(self: Function) -> UnfilledHit[] {
 
 # The hit for `self`, when it is a `set` of a place to an array literal that starts by spreading it.
 fn rebuild(self: Expr) -> UnfilledHit? {
-    let Assign(target, value, _) = self.kind.as_case(Assign)?;
-    let ArrayLit(elements) = value.kind.as_case(ArrayLit)?;
+    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
+    let ArrayLit(elements) = value.kind.as_case::<ArrayLit>()?;
     let root = target.root_name()?;
     let spread = elements.first()?;
-    let Spread(base) = spread.kind.as_case(Spread)?;
+    let Spread(base) = spread.kind.as_case::<Spread>()?;
     let appended = elements.drop_first();
     if (!base.is_same_place(target) || appended.is_empty()) { return none; };
     if (appended.len() > 1 && appended.any(|element| element.mentions_any([root], none))) {

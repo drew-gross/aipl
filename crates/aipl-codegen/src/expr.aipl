@@ -871,8 +871,8 @@ pub fn collect_expr_cases(self: Expr, arm: Case<ExprKind>) -> ExprKind[] {
 
 # The field read `self` is, when it reads one off a plain name.
 pub fn read(self: Expr) -> Read? {
-    let Field(base, field) = self.kind.as_case(Field)?;
-    let Ident(name) = base.kind.as_case(Ident)?;
+    let Field(base, field) = self.kind.as_case::<Field>()?;
+    let Ident(name) = base.kind.as_case::<Ident>()?;
     some(Read { field, base: name })
 }.test({
     assert(expr(Field(ident("p"), "x")).read() == some(Read { field: "x", base: "p" }));

@@ -145,7 +145,7 @@ pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {
 # file imports. A function from another file is not here — its parameters are not in view
 # when a file is linted.
 fn methods_in_view(self: Item[]) -> str[] {
-    let own = self.collect_arms(LoweredFn)$method_name().collect_ok();
+    let own = self.collect_arms::<LoweredFn>()$method_name().collect_ok();
     let imported = self
         .imported_locals()
         .filter(|name| name[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyz_".contains(c)));
@@ -185,7 +185,7 @@ struct MapAdvice { hit: LintHit, lambda: Span? }
 # `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
 fn map_advice(self: Expr, map_name: str?, methods: str[]) -> MapAdvice? {
     let name = map_name?;
-    let Call(callee, arguments, _) = self.kind.as_case(Call)?;
+    let Call(callee, arguments, _) = self.kind.as_case::<Call>()?;
     if (callee != name) { return none; };
     let [receiver, argument] = arguments else { return none; };
     let items = receiver.quote("<items>");
@@ -199,7 +199,7 @@ fn map_advice(self: Expr, map_name: str?, methods: str[]) -> MapAdvice? {
             lambda: none,
         });
     };
-    let Lambda(parameters, body) = argument.kind.as_case(Lambda)?;
+    let Lambda(parameters, body) = argument.kind.as_case::<Lambda>()?;
     let [parameter] = parameters else { return none; };
     if (parameter.ty.is_some() || parameter.synthesized_name().contains('$')) { return none; };
     let steps = body.chain(parameter.synthesized_name(), methods)?;
@@ -222,7 +222,7 @@ fn chain(self: Expr, parameter: str, methods: str[]) -> str[]? {
         let steps = inner.chain(parameter, methods)?;
         return some([..steps, `${name.slot_shown()}`]);
     };
-    let Call(name, arguments, method_style) = self.kind.as_case(Call)?;
+    let Call(name, arguments, method_style) = self.kind.as_case::<Call>()?;
     let target = arguments.first()?;
     let rest = arguments.drop_first();
 
@@ -259,13 +259,13 @@ fn slot_shown(self: str) -> str {
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.
 fn forwarded(self: Expr, advised: Span[]) -> LintHit? {
-    let Lambda(parameters, body) = self.kind.as_case(Lambda)?;
+    let Lambda(parameters, body) = self.kind.as_case::<Lambda>()?;
     if (advised.contains(self.span) || parameters.any(
         |parameter| parameter.synthesized_name().contains('$'),
     )) {
         return none;
     };
-    let Call(name, arguments, _) = body.kind.as_case(Call)?;
+    let Call(name, arguments, _) = body.kind.as_case::<Call>()?;
     if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
         |parameter| parameter.synthesized_name() == name,
     )) {

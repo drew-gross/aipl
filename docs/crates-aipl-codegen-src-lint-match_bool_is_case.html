@@ -18,7 +18,7 @@
     Circle(..) =&gt; true,
     Square(..) =&gt; false,
 }
-</code></pre><p>— a variant value turned into whether it is one case. That is <code>shape.is_case(Circle)</code>, which says so without the other arms and stays right when the variant gains a case.</p><p>The shape is exact: every arm's body is a <code>true</code> or <code>false</code> literal, exactly one of them is <code>true</code>, and its pattern is a variant case's constructor. <code>some</code>, <code>none</code>, <code>ok</code> and <code>err</code> are optionals and results rather than cases of a variant the program declares, and a bare lowercase name binds rather than naming a case, so neither is advised. A second <code>true</code> arm (<code>A | B =&gt; true</code>) is two cases, which <code>is_case</code> does not ask about.</p><p>The hit points at the <code>true</code> arm, a short line the formatter keeps in place.</p></div>
+</code></pre><p>— a variant value turned into whether it is one case. That is <code>shape.is_case::&lt;Circle&gt;()</code>, which says so without the other arms and stays right when the variant gains a case.</p><p>The shape is exact: every arm's body is a <code>true</code> or <code>false</code> literal, exactly one of them is <code>true</code>, and its pattern is a variant case's constructor. <code>some</code>, <code>none</code>, <code>ok</code> and <code>err</code> are optionals and results rather than cases of a variant the program declares, and a bare lowercase name binds rather than naming a case, so neither is advised. A second <code>true</code> arm (<code>A | B =&gt; true</code>) is two cases, which <code>is_case</code> does not ask about.</p><p>The hit points at the <code>true</code> arm, a short line the formatter keeps in place.</p></div>
 
 
 
@@ -31,7 +31,7 @@
             <a class="anchor" href="#item-match_bool_is_case">match_bool_is_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_bool_is_case(__spat$1394: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn match_bool_is_case(__spat$1398: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>match</code> in the program that only asks which case a value is.</p></div>
 
