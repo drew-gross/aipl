@@ -23,7 +23,6 @@ import {
     map_join,
     starts_with,
     value_or,
-    wrapping_sub as -,
 } from builtins;
 import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
@@ -45,6 +44,10 @@ pub fn hit(message: str, span: Span) -> LintHit { message, span }.test({
 # file that does not import a builtin is told to, which the lint need not know either.
 struct UnfilledHit { named: Named[], tail: str, span: Span }
 
+# An [`UnfilledHit`] with nowhere to point yet: what a lint over one node says of it, the node being
+# the caller's to name. [`advised`] puts each at the node it is for.
+struct Advice { named: Named[], tail: str }
+
 # Some text and the builtin whose name follows it in the message.
 struct Named { text: str, builtin: str }
 
@@ -55,6 +58,23 @@ pub fn unfilled(builtin: str, before: str, after: str, span: Span) -> UnfilledHi
     span,
 }.test({
     assert(unfilled("len", "use ", "()", 1..2).span == 1..2);
+})
+
+# An advice for a message `before` + the builtin's name + `after`.
+pub fn advice(builtin: str, before: str, after: str) -> Advice {
+    named: [Named { text: before, builtin }],
+    tail: after,
+}.test({
+    assert(advice("len", "use ", "()").named == [Named { text: "use ", builtin: "len" }]);
+})
+
+# The hit that `self` is when it is about the node whose span is `span`.
+pub fn at(self: Advice, span: Span) -> UnfilledHit {
+    named: self.named,
+    tail: self.tail,
+    span,
+}.test({
+    assert(advice("len", "use ", "()").at(1..2) == unfilled("len", "use ", "()", 1..2));
 })
 
 # `self` as the hit it is for a file that spells builtin `name` as `spelled(name)`,
@@ -237,16 +257,6 @@ fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> s
         Path(..) => [],
     }
 }
-
-# The text of `container` after `self` ends. `self` is an expression inside `container`, so
-# a lint that needs what was written around a node reads it from the enclosing one.
-pub fn text_after(self: Expr, container: Expr) -> str {
-    container.source[self.span.end - container.span.start..]
-}.test({
-    let inner = Expr { ..ident("x"), span: 4..5, source: "x" };
-    let outer = Expr { ..ident("x"), span: 4..12, source: "x.len() " };
-    assert(inner.text_after(outer) == ".len() ");
-})
 
 # Every name a file's `items` import from builtins, as the file spells it.
 pub fn imported_locals(self: Item[]) -> str[] {

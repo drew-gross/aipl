@@ -4,8 +4,8 @@
 # covers and says how to keep the rest. A lint is added by giving it its own file and
 # a line in `lint`; the hits come back in the order the lints are listed.
 
-import { collect_ok, equal as ==, join } from builtins;
-import { Assign, Call, Construct, descendants_of_kind } from "../expr.aipl";
+import { collect_ok, equal as ==, join, map } from builtins;
+import { Assign, Call, Construct, Expr, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item, Program, SuperProgram } from "../item.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
@@ -24,7 +24,10 @@ import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
 import {
+    Advice,
     LintHit,
+    UnfilledHit,
+    at,
     filled,
     functions,
     hits,
@@ -135,10 +138,21 @@ fn call_lints(Function { body }, items: Item[]) -> LintHit[] {
     let calls = body.descendants_of_kind::<Call>();
     [
         ..calls$kind$value_or_compare().collect_ok(),
-        ..calls$len_gt_zero().collect_ok().filled(items),
-        ..calls$is_empty_longhand().collect_ok().filled(items),
+        ..calls
+            .map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) })
+            .collect_ok()
+            .filled(items),
+        ..calls
+            .map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) })
+            .collect_ok()
+            .filled(items),
     ]
 }
+
+# `advice`, when there is one, as the hit at the call `self`: a lint of one call says what is wrong
+# with it, and the call's own span is where that is pointed. (The lint is passed as its result
+# because a function type over a case, `(Call) -> Advice?`, is not typed yet.)
+fn hit_at(self: Expr<Call>, advice: Advice?) -> UnfilledHit? { some(advice?.at(self.span)) }
 
 # The lints over the assignments of `function`, which are found once for all of them.
 fn assign_lints(Function { body }) -> LintHit[] {

@@ -14,9 +14,8 @@
 # that is not a length test at all. The same goes for `len`: a file's own `len` is a different function
 # answering a different question, and `is_nonempty` does not apply to what it takes.
 #
-# The receiver is quoted only where the rewrite is a literal splice — the method spelling, whose
-# `.len` or `.is_empty` follows the receiver's text. That keeps a parenthesized or free-call
-# receiver (`len(f(x))`, `(a + b).len()`) from being spliced into advice that would reassociate it.
+# The receiver is quoted only where the rewrite is a literal splice: a call's span stops before its
+# closing paren, so splicing `len(f(x))`'s receiver would produce advice that does not parse.
 
 import {
     as_case,
@@ -25,18 +24,16 @@ import {
     logical_and as &&,
     logical_or as ||,
     not_equal as !=,
-    starts_with,
 } from builtins;
 import { Callee } from "../builtin_table.aipl";
 import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
-import { UnfilledHit, text_after, unfilled } from "./lint_hit.aipl";
+import { Advice, advice, spans_its_text } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
-# The hit for the call `self`, when it is a comparison of a length with zero, or a negated `is_empty`.
-pub fn len_gt_zero(self: Expr<Call> { kind }) -> UnfilledHit? {
-    let Call(_, args, _, callee) = kind;
+# The advice for the call `self`, when it is a comparison of a length with zero, or a negated `is_empty`.
+pub fn len_gt_zero(self: Call(_, args, _, callee)) -> Advice? {
     let (receiver, what) = match (args.len()) {
         1 => (args.negated_emptiness(callee)?, "a negated emptiness test"),
         2 => (args.length_against_zero(callee)?, "a length compared against 0"),
@@ -44,12 +41,10 @@ pub fn len_gt_zero(self: Expr<Call> { kind }) -> UnfilledHit? {
             return none;
         },
     };
-    // The method spelling, `x.len()` or `x.is_empty()`, is what the advice can splice back.
-    let method = receiver.text_after(self).starts_with(".");
-    some(if (method) {
-        unfilled("is_nonempty", `{what} — use "{receiver.source}.`, `()"`, self.span)
+    some(if (receiver.spans_its_text()) {
+        advice("is_nonempty", `{what} — use "{receiver.source}.`, `()"`)
     } else {
-        unfilled("is_nonempty", `{what} — use "`, `" on the receiver`, self.span)
+        advice("is_nonempty", `{what} — use "`, `" on the receiver`)
     })
 }.test({
     // `lint_str` runs every lint, so each snippet imports exactly the names it uses; the ones that
@@ -71,6 +66,9 @@ pub fn len_gt_zero(self: Expr<Call> { kind }) -> UnfilledHit? {
 
     // A receiver that is not spelled by its text is a placeholder, and a missing import is named.
     assert(messages(long, "len(x) > 0 && x.is_nonempty()")? == [
+        `a length compared against 0 — use "x.is_nonempty()"`,
+    ]);
+    assert(messages(long, "f(x).len() > 0 && x.is_nonempty()")? == [
         `a length compared against 0 — use "is_nonempty" on the receiver`,
     ]);
     assert(messages("len, greater_than as >", "x.len() > 0")? == [

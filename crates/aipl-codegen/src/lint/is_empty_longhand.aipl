@@ -27,32 +27,21 @@ import { Callee } from "../builtin_table.aipl";
 import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
-import { UnfilledHit, spans_its_text, unfilled } from "./lint_hit.aipl";
+import { Advice, advice, spans_its_text } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
-# The hit for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
+# The advice for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
 # equality.
-pub fn is_empty_longhand(self: Expr<Call> { kind }) -> UnfilledHit? {
-    let Call(_, args, _, callee) = kind;
+pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
     let receiver = if (args.len() == 1) {
         args.negated_nonempty(callee)?
     } else {
         args.length_equal_zero(callee)?
     };
     some(if (receiver.spans_its_text()) {
-        unfilled(
-            "is_empty",
-            `emptiness asked the long way — use "{receiver.source}.`,
-            `()"`,
-            self.span,
-        )
+        advice("is_empty", `emptiness asked the long way — use "{receiver.source}.`, `()"`)
     } else {
-        unfilled(
-            "is_empty",
-            `emptiness asked the long way — use "`,
-            `" on the receiver`,
-            self.span,
-        )
+        advice("is_empty", `emptiness asked the long way — use "`, `" on the receiver`)
     })
 }.test({
     // `lint_str` runs every lint, so each snippet imports exactly the names it uses; the ones that

@@ -564,7 +564,6 @@ skills:
 lint:
   const function should be const var most of the time
   make Call's Callee field non-optional
-  change how UnfilledHit works so that we don't need access to spans in the lints. Then, len_gt_zero and is_empty_longhand can accept just Call, not Expr<Call>
   lint after name resolution so we don't have to do the "names" check that makes sure things are imported with the expected names - lints should continue to work even if e.g import { len as foo } from builtins is done
   lint test helper so messages doesn't need to keep getting reimplemented
   allow declaring types in tests, and require a type to be declared in the test if it's only used in the test
@@ -792,6 +791,7 @@ optimizations:
     apparently, to_str_len still uses to_str() on boxed types to compute the len. We should stop that and use to_str_len.
     foo.reverse()[x] and foo.reverse()[x..y] should fuse
     .map().to_set() should fuse
+    .to_set().has() should fuse
     map().join().len() should fuse
     .join().first() should fuse. also map_join().first()?
     .reverse().find_map() should fuse

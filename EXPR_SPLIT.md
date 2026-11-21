@@ -52,7 +52,7 @@ Each ends at a green `cargo handoff`.
 Goal: the lints that start a `descendants()$f()` with `self.kind.as_case::<C>()?` use
 `descendants_of_kind::<C>()` and destructure the kind in the parameter.
 
-- [ ] Moved: `field_init_shorthand`, `set_spread_field`, `value_or_compare`, `len_gt_zero`, `is_empty_longhand` (the last three share `call_lints`). A lint over one kind is a function of one node (`self: Expr<C>`, destructured in place or read as `self.kind`) with no helper of its own unless it is shared; `lint.aipl` finds the nodes of a kind once per function (`construct_lints`, `assign_lints`) and maps each lint over them. A lint over a new kind adds a helper there. `self: Expr<C> { kind }` is the form for a lint that also needs the node's span.
+- [ ] Moved: `field_init_shorthand`, `set_spread_field`, `value_or_compare`, `len_gt_zero`, `is_empty_longhand` (the last three share `call_lints`). A lint over one kind is a function of one node (`self: Expr<C>`, destructured in place or read as `self.kind`) with no helper of its own unless it is shared; `lint.aipl` finds the nodes of a kind once per function (`construct_lints`, `assign_lints`) and maps each lint over them. A lint over a new kind adds a helper there. A lint of one node returns what it says without a span (`Advice`, `advice(builtin, before, after)`); `lint.aipl` places it at the node (`hit_at`), so the lint takes the case alone (`self: Call(..)`).
 - [ ] One lint at a time (each is its own `.aipl` file with its own tests); the hit spans and
   messages do not change. A lint that matched imported names moves to `callee` matching as it moves.
 - [ ] `collect_expr_cases` (kinds alone) goes once nothing wants kinds without their node.

@@ -64,6 +64,20 @@
 
 
 
+        <section class="item" id="item-Advice">
+          <h3>
+            <a class="anchor" href="#item-Advice">Advice</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Advice</code></pre>
+
+          <div class="doc"><p>An [<code>UnfilledHit</code>] with nowhere to point yet: what a lint over one node says of it, the node being the caller's to name. [<code>advised</code>] puts each at the node it is for.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Named">
           <h3>
             <a class="anchor" href="#item-Named">Named</a>
@@ -86,6 +100,34 @@
           <pre class="signature"><code>pub fn unfilled(builtin: str, before: str, after: str, span: Span) -&#62; UnfilledHit</code></pre>
 
           <div class="doc"><p>An unfilled hit at <code>span</code> for a message <code>before</code> + the builtin's name + <code>after</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-advice">
+          <h3>
+            <a class="anchor" href="#item-advice">advice</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn advice(builtin: str, before: str, after: str) -&#62; Advice</code></pre>
+
+          <div class="doc"><p>An advice for a message <code>before</code> + the builtin's name + <code>after</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-at">
+          <h3>
+            <a class="anchor" href="#item-at">at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn at(self: Advice, span: Span) -&#62; UnfilledHit</code></pre>
+
+          <div class="doc"><p>The hit that <code>self</code> is when it is about the node whose span is <code>span</code>.</p></div>
 
 
         </section>
@@ -198,20 +240,6 @@
           <pre class="signature"><code>pub fn bound_to(self: Item[], local: str) -&#62; str?</code></pre>
 
           <div class="doc"><p>The builtin a file's <code>items</code> import under the local name <code>local</code>, as builtins exports it (<code>wrapping_add</code> for <code>import { wrapping_add as + } from builtins;</code>), or <code>none</code> when that name is not bound by an import from builtins — unbound, or one of the file's own.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-text_after">
-          <h3>
-            <a class="anchor" href="#item-text_after">text_after</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn text_after(self: Expr, container: Expr) -&#62; str</code></pre>
-
-          <div class="doc"><p>The text of <code>container</code> after <code>self</code> ends. <code>self</code> is an expression inside <code>container</code>, so a lint that needs what was written around a node reads it from the enclosing one.</p></div>
 
 
         </section>
