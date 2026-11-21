@@ -888,6 +888,7 @@ case_tests! {
     cases_variants_case_parameter = "cases/variants/case_parameter",
     cases_variants_case_type = "cases/variants/case_type",
     cases_variants_case_type_arguments = "cases/variants/case_type_arguments",
+    cases_variants_case_with_keyword_parameter = "cases/variants/case_with_keyword_parameter",
     cases_variants_collect_arms = "cases/variants/collect_arms",
     cases_variants_ctor_as_fn_value = "cases/variants/ctor_as_fn_value",
     cases_variants_err_arm_of_not_a_variant_parameter = "cases/variants/err_arm_of_not_a_variant_parameter",

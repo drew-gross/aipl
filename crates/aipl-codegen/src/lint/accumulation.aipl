@@ -130,9 +130,7 @@ pub fn plain_seeded_loop(self: LetMut) -> SeededLoop? {
 fn seeded_loop(self: LetMut(name, annotation, seed, rest)) -> SeededLoop? {
     let Seq(first, _) = rest.kind.as_case::<Seq>()?;
 
-    // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
-    // from being passed as a function value.
-    let For(variable, iterable, body, index) = first.kind else { return none; }; #[allow]
+    let For(variable, iterable, body, index) = first.kind.as_case::<For>()?;
     some(SeededLoop { name, annotation, seed, variable, index, iterable, body })
 }
 

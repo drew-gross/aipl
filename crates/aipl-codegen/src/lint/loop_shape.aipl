@@ -143,9 +143,7 @@ fn search_variables(src: str) -> str[]!ParseError {
 
 # `self` as a [`SearchLoop`], when it is one.
 fn search_loop(self: Seq(first, rest)) -> SearchLoop? {
-    // `as_case(For)` would say this, but `For` has a keyword parameter, which keeps it
-    // from being passed as a function value.
-    let For(variable, iterable, body, index) = first.kind else { return none; }; #[allow]
+    let For(variable, iterable, body, index) = first.kind.as_case::<For>()?;
     let If(condition, then, otherwise) = body.lone_statement()?.kind.as_case::<If>()?;
     if (otherwise.kind != Unit) { return none; };
     let statement = then.lone_statement()?;

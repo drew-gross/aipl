@@ -240,8 +240,7 @@ variant ExprKind =
     | Ident(str)
     # `callee` is what the name is to: the parser writes `Unresolved`, and `resolve_callees.aipl`
     # decides from the file's imports and locals for the lints. It is last so an artifact built
-    # before it decodes as it always did. It has no default because a case with a keyword
-    # parameter cannot be a `Case<..>` argument.
+    # before it decodes as it always did.
     | Call(name: str, args: Expr[], method_style: bool, callee: Callee)
     | Neg(Expr)
     | If(Expr, Expr, Expr)

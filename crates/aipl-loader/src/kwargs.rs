@@ -1533,9 +1533,15 @@ impl Expander {
                 }
                 // Expand within each argument first (a keyword argument's value
                 // is expanded; the KwArg wrapper itself is handled below).
+                //
+                // The case a type argument wrote is a marker that picks one case, and nothing calls
+                // it, so it is left as the constructor's name: expanding it would refuse a case with
+                // keyword parameters as a function value, which it is not.
+                let case_position = from_type_argument.then(|| self.case_index(name)).flatten();
                 let args: Vec<Expr> = args
                     .iter()
-                    .map(|a| match &a.kind {
+                    .enumerate()
+                    .map(|(i, a)| match &a.kind {
                         ExprKind::KwArg(k, v, fwd) => {
                             let v = self.expand_expr(v, locals)?;
                             Ok(Expr::rebuilt(
@@ -1543,6 +1549,7 @@ impl Expander {
                                 a,
                             ))
                         }
+                        _ if case_position == Some(i) => Ok(a.clone()),
                         _ => self.expand_expr(a, locals),
                     })
                     .collect::<Result<_, _>>()?;

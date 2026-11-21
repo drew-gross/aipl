@@ -1,0 +1,35 @@
+# A case with a keyword parameter, a payload slot with a default, is written as a type argument like
+# any other case: `x.is_case::<Rect>()`, `x.as_case::<Rect>()`, `xs.collect_arms::<Rect>()` and a
+# function's own `Case<T>` parameter. The case there only picks which case is meant, and is never
+# called, so it is no function value that would need the keyword argument filled in.
+
+import {
+    as_case,
+    collect_arms,
+    count_if,
+    equal as ==,
+    is_case,
+    len,
+    logical_not as !,
+    wrapping_mul as *,
+} from builtins;
+
+variant Shape = Circle(r: i64) | Rect(w: i64, h: i64 = 1) | Dot
+
+pub fn area(self: Shape) -> i64? {
+    let Rect(w, h) = self.as_case::<Rect>()?;
+    some(w * h)
+}.test({
+    assert(Rect(3, h=2).area() == some(6));
+    assert(Rect(3).area() == some(3));
+    assert(Circle(1).area() == none);
+    assert(Rect(1).is_case::<Rect>());
+    assert(!Dot.is_case::<Rect>());
+    assert([Circle(1), Rect(1), Dot, Rect(2, h=3)].collect_arms::<Rect>().len() == 2);
+})
+
+pub fn how_many(self: Shape[], arm: Case<Shape>) -> u64 { self.count_if(|s| s.is_case(arm)) }.test({
+    let shapes = [Rect(1), Dot, Rect(2, h=3), Circle(4)];
+    assert(shapes.how_many::<Rect>() == 2);
+    assert(shapes.how_many::<Dot>() == 1);
+})

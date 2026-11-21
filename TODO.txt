@@ -304,6 +304,7 @@ lsp:
   go-to-def on a keyword/operator (e.g. `fn`, `$`, `.` should show the docs for that operator)
   go-to-def on builting types should do the same as for functions
   go-to-def on builtins don't need the explainer comment
+  go-to-def should work on files that don't typecheck
 
 bugs:
   lint quirk: Equivalence assumption: the ++/+= flavor matching uses the wrapping_/saturating_ name prefix instead of Rust's canonical-callee table. It is equivalent for every real import. It differs only for an absurd alias such as wrapping_add as ++.
@@ -447,6 +448,9 @@ matrices:
   support more than 2 dimensions
 
 types:
+  functions with keyword arguments:
+    should be able to pass these anywhere the keyword arguments are't used (and they get implicitly defaulted)
+    should be able to have keyword arguments in the type somehow, so you can pass them where the keyword arguments are accounted for in the API
   need some syntax for type operators so we can e.g. at runtime get the type of the first arg (primarily to call it only if it matches)
   remove concept of "unsettled" types, probably by having a better concept of bounds
   some way to turn a json object into a native object (and error id shape doesn't match)
