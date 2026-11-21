@@ -39,37 +39,36 @@ pub(crate) fn expand_calls(
             continue;
         }
         let mut here = false;
-        let body = replace_call(&g.body, &f.name, fparams, &f.body, &mut here, sites);
-        if here {
-            replaced = true;
-            g.body = body;
-        }
+        replace_call(&mut g.body, &f.name, fparams, &f.body, &mut here, sites);
+        replaced |= here;
     }
     replaced
 }
 
-/// `e` with the calls to `fname` — with matching arity — replaced by the inlined body.
+/// Replace, in `e` itself, the calls to `fname` — with matching arity — by the inlined body. The
+/// body that replaces a call is not searched again, and under [`Sites::First`] nothing is searched
+/// once a call has been replaced.
 fn replace_call(
-    e: &Typed,
+    e: &mut Typed,
     fname: &str,
     fparams: &[InlineParam],
     fbody: &Typed,
     replaced: &mut bool,
     sites: Sites,
-) -> Typed {
-    if !*replaced || sites == Sites::All {
-        if let TExprKind::Call { callee, args, .. } = &e.kind {
-            if callee.name() == fname && args.len() == fparams.len() {
-                *replaced = true;
-                return build_inlined(fparams, fbody, args, e);
-            }
+) {
+    if *replaced && sites == Sites::First {
+        return;
+    }
+    if let TExprKind::Call { callee, args, .. } = &e.kind {
+        if callee.name() == fname && args.len() == fparams.len() {
+            *replaced = true;
+            *e = build_inlined(fparams, fbody, args, e);
+            return;
         }
     }
-    let mut out = e.clone();
-    each_child_mut(&mut out, &mut |child| {
-        *child = replace_call(child, fname, fparams, fbody, replaced, sites);
+    each_child_mut(e, &mut |child| {
+        replace_call(child, fname, fparams, fbody, replaced, sites);
     });
-    out
 }
 
 /// A node made here carries no stamp, as the `Expr` it replaces had none.

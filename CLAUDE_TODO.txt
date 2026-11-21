@@ -74,7 +74,8 @@ check:
 handoff / check speed (corpus now runs as `aipl check --baseline --shard` processes; handoff 675s -> 444s):
   shards are uneven (171-293s in one run): hand out the heavy files (crates/, ~7s each; lint files ~17s) first, or from a shared queue, instead of round-robin by sorted position
   the 200 compiler-source files under crates/ are ~90% of the corpus cost; the other 874 cases are ~0.13s each
-  optimizer: `inline_single_use_post_mono` was 26% of a lint file's check (use counts recomputed per round?), pre-mono passes ~15%, Expr clone/drop churn ~24%; speeds up every compile, production builds included
+  optimizer: `inline_single_use_post_mono` is ~30% of a lint file's check (clones per call site, counts and binders recomputed every round); speeds up every compile, production builds included: plan in INLINE_SINGLE_USE_SPEED.md
+  optimizer: pre-mono passes ~15% of a lint file's check
   Cranelift verifier is on (5% of a check): turn it off outside debug builds, if it isn't deliberate
   run the non-case nextest (~75s) at the same time as the shards instead of after them (they would slow each other)
   skip the baseline AOT build for a file whose sources, imports and compiler fingerprint are unchanged (cache the measurement; needs a trustworthy compiler fingerprint)

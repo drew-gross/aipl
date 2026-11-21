@@ -3283,17 +3283,6 @@ fn lower_program(
     // specializations: those lifted lambdas (and any other now-single-use
     // instance) are each called from exactly one site, so fold them back in. Only
     // possible post-mono — the lambdas don't exist until mono creates them.
-    // Inline single-use instances. The functions an *external* caller reaches by
-    // name — the FFI engines' entries, and the `check` driver's `__test_main` —
-    // are named here so they are never elided; they can still be inlined into
-    // any AIPL caller, since keeping the definition is all an external call
-    // needs. `DOGFOOD_ENTRIES` is the same list the engine is built and
-    // validated against, so this can't drift from what FFI actually calls.
-    let externally_called: std::collections::HashSet<String> = DOGFOOD_ENTRIES
-        .iter()
-        .map(|s| (*s).to_string())
-        .chain(["main".to_string(), "__test_main".to_string()])
-        .collect();
     // The post-monomorphization pipeline, iterated the same way. Mono has
     // lifted each lambda to its own function and instantiated the
     // AIPL-implemented builtins, so there is a second crop of single-use
@@ -3304,18 +3293,17 @@ fn lower_program(
         // exactly one specialization) and any other now-single-use instance,
         // folded back into their one caller. Only possible post-mono — the
         // lambdas don't exist until mono creates them.
-        Pass::whole_program("inline_single_use_post_mono", {
-            let externally_called = externally_called.clone();
-            move |program| aipl_mono::inline_single_use_post_mono(program, &externally_called)
-        }),
+        Pass::whole_program(
+            "inline_single_use_post_mono",
+            aipl_mono::inline_single_use_post_mono,
+        ),
         // Then the small bodies, at *every* call site. This is what the
         // sinking pass below needs to see through a call: `value_or`'s `match`
         // has to be in the caller before a binding can be moved into one of
         // its arms. First round only, for the same reason as its pre-mono
         // counterpart.
-        Pass::whole_program("inline_small_post_mono", {
-            let externally_called = externally_called.clone();
-            move |program| aipl_mono::inline_small_post_mono(program, max_exprs, &externally_called)
+        Pass::whole_program("inline_small_post_mono", move |program| {
+            aipl_mono::inline_small_post_mono(program, max_exprs)
         })
         .once(),
         // Pick the arm of each `match` on a literal, over what the inlining

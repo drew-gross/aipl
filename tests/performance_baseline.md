@@ -49,7 +49,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/hoist_test_fns | 64 | 8345 | 3375 | 6512 | 136968 |
 | crates/aipl-codegen/src/indent | 24 | 1647 | 231 | 5333 | 4892 |
 | crates/aipl-codegen/src/int_fits | 0 | 0 | 0 | 2177 | 3520 |
-| crates/aipl-codegen/src/is_operator_name | 0 | 0 | 0 | 4105 | 37964 |
+| crates/aipl-codegen/src/is_operator_name | 0 | 0 | 0 | 4105 | 36800 |
 | crates/aipl-codegen/src/item | 175 | 14287 | 3688 | 18655 | 183916 |
 | crates/aipl-codegen/src/lex_aipl | 617 | 678707 | 529440 | 1953184 | 297128 |
 | crates/aipl-codegen/src/lexer | 656 | 81560 | 45320 | 781332 | 606072 |

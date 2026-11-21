@@ -87,6 +87,34 @@ const ARTIFACTS: &[Artifact] = &[Artifact {
     entries: DOGFOOD_ENTRIES,
 }];
 
+/// No artifact's sources define `main` or `__test_main`, so every program an artifact's entries
+/// are called from is a library: the optimizer elides nothing in it. A program with a `main`
+/// therefore has no function an outside caller reaches by name besides `main` itself.
+#[test]
+fn artifacts_have_no_main() {
+    aipl::install_parser_hooks();
+    for a in ARTIFACTS {
+        for (name, src) in read_dogfood_sources(a.sources) {
+            let program = aipl::parse(aipl::strip_test_sections(&src))
+                .unwrap_or_else(|e| panic!("{name} does not parse: {e}"));
+            let entry_points: Vec<&str> = program
+                .items
+                .iter()
+                .filter_map(|item| match item {
+                    aipl::ast::Item::Fn(f) => Some(f.name.text.as_str()),
+                    _ => None,
+                })
+                .filter(|name| matches!(*name, "main" | "__test_main"))
+                .collect();
+            assert!(
+                entry_points.is_empty(),
+                "{name} defines {entry_points:?}: an artifact is a library, and the optimizer \
+                 relies on that (see `inline_single_use_post_mono`)",
+            );
+        }
+    }
+}
+
 fn src_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("crates/aipl-codegen/src")
 }

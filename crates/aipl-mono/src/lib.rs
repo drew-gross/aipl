@@ -4498,16 +4498,15 @@ pub(crate) fn count_uses<'a>(
 /// lifted lambdas (synthesized, each called from exactly one specialization) and
 /// other single-use instances fold away. Still gated to `main` binaries, so FFI
 /// engines and the `check` driver are untouched.
-pub fn inline_single_use_post_mono(
-    program: &MonoProgram,
-    externally_called: &HashSet<String>,
-) -> MonoProgram {
+pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
     // A program with no single entry point is a *library*: an FFI engine loaded
     // for its `pub` entries, or a fragment a Rust caller compiled to invoke by
     // name through `Compilation::run_*`. Any function in one may be called from
-    // outside, so none may be elided — `externally_called` cannot enumerate the
-    // callers of an open API. Inlining into AIPL callers is still safe there,
-    // and still what lets the sinking pass see through a call.
+    // outside, so none may be elided. Inlining into AIPL callers is still safe
+    // there, and still what lets the sinking pass see through a call. A program
+    // with an entry point has no other way in: no dogfood artifact defines one
+    // (`dogfood_ir::artifacts_have_no_main`), so the functions Rust calls by
+    // name are never in a program that has a `main`.
     let library = !program
         .fns
         .iter()
@@ -4548,7 +4547,7 @@ pub fn inline_single_use_post_mono(
             // once from AIPL can be folded into that caller and still be
             // emitted, which is all an external caller needs — so an entry stays
             // in the program whether or not any AIPL code still calls it.
-            if library || externally_called.contains(&f.name) {
+            if library {
                 skip.insert(f.name.clone());
             } else {
                 program.fns.retain(|g| g.name != f.name);
@@ -4636,11 +4635,7 @@ pub const DEFAULT_INLINE_INSPECTED_MAX_EXPRS: usize = 64;
 /// Candidates are chosen once, from the program as it arrives — inlining only
 /// grows callers, so re-selecting could never add to the set, while re-walking
 /// it risks an unbounded ping-pong between two small mutually-calling functions.
-pub fn inline_small_post_mono(
-    program: &MonoProgram,
-    max_exprs: usize,
-    externally_called: &HashSet<String>,
-) -> MonoProgram {
+pub fn inline_small_post_mono(program: &MonoProgram, max_exprs: usize) -> MonoProgram {
     let mut program = program.clone();
     let binders = collect_binders_mono(&program);
     // See `inline_single_use_post_mono`: with no single entry, any function may
@@ -4705,7 +4700,7 @@ pub fn inline_small_post_mono(
         // Unlike the pre-mono pass, nothing downstream will drop the orphan for
         // us — an unreferenced function still reaches codegen — so drop it here
         // once nothing names it and nothing outside can ask for it.
-        if replaced && !library && !externally_called.contains(&f.name) {
+        if replaced && !library {
             let counts = use_counts_mono(&program);
             if counts.get(f.name.as_str()) == Some(&0) {
                 program.fns.retain(|g| g.name != f.name);
