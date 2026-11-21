@@ -1,0 +1,14 @@
+# A mismatch against a generic parameter nothing has fixed names it `_`: `T?[]` is not an
+# array of `i64?`, which is what the type would be pinned to if it stayed unconstrained.
+
+import { collect_ok } from builtins;
+
+fn flattened(options: i64?[]) -> i64[] { options.collect_ok() }
+
+fn wrong(option: i64?) -> i64[] { option$collect_ok() }
+--- check --compile ---
+error: fn "collect_ok" arg 0: expected _?[], got i64
+ --> ./tests/cases/generics/err_unconstrained_parameter_shown_as_unknown.aipl:8:42
+  |
+8 | fn wrong(option: i64?) -> i64[] { option$collect_ok() }
+  |                                          ^^^^^^^^^^

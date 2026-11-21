@@ -2164,8 +2164,8 @@ impl Pinner<'_> {
         // The value keeps its refinements, so a variable it meets is fixed to the refined type.
         self.agree(actual, &e).or_else(|_| {
             let (given, wanted) = (
-                aipl_syntax::type_name(&self.refined_type(actual)),
-                aipl_syntax::type_name(&self.refined_type(expected)),
+                aipl_syntax::type_name(&self.spelled_type(actual)),
+                aipl_syntax::type_name(&self.spelled_type(expected)),
             );
             let hint = match (&a, &e) {
                 (It::Prim(x), It::Prim(y)) if x.is_int() && y.is_int() => format!(
@@ -3793,7 +3793,17 @@ impl Pinner<'_> {
     /// `t` as a written type, keeping every refinement in it and a tuple as its template applied
     /// to its elements (the instance of an unseen tuple is not a declaration anyone holds).
     fn refined_type(&self, t: &It) -> Type {
-        let boxed = |t: &It| Box::new(self.refined_type(t));
+        self.refined(t, false)
+    }
+
+    /// [`Pinner::refined_type`] for a message: a variable nothing has constrained is `_`, not the
+    /// `i64` it would be pinned to, which would read as a requirement.
+    fn spelled_type(&self, t: &It) -> Type {
+        self.refined(t, true)
+    }
+
+    fn refined(&self, t: &It, unconstrained_as_unknown: bool) -> Type {
+        let boxed = |t: &It| Box::new(self.refined(t, unconstrained_as_unknown));
         let raw = self.table.chase(t);
         match raw {
             It::Without(inner, x) => self
@@ -3804,11 +3814,28 @@ impl Pinner<'_> {
             It::Opt(t) => Type::Optional(boxed(&t)),
             It::Arr(t) => Type::Array(boxed(&t)),
             It::Case(t) => Type::Case(boxed(&t)),
-            It::Fn(ps, r) => Type::Fn(ps.iter().map(|p| self.refined_type(p)).collect(), boxed(&r)),
+            It::Fn(ps, r) => Type::Fn(
+                ps.iter()
+                    .map(|p| self.refined(p, unconstrained_as_unknown))
+                    .collect(),
+                boxed(&r),
+            ),
             It::Res(a, b) => Type::Result(boxed(&a), boxed(&b)),
             It::Dict(k, v) => Type::Dict(boxed(&k), boxed(&v)),
             It::Gen(base, args) if base.starts_with(crate::typing::TUPLE_TEMPLATE) => {
-                Type::Generic(base, args.iter().map(|a| self.refined_type(a)).collect())
+                Type::Generic(
+                    base,
+                    args.iter()
+                        .map(|a| self.refined(a, unconstrained_as_unknown))
+                        .collect(),
+                )
+            }
+            It::Var(v)
+                if unconstrained_as_unknown
+                    && matches!(self.table.slots[v].kind, Kind::Any)
+                    && !self.table.slots[v].diverges =>
+            {
+                Type::Unknown
             }
             other => self.table.resolve(&other).to_type(),
         }

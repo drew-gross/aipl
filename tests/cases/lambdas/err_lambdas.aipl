@@ -97,7 +97,7 @@ error: fn "shout" has effect "!prints" but the calling function does not declare
 45 |     let ys = [1, 2, 3].map(shout); #[allow]
    |                            ^^^^^
 
-error: fn "map" arg 1: expected (i64) -> i64, got (str) -> str
+error: fn "map" arg 1: expected (i64) -> _, got (str) -> str
   --> ./tests/cases/lambdas/err_lambdas.aipl:52:32
    |
 52 |     print(to_str([1, 2, 3].map(takes_str)));
@@ -127,7 +127,7 @@ error: lambda body returns bool, but i64 was expected
 66 | fn lambda_body_type() -> i64 { apply_i64(|x| true, 3) }
    |                                              ^^^^
 
-error: fn "map" arg 0: expected i64[], got i64
+error: fn "map" arg 0: expected _[], got i64
   --> ./tests/cases/lambdas/err_lambdas.aipl:70:22
    |
 70 |     print(to_str(map(5, |x| x + 1)));

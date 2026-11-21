@@ -153,27 +153,26 @@ fn hit_at(self: Expr<Call>, advice: Advice?) -> UnfilledHit? { some(advice?.at(s
 # The lints over the `match`es of `function`, which are found once for all of them. One that is about
 # the function it is in takes it as well.
 fn match_lints(function: Function, items: Item[]) -> LintHit[] {
-    let matches = function.body.descendants_of_kind::<Match>();
+    let matches = function.body.descendants_of_kind::<Match>()$kind;
     [
-        ..matches$kind$match_bool_is_case().collect_ok().filled(items),
-        ..matches$kind$match_is_some_and().collect_ok().filled(items),
-        ..matches$kind$match_value_or().collect_ok().filled(items),
-        ..matches$kind$match_value_or_err(function).collect_ok().filled(items),
-        ..matches$kind$match_map_value_or().collect_ok().filled(items),
-        ..matches$kind$match_map_err().collect_ok().filled(items),
-        ..matches$kind$match_map_ok().collect_ok().filled(items),
-        ..matches$kind$match_case_as_case().collect_ok().filled(items),
+        ..matches$match_bool_is_case(),
+        ..matches$match_is_some_and(),
+        ..matches$match_value_or(),
+        ..matches$match_value_or_err(function),
+        ..matches$match_map_value_or(),
+        ..matches$match_map_err(),
+        ..matches$match_map_ok(),
+        ..matches$match_case_as_case(),
     ]
+        .collect_ok()
+        .filled(items)
 }
 
 # The lints over the `mut` bindings of `function`, which are found once for all of them: each is
 # about an array or set seeded and then filled by the loop that follows.
 fn let_mut_lints(Function { body }, items: Item[]) -> LintHit[] {
-    let seeds = body.descendants_of_kind::<LetMut>();
-    [
-        ..seeds$kind$push_loop_pipeline().collect_ok().filled(items),
-        ..seeds$kind$push_loop_collect_ok().collect_ok().filled(items),
-    ]
+    let seeds = body.descendants_of_kind::<LetMut>()$kind;
+    [..seeds$push_loop_pipeline(), ..seeds$push_loop_collect_ok()].collect_ok().filled(items)
 }
 
 # The lints over the assignments of `function`, which are found once for all of them.

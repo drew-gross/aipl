@@ -128,7 +128,7 @@ error: an index must be an integer, got char
 67 |     let x = s[..'z']; #[allow]
    |                 ^^^
 
-error: fn "len" arg 0: expected i64[], got i64
+error: fn "len" arg 0: expected _[], got i64
   --> ./tests/cases/strings/err_strings.aipl:74:5
    |
 74 |     n[sp].len()
