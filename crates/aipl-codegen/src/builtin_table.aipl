@@ -21,7 +21,7 @@ import {
 } from builtins;
 
 # What a call is to. The importable builtins have a case each, named as the Rust `Callee` arm is;
-# `Some`, `Ok` and `Err` are the constructors the language reserves; a call to a name the file
+# `Some`, `Ok`, `Err` and `Assert` are the names the language reserves; a call to a name the file
 # does not import from a builtins library is `User`, or `Local` where a local holding a function
 # hides the name. `Unresolved` is what the parser writes, before `resolve_callees` decides.
 variant Callee =
@@ -223,6 +223,7 @@ variant Callee =
     | Some
     | Ok
     | Err
+    | Assert
     | User(name: str)
     | Local(name: str)
     | Unresolved

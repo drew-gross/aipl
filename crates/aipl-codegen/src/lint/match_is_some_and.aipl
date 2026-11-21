@@ -28,11 +28,10 @@ import {
     equal as ==,
     is_some_and,
     logical_or as ||,
-    map,
     not_equal as !=,
     to_str,
 } from builtins;
-import { Bool } from "../expr.aipl";
+import { Bool, Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
     UnfilledHit,
@@ -42,39 +41,38 @@ import {
     lint_function_unfilled_messages,
     unfilled,
 } from "./lint_hit.aipl";
-import { OptionMatch, option_matches, receiver_text } from "./option_match.aipl";
+import { OptionMatch, option_match, receiver_text } from "./option_match.aipl";
 
-# A hit for each `match` in the program that only asks whether an optional holds a
-# value its arm accepts.
-pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
-    body
-        .option_matches()
-        .map(|OptionMatch { scrutinee, binder, some_body, none_body }| {
-            if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) { return none; };
-            some(advice(scrutinee.receiver_text(), binder, none_body.span))
-        })
-        .collect_ok()
+# The hit for the `match` `self`, when it only asks whether an optional holds a value its arm
+# accepts.
+pub fn match_is_some_and(self: Match) -> UnfilledHit? {
+    let OptionMatch { scrutinee, binder, some_body, none_body } = self.option_match()?;
+    if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) { return none; };
+    some(advice(scrutinee.receiver_text(), binder, none_body.span))
 }.test({
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Match>()$kind$match_is_some_and().collect_ok()
+    }
     // The `none => false` arm is what is pointed at, in either arm order.
     assert(lint_function_unfilled_hits(
         "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } }",
-        match_is_some_and,
+        flagged,
     )? == [hit(message("o", "v"), 62..67)]);
     assert(lint_function_unfilled_messages(
         "fn f(o: i64?) -> bool { match (o) { none => false, some(v) => v > 1 } }",
-        match_is_some_and,
+        flagged,
     )? == [message("o", "v")]);
 
     // A receiver that cannot take a method as written is not quoted.
     assert(lint_function_unfilled_messages(
         "fn f(a: i64?, b: i64?) -> bool { match (a || b) { some(v) => v > 1, none => false } }",
-        match_is_some_and,
+        flagged,
     )? == [message("<value>", "v")]);
 
     // The `.test` block is held to it too.
     assert(lint_function_unfilled_messages(
         "fn f() { }.test({ assert(match (o) { some(v) => v > 1, none => false }); })",
-        match_is_some_and,
+        flagged,
     )? == [message("o", "v")]);
 
     // A `none` arm that is not `false`, a `some` arm that is `true`, and a catch-all
@@ -82,19 +80,19 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
     assert(
         lint_function_unfilled_messages(
             "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => flag } }",
-            match_is_some_and,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(o: i64?) -> bool { match (o) { some(v) => true, none => false } }",
-            match_is_some_and,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, _ => false } }",
-            match_is_some_and,
+            flagged,
         )? == [],
     );
 
@@ -113,7 +111,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_is_some_and,
+            flagged,
         )? == [],
     );
 
@@ -130,7 +128,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_is_some_and,
+            flagged,
         )? == [],
     );
 
@@ -147,7 +145,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_is_some_and,
+            flagged,
         )? == [],
     );
     // Not a bool at all.
@@ -161,7 +159,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_is_some_and,
+            flagged,
         )? == [],
     );
 
@@ -175,7 +173,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_is_some_and,
+        flagged,
     )? == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead, importing `is_some_and` from builtins""",
     ]);
@@ -188,7 +186,7 @@ pub fn match_is_some_and(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_is_some_and,
+        flagged,
     )? == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.is_some_and(|v| ..)" instead, importing `is_some_and` from builtins""",
     ]);

@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Callee</code></pre>
 
-          <div class="doc"><p>What a call is to. The importable builtins have a case each, named as the Rust <code>Callee</code> arm is; <code>Some</code>, <code>Ok</code> and <code>Err</code> are the constructors the language reserves; a call to a name the file does not import from a builtins library is <code>User</code>, or <code>Local</code> where a local holding a function hides the name. <code>Unresolved</code> is what the parser writes, before <code>resolve_callees</code> decides.</p></div>
+          <div class="doc"><p>What a call is to. The importable builtins have a case each, named as the Rust <code>Callee</code> arm is; <code>Some</code>, <code>Ok</code>, <code>Err</code> and <code>Assert</code> are the names the language reserves; a call to a name the file does not import from a builtins library is <code>User</code>, or <code>Local</code> where a local holding a function hides the name. <code>Unresolved</code> is what the parser writes, before <code>resolve_callees</code> decides.</p></div>
 
 
           <ul class="cases">
@@ -1020,6 +1020,11 @@
             </li>
 
             <li id="item-Err"><code>Err</code>
+
+
+            </li>
+
+            <li id="item-Assert"><code>Assert</code>
 
 
             </li>

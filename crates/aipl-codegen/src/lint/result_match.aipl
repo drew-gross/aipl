@@ -14,7 +14,8 @@ import {
     not_equal as !=,
     value_or,
 } from builtins;
-import { Call, Expr, Ident, Match, collect_expr_cases } from "../expr.aipl";
+import { Callee, Ok } from "../builtin_table.aipl";
+import { Call, Expr, Ident, Match, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { hit, lint_function_messages } from "./lint_hit.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
@@ -49,7 +50,9 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
         lint_function_messages(
             src,
             |function| function.body
-                .result_matches()
+                .descendants_of_kind::<Match>()$kind
+                $result_match()
+                .collect_ok()
                 .map(|m| hit(`{m.ok_binder} {m.err_binder}`, 0..0)),
         )
     }
@@ -62,14 +65,9 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
     assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")? == []);
 })
 
-# Every `match` in `self` and under it that is a [`ResultMatch`], outermost first.
-pub fn result_matches(self: Expr) -> ResultMatch[] {
-    self.collect_expr_cases(Match)$result_match().collect_ok()
-}
-
 # Whether `self` is `constructor(binder)`: the arm hands its own binding straight back to
 # the constructor it came from.
-pub fn passes_through(self: Expr, constructor: str, binder: str) -> bool {
+pub fn passes_through(self: Expr, constructor: Callee, binder: str) -> bool {
     self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind == Ident(binder))
 }.test({
     assert(ok_arm_flags("ok(v)")? == "true false");
@@ -84,15 +82,15 @@ pub fn passes_through(self: Expr, constructor: str, binder: str) -> bool {
 
 # Whether `self` is `constructor(..)` of something other than `binder`: the arm builds
 # a new value for the side it came from.
-pub fn rebuilds(self: Expr, constructor: str, binder: str) -> bool {
+pub fn rebuilds(self: Expr, constructor: Callee, binder: str) -> bool {
     self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind != Ident(binder))
 }
 
 # The one argument of `self`, when it is a call to `constructor`.
-pub fn wraps_with(self: Expr, constructor: str) -> Expr? {
-    let Call(name, arguments, _, _) = self.kind.as_case::<Call>()?;
+pub fn wraps_with(self: Expr, constructor: Callee) -> Expr? {
+    let Call(_, arguments, _, callee) = self.kind.as_case::<Call>()?;
     let [wrapped] = arguments else { return none; };
-    if (name == constructor) { some(wrapped) } else { none }
+    if (callee == constructor) { some(wrapped) } else { none }
 }
 
 # What [`passes_through`] and [`rebuilds`] say of the `ok` arm's body `body`, in a
@@ -101,9 +99,11 @@ fn ok_arm_flags(body: str) -> str!ParseFailure {
     let flags = lint_function_messages(
         `fn f(r: i64!str) -> i64!str \{ match (r) \{ ok(v) => {body}, err(e) => err(e) } }`,
         |function| function.body
-            .result_matches()
+            .descendants_of_kind::<Match>()$kind
+            $result_match()
+            .collect_ok()
             .map(|m| hit(
-                `{m.ok_body.passes_through("ok", m.ok_binder)} {m.ok_body.rebuilds("ok", m.ok_binder)}`,
+                `{m.ok_body.passes_through(Ok, m.ok_binder)} {m.ok_body.rebuilds(Ok, m.ok_binder)}`,
                 0..0,
             )),
     )?;

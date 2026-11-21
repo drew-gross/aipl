@@ -33,6 +33,7 @@
 # occupies one line, and it is the line that makes this a search for the first match.
 
 import { collect_ok, equal as ==, is_some, logical_not as !, logical_or as ||, map } from builtins;
+import { Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
 import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
@@ -47,7 +48,7 @@ pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
             // index to pass with it, so the rewrite would silently drop whatever the body
             // did with it.
             if (found.index.is_some() || !found.rest.answers_none() || !found.returned.passes_through(
-                "some",
+                Some,
                 found.variable,
             ) || !found.condition.is_lambda_safe()) {
                 return none;

@@ -24,6 +24,7 @@ import {
     value_or,
 } from builtins;
 import {
+    Assert,
     BuiltinEntry,
     Callee,
     Err,
@@ -157,8 +158,9 @@ pub fn resolve_callees(self: Program) -> ResolvedProgram {
         User("len"),
     ]);
 
-    // The constructors the language reserves.
+    // The names the language reserves.
     assert(called("fn f(x: i64) -> i64? { some(x) }")? == [Some]);
+    assert(called("fn f(x: i64) { assert(x == 1); }")? == [Assert, User("==")]);
 
     // Defaults are resolved too: nothing in the program is left unresolved.
     assert(called("fn f(x: u64 = len([1])) -> u64 { x }")? == [User("len")]);
@@ -309,6 +311,8 @@ fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -> ResolvedCall
         Ok
     } else if (name == "err") {
         Err
+    } else if (name == "assert") {
+        Assert
     } else {
         User(name)
     }

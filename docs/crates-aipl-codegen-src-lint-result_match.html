@@ -50,26 +50,12 @@
 
 
 
-        <section class="item" id="item-result_matches">
-          <h3>
-            <a class="anchor" href="#item-result_matches">result_matches</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn result_matches(self: Expr) -&#62; ResultMatch[]</code></pre>
-
-          <div class="doc"><p>Every <code>match</code> in <code>self</code> and under it that is a [<code>ResultMatch</code>], outermost first.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-passes_through">
           <h3>
             <a class="anchor" href="#item-passes_through">passes_through</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn passes_through(self: Expr, constructor: str, binder: str) -&#62; bool</code></pre>
+          <pre class="signature"><code>pub fn passes_through(self: Expr, constructor: Callee, binder: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is <code>constructor(binder)</code>: the arm hands its own binding straight back to the constructor it came from.</p></div>
 
@@ -83,7 +69,7 @@
             <a class="anchor" href="#item-rebuilds">rebuilds</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn rebuilds(self: Expr, constructor: str, binder: str) -&#62; bool</code></pre>
+          <pre class="signature"><code>pub fn rebuilds(self: Expr, constructor: Callee, binder: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is <code>constructor(..)</code> of something other than <code>binder</code>: the arm builds a new value for the side it came from.</p></div>
 
@@ -97,7 +83,7 @@
             <a class="anchor" href="#item-wraps_with">wraps_with</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn wraps_with(self: Expr, constructor: str) -&#62; Expr?</code></pre>
+          <pre class="signature"><code>pub fn wraps_with(self: Expr, constructor: Callee) -&#62; Expr?</code></pre>
 
           <div class="doc"><p>The one argument of <code>self</code>, when it is a call to <code>constructor</code>.</p></div>
 

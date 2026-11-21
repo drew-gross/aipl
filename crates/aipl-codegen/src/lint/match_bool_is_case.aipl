@@ -21,6 +21,7 @@
 import {
     Span,
     all,
+    as_case,
     collect_ok,
     contains,
     equal as ==,
@@ -28,9 +29,8 @@ import {
     is_case,
     logical_not as !,
     logical_or as ||,
-    map,
 } from builtins;
-import { Bool, Match, MatchArm, collect_expr_cases } from "../expr.aipl";
+import { Bool, Match, MatchArm, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor, is_binder_name } from "../pat.aipl";
 import {
@@ -40,51 +40,47 @@ import {
     unfilled,
 } from "./lint_hit.aipl";
 
-# A hit for each `match` in the program that only asks which case a value is.
-pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
-    body
-        .collect_expr_cases(Match)
-        .map(|Match(scrutinee, arms)| {
-            if (!arms.all(|arm| arm.body.kind.is_case::<Bool>())) { return none; };
-            let [MatchArm { pattern, span }] = arms.filter(|arm| arm.body.kind == Bool(true)) else {
-                return none;
-            };
-            let Ctor(case, _, _) = pattern else { return none; };
-            if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) {
-                return none;
-            };
-            some(advice(case, span))
-        })
-        .collect_ok()
+# The hit for the `match` `self`, when it only asks which case a value is.
+pub fn match_bool_is_case(self: Match(_, arms)) -> UnfilledHit? {
+    if (!arms.all(|arm| arm.body.kind.is_case::<Bool>())) { return none; };
+    let [MatchArm { pattern, span }] = arms.filter(|arm| arm.body.kind == Bool(true)) else {
+        return none;
+    };
+    let Ctor(case, _, _) = pattern.as_case::<Ctor>()?;
+    if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) { return none; };
+    some(advice(case, span))
 }.test({
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Match>()$kind$match_bool_is_case().collect_ok()
+    }
     // One case is `true`, the rest `false`.
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { match (s) { Circle(..) => true, Square(..) => false } }",
-        match_bool_is_case,
+        flagged,
     )? == [message("Circle", none)]);
 
     // A catch-all `false` does as well, and the payload may be bound.
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { match (s) { Circle(r) => true, _ => false } }",
-        match_bool_is_case,
+        flagged,
     )? == [message("Circle", none)]);
 
     // A nullary case.
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
-        match_bool_is_case,
+        flagged,
     )? == [message("Dot", none)]);
 
     // The name the file imports it under is the advice's.
     assert(lint_function_unfilled_messages(
         "import { is_case as isa } from builtins; fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
-        match_bool_is_case,
+        flagged,
     )? == [message("Dot", some("isa"))]);
 
     // A `.test` block is held to it too.
     assert(lint_function_unfilled_messages(
         "fn f() { }.test({ assert(match (s) { Dot => true, _ => false }); })",
-        match_bool_is_case,
+        flagged,
     )? == [message("Dot", none)]);
 
     // Two cases answering `true`, an arm that is not a bool, `false` for the case
@@ -92,37 +88,37 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> bool { match (s) { A | B => true, _ => false } }",
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> bool { match (s) { A(..) => true, B(r) => r, _ => false } }",
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> bool { match (s) { A(..) => false, _ => true } }",
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: i64?) -> bool { match (s) { some(..) => true, none => false } }",
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: i64!str) -> bool { match (s) { ok(..) => true, err(..) => false } }",
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(n: i64) -> bool { match (n) { other => true, _ => false } }",
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
 
@@ -138,7 +134,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     // The case answering `true` is the catch-all: the question is "is it not a Dot".
@@ -152,7 +148,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     // An arm that is not a literal does work of its own.
@@ -166,7 +162,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
     // An optional is not a variant case, and has `is_some`.
@@ -180,7 +176,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_bool_is_case,
+            flagged,
         )? == [],
     );
 
@@ -196,7 +192,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_bool_is_case,
+        flagged,
     )? == [
         """this match only asks whether the value is Circle — write "<value>.is_case::<Circle>()" and drop the match, importing `is_case` from builtins""",
     ]);
@@ -210,7 +206,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_bool_is_case,
+        flagged,
     )? == [
         """this match only asks whether the value is Square — write "<value>.is_case::<Square>()" and drop the match, importing `is_case` from builtins""",
     ]);
@@ -224,7 +220,7 @@ pub fn match_bool_is_case(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_bool_is_case,
+        flagged,
     )? == [
         """this match only asks whether the value is Dot — write "<value>.is_case::<Dot>()" and drop the match, importing `is_case` from builtins""",
     ]);

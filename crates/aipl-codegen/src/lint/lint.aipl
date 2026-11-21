@@ -5,7 +5,7 @@
 # a line in `lint`; the hits come back in the order the lints are listed.
 
 import { collect_ok, equal as ==, join, map } from builtins;
-import { Assign, Call, Construct, Expr, LetMut, descendants_of_kind } from "../expr.aipl";
+import { Assign, Call, Construct, Expr, LetMut, Match, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item, SuperProgram } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
@@ -84,15 +84,7 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.hits(destructure),
         ..functions.hits(unused_binding),
         ..functions.hits_once(fn_body_type_stutter),
-        ..functions.unfilled_hits(match_bool_is_case).filled(items),
-        ..functions.unfilled_hits(case_of_equal_is_case).filled(items),
-        ..functions.unfilled_hits(match_is_some_and).filled(items),
-        ..functions.unfilled_hits(match_value_or).filled(items),
-        ..functions.unfilled_hits(match_value_or_err).filled(items),
-        ..functions.unfilled_hits(match_map_value_or).filled(items),
-        ..functions.unfilled_hits(match_map_err).filled(items),
-        ..functions.unfilled_hits(match_map_ok).filled(items),
-        ..functions.unfilled_hits(match_case_as_case).filled(items),
+        ..functions.hits(|function| match_lints(function, items)),
         ..functions.unfilled_hits(match_case_try_as_case).filled(items),
         ..functions.unfilled_hits(let_else_as_case).filled(items),
         ..functions.hits(|function| let_mut_lints(function, items)),
@@ -139,6 +131,10 @@ fn call_lints(Function { body }, items: Item[]) -> LintHit[] {
     [
         ..calls$kind$value_or_compare().collect_ok(),
         ..calls
+            .map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) })
+            .collect_ok()
+            .filled(items),
+        ..calls
             .map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) })
             .collect_ok()
             .filled(items),
@@ -153,6 +149,22 @@ fn call_lints(Function { body }, items: Item[]) -> LintHit[] {
 # with it, and the call's own span is where that is pointed. (The lint is passed as its result
 # because a function type over a case, `(Call) -> Advice?`, is not typed yet.)
 fn hit_at(self: Expr<Call>, advice: Advice?) -> UnfilledHit? { some(advice?.at(self.span)) }
+
+# The lints over the `match`es of `function`, which are found once for all of them. One that is about
+# the function it is in takes it as well.
+fn match_lints(function: Function, items: Item[]) -> LintHit[] {
+    let matches = function.body.descendants_of_kind::<Match>();
+    [
+        ..matches$kind$match_bool_is_case().collect_ok().filled(items),
+        ..matches$kind$match_is_some_and().collect_ok().filled(items),
+        ..matches$kind$match_value_or().collect_ok().filled(items),
+        ..matches$kind$match_value_or_err(function).collect_ok().filled(items),
+        ..matches$kind$match_map_value_or().collect_ok().filled(items),
+        ..matches$kind$match_map_err().collect_ok().filled(items),
+        ..matches$kind$match_map_ok().collect_ok().filled(items),
+        ..matches$kind$match_case_as_case().collect_ok().filled(items),
+    ]
+}
 
 # The lints over the `mut` bindings of `function`, which are found once for all of them: each is
 # about an array or set seeded and then filled by the loop that follows.

@@ -19,7 +19,9 @@
 # That pass-through is always one line — the `err` arm's replacement need not be — and
 # it is the arm that identifies the shape.
 
-import { equal as ==, filter, logical_and as &&, map } from builtins;
+import { collect_ok, equal as ==, logical_not as !, logical_or as || } from builtins;
+import { Err, Ok } from "../builtin_table.aipl";
+import { Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
     UnfilledHit,
@@ -29,45 +31,44 @@ import {
     unfilled,
 } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
-import { passes_through, rebuilds, result_matches } from "./result_match.aipl";
+import { ResultMatch, passes_through, rebuilds, result_match } from "./result_match.aipl";
 
 # A hit for each `match` in the function that rebuilds a result's error side and passes
 # its value through.
-pub fn match_map_err(Function { body }) -> UnfilledHit[] {
-    body
-        .result_matches()
-        .filter(
-            |m| m.ok_body.passes_through("ok", m.ok_binder) && m.err_body.rebuilds(
-                "err",
-                m.err_binder,
-            ),
-        )
-        .map(|m| unfilled(
-            "map_err",
-            `this \`match\` rewrites the result's error side and passes its value through — write "{m.scrutinee.receiver_text()}.`,
-            `(|{m.err_binder}| ..)" instead`,
-            m.ok_body.span,
-        ))
+pub fn match_map_err(self: Match) -> UnfilledHit? {
+    let ResultMatch { scrutinee, ok_binder, ok_body, err_binder, err_body } = self.result_match()?;
+    if (!ok_body.passes_through(Ok, ok_binder) || !err_body.rebuilds(Err, err_binder)) {
+        return none;
+    };
+    some(unfilled(
+        "map_err",
+        `this \`match\` rewrites the result's error side and passes its value through — write "{scrutinee.receiver_text()}.`,
+        `(|{err_binder}| ..)" instead`,
+        ok_body.span,
+    ))
 }.test({
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Match>()$kind$match_map_err().collect_ok()
+    }
     // The error side is rebuilt, in either arm order; the hit is the pass-through arm.
     assert(lint_function_unfilled_hits(
         "fn f(r: i64!str) -> i64!P { match (r) { ok(v) => ok(v), err(e) => err(P { m: e }) } }",
-        match_map_err,
+        flagged,
     )? == [hit(message("r", "e"), 49..54)]);
     assert(lint_function_unfilled_messages(
         "fn f(r: i64!str) -> i64!P { match (r) { err(e) => err(g(e)), ok(v) => ok(v) } }",
-        match_map_err,
+        flagged,
     )? == [message("r", "e")]);
 
     // A call as the scrutinee is quoted when a method can follow it, and a placeholder
     // stands in when it cannot.
     assert(lint_function_unfilled_messages(
         "fn f(s: str) -> i64!str { match (parse(s)) { ok(v) => ok(v), err(e) => err(g(e)) } }",
-        match_map_err,
+        flagged,
     )? == [message("parse(s)", "e")]);
     assert(lint_function_unfilled_messages(
         "fn f(a: i64!str) -> i64!str { match (a || b) { ok(v) => ok(v), err(e) => err(g(e)) } }",
-        match_map_err,
+        flagged,
     )? == [message("<value>", "e")]);
 
     // Not the shape: the value side is rebuilt too, the value is dropped, the error is
@@ -76,38 +77,38 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
     assert(
         lint_function_unfilled_messages(
             "fn f(r: i64!str) -> i64!P { match (r) { ok(v) => ok(v + 1), err(e) => err(g(e)) } }",
-            match_map_err,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(r: i64!str) -> i64!P { match (r) { ok(v) => ok(0), err(e) => err(g(e)) } }",
-            match_map_err,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(r: i64!str) -> i64!str { match (r) { ok(v) => ok(v), err(e) => err(e) } }",
-            match_map_err,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(r: i64!str) -> i64 { match (r) { ok(v) => ok(v), err(e) => 0 } }",
-            match_map_err,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(r: i64!str) -> i64!P { match (r) { ok(v) => ok(v), _ => err(g()) } }",
-            match_map_err,
+            flagged,
         )? == [],
     );
     // Shapes the lint must leave alone.
     assert(
         lint_function_unfilled_messages(
             """fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }""",
-            match_map_err,
+            flagged,
         )? == [],
     );
 
@@ -123,7 +124,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_map_err,
+            flagged,
         )? == [],
     );
     // The `ok` arm ignores its binding, so the value does not pass through.
@@ -137,7 +138,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_map_err,
+            flagged,
         )? == [],
     );
 
@@ -155,7 +156,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_map_err,
+            flagged,
         )? == [],
     );
 
@@ -171,7 +172,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_map_err,
+            flagged,
         )? == [],
     );
     assert(
@@ -184,7 +185,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_map_err,
+            flagged,
         )? == [],
     );
 
@@ -192,7 +193,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
     assert(
         lint_function_unfilled_messages(
             """fn parse(s: str) -> i64!str { if (s == "1") { ok(1) } else { err("not a one") } }""",
-            match_map_err,
+            flagged,
         )? == [],
     );
     assert(lint_function_unfilled_messages(
@@ -204,7 +205,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_map_err,
+        flagged,
     )? == [
         """this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead, importing `map_err` from builtins""",
     ]);
@@ -217,13 +218,11 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_map_err,
+        flagged,
     )? == [
         """this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead, importing `map_err` from builtins""",
     ]);
-    assert(
-        lint_function_unfilled_messages("fn shout(s: str) -> str { `{s}!` }", match_map_err)? == [],
-    );
+    assert(lint_function_unfilled_messages("fn shout(s: str) -> str { `{s}!` }", flagged)? == []);
 
     // A *call* in the `err` arm is flagged too. Unlike `value_or`, there is no
     // eager/lazy question to guard against: `map_err` takes a function, which runs
@@ -237,7 +236,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_map_err,
+        flagged,
     )? == [
         """this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead, importing `map_err` from builtins""",
     ]);
@@ -253,7 +252,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_map_err,
+        flagged,
     )? == [
         """this `match` rewrites the result's error side and passes its value through — write "parse(s).map_err(|e| ..)" instead, importing `map_err` from builtins""",
     ]);
@@ -267,7 +266,7 @@ pub fn match_map_err(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_map_err,
+            flagged,
         )? == [],
     );
 })

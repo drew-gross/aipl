@@ -23,46 +23,42 @@ import {
     equal as ==,
     logical_not as !,
     logical_or as ||,
-    map,
     not_equal as !=,
 } from builtins;
-import { Call, Match, collect_expr_cases, show_expr } from "../expr.aipl";
+import { Some } from "../builtin_table.aipl";
+import { Call, Match, descendants_of_kind, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { case_pattern, is_give_up } from "./case_match.aipl";
+import { CasePattern, case_pattern, is_give_up } from "./case_match.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 
 # A hit for each `match` in the function that only asks whether a value is one case.
-pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
-    body
-        .collect_expr_cases(Match)
-        .map(|Match(scrutinee, arms)| {
-            let [case_arm, other_arm] = arms else { return none; };
-            let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
-            let Call("some", wrapped, _, _) = case_arm.body.kind else { return none; };
-            if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) {
-                return none;
-            };
-            some(unfilled(
-                "as_case",
-                `this match only asks whether the value is {pattern.case} — write "{scrutinee.receiver_text()}.`,
-                `::<{pattern.case}>()" and drop the match`,
-                other_arm.span,
-            ))
-        })
-        .collect_ok()
+pub fn match_case_as_case(self: Match(scrutinee, arms)) -> UnfilledHit? {
+    let [case_arm, other_arm] = arms else { return none; };
+    let CasePattern { case } = case_arm.pattern.case_pattern()?;
+    let Call(_, wrapped, _, Some) = case_arm.body.kind else { return none; };
+    if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) { return none; };
+    some(unfilled(
+        "as_case",
+        `this match only asks whether the value is {case} — write "{scrutinee.receiver_text()}.`,
+        `::<{case}>()" and drop the match`,
+        other_arm.span,
+    ))
 }.test({
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Match>()$kind$match_case_as_case().collect_ok()
+    }
     // The case, handed back as the value matched, and the hit on the catch-all.
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(s), _ => none } }",
-        match_case_as_case,
+        flagged,
     )? == [message("s", "Circle")]);
 
     // A payload the arm binds but does not read is no matter, and a call quotes as
     // written.
     assert(lint_function_unfilled_messages(
         "fn f(s: Shape) -> Shape? { match (g(s)) { Circle(r) => some(g(s)), _ => none } }",
-        match_case_as_case,
+        flagged,
     )? == [message("g(s)", "Circle")]);
 
     // Not the shape: another value handed back, a payload, a different fallback, an
@@ -70,31 +66,31 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(t), _ => none } }",
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> i64? { match (s) { Circle(r) => some(r), _ => none } }",
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(s), _ => some(s) } }",
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(o: i64??) -> i64?? { match (o) { some(..) => some(o), _ => none } }",
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     assert(
         lint_function_unfilled_messages(
             "fn f(s: Shape) -> Shape? { match (s) { Circle(..) => some(s), Dot => some(s), _ => none } }",
-            match_case_as_case,
+            flagged,
         )? == [],
     );
 
@@ -110,7 +106,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     // A third arm: this is asking about more than one case.
@@ -125,7 +121,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     // The fallthrough is not `none`.
@@ -139,7 +135,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_case_as_case,
+            flagged,
         )? == [],
     );
     // Not the value matched: a different value is a different program.
@@ -153,7 +149,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                     }
                 }
             """,
-            match_case_as_case,
+            flagged,
         )? == [],
     );
 
@@ -168,7 +164,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_case_as_case,
+        flagged,
     )? == [
         """this match only asks whether the value is Circle — write "s.as_case::<Circle>()" and drop the match, importing `as_case` from builtins""",
     ]);
@@ -182,7 +178,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_case_as_case,
+        flagged,
     )? == [
         """this match only asks whether the value is Empty — write "s.as_case::<Empty>()" and drop the match, importing `as_case` from builtins""",
     ]);
@@ -196,7 +192,7 @@ pub fn match_case_as_case(Function { body }) -> UnfilledHit[] {
                 }
             }
         """,
-        match_case_as_case,
+        flagged,
     )? == [
         """this match only asks whether the value is Rect — write "s.as_case::<Rect>()" and drop the match, importing `as_case` from builtins""",
     ]);

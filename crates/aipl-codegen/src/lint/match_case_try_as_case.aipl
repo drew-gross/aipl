@@ -20,6 +20,7 @@
 # `#[allow]` squelches it.
 
 import { collect_ok, equal as ==, logical_not as !, map } from builtins;
+import { Some } from "../builtin_table.aipl";
 import { Call, Match, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, is_give_up, statement_head, tail_matches } from "./case_match.aipl";
@@ -37,7 +38,7 @@ pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
             let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
             if (!other_arm.is_give_up()) { return none; };
             // `K(..) => some(x)` of the matched value is `match_case_as_case`'s.
-            if (let Call("some", wrapped, _, _) = case_arm.body.kind) {
+            if (let Call(_, wrapped, _, Some) = case_arm.body.kind) {
                 if (wrapped$show_expr() == [scrutinee.show_expr()]) { return none; };
             };
             some(unfilled(

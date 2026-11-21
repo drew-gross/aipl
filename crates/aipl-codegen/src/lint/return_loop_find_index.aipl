@@ -38,6 +38,7 @@ import {
     map,
     to_str,
 } from builtins;
+import { Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
@@ -52,7 +53,7 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
         .map(|found| {
             let some(index) = found.index else { return none; };
             if (!found.rest.answers_none() || !found.returned.passes_through(
-                "some",
+                Some,
                 index,
             ) || found.condition.mentions_any([index], none) || !found.condition.is_lambda_safe()) {
                 return none;

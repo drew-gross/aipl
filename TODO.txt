@@ -566,6 +566,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  match_value_or_err should be able to leverage the actual can_defer (maybe this needs to go in a later stage? maybe can_defer needs to go earlier?)
   const function should be const var most of the time
   make Call's Callee field non-optional
   lint after name resolution so we don't have to do the "names" check that makes sure things are imported with the expected names - lints should continue to work even if e.g import { len as foo } from builtins is done

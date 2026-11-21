@@ -23,7 +23,7 @@ import {
     Index,
     Match,
     Slice,
-    collect_expr_cases,
+    descendants_of_kind,
     ident,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -53,7 +53,9 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
         lint_function_messages(
             src,
             |function| function.body
-                .option_matches()
+                .descendants_of_kind::<Match>()$kind
+                $option_match()
+                .collect_ok()
                 .map(|m| hit(`{m.binder} {m.scrutinee.receiver_text()}`, 0..0)),
         )
     }
@@ -76,17 +78,6 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
     assert(shapes("fn f(a: i64?) -> i64 { match (a || b) { some(v) => v, none => 0 } }")? == [
         "v <value>",
     ]);
-})
-
-# Every `match` in `self` and under it that is an [`OptionMatch`], outermost first.
-pub fn option_matches(self: Expr) -> OptionMatch[] {
-    self.collect_expr_cases(Match)$option_match().collect_ok()
-}.test({
-    // Nested ones are found, outer first.
-    assert(lint_function_messages(
-        "fn f(a: i64?, b: i64?) -> i64 { match (a) { some(x) => match (b) { some(y) => y, none => 1 }, none => 0 } }",
-        |function| function.body.option_matches()$binder.map(|name| hit(name, 0..0)),
-    )? == ["x", "y"]);
 })
 
 # The names a constructor pattern binds, when `self` is one.
