@@ -32,9 +32,15 @@ fn mono_names(src: &str) -> Vec<String> {
     let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
         .expect("load");
     let frontend = aipl::codegen::frontend(&prog).expect("frontend");
+    // Every function is an entry, so the result is all of what the source defines.
+    let entries: Vec<String> = aipl::codegen::all_functions(&prog)
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     let mono = monomorphize(
         &frontend.pinned.program,
         &frontend.pinned.instances,
+        &entries,
         DebugOptions::OFF,
     )
     .expect("monomorphize");

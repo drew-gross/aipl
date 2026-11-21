@@ -23,7 +23,9 @@ fn compile(src: &str) -> Compilation {
     aipl::install_parser_hooks();
     let program = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
         .expect("load");
-    Compilation::new(&program, DebugOptions::OFF).unwrap()
+    // Every function is an entry: the tests call whichever they define by name.
+    let entries = aipl::codegen::all_functions(&program);
+    Compilation::new(&program, DebugOptions::OFF, &entries).unwrap()
 }
 
 #[test]
@@ -54,7 +56,11 @@ fn ir_contains_function_body() {
 fn render_points_at_offending_expression() {
     let src = "fn f(c: i64) -> i64 { if (c) { 1 } else { 2 } }";
     let program = parse(src).unwrap();
-    let Err(errs): Result<_, Vec<Error>> = Compilation::new(&program, DebugOptions::OFF) else {
+    let Err(errs): Result<_, Vec<Error>> = Compilation::new(
+        &program,
+        DebugOptions::OFF,
+        &aipl::codegen::all_functions(&program),
+    ) else {
         panic!("expected error");
     };
     // The `c` in the if condition is at byte 26 → column 27.
@@ -70,7 +76,11 @@ fn render_points_at_offending_expression() {
 fn render_multiline_source_picks_correct_line() {
     let src = "fn f() -> i64 {\n    bogus\n}";
     let program = parse(src).unwrap();
-    let Err(errs): Result<_, Vec<Error>> = Compilation::new(&program, DebugOptions::OFF) else {
+    let Err(errs): Result<_, Vec<Error>> = Compilation::new(
+        &program,
+        DebugOptions::OFF,
+        &aipl::codegen::all_functions(&program),
+    ) else {
         panic!("expected error");
     };
     // `bogus` spans bytes 20..25 → line 2, col 5.

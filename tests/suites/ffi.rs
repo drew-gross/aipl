@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 fn calls_a_scalar_function() {
     let e = Engine::compile(
         "import { wrapping_add as + } from builtins; pub fn add(a: i64, b: i64) -> i64 { a + b }",
+        &["add"],
     )
     .unwrap();
     assert_eq!(e.call("add", &[2, 3]).unwrap(), 5);
@@ -20,7 +21,7 @@ fn bool_and_char_marshal_as_i64() {
 import { saturating_remainder as %, equal as ==} from builtins;
 pub fn is_even(n: i64) -> bool { n % 2 == 0 }
 pub fn echo_char(c: char) -> char { c }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["is_even", "echo_char"]).unwrap();
     assert_eq!(e.call("is_even", &[4]).unwrap(), 1); // true
     assert_eq!(e.call("is_even", &[7]).unwrap(), 0); // false
     assert_eq!(e.call("echo_char", &['Z' as i64]).unwrap(), 'Z' as i64);
@@ -31,6 +32,7 @@ fn supports_higher_arity_than_the_cli_runner() {
     // The CLI's `run` path only wires up arity 0–2; the FFI goes further.
     let e = Engine::compile(
         "import { wrapping_add as + } from builtins; pub fn sum4(a: i64, b: i64, c: i64, d: i64) -> i64 { a + b + c + d }",
+        &["sum4"],
     )
     .unwrap();
     assert_eq!(e.call("sum4", &[1, 2, 3, 4]).unwrap(), 10);
@@ -44,27 +46,27 @@ fn calls_reach_private_helpers_within_the_program() {
 import { wrapping_mul as *, wrapping_add as + } from builtins;
 fn helper(n: i64) -> i64 { n * 10 }
 pub fn entry(n: i64) -> i64 { helper(n) + 1 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["entry", "helper"]).unwrap();
     assert_eq!(e.call("entry", &[5]).unwrap(), 51);
     assert_eq!(e.call("helper", &[4]).unwrap(), 40);
 }
 
 #[test]
 fn rejects_unknown_function() {
-    let e = Engine::compile("pub fn one() -> i64 { 1 }").unwrap();
+    let e = Engine::compile("pub fn one() -> i64 { 1 }", &["missing"]).unwrap();
     assert!(e.call("missing", &[]).is_err());
 }
 
 #[test]
 fn rejects_wrong_arity() {
-    let e = Engine::compile("pub fn one() -> i64 { 1 }").unwrap();
+    let e = Engine::compile("pub fn one() -> i64 { 1 }", &["one"]).unwrap();
     assert!(e.call("one", &[7]).is_err());
 }
 
 #[test]
 fn rejects_non_scalar_parameter() {
     // The `i64`-only `call` can't marshal `str` — use `call_values` for that.
-    let e = Engine::compile("pub fn id(s: str) -> str { s }").unwrap();
+    let e = Engine::compile("pub fn id(s: str) -> str { s }", &["id"]).unwrap();
     assert!(e.call("id", &[0]).is_err());
 }
 
@@ -79,7 +81,7 @@ fn both_spaces(a: str, b: str, i: i64) -> bool {
 }
 fn go(a: str, b: str, i: i64) -> i64 { if (both_spaces(a, b, i)) { go(a, b, i + 1) } else { i } }
 pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["common_space_prefix"]).unwrap();
     use aipl::FfiValue::{Int, Str};
     // Inline (<= 22-byte) arguments.
     assert_eq!(
@@ -136,7 +138,7 @@ fn call_values_marshals_str_return() {
     let src = "\
 pub fn id(s: str) -> str { s }
 pub fn shout(s: str) -> str { `{s} is loud!` }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["id", "shout"]).unwrap();
     use aipl::FfiValue::Str;
     // Inline arg, inline return.
     assert_eq!(
@@ -176,7 +178,7 @@ pub fn maybe_str(present: bool) -> str? { if (present) { some(\"a long present s
 pub fn nested(outer: bool, inner: bool) -> str?? {
     if (outer) { if (inner) { some(some(\"deep\")) } else { some(none) } } else { none }
 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["maybe_int", "maybe_str", "nested"]).unwrap();
     use aipl::FfiValue::{Int, Opt, Str};
     let some = |v| Opt(Some(Box::new(v)));
 
@@ -223,7 +225,7 @@ pub fn span(a: i64, b: i64) -> Span { start: a, end: b }
 pub fn tagged(suffix: str, present: bool) -> Tagged {
     name: `item-{suffix}`, ok: present, code: 'Z'
 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["span", "tagged"]).unwrap();
     use aipl::FfiValue::{Int, Str, Struct};
 
     // Two-i64 struct (Span): both fields ride the sret buffer back.
@@ -264,7 +266,7 @@ struct Span { start: i64, end: i64 }
 pub fn span(present: bool, a: i64, b: i64) -> Span? {
     if (present) { some(Span { start: a, end: b }) } else { none }
 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["span"]).unwrap();
     use aipl::FfiValue::{Int, Opt, Struct};
     let some_span = |a, b| {
         Opt(Some(Box::new(Struct(vec![
@@ -298,7 +300,7 @@ import { wrapping_add as +, wrapping_sub as - } from builtins;
 struct Span { start: i64, end: i64 }
 pub fn span_len(span: Span) -> i64 { span.end - span.start } #[allow]
 pub fn span_sum(a: Span, b: Span) -> i64 { a.start + a.end + b.start + b.end }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["span_len", "span_sum", "id"]).unwrap();
     use aipl::FfiValue::{Int, Struct};
     let span = |start, end| Struct(vec![("start".into(), Int(start)), ("end".into(), Int(end))]);
 
@@ -318,7 +320,7 @@ pub fn span_sum(a: Span, b: Span) -> i64 { a.start + a.end + b.start + b.end }";
     assert!(e.call_values("span_len", &[short]).is_err());
     // FfiValue::Struct for a non-struct param is rejected.
     let src2 = "pub fn id(x: i64) -> i64 { x }";
-    let e2 = Engine::compile(src2).unwrap();
+    let e2 = Engine::compile(src2, &["span_len", "span_sum", "id"]).unwrap();
     assert!(e2.call_values("id", &[span(1, 2)]).is_err());
 }
 
@@ -338,7 +340,7 @@ pub fn toks() -> Tok[] {
     [Tok { kind: Word(\"first\"), span: Span { start: 0, end: 5 }, tags: [] },
      Tok { kind: Punct, span: Span { start: 5, end: 6 }, tags: [1] }]
 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["tok", "toks"]).unwrap();
     use aipl::FfiValue::{Array, Int, Str, Struct, Variant};
 
     let span = |a, b| Struct(vec![("start".into(), Int(a)), ("end".into(), Int(b))]);
@@ -381,7 +383,7 @@ pub fn toks() -> Tok[] {
 fn call_values_rejects_unmarshalable_return() {
     // A type the FFI still can't marshal (a set) is rejected with a clear error.
     let src = "pub fn make_set() -> #{i64} { #{1, 2, 3} }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["make_set"]).unwrap();
     assert!(e.call_values("make_set", &[]).is_err());
 }
 
@@ -421,7 +423,7 @@ fn call_values_marshals_variant_return() {
     // A variant is returned through a hidden sret pointer and marshaled back as
     // `FfiValue::Variant(case_name, payload)` — the active case's constructor name
     // plus its payload values in positional order (empty for a nullary case).
-    let e = Engine::compile(VARIANT_SRC).unwrap();
+    let e = Engine::compile(VARIANT_SRC, &["classify"]).unwrap();
     use aipl::FfiValue::{Int, Str, Variant};
 
     // Nullary case: empty payload.
@@ -452,7 +454,7 @@ fn call_values_marshals_variant_param() {
     // A variant passed as `FfiValue::Variant` is written into a caller-allocated
     // buffer (tag at offset 0, payload at each field's offset); the callee gets a
     // pointer to it — the same ABI as a struct param, on the input side.
-    let e = Engine::compile(VARIANT_SRC).unwrap();
+    let e = Engine::compile(VARIANT_SRC, &["describe", "count_of", "id"]).unwrap();
     use aipl::FfiValue::{Int, Str, Variant};
 
     // Nullary case round-trips through `describe`.
@@ -489,7 +491,11 @@ fn call_values_marshals_variant_param() {
         .call_values("describe", &[Variant("Ident".into(), vec![])])
         .is_err());
     // FfiValue::Variant for a non-variant param is rejected.
-    let e2 = Engine::compile("pub fn id(x: i64) -> i64 { x }").unwrap();
+    let e2 = Engine::compile(
+        "pub fn id(x: i64) -> i64 { x }",
+        &["describe", "count_of", "id"],
+    )
+    .unwrap();
     assert!(e2
         .call_values("id", &[Variant("Eof".into(), vec![])])
         .is_err());
@@ -499,7 +505,7 @@ fn call_values_marshals_variant_param() {
 fn call_values_marshals_optional_variant_return() {
     // `Token?` — an optional whose core is a variant — rides the sret pointer as a
     // flattened `{ tag, Token }`, marshaled back as `Opt(Some(Variant))` / `Opt(None)`.
-    let e = Engine::compile(VARIANT_SRC).unwrap();
+    let e = Engine::compile(VARIANT_SRC, &["maybe_tok"]).unwrap();
     use aipl::FfiValue::{Int, Opt, Variant};
     assert_eq!(
         e.call_values("maybe_tok", &[Int(1)]).unwrap(),
@@ -516,7 +522,7 @@ fn call_values_marshals_variant_with_composite_payload() {
 variant Bag = Full(i64[]) | Empty
 pub fn full() -> Bag { Full([1, 2]) }
 pub fn empty() -> Bag { Empty }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["full", "empty"]).unwrap();
     use aipl::FfiValue::{Array, Int, Variant};
     assert_eq!(
         e.call_values("full", &[]).unwrap(),
@@ -540,7 +546,7 @@ fn call_values_marshals_a_recursive_variant() {
 variant Tree = Leaf(i64) | Node(Tree[])
 pub fn leaf() -> Tree { Leaf(7) }
 pub fn deep() -> Tree { Node([Leaf(1), Node([Leaf(2), Leaf(3)]), Node([])]) }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["leaf", "deep"]).unwrap();
     use aipl::FfiValue::{Array, Int, Variant};
     let leaf = |n| Variant("Leaf".into(), vec![Int(n)]);
     assert_eq!(e.call_values("leaf", &[]).unwrap(), leaf(7));
@@ -575,7 +581,7 @@ pub fn tree() -> Expr {
 }
 pub fn empty_tail() -> Expr { at(Tail(none), 0, 1) }
 pub fn some_tail() -> Expr { at(Tail(some(at(Num(2), 3, 4))), 0, 5) }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["tree", "empty_tail", "some_tail"]).unwrap();
     use aipl::FfiValue::{Array, Int, Opt, Str, Struct, Variant};
 
     let span = |s, t| Struct(vec![("start".into(), Int(s)), ("end".into(), Int(t))]);
@@ -625,7 +631,7 @@ fn reading_a_boxed_return_balances_its_refcount() {
     let src = "\
 variant Tree = Leaf(str) | Node(Tree[])
 pub fn tree() -> Tree { Node([Leaf(\"a heap string, not an inline one\"), Node([Leaf(\"b\")])]) }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["tree"]).unwrap();
     let first = e.call_values("tree", &[]).unwrap();
     for _ in 0..10_000 {
         assert_eq!(e.call_values("tree", &[]).unwrap(), first);
@@ -640,7 +646,7 @@ fn call_values_still_refuses_a_boxed_argument() {
     let src = "\
 variant Tree = Leaf(i64) | Node(Tree[])
 pub fn depth(t: Tree) -> i64 { 0 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["depth"]).unwrap();
     let err = e
         .call_values(
             "depth",
@@ -674,7 +680,13 @@ pub fn maybe(present: bool) -> i64[]? { if (present) { some([1, 2]) } else { non
 
 #[test]
 fn call_values_marshals_array_return() {
-    let e = Engine::compile(ARRAY_SRC).unwrap();
+    let e = Engine::compile(
+        ARRAY_SRC,
+        &[
+            "ints", "strs", "bools", "chars", "nested", "spans", "tokens",
+        ],
+    )
+    .unwrap();
     use aipl::FfiValue::{Array, Int, Str, Struct, Variant};
 
     // Scalars, plus the empty-array case (an empty `Array`).
@@ -742,7 +754,7 @@ fn call_values_marshals_array_return() {
 fn call_values_marshals_optional_array_return() {
     // `i64[]?` — an optional whose core is an array — rides the sret pointer, its
     // present core array read (and released) like a bare array return.
-    let e = Engine::compile(ARRAY_SRC).unwrap();
+    let e = Engine::compile(ARRAY_SRC, &["maybe"]).unwrap();
     use aipl::FfiValue::{Array, Int, Opt};
     assert_eq!(
         e.call_values("maybe", &[Int(1)]).unwrap(),
@@ -839,6 +851,7 @@ import { value_or } from builtins;
 fn third(xs: u8[]) -> u8 { xs[2].value_or(0) }
 fn swings() -> i16[] { [-32768, 5, 32767] }
 fn echo(xs: i8[]) -> i8[] { xs }",
+        &["third", "swings", "echo"],
     )
     .unwrap();
     use aipl::FfiValue::{Array, Int};
@@ -863,7 +876,21 @@ fn call_values_marshals_array_params() {
     // An array argument is a host-built block the callee borrows: `STATIC_REFCOUNT`
     // so its retains/releases no-op, elements written in the callee's own inline
     // representation. Every element type the FFI marshals *out* also goes in.
-    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    let e = Engine::compile(
+        ARRAY_PARAM_SRC,
+        &[
+            "total",
+            "count",
+            "concat_all",
+            "echo",
+            "trues",
+            "echo_chars",
+            "char_count",
+            "grid_total",
+            "somes",
+        ],
+    )
+    .unwrap();
     use aipl::FfiValue::{Array, Int, Opt, Str};
 
     // Scalars, and the empty array (a real zero-length block, so `len` is 0).
@@ -967,7 +994,7 @@ fn call_values_marshals_array_params() {
 fn call_values_marshals_composite_array_params() {
     // Struct and variant elements: written inline at the element stride, field
     // by field (a `str` payload becomes a borrowed value word inside the block).
-    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    let e = Engine::compile(ARRAY_PARAM_SRC, &["span_total", "describe_all"]).unwrap();
     use aipl::FfiValue::{Array, Int, Str, Struct, Variant};
 
     let span = |a, b| Struct(vec![("start".into(), Int(a)), ("end".into(), Int(b))]);
@@ -1000,7 +1027,7 @@ fn array_param_grows_into_a_copy() {
     // out from under the host's own free. (Codegen sends this through the
     // *copying* `aipl_array_push`: an FFI entry is the borrow form of the
     // function, whose parameter isn't moved in and so isn't exclusive.)
-    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    let e = Engine::compile(ARRAY_PARAM_SRC, &["appended", "total"]).unwrap();
     use aipl::FfiValue::{Array, Int};
 
     let xs = Array(vec![Int(1), Int(2), Int(3)]);
@@ -1052,7 +1079,19 @@ pub fn why(r: i64!str) -> str {
         err(e) => e,
     }
 }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(
+        src,
+        &[
+            "note_size",
+            "note_width",
+            "note_text",
+            "span_end",
+            "depth",
+            "or_zero",
+            "why",
+        ],
+    )
+    .unwrap();
     use aipl::FfiValue::{Array, Int, Opt, Res, Str, Struct};
 
     // A struct whose fields are a buffer-backed `str`, a nested struct, and an
@@ -1130,7 +1169,11 @@ pub fn why(r: i64!str) -> str {
 
 #[test]
 fn call_values_validates_array_params() {
-    let e = Engine::compile(ARRAY_PARAM_SRC).unwrap();
+    let e = Engine::compile(
+        ARRAY_PARAM_SRC,
+        &["count", "total", "span_total", "grid_total"],
+    )
+    .unwrap();
     use aipl::FfiValue::{Array, Int, Str};
 
     // An `Array` for a non-array param, and a non-`Array` for an array param.
@@ -1150,7 +1193,7 @@ fn call_values_validates_variant_against_param_type() {
 import { wrapping_add as + } from builtins;
 pub fn add(a: i64, b: i64) -> i64 { a + b }
 pub fn id(s: str) -> str { s }";
-    let e = Engine::compile(src).unwrap();
+    let e = Engine::compile(src, &["add", "id"]).unwrap();
     use aipl::FfiValue::{Int, Str};
     // Scalars still marshal via `Int`.
     assert_eq!(e.call_values("add", &[Int(2), Int(3)]).unwrap(), Int(5));
@@ -1175,7 +1218,7 @@ pub fn id(s: str) -> str { s }";
 fn doc_example_engine() {
     let src =
         "import { wrapping_add as + } from builtins; pub fn add(a: i64, b: i64) -> i64 { a + b }";
-    let engine = Engine::compile(src).unwrap();
+    let engine = Engine::compile(src, &["add"]).unwrap();
     assert_eq!(engine.call("add", &[2, 3]).unwrap(), 5);
 }
 
@@ -1199,7 +1242,7 @@ fn doc_example_compile_sources() {
             "./mathlib.aipl",
             "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }",
         ),
-    ])
+    ], &["sum_of_squares"])
     .unwrap();
     assert_eq!(engine.call("sum_of_squares", &[3, 4]).unwrap(), 25);
 }
@@ -1213,7 +1256,7 @@ fn doc_example_call_values() {
                fn go(a: str, b: str, i: i64) -> i64 {\n\
                  if (both_spaces(a, b, i)) { go(a, b, i + 1) } else { i } }\n\
                pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
-    let engine = Engine::compile(src).unwrap();
+    let engine = Engine::compile(src, &["common_space_prefix"]).unwrap();
     use aipl::FfiValue;
     let n = engine
         .call_values(
@@ -1230,7 +1273,7 @@ fn compile_file_loads_functions_from_separate_files() {
     // a root file imports them, and the FFI loads the root and calls its
     // functions by name — the imported helper is reached transitively.
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/ffi_fixtures/calc.aipl");
-    let e = Engine::compile_file(&root).unwrap();
+    let e = Engine::compile_file(&root, &["sum_of_squares"]).unwrap();
     assert_eq!(e.call("sum_of_squares", &[3, 4]).unwrap(), 25); // 9 + 16
 }
 
@@ -1240,13 +1283,16 @@ fn compile_sources_embeds_separate_files_via_include_str() {
     // in-memory sources (as a host would `include_str!` them). `calc.aipl`
     // imports `from "./mathlib.aipl"`, which resolves by name to the supplied
     // "mathlib.aipl" entry — nothing is read from disk.
-    let e = Engine::compile_sources(&[
-        ("./calc.aipl", include_str!("../ffi_fixtures/calc.aipl")), // root (first)
-        (
-            "./mathlib.aipl",
-            include_str!("../ffi_fixtures/mathlib.aipl"),
-        ),
-    ])
+    let e = Engine::compile_sources(
+        &[
+            ("./calc.aipl", include_str!("../ffi_fixtures/calc.aipl")), // root (first)
+            (
+                "./mathlib.aipl",
+                include_str!("../ffi_fixtures/mathlib.aipl"),
+            ),
+        ],
+        &["sum_of_squares"],
+    )
     .unwrap();
     assert_eq!(e.call("sum_of_squares", &[3, 4]).unwrap(), 25);
 }
@@ -1254,10 +1300,13 @@ fn compile_sources_embeds_separate_files_via_include_str() {
 #[test]
 fn compile_sources_rejects_a_missing_module() {
     // calc.aipl imports "mathlib.aipl", which we don't supply.
-    let err = Engine::compile_sources(&[(
-        "./ffi_fixtures/calc.aipl",
-        include_str!("../ffi_fixtures/calc.aipl"),
-    )]);
+    let err = Engine::compile_sources(
+        &[(
+            "./ffi_fixtures/calc.aipl",
+            include_str!("../ffi_fixtures/calc.aipl"),
+        )],
+        &[],
+    );
     let errs = err.err().expect("Should err");
     assert_eq!(errs.len(), 1);
     assert_eq!(errs[0].message, "calc.aipl: imported module \"mathlib.aipl\" was not provided to compile_sources. Sources: [\"./ffi_fixtures/calc.aipl\"]");
@@ -1269,7 +1318,7 @@ fn compile_sources_requires_relative_names() {
     // reach them, so a bare `"calc.aipl"` names nothing. It reports that rather
     // than panicking: the names come from the host, so a wrong one is a caller
     // error to explain, not an invariant to assert.
-    let errs = Engine::compile_sources(&[("calc.aipl", "pub fn f() -> i64 { 1 }")])
+    let errs = Engine::compile_sources(&[("calc.aipl", "pub fn f() -> i64 { 1 }")], &[])
         .err()
         .expect("a name without `./` is rejected");
     assert_eq!(errs.len(), 1);
@@ -1329,7 +1378,7 @@ fn compiler_aipl_files_are_tested() {
 #[test]
 fn surfaces_compile_errors() {
     // Body type doesn't match the declared return — a checker error.
-    let err = Engine::compile("pub fn f() -> i64 { \"oops\" }");
+    let err = Engine::compile("pub fn f() -> i64 { \"oops\" }", &[]);
     assert!(err.is_err());
 }
 

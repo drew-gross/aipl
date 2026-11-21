@@ -1451,6 +1451,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
 pub fn monomorphize(
     typed: &aipl_syntax::typed::TProgram,
     instances: &pin::Instances,
+    entries: &[String],
     dbg: DebugOptions,
 ) -> Result<MonoProgram, Error> {
     // Signatures, structs and variants are read from the written declarations.
@@ -1657,28 +1658,27 @@ pub fn monomorphize(
         dbg,
     };
 
-    // Seed lazily: a program is reached from `main`. A `main`-less *library*
-    // checked via the `.test` runner is reached from its synthesized
-    // `__test_main` driver, which transitively pulls in the code under test —
-    // specializing any higher-order function through its lambda call sites.
-    // (Seeding every concrete fn there would try to emit an HOF *template*
-    // directly, which has no lowering: its function-typed parameter is resolved
-    // only by specialization.) A fragment with neither (e.g. a codegen unit test
-    // compiling one function, or an FFI engine loaded for its `pub` entry points)
-    // falls back to every concrete fn — except non-generic HOF templates (those
-    // with a function-typed parameter), which can't be lowered directly and are
-    // reached only through a specialized call site.
+    // Seed lazily: a program is reached from its roots. `main` is one, and so is the synthesized
+    // `__test_main` driver of a `.test` run, which transitively pulls in the code under test —
+    // specializing any higher-order function through its lambda call sites. The rest are the
+    // `entries` the host calls by name, which is how a program with neither `main` nor a driver (a
+    // codegen unit test, an FFI engine loaded for its entry points) has any code at all. A
+    // non-generic higher-order template cannot be an entry: it has no lowering of its own, since
+    // its function-typed parameter is resolved only by specialization at a call site.
     let mut seeds: Vec<String> = if mono.concrete.contains_key("main") {
         vec!["main".to_string()]
     } else if mono.concrete.contains_key("__test_main") {
         vec!["__test_main".to_string()]
     } else {
+        Vec::new()
+    };
+    seeds.extend(
         concrete_fns
             .iter()
+            .filter(|f| entries.contains(&f.name.text))
             .filter(|f| !f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))))
-            .map(|f| f.name.text.clone())
-            .collect()
-    };
+            .map(|f| f.name.text.clone()),
+    );
     // The `check` command synthesizes a `__test_main` driver (calling each
     // `__test$<fn>` body); seed it too so it survives even when the program also
     // has a `main`. It transitively reaches every test and the code under test.
@@ -4492,25 +4492,17 @@ pub(crate) fn count_uses<'a>(
 /// [`inline_single_use`], but over [`MonoProgram`]/[`ConcreteFn`] and with `pub`
 /// no longer protecting a function from inlining. Before monomorphization a
 /// `pub` function may be imported by another file, so its in-program use count
-/// understates its references; after, every reference is resolved and the only
-/// externally-reachable entry of a `main` binary is `main` itself, so a
-/// single-use non-`main` function is genuinely single-use. This is what lets the
+/// understates its references; after, every reference is resolved, and the only
+/// way into the program from outside is `main`, the `check` driver's
+/// `__test_main` and the `entries` the host calls by name. So a single-use
+/// function that is none of those is genuinely single-use. This is what lets the
 /// lifted lambdas (synthesized, each called from exactly one specialization) and
-/// other single-use instances fold away. Still gated to `main` binaries, so FFI
-/// engines and the `check` driver are untouched.
-pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
-    // A program with no single entry point is a *library*: an FFI engine loaded
-    // for its `pub` entries, or a fragment a Rust caller compiled to invoke by
-    // name through `Compilation::run_*`. Any function in one may be called from
-    // outside, so none may be elided. Inlining into AIPL callers is still safe
-    // there, and still what lets the sinking pass see through a call. A program
-    // with an entry point has no other way in: no dogfood artifact defines one
-    // (`dogfood_ir::artifacts_have_no_main`), so the functions Rust calls by
-    // name are never in a program that has a `main`.
-    let library = !program
-        .fns
-        .iter()
-        .any(|f| f.name == "main" || f.name == "__test_main");
+/// other single-use instances fold away. An entry is folded into its caller like
+/// any other function, but its definition stays.
+pub fn inline_single_use_post_mono(
+    program: &MonoProgram,
+    entries: &HashSet<String>,
+) -> MonoProgram {
     let mut program = program.clone();
     let mut skip: HashSet<String> = HashSet::new();
 
@@ -4547,7 +4539,7 @@ pub fn inline_single_use_post_mono(program: &MonoProgram) -> MonoProgram {
             // once from AIPL can be folded into that caller and still be
             // emitted, which is all an external caller needs — so an entry stays
             // in the program whether or not any AIPL code still calls it.
-            if library {
+            if entries.contains(&f.name) {
                 skip.insert(f.name.clone());
             } else {
                 program.fns.retain(|g| g.name != f.name);
@@ -4635,15 +4627,13 @@ pub const DEFAULT_INLINE_INSPECTED_MAX_EXPRS: usize = 64;
 /// Candidates are chosen once, from the program as it arrives — inlining only
 /// grows callers, so re-selecting could never add to the set, while re-walking
 /// it risks an unbounded ping-pong between two small mutually-calling functions.
-pub fn inline_small_post_mono(program: &MonoProgram, max_exprs: usize) -> MonoProgram {
+pub fn inline_small_post_mono(
+    program: &MonoProgram,
+    max_exprs: usize,
+    entries: &HashSet<String>,
+) -> MonoProgram {
     let mut program = program.clone();
     let binders = collect_binders_mono(&program);
-    // See `inline_single_use_post_mono`: with no single entry, any function may
-    // be called by name from Rust, so none may be elided.
-    let library = !program
-        .fns
-        .iter()
-        .any(|f| f.name == "main" || f.name == "__test_main");
     let candidates: Vec<ConcreteFn> = program
         .fns
         .iter()
@@ -4700,7 +4690,7 @@ pub fn inline_small_post_mono(program: &MonoProgram, max_exprs: usize) -> MonoPr
         // Unlike the pre-mono pass, nothing downstream will drop the orphan for
         // us — an unreferenced function still reaches codegen — so drop it here
         // once nothing names it and nothing outside can ask for it.
-        if replaced && !library {
+        if replaced && !entries.contains(&f.name) {
             let counts = use_counts_mono(&program);
             if counts.get(f.name.as_str()) == Some(&0) {
                 program.fns.retain(|g| g.name != f.name);

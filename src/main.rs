@@ -261,8 +261,8 @@ fn run_cmd(args: &[String]) -> Result<ExitCode, String> {
         });
     }
     let comp = match flamegraph {
-        Some(_) => Compilation::new_profiled(&program, dbg),
-        None => Compilation::new(&program, dbg),
+        Some(_) => Compilation::new_profiled(&program, dbg, &[fn_name]),
+        None => Compilation::new(&program, dbg, &[fn_name]),
     }
     .map_err(|e| render_err(file, e))?;
 
@@ -450,7 +450,10 @@ fn check_file(
         // diagnostic sits where it did when the section was written.
         let compiled =
             loader::load_program_overlay(&staged.entry, Some(&staged.root), &spec.source, dbg)
-                .and_then(|program| Compilation::new(&program, dbg).map(|_| ()));
+                .and_then(|program| {
+                    Compilation::new(&program, dbg, &aipl::codegen::all_functions(&program))
+                        .map(|_| ())
+                });
         let mut found = sections::conflicts(spec);
         found.extend(sections::errors(spec, compiled, section_label));
         return Ok(Checked {
@@ -484,7 +487,7 @@ fn check_file(
         .iter()
         .any(|item| matches!(item, aipl::ast::Item::Fn(f) if f.name == "main"))
     {
-        Compilation::new(&aipl::codegen::build_test_program(&program), dbg).map_err(render)?;
+        Compilation::new(&aipl::codegen::build_test_program(&program), dbg, &[]).map_err(render)?;
     }
     // `__test_main` runs each test and returns the exit code (0 ok, 1 failures),
     // printing failures itself. (Runs on `main`'s large-stack worker thread,
@@ -492,7 +495,7 @@ fn check_file(
     let mut exit_code = 0;
     // Compiled whichever part runs: a file that does not compile has nothing to run, and the
     // diagnostics are the same however the run was asked for.
-    let comp = Compilation::new(&test_program, dbg).map_err(render)?;
+    let comp = Compilation::new(&test_program, dbg, &[]).map_err(render)?;
     if parts.tests {
         exit_code = comp.run_cli("main", &[]).map_err(|e| e.to_string())?;
         run.absorb(aipl::codegen::take_test_run());
@@ -1353,7 +1356,8 @@ fn ir_cmd(args: &[String]) -> Result<(), String> {
     let (args, dbg) = take_debug_flag(args);
     let file = args.first().ok_or("missing source file")?;
     let program = loader::load_program(Path::new(file), dbg).map_err(|e| render_err(file, e))?;
-    let comp = Compilation::new(&program, dbg).map_err(|e| render_err(file, e))?;
+    let comp = Compilation::new(&program, dbg, &aipl::codegen::all_functions(&program))
+        .map_err(|e| render_err(file, e))?;
     print!("{}", comp.ir());
     Ok(())
 }

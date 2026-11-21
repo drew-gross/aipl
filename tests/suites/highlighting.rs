@@ -432,7 +432,7 @@ fn generated_tmlanguage() -> String {
                 .join("aipl-codegen")
                 .join("src")
                 .join("highlight_aipl.aipl");
-            let engine = aipl::Engine::compile_file(&path)
+            let engine = aipl::Engine::compile_file(&path, &["aipl_tmlanguage"])
                 .unwrap_or_else(|e| panic!("compile {}: {e:?}", path.display()));
             match engine.call_values("aipl_tmlanguage", &[]) {
                 Ok(aipl::FfiValue::Str(s)) => s,

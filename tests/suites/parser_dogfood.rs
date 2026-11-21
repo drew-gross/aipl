@@ -39,7 +39,8 @@ fn compile_grammar() -> Engine {
         .join("aipl-codegen")
         .join("src")
         .join("grammar_aipl.aipl");
-    Engine::compile_file(&path).unwrap_or_else(|e| panic!("compile {}: {e:?}", path.display()))
+    Engine::compile_file(&path, &["aipl_parse_report"])
+        .unwrap_or_else(|e| panic!("compile {}: {e:?}", path.display()))
 }
 
 /// What the AIPL grammar makes of `src`: empty when it parses and its tree

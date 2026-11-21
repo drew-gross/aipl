@@ -64,8 +64,10 @@ pub fn install_parser_hooks() {
 /// Embedding FFI: JIT-compile AIPL source and call its functions from Rust.
 ///
 /// An `Engine` owns the JIT-compiled program (code stays mapped for the
-/// engine's lifetime). Functions are called by name with `i64` arguments and
-/// result — the runtime representation of every scalar AIPL value (`bool` is
+/// engine's lifetime). The host names the functions it will call when it compiles,
+/// as `entries`: the compiler may fold any other function into its callers and drop
+/// it, so a name not listed is not callable. Functions are called by name with `i64`
+/// arguments and result — the runtime representation of every scalar AIPL value (`bool` is
 /// `0`/`1`, `char` is a codepoint). `str`, arrays, and other composite
 /// arguments/returns aren't marshalable across the FFI yet.
 ///
@@ -73,7 +75,7 @@ pub fn install_parser_hooks() {
 ///
 /// ```ignore
 /// let src = "import { wrapping_add as + } from builtins; pub fn add(a: i64, b: i64) -> i64 { a + b }";
-/// let engine = aipl::Engine::compile(src)?;
+/// let engine = aipl::Engine::compile(src, &["add"])?;
 /// assert_eq!(engine.call("add", &[2, 3])?, 5);
 /// # Ok::<(), Vec<aipl::Error>>(())
 /// ```
@@ -82,21 +84,22 @@ pub struct Engine {
 }
 
 impl Engine {
-    /// Compile AIPL source held in memory. `from "..."` path imports resolve
-    /// relative to the current directory; `from builtins` works as usual.
-    pub fn compile(source: &str) -> Result<Engine, Vec<Error>> {
+    /// Compile AIPL source held in memory, to be called into by the functions named in `entries`.
+    /// `from "..."` path imports resolve relative to the current directory; `from builtins`
+    /// works as usual.
+    pub fn compile(source: &str, entries: &[&str]) -> Result<Engine, Vec<Error>> {
         install_parser_hooks();
         let dbg = DebugOptions::new(false);
         let program = loader::load_program_str(source, dbg)?;
         Ok(Engine {
-            comp: codegen::Compilation::new(&program, dbg)?,
+            comp: codegen::Compilation::new(&program, dbg, entries)?,
         })
     }
 
     /// Compile a set of in-memory virtual files, supplied as `(name, source)`
     /// pairs — typically each `include_str!`'d into the host binary, so the AIPL
     /// is embedded at build time and nothing is read from disk at run time. The
-    /// **first** pair is the root (its functions are callable by name); the rest
+    /// **first** pair is the root (its functions are callable by name, when `entries` lists them); the rest
     /// are reached through `import { f } from "./name.aipl"` clauses, resolved
     /// against the supplied names by *exact match*.
     ///
@@ -115,18 +118,21 @@ impl Engine {
     ///                      import { wrapping_add as + } from builtins;\n\
     ///                      pub fn sum_of_squares(a: i64, b: i64) -> i64 { square(a) + square(b) }"),
     ///     ("./mathlib.aipl", "import { wrapping_mul as * } from builtins; pub fn square(n: i64) -> i64 { n * n }"),
-    /// ])?;
+    /// ], &["sum_of_squares"])?;
     /// assert_eq!(engine.call("sum_of_squares", &[3, 4])?, 25);
     /// # Ok::<(), Vec<aipl::Error>>(())
     /// ```
     ///
     /// [`compile_file`]: Engine::compile_file
-    pub fn compile_sources(sources: &[(&str, &str)]) -> Result<Engine, Vec<Error>> {
+    pub fn compile_sources(
+        sources: &[(&str, &str)],
+        entries: &[&str],
+    ) -> Result<Engine, Vec<Error>> {
         install_parser_hooks();
         let dbg = DebugOptions::new(false);
         let program = loader::load_program_sources(sources, dbg)?;
         Ok(Engine {
-            comp: codegen::Compilation::new(&program, dbg)?,
+            comp: codegen::Compilation::new(&program, dbg, entries)?,
         })
     }
 
@@ -138,12 +144,12 @@ impl Engine {
     /// surface and helpers are invoked transitively.
     ///
     /// [`call`]: Engine::call
-    pub fn compile_file(path: &Path) -> Result<Engine, Vec<Error>> {
+    pub fn compile_file(path: &Path, entries: &[&str]) -> Result<Engine, Vec<Error>> {
         install_parser_hooks();
         let dbg = DebugOptions::new(false);
         let program = loader::load_program(path, dbg)?;
         Ok(Engine {
-            comp: codegen::Compilation::new(&program, dbg)?,
+            comp: codegen::Compilation::new(&program, dbg, entries)?,
         })
     }
 
@@ -171,7 +177,7 @@ impl Engine {
     ///            fn go(a: str, b: str, i: i64) -> i64 {\n\
     ///              if (both_spaces(a, b, i)) { go(a, b, i + 1) } else { i } }\n\
     ///            pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
-    /// let engine = aipl::Engine::compile(src)?;
+    /// let engine = aipl::Engine::compile(src, &["common_space_prefix"])?;
     /// use aipl::FfiValue;
     /// let n = engine.call_values(
     ///     "common_space_prefix",

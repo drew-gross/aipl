@@ -3122,6 +3122,7 @@ fn pinned_findings(
 /// same program can share one of these (see [`lowered`]).
 fn lower_program(
     program: &Program,
+    entries: &[String],
     dbg: DebugOptions,
 ) -> Result<aipl_mono::MonoProgram, Vec<Error>> {
     // The frontend — resolve, lower and type-check — then compile what it
@@ -3277,7 +3278,7 @@ fn lower_program(
 
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
-    let monomorphized = aipl_mono::monomorphize(&typed, &instances, dbg)?;
+    let monomorphized = aipl_mono::monomorphize(&typed, &instances, entries, dbg)?;
     // A second inlining pass now that monomorphization has lifted each lambda to
     // its own function and split higher-order callees into per-lambda
     // specializations: those lifted lambdas (and any other now-single-use
@@ -3288,22 +3289,23 @@ fn lower_program(
     // AIPL-implemented builtins, so there is a second crop of single-use
     // instances and a second crop of bindings only one branch reads — and the
     // passes feed each other here exactly as they do before mono.
+    let entry_set: std::collections::HashSet<String> = entries.iter().cloned().collect();
     let post_mono: Vec<Pass<aipl_mono::MonoProgram>> = vec![
         // Inline single-use instances: the lifted lambdas (each called from
         // exactly one specialization) and any other now-single-use instance,
         // folded back into their one caller. Only possible post-mono — the
         // lambdas don't exist until mono creates them.
-        Pass::whole_program(
-            "inline_single_use_post_mono",
-            aipl_mono::inline_single_use_post_mono,
-        ),
+        Pass::whole_program("inline_single_use_post_mono", {
+            let entry_set = entry_set.clone();
+            move |program| aipl_mono::inline_single_use_post_mono(program, &entry_set)
+        }),
         // Then the small bodies, at *every* call site. This is what the
         // sinking pass below needs to see through a call: `value_or`'s `match`
         // has to be in the caller before a binding can be moved into one of
         // its arms. First round only, for the same reason as its pre-mono
         // counterpart.
         Pass::whole_program("inline_small_post_mono", move |program| {
-            aipl_mono::inline_small_post_mono(program, max_exprs)
+            aipl_mono::inline_small_post_mono(program, max_exprs, &entry_set)
         })
         .once(),
         // Pick the arm of each `match` on a literal, over what the inlining
@@ -3377,34 +3379,38 @@ const LOWERED_KEPT: usize = 2;
 
 thread_local! {
     /// The last few programs lowered on this thread, with their results.
-    static LOWERED: RefCell<Vec<(Program, Rc<aipl_mono::MonoProgram>)>> =
+    static LOWERED: RefCell<Vec<(Program, Vec<String>, Rc<aipl_mono::MonoProgram>)>> =
         const { RefCell::new(Vec::new()) };
 }
 
-/// [`lower_program`], remembered: a program equal to one of the last [`LOWERED_KEPT`] lowered on
-/// this thread gets that result back.
+/// [`lower_program`], remembered: a program with the same entries as one of the last
+/// [`LOWERED_KEPT`] lowered on this thread gets that result back.
 ///
 /// The front end is the larger part of what compiling a program costs (the optimization passes
 /// alone were half of a measured `aipl check`), and `check` compiles the same synthesized test
 /// driver several times over: the JIT that runs the tests, the object that is measured, the
-/// instrumented object that counts, the leak gate. Lowering depends on nothing but the program, so
-/// those share one.
-fn lowered(program: &Program, dbg: DebugOptions) -> Result<Rc<aipl_mono::MonoProgram>, Vec<Error>> {
+/// instrumented object that counts, the leak gate. Lowering depends on nothing but the program and
+/// its entries, so those share one.
+fn lowered(
+    program: &Program,
+    entries: &[String],
+    dbg: DebugOptions,
+) -> Result<Rc<aipl_mono::MonoProgram>, Vec<Error>> {
     if let Some(found) = LOWERED.with(|kept| {
         kept.borrow()
             .iter()
-            .find(|(seen, _)| seen == program)
-            .map(|(_, result)| Rc::clone(result))
+            .find(|(seen, seen_entries, _)| seen == program && seen_entries == entries)
+            .map(|(_, _, result)| Rc::clone(result))
     }) {
         return Ok(found);
     }
-    let result = Rc::new(lower_program(program, dbg)?);
+    let result = Rc::new(lower_program(program, entries, dbg)?);
     LOWERED.with(|kept| {
         let mut kept = kept.borrow_mut();
         if kept.len() == LOWERED_KEPT {
             kept.remove(0);
         }
-        kept.push((program.clone(), Rc::clone(&result)));
+        kept.push((program.clone(), entries.to_vec(), Rc::clone(&result)));
     });
     Ok(result)
 }
@@ -3417,6 +3423,8 @@ fn compile_program<M: Module>(
     module: &mut M,
     program: &Program,
     main_export_name: Option<&str>,
+    // The functions the host calls by name, besides `main`.
+    entries: &[String],
     dbg: DebugOptions,
     // When set, instrument each function to tally executed instructions (the
     // `instructions executed` perf counter). Off for JIT and production binary
@@ -3425,7 +3433,7 @@ fn compile_program<M: Module>(
     instrument: bool,
     const_base: usize,
 ) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
-    let program = &*lowered(program, dbg)?;
+    let program = &*lowered(program, entries, dbg)?;
     let mut ctx = module.make_context();
     let mut fbc = FunctionBuilderContext::new();
     let mut funcs: HashMap<String, FuncInfo> = HashMap::new();
@@ -4225,8 +4233,22 @@ pub fn generate_dogfood_artifact(
     // one useful fact — which file — buried in it.
     let program = aipl_loader::load_program_sources(sources, dbg)?;
     let mut module = new_jit_module(false).unwrap();
-    let (funcs, structs, ir) =
-        compile_program(&mut module, &program, None, dbg, false, ARTIFACT_CONST_BASE)?;
+    // The names the program compiles them under: a function outside the root file is mangled (see
+    // [`resolve_dogfood_entry`]), and what the optimizer keeps is the compiled name.
+    let entry_names: Vec<String> = all_functions(&program)
+        .into_iter()
+        .filter(|compiled| entries.contains(&aipl_loader::unmangled_name(compiled)))
+        .map(str::to_string)
+        .collect();
+    let (funcs, structs, ir) = compile_program(
+        &mut module,
+        &program,
+        None,
+        &entry_names,
+        dbg,
+        false,
+        ARTIFACT_CONST_BASE,
+    )?;
 
     // Collect static data objects (e.g. string literals longer than the 7-byte
     // inline SSO threshold). Finalize the JIT module only when any exist so we
@@ -4578,25 +4600,59 @@ fn manifest_type_head(toks: &[&str], kind: &str) -> Result<(String, u32, bool, u
     let boxed = toks.get(2) == Some(&"boxed");
     Ok((name.to_string(), size, boxed, if boxed { 3 } else { 2 }))
 }
+/// The name of every function `program` defines: the entries of a compile that wants all of the
+/// program lowered, whether or not anything calls into it, as one that reports diagnostics or
+/// prints IR does.
+pub fn all_functions(program: &Program) -> Vec<&str> {
+    program
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Fn(f) => Some(f.name.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
 impl Compilation {
-    pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
-        Self::jit(program, dbg, false)
+    /// Compile `program`, which the host will call into by the names in `entries`, besides
+    /// `main` and the `check` driver. A function that is none of those is only reachable from
+    /// AIPL, so the optimizer may fold it into its caller and drop it.
+    pub fn new(program: &Program, dbg: DebugOptions, entries: &[&str]) -> Result<Self, Vec<Error>> {
+        Self::jit(program, dbg, false, entries)
     }
 
     /// [`Compilation::new`] for a run that will be profiled: every function
     /// keeps a frame record, so a sampler can walk the stack from wherever it
     /// interrupts, and [`Compilation::code_symbols`] names what it finds.
-    pub fn new_profiled(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {
-        Self::jit(program, dbg, true)
+    pub fn new_profiled(
+        program: &Program,
+        dbg: DebugOptions,
+        entries: &[&str],
+    ) -> Result<Self, Vec<Error>> {
+        Self::jit(program, dbg, true, entries)
     }
 
-    fn jit(program: &Program, dbg: DebugOptions, frame_pointers: bool) -> Result<Self, Vec<Error>> {
+    fn jit(
+        program: &Program,
+        dbg: DebugOptions,
+        frame_pointers: bool,
+        entries: &[&str],
+    ) -> Result<Self, Vec<Error>> {
+        let entries: Vec<String> = entries.iter().map(|e| (*e).to_string()).collect();
         let mut module = new_jit_module(frame_pointers)?;
         forget_jit_constants();
 
         // The JIT never reports perf counters, so it's never instrumented.
-        let (funcs, structs, ir) =
-            compile_program(&mut module, program, None, dbg, false, JIT_CONST_BASE)?;
+        let (funcs, structs, ir) = compile_program(
+            &mut module,
+            program,
+            None,
+            &entries,
+            dbg,
+            false,
+            JIT_CONST_BASE,
+        )?;
 
         module
             .finalize_definitions()
@@ -6650,6 +6706,7 @@ impl ObjectCompilation {
             &mut module,
             &program,
             Some(BINARY_USER_MAIN),
+            &[],
             dbg,
             instrument,
             ARTIFACT_CONST_BASE,
