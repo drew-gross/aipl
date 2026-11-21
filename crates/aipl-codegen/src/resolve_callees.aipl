@@ -7,6 +7,9 @@
 # file's own, a constructor, or a local that holds a function and so hides the import.
 #
 # Only the lints read the result. The program the rest of the compiler gets is the one before it.
+#
+# The result is typed as what it is: a `ResolvedProgram` has no `Unresolved` callee anywhere in it,
+# so the lints, which take one, cannot be handed a program that skipped this pass.
 
 import {
     collect_arms,
@@ -19,27 +22,70 @@ import {
     to_dict,
     value_or,
 } from builtins;
-import { BuiltinEntry, Callee, builtin_imported, builtin_table } from "./builtin_table.aipl";
 import {
+    BuiltinEntry,
+    Callee,
+    Err,
+    Local,
+    Ok,
+    Some,
+    User,
+    builtin_imported,
+    builtin_table,
+} from "./builtin_table.aipl";
+import {
+    ArrayLit,
+    Assign,
+    Bool,
     Call,
+    Char,
+    Construct,
+    DictLit,
     Expr,
+    ExprKind,
+    Field,
+    FieldInit,
+    FloatLit,
     For,
     ForPattern,
+    Ident,
+    If,
     IfLet,
+    Index,
+    KwArg,
     Lambda,
     Let,
     LetMut,
     LetPattern,
     Match,
     MatchArm,
+    Neg,
+    None,
+    Num,
+    ProviderShim,
+    Return,
+    Seq,
+    SetLit,
+    Shim,
+    Slice,
+    Spread,
+    Str,
+    Try,
+    TupleLit,
+    TypeArgs,
+    Unit,
+    While,
     binders,
     descendants_of_kind,
-    map_subexprs,
 } from "./expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import {
     Builtins,
+    CaseParam,
+    Const,
+    ConstDecl,
+    FieldDecl,
     Function,
     Import,
     ImportDecl,
@@ -47,18 +93,35 @@ import {
     ImportSource,
     Item,
     LoweredFn,
+    Param,
     Program,
+    Refinement,
+    Signature,
+    Struct,
+    StructDecl,
     SuperProgram,
+    Variant,
+    VariantCase,
+    VariantDecl,
     local,
 } from "./item.aipl";
 import { pat_bindings } from "./pat.aipl";
 
-# `self` with the `callee` of each call in it filled in.
-pub fn resolve_callees(self: Program) -> Program {
+# The tree the lints are handed: a program whose every call says what it is to.
+variant ResolvedProgram = Program without Unresolved throughout
+
+variant ResolvedItem = Item without Unresolved throughout
+
+variant ResolvedExpr = Expr without Unresolved throughout
+
+variant ResolvedKind = ExprKind without Unresolved throughout
+
+# `self` with the `callee` of each call in it decided.
+pub fn resolve_callees(self: Program) -> ResolvedProgram {
     let imported = self.items.imported_callees();
     SuperProgram { items: self.items$resolved_item(imported), doc: self.doc }
 }.test({
-    fn called(source: str) -> Callee?[]!ParseFailure {
+    fn called(source: str) -> Callee[]!ParseFailure {
         let Program { items } = aipl_parse_surface_file(source)?.program
             .hoist_test_fns()
             .resolve_callees();
@@ -69,28 +132,37 @@ pub fn resolve_callees(self: Program) -> Program {
     // not matter.
     assert(called(
         "import { len as length } from builtins; fn f(x: i64[]) -> u64 { x.length() }",
-    )? == [some(Callee.Len)]);
+    )? == [Callee.Len]);
     // A library's builtin, by the name that library gives it.
     assert(called("import { union } from sets; fn f(a: #{i64}) -> #{i64} { union(a, a) }")? == [
-        some(Callee.Union),
+        Callee.Union,
     ]);
 
-    // A local that holds a function hides the import, and the file's own function or an import from
-    // another file of the same name is no builtin.
+    // A local that holds a function hides the import; the file's own function, or an import from
+    // another file, of the same name is no builtin.
     assert(called(
         "import { len } from builtins; fn f(len: (i64[]) -> u64, x: i64[]) -> u64 { len(x) }",
-    )? == [none]);
-    assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [none]);
-    assert(called("""import { len } from "./a.aipl"; fn f(x: i64[]) -> u64 { len(x) }""")? == [
-        none,
+    )? == [Callee.Local("len")]);
+    assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [
+        Callee.User("len"),
     ]);
+    assert(called("""import { len } from "./a.aipl"; fn f(x: i64[]) -> u64 { len(x) }""")? == [
+        Callee.User("len"),
+    ]);
+
+    // The constructors the language reserves.
+    assert(called("fn f(x: i64) -> i64? { some(x) }")? == [Callee.Some]);
+
+    // Defaults are resolved too: nothing in the program is left unresolved.
+    assert(called("fn f(x: u64 = len([1])) -> u64 { x }")? == [Callee.User("len")]);
+    assert(called("struct P { x: u64 = len([1]) }")? == [Callee.User("len")]);
 })
 
-# The callee of each call in the program's functions, outermost first.
-fn callees_called(self: Item[]) -> Callee?[] {
+# The callee of each call in the program's functions and defaults, outermost first.
+fn callees_called(self: Item[]) -> Callee[] {
     self
-        .collect_arms::<LoweredFn>()
-        $function_body()
+        $expressions()
+        .join()
         .map(|body| body.descendants_of_kind::<Call>())
         .join()
         .map(|call| {
@@ -99,17 +171,15 @@ fn callees_called(self: Item[]) -> Callee?[] {
         })
 }
 
-# The body of the function `self` is.
-fn function_body(self: LoweredFn(Function { body })) -> Expr { body }
-
-# The functions of `self`, resolved against `imported`.
-fn resolved_item(self: Item, imported: #{str: Callee}) -> Item {
+# Every expression a declaration holds at its top: a function's body and parameter defaults, a
+# struct field's default, a variant case slot's default, a constant's value.
+fn expressions(self: Item) -> Expr[] {
     match (self) {
-        LoweredFn(f) => LoweredFn(Function {
-            ..f,
-            body: f.body.resolved(imported, f.sig.params$binding.map(binders).join()),
-        }),
-        _ => self,
+        LoweredFn(f) => [f.body, ..f.sig.params$default.collect_ok()],
+        Struct(s) => s.fields$default.collect_ok(),
+        Variant(v) => v.cases$payload.join()$default.collect_ok(),
+        Const(c) => [c.value],
+        _ => [],
     }
 }
 
@@ -143,92 +213,218 @@ fn imported_pair(self: ImportName, library: str, table: BuiltinEntry[]) -> (str,
     some((self.local(), arm))
 }
 
+variant ResolvedFunction = Function without Unresolved throughout
+
+variant ResolvedParam = Param without Unresolved throughout
+
+variant ResolvedFieldDecl = FieldDecl without Unresolved throughout
+
+variant ResolvedCaseParam = CaseParam without Unresolved throughout
+
+variant ResolvedVariantCase = VariantCase without Unresolved throughout
+
+# `self` with every call in it resolved against `imported`. A declaration's defaults are
+# expressions too, and no local is in scope for them.
+fn resolved_item(self: Item, imported: #{str: Callee}) -> ResolvedItem {
+    match (self) {
+        LoweredFn(f) => LoweredFn(f.resolved_function(imported)),
+        Struct(s) => Struct(StructDecl { ..s, fields: s.fields$resolved_field(imported) }),
+        Variant(v) => Variant(VariantDecl { ..v, cases: v.cases$resolved_case(imported) }),
+        Const(c) => Const(ConstDecl { ..c, value: c.value.resolved(imported, []) }),
+        Refinement(r) => Refinement(r),
+        Import(i) => Import(i),
+    }
+}
+
+fn resolved_function(self: Function, imported: #{str: Callee}) -> ResolvedFunction {
+    Function {
+        ..self,
+        sig: Signature { ..self.sig, params: self.sig.params$resolved_param(imported) },
+        body: self.body.resolved(imported, self.sig.params$binding.map(binders).join()),
+    }
+}
+
+fn resolved_param(self: Param, imported: #{str: Callee}) -> ResolvedParam {
+    Param { ..self, default: self.default$resolved(imported, []) }
+}
+
+fn resolved_field(self: FieldDecl, imported: #{str: Callee}) -> ResolvedFieldDecl {
+    FieldDecl { ..self, default: self.default$resolved(imported, []) }
+}
+
+fn resolved_case(self: VariantCase, imported: #{str: Callee}) -> ResolvedVariantCase {
+    VariantCase { ..self, payload: self.payload$resolved_slot(imported) }
+}
+
+fn resolved_slot(self: CaseParam, imported: #{str: Callee}) -> ResolvedCaseParam {
+    CaseParam { ..self, default: self.default$resolved(imported, []) }
+}
+
+variant ResolvedCallee = Callee without Unresolved
+
+# `self`, which the import table gives, as a callee that is decided: the table lists no `Unresolved`,
+# so the case here only keeps the type honest.
+fn settled(self: Callee, name: str) -> ResolvedCallee {
+    let callee = self;
+    match (callee) {
+        Unresolved => User(name),
+        _ => callee,
+    }
+}
+
+# What the call to `name` is to, where `locals` are the names in scope that hold a value.
+fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -> ResolvedCallee {
+    if (locals.contains(name)) {
+        Local(name)
+    } else if (let some(found) = imported.get(name)) {
+        found.settled(name)
+    } else if (name == "some") {
+        Some
+    } else if (name == "ok") {
+        Ok
+    } else if (name == "err") {
+        Err
+    } else {
+        User(name)
+    }
+}
+
 # `self` with every call resolved: against `imported`, except where a name in `locals` hides it.
-# A name is hidden by the binders in scope, which a construct that binds adds for the part it binds
-# over.
-fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -> Expr {
-    match (self.kind) {
-        Call(name, args, method_style, _) => Expr {
-            ..self,
-            kind: Call(
-                name,
-                args$resolved(imported, locals),
-                method_style,
-                if (locals.contains(name)) { none } else { imported.get(name) },
-            ),
-        },
-        Let(name, ty, value, body) => Expr {
-            ..self,
-            kind: Let(
-                name,
-                ty,
-                value.resolved(imported, locals),
-                body.resolved(imported, [..locals, name]),
-            ),
-        },
-        LetMut(name, ty, value, body) => Expr {
-            ..self,
-            kind: LetMut(
-                name,
-                ty,
-                value.resolved(imported, locals),
-                body.resolved(imported, [..locals, name]),
-            ),
-        },
-        LetPattern(binding, value, body) => Expr {
-            ..self,
-            kind: LetPattern(
-                binding,
-                value.resolved(imported, locals),
-                body.resolved(imported, [..locals, ..binding.binders()]),
-            ),
-        },
-        For(name, iterable, body, index) => Expr {
-            ..self,
-            kind: For(
-                name,
-                iterable.resolved(imported, locals),
-                body.resolved(imported, [..locals, name, ..index.bound()]),
-                index=index,
-            ),
-        },
-        ForPattern(binding, iterable, body, index) => Expr {
-            ..self,
-            kind: ForPattern(
-                binding,
-                iterable.resolved(imported, locals),
-                body.resolved(imported, [..locals, ..binding.binders(), ..index.bound()]),
-                index=index,
-            ),
-        },
-        Lambda(params, body) => Expr {
-            ..self,
-            kind: Lambda(
-                params,
-                body.resolved(imported, [..locals, ..params$binding.map(binders).join()]),
-            ),
-        },
-        Match(scrutinee, arms) => Expr {
-            ..self,
-            kind: Match(scrutinee.resolved(imported, locals), arms$resolved_arm(imported, locals)),
-        },
-        IfLet(arm, scrutinee, else_branch) => Expr {
-            ..self,
-            kind: IfLet(
-                arm.resolved_arm(imported, locals),
-                scrutinee.resolved(imported, locals),
-                else_branch.resolved(imported, locals),
-            ),
-        },
-        _ => self.map_subexprs(|child| child.resolved(imported, locals)),
+fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -> ResolvedExpr {
+    let Expr { span, value_span, name_span, source, written } = self;
+    Expr {
+        kind: self.kind.resolved_kind(imported, locals),
+        span,
+        value_span,
+        name_span,
+        source,
+        written,
+    }
+}
+
+# `self` with every call under it resolved. A name is hidden by the binders in scope, which a
+# construct that binds adds for the part it binds over.
+fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -> ResolvedKind {
+    match (self) {
+        Num(n) => Num(n),
+        FloatLit(text) => FloatLit(text),
+        Bool(b) => Bool(b),
+        Str(s) => Str(s),
+        Char(c) => Char(c),
+        Ident(name) => Ident(name),
+        None => None,
+        Unit => Unit,
+        Call(name, args, method_style, _) => Call(
+            name,
+            args$resolved(imported, locals),
+            method_style,
+            callee_of(name, imported, locals),
+        ),
+        Neg(x) => Neg(x.resolved(imported, locals)),
+        If(cond, then_branch, else_branch) => If(
+            cond.resolved(imported, locals),
+            then_branch.resolved(imported, locals),
+            else_branch.resolved(imported, locals),
+        ),
+        Construct(name, inits) => Construct(name, inits$resolved_init(imported, locals)),
+        Field(x, name) => Field(x.resolved(imported, locals), name),
+        Let(name, ty, value, body) => Let(
+            name,
+            ty,
+            value.resolved(imported, locals),
+            body.resolved(imported, [..locals, name]),
+        ),
+        LetMut(name, ty, value, body) => LetMut(
+            name,
+            ty,
+            value.resolved(imported, locals),
+            body.resolved(imported, [..locals, name]),
+        ),
+        Assign(lhs, value, body) => Assign(
+            lhs.resolved(imported, locals),
+            value.resolved(imported, locals),
+            body.resolved(imported, locals),
+        ),
+        For(name, iterable, body, index) => For(
+            name,
+            iterable.resolved(imported, locals),
+            body.resolved(imported, [..locals, name, ..index.bound()]),
+            index=index,
+        ),
+        While(cond, body) => While(
+            cond.resolved(imported, locals),
+            body.resolved(imported, locals),
+        ),
+        Shim(effect, bindings, body) => Shim(effect, bindings, body.resolved(imported, locals)),
+        Match(scrutinee, arms) => Match(
+            scrutinee.resolved(imported, locals),
+            arms$resolved_arm(imported, locals),
+        ),
+        IfLet(arm, scrutinee, else_branch) => IfLet(
+            arm.resolved_arm(imported, locals),
+            scrutinee.resolved(imported, locals),
+            else_branch.resolved(imported, locals),
+        ),
+        ArrayLit(elements) => ArrayLit(elements$resolved(imported, locals)),
+        Spread(x) => Spread(x.resolved(imported, locals)),
+        SetLit(elements, order) => SetLit(elements$resolved(imported, locals), order),
+        DictLit(pairs) => DictLit(pairs.map(|pair: (Expr, Expr)| {
+            (pair.0.resolved(imported, locals), pair.1.resolved(imported, locals))
+        })),
+        Index(obj, index) => Index(
+            obj.resolved(imported, locals),
+            index.resolved(imported, locals),
+        ),
+        Slice(obj, start, end) => Slice(
+            obj.resolved(imported, locals),
+            start$resolved(imported, locals),
+            end$resolved(imported, locals),
+        ),
+        Try(x) => Try(x.resolved(imported, locals)),
+        Seq(first, rest) => Seq(first.resolved(imported, locals), rest.resolved(imported, locals)),
+        Return(x) => Return(x.resolved(imported, locals)),
+        Lambda(params, body) => Lambda(
+            params,
+            body.resolved(imported, [..locals, ..params$binding.map(binders).join()]),
+        ),
+        TupleLit(elements) => TupleLit(elements$resolved(imported, locals)),
+        KwArg(name, value, forwarded) => KwArg(name, value.resolved(imported, locals), forwarded),
+        TypeArgs(x, types) => TypeArgs(x.resolved(imported, locals), types),
+        LetPattern(binding, value, body) => LetPattern(
+            binding,
+            value.resolved(imported, locals),
+            body.resolved(imported, [..locals, ..binding.binders()]),
+        ),
+        ProviderShim(provider, args, body) => ProviderShim(
+            provider,
+            args$resolved(imported, locals),
+            body.resolved(imported, locals),
+        ),
+        ForPattern(binding, iterable, body, index) => ForPattern(
+            binding,
+            iterable.resolved(imported, locals),
+            body.resolved(imported, [..locals, ..binding.binders(), ..index.bound()]),
+            index=index,
+        ),
     }
 }
 
 # The names an optional loop index binds.
 fn bound(self: str?) -> str[] { if (let some(name) = self) { [name] } else { [] } }
 
+variant ResolvedFieldInit = FieldInit without Unresolved throughout
+
+variant ResolvedMatchArm = MatchArm without Unresolved throughout
+
+# `self` with its value resolved.
+fn resolved_init(self: FieldInit, imported: #{str: Callee}, locals: str[]) -> ResolvedFieldInit {
+    FieldInit { ..self, value: self.value.resolved(imported, locals) }
+}
+
 # `self` with its body resolved where the names its pattern binds are in scope.
-fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -> MatchArm {
-    ..self,
-    body: self.body.resolved(imported, [..locals, ..self.pattern.pat_bindings()]),
+fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -> ResolvedMatchArm {
+    MatchArm {
+        ..self,
+        body: self.body.resolved(imported, [..locals, ..self.pattern.pat_bindings()]),
+    }
 }

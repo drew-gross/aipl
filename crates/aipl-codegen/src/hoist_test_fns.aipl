@@ -26,6 +26,7 @@
 # loader.
 
 import { Span, equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
+import { Unresolved } from "./builtin_table.aipl";
 import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
 import {
     Benchmark,
@@ -149,7 +150,12 @@ fn renamed(self: str, renames: #{str: str}) -> str { renames.get(self).value_or(
 fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     let kind = match (self.kind) {
         Ident(name) => Ident(name.renamed(renames)),
-        Call(name, args, method_style, _) => Call(name.renamed(renames), args, method_style, none),
+        Call(name, args, method_style, _) => Call(
+            name.renamed(renames),
+            args,
+            method_style,
+            Unresolved,
+        ),
         _ => self.kind,
     };
     Expr { ..self, kind }.map_subexprs(|child| child.rename_uses(renames))
@@ -158,9 +164,9 @@ fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     // A call, a value use, and a use nested in both.
     let used = expr(Call(
         "four",
-        [ident("four"), expr(Call("g", [ident("four")], false, none))],
+        [ident("four"), expr(Call("g", [ident("four")], false, Unresolved))],
         false,
-        none,
+        Unresolved,
     ));
     assert(
         used.rename_uses(renames).show_expr() == "__test$f$four(__test$f$four, g(__test$f$four))",
@@ -168,7 +174,7 @@ fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     // A name that is not renamed, and a method-style call's receiver.
     assert(ident("other").rename_uses(renames).show_expr() == "other");
     assert(
-        expr(Call("four", [ident("x")], true, none))
+        expr(Call("four", [ident("x")], true, Unresolved))
             .rename_uses(renames)
             .show_expr() == "x.__test$f$four()",
     );

@@ -5,6 +5,7 @@
 
 import { Span, equal as ==, is_empty, join, map, split, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
+import { Unresolved } from "./builtin_table.aipl";
 import {
     Alias,
     ArrayLit,
@@ -417,7 +418,7 @@ pub fn ty_and_default_names(ty: Ty, default: Expr?) -> #{str} {
 pub fn names_in(self: Expr) -> #{str} {
     #{..self.own_names(), ..self.subexprs()$names_in().union_all()}
 }.test({
-    assert(expr(Call("f", [ident("x")], false, none)).names_in() == #{"f", "x"});
+    assert(expr(Call("f", [ident("x")], false, Unresolved)).names_in() == #{"f", "x"});
     assert(expr(Neg(ident("x"))).names_in() == #{"-", "x"});
     assert(expr(TypeArgs(ident("f"), [Named("Circle")])).names_in() == #{"f", "Circle"});
     assert(expr(LetPattern(

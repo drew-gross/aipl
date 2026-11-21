@@ -152,6 +152,7 @@ import {
     bound_from_name,
 } from "./bound.aipl";
 import { BraceEntry, Key, Pair, brace_literal } from "./brace_entry.aipl";
+import { Unresolved } from "./builtin_table.aipl";
 import {
     Cst,
     Parts,
@@ -1600,7 +1601,7 @@ fn lower_expr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             tsp,
         )));
     };
-    ok(AExpr(at(Call(op, [lhs, rhs], false, none), tsp)))
+    ok(AExpr(at(Call(op, [lhs, rhs], false, Unresolved), tsp)))
 }
 
 # `unary` — `-x`, `!x`, or the postfix it wraps. Unary `-` is the one operator
@@ -1612,7 +1613,7 @@ fn lower_unary(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let tsp = node.tok_span();
     let op = node.own_token_text(src);
     if (op == "-") { return ok(AExpr(at(Neg(inner), tsp))); };
-    if (op == "!") { return ok(AExpr(at(Call("!", [inner], false, none), tsp))); };
+    if (op == "!") { return ok(AExpr(at(Call("!", [inner], false, Unresolved), tsp))); };
     ok(AExpr(inner))
 }
 
@@ -1803,7 +1804,9 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                     let TypedCall { tys, args } = typed_call(kids, sp)?;
                     ok(AExpr(at(
                         TypeArgs(
-                            at(Call(head, args, false, none), tsp).named_at(node.first_tok(tsp)),
+                            at(Call(head, args, false, Unresolved), tsp).named_at(node.first_tok(
+                                tsp,
+                            )),
                             tys,
                         ),
                         sp,
@@ -1811,7 +1814,9 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 },
                 [_, "(", ..] => {
                     let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
-                    ok(AExpr(at(Call(head, args, false, none), tsp).named_at(node.first_tok(tsp))))
+                    ok(AExpr(at(Call(head, args, false, Unresolved), tsp).named_at(node.first_tok(
+                        tsp,
+                    ))))
                 },
                 [_, "{", ..] => {
                     ok(AExpr(at(
@@ -2072,12 +2077,12 @@ fn interpolation_piece(segment: str, e: Expr, sp: Span) -> Expr {
 # by its type — kept distinct so a lowered template is recognizable as one.
 fn interp_call(e: Expr) -> Expr {
     let span = e.span;
-    at(Call("__template_interp", [e], false, none), span)
+    at(Call("__template_interp", [e], false, Unresolved), span)
 }
 
 fn concat_call(a: Expr, b: Expr) -> Expr {
     let span = join_spans(a.span, b.span);
-    at(Call("__aipl_concat", [a, b], false, none), span)
+    at(Call("__aipl_concat", [a, b], false, Unresolved), span)
 }
 
 # `args` — the comma-separated list every call, array literal and array pattern
@@ -2147,7 +2152,12 @@ fn kw_arg(
 fn lower_op_value(src: str, node: Parts, kids: Ast[]) -> Ast {
     let tsp = node.tok_span();
     let body = at(
-        Call(node.own_token_text(src), [at(Ident("lhs"), tsp), at(Ident("rhs"), tsp)], false, none),
+        Call(
+            node.own_token_text(src),
+            [at(Ident("lhs"), tsp), at(Ident("rhs"), tsp)],
+            false,
+            Unresolved,
+        ),
         tsp,
     );
     let params = [
@@ -2697,7 +2707,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // operator carry the operator's own span, so a missing import points at it.
     if (op == "++" || op == "--") {
         let span = join_spans(name_span, op_span);
-        let value = at(Call(op, [target, at(Num(1), op_span)], false, none), span);
+        let value = at(Call(op, [target, at(Num(1), op_span)], false, Unresolved), span);
         return ok(AStmt(SAssign(target, value, span)));
     };
 
@@ -2706,7 +2716,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     if (compound_ops().contains(op)) {
         let rhs = kid_expr(kids, 0, sp)?;
         let span = join_spans(name_span, rhs.span);
-        let value = at(Call(op, [target, rhs], false, none), op_span);
+        let value = at(Call(op, [target, rhs], false, Unresolved), op_span);
         return ok(AStmt(SAssign(target, value, span)));
     };
 
@@ -2720,7 +2730,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
             let end = args.last()$span.value_or(target.span);
             let span = join_spans(name_span, end);
-            let value = at(Call(method, [recv, ..args], true, none), span).named_at(
+            let value = at(Call(method, [recv, ..args], true, Unresolved), span).named_at(
                 target.name_span,
             );
             return ok(AStmt(SAssign(recv, value, span)));
@@ -2772,12 +2782,12 @@ fn indexed_write(
         });
     let grid = indexes.len() == 2;
     let read = if (grid) {
-        at(Call("__builtin_grid_get", [target, ..reads], false, none), sp)
+        at(Call("__builtin_grid_get", [target, ..reads], false, Unresolved), sp)
     } else {
         at(Index(target, reads[0].value_or(target)), sp)
     };
     let write_name = if (grid) { "__builtin_grid_try_set" } else { "__with_or_self" };
-    let write = at(Call(write_name, [target, ..reads, value], false, none), sp);
+    let write = at(Call(write_name, [target, ..reads, value], false, Unresolved), sp);
     let arm = MatchArm {
         pattern: PatCtor("some", ignore_payload=true),
         body: at(Assign(target, write, at(Unit, sp)), sp),

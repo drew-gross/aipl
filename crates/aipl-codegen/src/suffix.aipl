@@ -2,6 +2,7 @@
 # means. One of the files the AST is declared across; see `ast.aipl`.
 
 import { Span, equal as ==, value_or } from builtins;
+import { Unresolved } from "./builtin_table.aipl";
 import {
     Binding,
     Call,
@@ -50,12 +51,12 @@ variant Suffix =
 pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     match (suf) {
         Field(name) => at(FieldExpr(recv, name.text), span).named_at(name.span),
-        Method(name, args) => at(Call(name.text, [recv, ..args], true, none), span).named_at(
+        Method(name, args) => at(Call(name.text, [recv, ..args], true, Unresolved), span).named_at(
             name.span,
         ),
         MethodTyped(name, tys, args) => at(
             TypeArgs(
-                at(Call(name.text, [recv, ..args], true, none), span).named_at(name.span),
+                at(Call(name.text, [recv, ..args], true, Unresolved), span).named_at(name.span),
                 tys,
             ),
             span,
@@ -63,7 +64,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         Index(index) => index_or_slice(recv, index, span),
         // `recv[row, column]` reads one cell of a grid; the builtin answers `none` off the grid.
         Index2(row, column) => at(
-            Call("__builtin_grid_get", [recv, row, column], false, none),
+            Call("__builtin_grid_get", [recv, row, column], false, Unresolved),
             span,
         ),
         SliceFrom(lo) => at(Slice(recv, some(lo), none), span),
@@ -79,7 +80,12 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         MapMethod(name, args) => mapped(
             recv,
             at(
-                Call(name.text, [at(Ident(mapped_element(span)), name.span), ..args], true, none),
+                Call(
+                    name.text,
+                    [at(Ident(mapped_element(span)), name.span), ..args],
+                    true,
+                    Unresolved,
+                ),
                 span,
             ).named_at(name.span),
             span,
@@ -168,7 +174,7 @@ fn mapped_element(Span { start, end }) -> str { `__map${start}_{end}` }
 
 fn mapped(recv: Expr, step: Expr, span: Span) -> Expr {
     let element = LambdaParam { binding: Binding.Name(mapped_element(span)), ty: none, span };
-    at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true, none), span)
+    at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true, Unresolved), span)
 }
 
 # `recv[a..b]` — a range literal written *as* an index is the closed slice form,

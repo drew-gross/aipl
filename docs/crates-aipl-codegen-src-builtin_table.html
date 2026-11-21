@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Callee</code></pre>
 
-          <div class="doc"><p>The importable builtins, one case each, named as the Rust <code>Callee</code> arm is. A call that is not to one of them (a user function, a local, a constructor) has no case.</p></div>
+          <div class="doc"><p>What a call is to. The importable builtins have a case each, named as the Rust <code>Callee</code> arm is; <code>Some</code>, <code>Ok</code> and <code>Err</code> are the constructors the language reserves; a call to a name the file does not import from a builtins library is <code>User</code>, or <code>Local</code> where a local holding a function hides the name. <code>Unresolved</code> is what the parser writes, before <code>resolve_callees</code> decides.</p></div>
 
 
           <ul class="cases">
@@ -1005,6 +1005,36 @@
             </li>
 
             <li id="item-LogicalNot"><code>LogicalNot</code>
+
+
+            </li>
+
+            <li id="item-Some"><code>Some</code>
+
+
+            </li>
+
+            <li id="item-Ok"><code>Ok</code>
+
+
+            </li>
+
+            <li id="item-Err"><code>Err</code>
+
+
+            </li>
+
+            <li id="item-User"><code>User(name: str)</code>
+
+
+            </li>
+
+            <li id="item-Local"><code>Local(name: str)</code>
+
+
+            </li>
+
+            <li id="item-Unresolved"><code>Unresolved</code>
 
 
             </li>

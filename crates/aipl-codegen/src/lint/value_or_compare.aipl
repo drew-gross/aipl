@@ -33,9 +33,9 @@ import { LintHit, hit } from "./lint_hit.aipl";
 # The hit for the comparison `self`, when it compares a `value_or` of one literal with a different
 # literal.
 pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
-    let operator = if (callee == some(Callee.Equal)) {
+    let operator = if (callee == Callee.Equal) {
         "=="
-    } else if (callee == some(Callee.NotEqual)) {
+    } else if (callee == Callee.NotEqual) {
         "!="
     } else {
         return none;
@@ -107,7 +107,7 @@ pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
 # `(optional, default, name)` when `self` is a call to `value_or`, spelled `name`.
 fn fill(self: Expr) -> (Expr, Expr, str)? {
     let Call(name, args, _, callee) = self.kind.as_case::<Call>()?;
-    if (callee != some(Callee.ValueOr)) { return none; };
+    if (callee != Callee.ValueOr) { return none; };
     let [optional, default] = args else { return none; };
     some((optional, default, name))
 }

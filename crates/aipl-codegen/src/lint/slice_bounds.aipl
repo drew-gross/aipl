@@ -3,6 +3,7 @@
 # must agree on what "runs to the end" and "starts at zero" mean.
 
 import { equal as ==, logical_not as ! } from builtins;
+import { Unresolved } from "../builtin_table.aipl";
 import { Call, Expr, Num, expr, ident, num, show_expr } from "../expr.aipl";
 
 # Whether `self` is `len(receiver)`: the receiver's own length, however it was
@@ -15,10 +16,10 @@ pub fn is_len_of(self: Expr, receiver: Expr) -> bool {
     }
 }.test({
     let xs = ident("xs");
-    assert(expr(Call("len", [xs], true, none)).is_len_of(xs));
-    assert(!expr(Call("len", [xs], true, none)).is_len_of(ident("ys")));
-    assert(!expr(Call("size", [xs], true, none)).is_len_of(xs));
-    assert(!expr(Call("len", [xs, xs], false, none)).is_len_of(xs));
+    assert(expr(Call("len", [xs], true, Unresolved)).is_len_of(xs));
+    assert(!expr(Call("len", [xs], true, Unresolved)).is_len_of(ident("ys")));
+    assert(!expr(Call("size", [xs], true, Unresolved)).is_len_of(xs));
+    assert(!expr(Call("len", [xs, xs], false, Unresolved)).is_len_of(xs));
     assert(!xs.is_len_of(xs));
 })
 

@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/resolve_callees.aipl</code></h1>
 
-      <div class="module-doc"><p>Which builtin each call is to, for the lints.</p><p>A call names a function as the file spells it, and a file may import a builtin under any name (<code>import { len as length } from builtins;</code>), so what a call is to is a fact about the file's imports and not about the text. This fills in the <code>callee</code> of every call to a name the file imported from a builtins library, leaving <code>none</code> for a call to anything else: a function of the file's own, a constructor, or a local that holds a function and so hides the import.</p><p>Only the lints read the result. The program the rest of the compiler gets is the one before it.</p></div>
+      <div class="module-doc"><p>Which builtin each call is to, for the lints.</p><p>A call names a function as the file spells it, and a file may import a builtin under any name (<code>import { len as length } from builtins;</code>), so what a call is to is a fact about the file's imports and not about the text. This fills in the <code>callee</code> of every call to a name the file imported from a builtins library, leaving <code>none</code> for a call to anything else: a function of the file's own, a constructor, or a local that holds a function and so hides the import.</p><p>Only the lints read the result. The program the rest of the compiler gets is the one before it.</p><p>The result is typed as what it is: a <code>ResolvedProgram</code> has no <code>Unresolved</code> callee anywhere in it, so the lints, which take one, cannot be handed a program that skipped this pass.</p></div>
 
 
 
@@ -22,14 +22,182 @@
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-ResolvedProgram">
+          <h3>
+            <a class="anchor" href="#item-ResolvedProgram">ResolvedProgram</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedProgram = Program without Unresolved throughout</code></pre>
+
+          <div class="doc"><p>The tree the lints are handed: a program whose every call says what it is to.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedItem">
+          <h3>
+            <a class="anchor" href="#item-ResolvedItem">ResolvedItem</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedItem = Item without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedExpr">
+          <h3>
+            <a class="anchor" href="#item-ResolvedExpr">ResolvedExpr</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedExpr = Expr without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedKind">
+          <h3>
+            <a class="anchor" href="#item-ResolvedKind">ResolvedKind</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedKind = ExprKind without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-resolve_callees">
           <h3>
             <a class="anchor" href="#item-resolve_callees">resolve_callees</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn resolve_callees(self: Program) -&#62; Program</code></pre>
+          <pre class="signature"><code>pub fn resolve_callees(self: Program) -&#62; ResolvedProgram</code></pre>
 
-          <div class="doc"><p><code>self</code> with the <code>callee</code> of each call in it filled in.</p></div>
+          <div class="doc"><p><code>self</code> with the <code>callee</code> of each call in it decided.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedFunction">
+          <h3>
+            <a class="anchor" href="#item-ResolvedFunction">ResolvedFunction</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedFunction = Function without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedParam">
+          <h3>
+            <a class="anchor" href="#item-ResolvedParam">ResolvedParam</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedParam = Param without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedFieldDecl">
+          <h3>
+            <a class="anchor" href="#item-ResolvedFieldDecl">ResolvedFieldDecl</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedFieldDecl = FieldDecl without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedCaseParam">
+          <h3>
+            <a class="anchor" href="#item-ResolvedCaseParam">ResolvedCaseParam</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedCaseParam = CaseParam without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedVariantCase">
+          <h3>
+            <a class="anchor" href="#item-ResolvedVariantCase">ResolvedVariantCase</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedVariantCase = VariantCase without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedCallee">
+          <h3>
+            <a class="anchor" href="#item-ResolvedCallee">ResolvedCallee</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedCallee = Callee without Unresolved</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedFieldInit">
+          <h3>
+            <a class="anchor" href="#item-ResolvedFieldInit">ResolvedFieldInit</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedFieldInit = FieldInit without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ResolvedMatchArm">
+          <h3>
+            <a class="anchor" href="#item-ResolvedMatchArm">ResolvedMatchArm</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ResolvedMatchArm = MatchArm without Unresolved throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -48,37 +216,23 @@
             <a class="anchor" href="#item-callees_called">callees_called</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn callees_called(self: Item[]) -&#62; Callee?[]</code></pre>
+          <pre class="signature"><code>fn callees_called(self: Item[]) -&#62; Callee[]</code></pre>
 
-          <div class="doc"><p>The callee of each call in the program's functions, outermost first.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-function_body">
-          <h3>
-            <a class="anchor" href="#item-function_body">function_body</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn function_body(self: LoweredFn) -&#62; Expr</code></pre>
-
-          <div class="doc"><p>The body of the function <code>self</code> is.</p></div>
+          <div class="doc"><p>The callee of each call in the program's functions and defaults, outermost first.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-resolved_item">
+        <section class="item" id="item-expressions">
           <h3>
-            <a class="anchor" href="#item-resolved_item">resolved_item</a>
+            <a class="anchor" href="#item-expressions">expressions</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn resolved_item(self: Item, imported: #{str: Callee}) -&#62; Item</code></pre>
+          <pre class="signature"><code>fn expressions(self: Item) -&#62; Expr[]</code></pre>
 
-          <div class="doc"><p>The functions of <code>self</code>, resolved against <code>imported</code>.</p></div>
+          <div class="doc"><p>Every expression a declaration holds at its top: a function's body and parameter defaults, a struct field's default, a variant case slot's default, a constant's value.</p></div>
 
 
         </section>
@@ -141,14 +295,140 @@
 
 
 
+        <section class="item" id="item-resolved_item">
+          <h3>
+            <a class="anchor" href="#item-resolved_item">resolved_item</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_item(self: Item, imported: #{str: Callee}) -&#62; ResolvedItem</code></pre>
+
+          <div class="doc"><p><code>self</code> with every call in it resolved against <code>imported</code>. A declaration's defaults are expressions too, and no local is in scope for them.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_function">
+          <h3>
+            <a class="anchor" href="#item-resolved_function">resolved_function</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_function(self: Function, imported: #{str: Callee}) -&#62; ResolvedFunction</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_param">
+          <h3>
+            <a class="anchor" href="#item-resolved_param">resolved_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_param(self: Param, imported: #{str: Callee}) -&#62; ResolvedParam</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_field">
+          <h3>
+            <a class="anchor" href="#item-resolved_field">resolved_field</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_field(self: FieldDecl, imported: #{str: Callee}) -&#62; ResolvedFieldDecl</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_case">
+          <h3>
+            <a class="anchor" href="#item-resolved_case">resolved_case</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_case(self: VariantCase, imported: #{str: Callee}) -&#62; ResolvedVariantCase</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_slot">
+          <h3>
+            <a class="anchor" href="#item-resolved_slot">resolved_slot</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_slot(self: CaseParam, imported: #{str: Callee}) -&#62; ResolvedCaseParam</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-settled">
+          <h3>
+            <a class="anchor" href="#item-settled">settled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn settled(self: Callee, name: str) -&#62; ResolvedCallee</code></pre>
+
+          <div class="doc"><p><code>self</code>, which the import table gives, as a callee that is decided: the table lists no <code>Unresolved</code>, so the case here only keeps the type honest.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-callee_of">
+          <h3>
+            <a class="anchor" href="#item-callee_of">callee_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedCallee</code></pre>
+
+          <div class="doc"><p>What the call to <code>name</code> is to, where <code>locals</code> are the names in scope that hold a value.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-resolved">
           <h3>
             <a class="anchor" href="#item-resolved">resolved</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedExpr</code></pre>
 
-          <div class="doc"><p><code>self</code> with every call resolved: against <code>imported</code>, except where a name in <code>locals</code> hides it. A name is hidden by the binders in scope, which a construct that binds adds for the part it binds over.</p></div>
+          <div class="doc"><p><code>self</code> with every call resolved: against <code>imported</code>, except where a name in <code>locals</code> hides it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolved_kind">
+          <h3>
+            <a class="anchor" href="#item-resolved_kind">resolved_kind</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedKind</code></pre>
+
+          <div class="doc"><p><code>self</code> with every call under it resolved. A name is hidden by the binders in scope, which a construct that binds adds for the part it binds over.</p></div>
 
 
         </section>
@@ -169,12 +449,26 @@
 
 
 
+        <section class="item" id="item-resolved_init">
+          <h3>
+            <a class="anchor" href="#item-resolved_init">resolved_init</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn resolved_init(self: FieldInit, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedFieldInit</code></pre>
+
+          <div class="doc"><p><code>self</code> with its value resolved.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-resolved_arm">
           <h3>
             <a class="anchor" href="#item-resolved_arm">resolved_arm</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -&#62; MatchArm</code></pre>
+          <pre class="signature"><code>fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedMatchArm</code></pre>
 
           <div class="doc"><p><code>self</code> with its body resolved where the names its pattern binds are in scope.</p></div>
 

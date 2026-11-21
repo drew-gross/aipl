@@ -8,6 +8,7 @@
 # carrying its text costs a pointer and a length, however long the text is.
 
 import { collect_arms, equal as ==, map } from builtins;
+import { Unresolved } from "./builtin_table.aipl";
 import { Call, Expr, Ident, at, map_subexprs, subexprs } from "./expr.aipl";
 import {
     Attributes,
@@ -39,7 +40,7 @@ pub fn with_source_text(self: WrittenProgram, text: str) -> WrittenProgram {
 }.test({
     // Each expression holds what was written for it, children included.
     let text = "fn f() { g(a) }";
-    let call = at(Call("g", [at(Ident("a"), 11..12)], false, none), 9..13);
+    let call = at(Call("g", [at(Ident("a"), 11..12)], false, Unresolved), 9..13);
     assert(call.sourced(text).source == "g(a)");
     assert(call.sourced(text).subexprs()$source == ["a"]);
 

@@ -108,19 +108,19 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> Advice? {
 
 # The receiver of the emptiness test the one argument `self` negates, when `callee` is `!` and it is
 # `!x.is_empty()`.
-fn negated_emptiness(self: Expr[], callee: Callee?) -> Expr? {
-    if (callee != some(Callee.LogicalNot)) { return none; };
+fn negated_emptiness(self: Expr[], callee: Callee) -> Expr? {
+    if (callee != Callee.LogicalNot) { return none; };
     let Call(_, args, _, inner) = self[0]?.kind.as_case::<Call>()?;
-    if (args.len() != 1 || inner != some(Callee.IsEmpty)) { return none; };
+    if (args.len() != 1 || inner != Callee.IsEmpty) { return none; };
     args[0]
 }
 
 # The receiver of the length that the two arguments `self` compare with zero as `0 < x.len()` or
 # `x.len() > 0`, when `callee` is the comparison.
-fn length_against_zero(self: Expr[], callee: Callee?) -> Expr? {
+fn length_against_zero(self: Expr[], callee: Callee) -> Expr? {
     let [left, right] = self else { return none; };
-    if (callee == some(Callee.LessThan) && left.is_zero()) { return right.length_receiver(); };
-    if (callee == some(Callee.GreaterThan) && right.is_zero()) { return left.length_receiver(); };
+    if (callee == Callee.LessThan && left.is_zero()) { return right.length_receiver(); };
+    if (callee == Callee.GreaterThan && right.is_zero()) { return left.length_receiver(); };
     none
 }
 
@@ -128,6 +128,6 @@ fn length_against_zero(self: Expr[], callee: Callee?) -> Expr? {
 # free call `len(x)`.
 fn length_receiver(self: Expr) -> Expr? {
     let Call(_, args, _, callee) = self.kind.as_case::<Call>()?;
-    if (callee != some(Callee.Len) || args.len() != 1) { return none; };
+    if (callee != Callee.Len || args.len() != 1) { return none; };
     args[0]
 }

@@ -20,8 +20,10 @@ import {
     value_or,
 } from builtins;
 
-# The importable builtins, one case each, named as the Rust `Callee` arm is. A call that is not
-# to one of them (a user function, a local, a constructor) has no case.
+# What a call is to. The importable builtins have a case each, named as the Rust `Callee` arm is;
+# `Some`, `Ok` and `Err` are the constructors the language reserves; a call to a name the file
+# does not import from a builtins library is `User`, or `Local` where a local holding a function
+# hides the name. `Unresolved` is what the parser writes, before `resolve_callees` decides.
 variant Callee =
     | Print
     | Put
@@ -218,6 +220,12 @@ variant Callee =
     | LogicalAnd
     | LogicalOr
     | LogicalNot
+    | Some
+    | Ok
+    | Err
+    | User(name: str)
+    | Local(name: str)
+    | Unresolved
 
 variant BuiltinDefinition = Written(file: str) | Declared | Described(signature: str, doc: str)
 

@@ -48,7 +48,7 @@
             <a class="anchor" href="#item-negated_emptiness">negated_emptiness</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn negated_emptiness(self: Expr[], callee: Callee?) -&#62; Expr?</code></pre>
+          <pre class="signature"><code>fn negated_emptiness(self: Expr[], callee: Callee) -&#62; Expr?</code></pre>
 
           <div class="doc"><p>The receiver of the emptiness test the one argument <code>self</code> negates, when <code>callee</code> is <code>!</code> and it is <code>!x.is_empty()</code>.</p></div>
 
@@ -62,7 +62,7 @@
             <a class="anchor" href="#item-length_against_zero">length_against_zero</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn length_against_zero(self: Expr[], callee: Callee?) -&#62; Expr?</code></pre>
+          <pre class="signature"><code>fn length_against_zero(self: Expr[], callee: Callee) -&#62; Expr?</code></pre>
 
           <div class="doc"><p>The receiver of the length that the two arguments <code>self</code> compare with zero as <code>0 &lt; x.len()</code> or <code>x.len() &gt; 0</code>, when <code>callee</code> is the comparison.</p></div>
 

@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-lint">lint</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint(program: Program) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn lint(program: ResolvedProgram) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>Every hit the ported lints find in <code>program</code>.</p><p>A lint is either a function of the whole program or of one function. The program's functions are listed once, and each function lint is run over them: every body that is code. One that also needs the file's imports takes the program's <code>items</code> beside the function.</p></div>
 
@@ -62,7 +62,7 @@
             <a class="anchor" href="#item-construct_lints">construct_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn construct_lints(__spat$7239: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn construct_lints(__spat$7332: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the struct literals of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-call_lints">call_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn call_lints(__spat$7482: Function, items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn call_lints(__spat$7575: Function, items: Item[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the calls of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-assign_lints">assign_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn assign_lints(__spat$8422: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn assign_lints(__spat$8515: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the assignments of <code>function</code>, which are found once for all of them.</p></div>
 

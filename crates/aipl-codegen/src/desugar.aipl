@@ -32,6 +32,7 @@ import {
     wrapping_add as +,
     wrapping_decrement as --,
 } from builtins;
+import { Unresolved } from "./builtin_table.aipl";
 import {
     Alias,
     Binding,
@@ -304,9 +305,9 @@ fn core_with_kind(
 # `seeded_with_clock()` from the clock, and `seeded_with_provider(p)` from a value that
 # holds the seed to start from, `none` for the clock.
 fn random_shim(provider: str, args: CoreExpr[], body: CoreExpr, head: Span) -> CoreExpr {
-    let clock = core_at(Call("__random_seed_from_clock", [], false, none), head);
+    let clock = core_at(Call("__random_seed_from_clock", [], false, Unresolved), head);
     let seeding = match (provider) {
-        "seeded_with_int" => core_at(Call("__random_seed", args, false, none), head),
+        "seeded_with_int" => core_at(Call("__random_seed", args, false, Unresolved), head),
         "seeded_with_provider" => match (args.first()) {
             some(value) => core_at(
                 IfLet(
@@ -317,7 +318,7 @@ fn random_shim(provider: str, args: CoreExpr[], body: CoreExpr, head: Span) -> C
                                 "__random_seed",
                                 [core_at(Ident("seed$provider"), head)],
                                 false,
-                                none,
+                                Unresolved,
                             ),
                             head,
                         ),

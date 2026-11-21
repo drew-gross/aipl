@@ -24,11 +24,12 @@ import {
     starts_with,
     value_or,
 } from builtins;
+import { Unresolved } from "../builtin_table.aipl";
 import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { Function, Import, ImportDecl, Item, LoweredFn, Program, local } from "../item.aipl";
-import { resolve_callees } from "../resolve_callees.aipl";
+import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -149,22 +150,24 @@ pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
 
 # What `lint` reports for the program `src` parses to. The one way the lints'
 # `.test` blocks run a lint over source text: pass the lint function itself.
-pub fn lint_hits(src: str, lint: (Program) -> LintHit[]) -> LintHit[]!ParseFailure {
+pub fn lint_hits(src: str, lint: (ResolvedProgram) -> LintHit[]) -> LintHit[]!ParseFailure {
     ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees()))
 }.test({
-    assert(lint_hits("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == [
+    assert(lint_hits("fn f() { }", |program: ResolvedProgram| { [hit("found", 0..1)] })? == [
         hit("found", 0..1),
     ]);
-    assert(lint_hits("fn (", |program: Program| { [] }).is_err_and(
+    assert(lint_hits("fn (", |program: ResolvedProgram| { [] }).is_err_and(
         |failure| failure.errors.is_nonempty(),
     ));
 })
 
 # [`lint_hits`], keeping only the messages.
-pub fn lint_messages(src: str, lint: (Program) -> LintHit[]) -> str[]!ParseFailure {
+pub fn lint_messages(src: str, lint: (ResolvedProgram) -> LintHit[]) -> str[]!ParseFailure {
     ok(lint_hits(src, lint)?$message)
 }.test({
-    assert(lint_messages("fn f() { }", |program: Program| { [hit("found", 0..1)] })? == ["found"]);
+    assert(lint_messages("fn f() { }", |program: ResolvedProgram| { [hit("found", 0..1)] })? == [
+        "found",
+    ]);
 })
 
 # Whether `self`'s span covers exactly the text that spells it, so the source can be
@@ -182,8 +185,8 @@ pub fn spans_its_text(self: Expr) -> bool {
 }.test({
     assert(ident("x").spans_its_text());
     assert(expr(Field(ident("p"), "x")).spans_its_text());
-    assert(!expr(Call("f", [ident("x")], false, none)).spans_its_text());
-    assert(!expr(Field(expr(Call("f", [], false, none)), "x")).spans_its_text());
+    assert(!expr(Call("f", [ident("x")], false, Unresolved)).spans_its_text());
+    assert(!expr(Field(expr(Call("f", [], false, Unresolved)), "x")).spans_its_text());
 })
 
 # What advice quotes for the expression `self`: its source where that spells it exactly
@@ -212,7 +215,9 @@ pub fn quote(self: Expr, placeholder: str) -> str {
     // A literal with no text of its own, a call and a multi-line string are not quoted.
     assert(num(5).quote("<element>") == "<element>");
     assert(
-        Expr { ..expr(Call("f", [], false, none)), source: "f(" }.quote("<element>") == "<element>",
+        Expr { ..expr(Call("f", [], false, Unresolved)), source: "f(" }.quote(
+            "<element>",
+        ) == "<element>",
     );
     assert(Expr { ..expr(Str("a\nb")), source: `"a\nb"` }.quote("<element>") == "<element>");
 })
@@ -341,13 +346,13 @@ pub fn unfilled_hits(self: Function[], lint: (Function) -> UnfilledHit[]) -> Unf
 
 # What the function lint `lint` reports for the program `src` parses to.
 pub fn lint_function_hits(src: str, lint: (Function) -> LintHit[]) -> LintHit[]!ParseFailure {
-    lint_hits(src, |program: Program| { program.functions().hits(lint) })
+    lint_hits(src, |program: ResolvedProgram| { program.functions().hits(lint) })
 }
 
 # What the lint `lint`, which reports at most one hit for a function, reports for the program
 # `src` parses to.
 pub fn lint_function_once_hits(src: str, lint: (Function) -> LintHit?) -> LintHit[]!ParseFailure {
-    lint_hits(src, |program: Program| { program.functions().hits_once(lint) })
+    lint_hits(src, |program: ResolvedProgram| { program.functions().hits_once(lint) })
 }
 
 # [`lint_function_hits`], keeping only the messages.
@@ -361,7 +366,7 @@ pub fn lint_function_unfilled_hits(
     src: str,
     lint: (Function) -> UnfilledHit[],
 ) -> LintHit[]!ParseFailure {
-    let program = aipl_parse_surface_file(src)?.program.hoist_test_fns();
+    let program = aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees();
     ok(program.functions().unfilled_hits(lint).filled(program.items))
 }
 
@@ -376,7 +381,9 @@ pub fn lint_function_unfilled_messages(
 pub fn lint_in_hits(src: str, lint: (Function, Item[]) -> LintHit[]) -> LintHit[]!ParseFailure {
     lint_hits(
         src,
-        |program: Program| { program.functions().hits(|function| lint(function, program.items)) },
+        |program: ResolvedProgram| {
+            program.functions().hits(|function| lint(function, program.items))
+        },
     )
 }
 
@@ -392,7 +399,7 @@ pub fn lint_in_unfilled_hits(
 ) -> LintHit[]!ParseFailure {
     lint_hits(
         src,
-        |program: Program| {
+        |program: ResolvedProgram| {
             program
                 .functions()
                 .unfilled_hits(|function| lint(function, program.items))
