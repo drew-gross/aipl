@@ -902,25 +902,25 @@ fn apply_fixes(path: &Path, checked: &mut Checked) {
 /// invocation surfaces every problem — the same reason a file that fails to
 /// compile doesn't stop the run.
 ///
-/// A source the formatter can't parse is left alone and is no complaint. Loading
+/// A source that does not parse is left alone and is no complaint. Loading
 /// it reports the syntax error, which is the diagnostic that actually helps;
-/// "needs formatting" stacked on top of it is noise.
+/// "needs formatting" stacked on top of it is noise. A source that parses and that the
+/// formatter still refuses is the formatter's bug, and is reported as a failure: the file
+/// cannot be brought to canonical format, and saying nothing would pass it.
 fn check_format(file: &Path, fix: bool) -> Formatting {
     let Ok(src) = std::fs::read_to_string(file) else {
         return Formatting::Clean;
     };
-    let Ok(formatted) = aipl::codegen::format_source(&src, aipl::codegen::FORMAT_WIDTH) else {
-        return Formatting::Clean;
-    };
-    if formatted == src {
-        return Formatting::Clean;
-    }
-    if !fix {
-        return Formatting::Needs;
-    }
-    match std::fs::write(file, &formatted) {
-        Ok(()) => Formatting::Rewritten,
-        Err(e) => Formatting::RewriteFailed(e.to_string()),
+    let answer = aipl::codegen::format_source(&src, aipl::codegen::FORMAT_WIDTH)
+        .map_err(|refusal| refusal.message);
+    match check::format_verdict(&src, answer, || aipl::parse(&src).is_ok()) {
+        check::FormatVerdict::Clean => Formatting::Clean,
+        check::FormatVerdict::Refused(why) => Formatting::RewriteFailed(why),
+        check::FormatVerdict::Rewrite(_) if !fix => Formatting::Needs,
+        check::FormatVerdict::Rewrite(formatted) => match std::fs::write(file, &formatted) {
+            Ok(()) => Formatting::Rewritten,
+            Err(e) => Formatting::RewriteFailed(e.to_string()),
+        },
     }
 }
 

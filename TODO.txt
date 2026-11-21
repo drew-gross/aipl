@@ -487,7 +487,9 @@ write_file.aipl
 companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
-formatter:
+format:
+  AIPL_INJECT_FORMAT_REFUSAL test to verify that check fails when formatting fails
+  why is char_set_literal passing check --format? it looks broken to me
   some way to allow really long string literals to wrap
   the formatter should decide whether to output a trailing comma based on the grammer definition
   wrap comments
@@ -560,6 +562,9 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  const function should be const var most of the time
+  make Call's Callee field non-optional
+  change how UnfilledHit works so that we don't need access to spans in the lints. Then, len_gt_zero and is_empty_longhand can accept just Call, not Expr<Call>
   lint after name resolution so we don't have to do the "names" check that makes sure things are imported with the expected names - lints should continue to work even if e.g import { len as foo } from builtins is done
   lint test helper so messages doesn't need to keep getting reimplemented
   allow declaring types in tests, and require a type to be declared in the test if it's only used in the test

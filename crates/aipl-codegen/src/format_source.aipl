@@ -25,12 +25,14 @@
 # the source.
 
 import {
+    drop_last,
     equal as ==,
     filter,
     first,
     is_nonempty,
     is_space,
     join,
+    last,
     len,
     less_than as <,
     logical_and as &&,
@@ -92,6 +94,12 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
         "fn main() {}\n--- stdout ---\nhi  \n",
     ));
     assert(format_source("", 100) == ok("\n"));
+
+    // A string that is respelled as a template keeps the tab after a `\n` escape. The token check
+    // used to read that tab as the indentation of a raw template's line and refuse the file.
+    assert(format_source("""fn f() -> str { "\"\n\t" }""", 100) == ok(
+        "fn f() -> str { `\"\\n\\t` }\n",
+    ));
 
     // A lambda parameter may take its argument apart, as a function's may.
     assert(format_source(
@@ -252,6 +260,9 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
 }.test({
     // The same tokens in a different layout pass; reordered imports pass.
     assert(verify_same_tokens("fn f() { 1 }", "fn f() {\n    1\n}\n") == ok());
+
+    // A string respelled as a template keeps a tab that follows a `\n` escape: it is content.
+    assert(verify_same_tokens("""fn f() { "\"\n\t" }""", """fn f() { `"\n\t` }""") == ok());
     assert(
         verify_same_tokens(
             "import { b } from \"./b.aipl\";\nimport { a } from builtins;",
@@ -295,7 +306,7 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
 # a string's delimiter is not part of it — `"a"`, `` `a` `` and a `"""` block
 # holding `a` are the same token, and respelling one as another (the walker's
 # `requote`) is the one edit the formatter makes inside a literal.
-fn token_value(kind: AiplTok) -> str {
+fn token_value(kind: AiplTok, in_raw_template: bool) -> str {
     if (let StrLit(v, _) = kind) { return `str {v}`; };
 
     // A template's opener likewise: which delimiter it was written with is not
@@ -307,20 +318,34 @@ fn token_value(kind: AiplTok) -> str {
     // A text segment reads as the string it is, so a literal respelled across
     // the string/template line compares equal — see `collapse_templates`.
     //
-    // Each line's leading indent comes off first. A raw template is de-dented
-    // across the whole literal, which no lexer reading one token at a time can
-    // do — so the segments arrive as written and the *parser* de-dents them
+    // In a raw template each line's leading indent comes off first. A raw template
+    // is de-dented across the whole literal, which no lexer reading one token at a
+    // time can do — so the segments arrive as written and the *parser* de-dents them
     // (`template_segments`). Re-indenting the literal is therefore a change the
     // formatter is allowed to make to these tokens, exactly as it may re-indent
-    // a `"""` block, and this is where that latitude is spelled out.
-    if (let TemplateText(v) = kind) { return `str {v.strip_line_indent()}`; };
+    // a `"""` block, and this is where that latitude is spelled out. A cooked
+    // template is not de-dented, so a space or tab after one of its `\n`s is
+    // content, and a string respelled as one (`requote`) keeps it.
+    if (let TemplateText(v) = kind) {
+        return if (in_raw_template) { `str {v.strip_line_indent()}` } else { `str {v}` };
+    };
     to_str(kind)
 }.test({
-    assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", Backtick)));
-    assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", TripleQuoted)));
-    assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("b", Quoted)));
-    assert(token_value(TemplateOpen(Backtick)) == token_value(TemplateOpen(TripleBacktick)));
-    assert(token_value(TemplateText("a")) != token_value(TemplateText("b")));
+    assert(token_value(StrLit("a", Quoted), false) == token_value(StrLit("a", Backtick), false));
+    assert(token_value(StrLit("a", Quoted), false) == token_value(
+        StrLit("a", TripleQuoted),
+        false,
+    ));
+    assert(token_value(StrLit("a", Quoted), false) != token_value(StrLit("b", Quoted), false));
+    assert(token_value(TemplateOpen(Backtick), false) == token_value(
+        TemplateOpen(TripleBacktick),
+        false,
+    ));
+    assert(token_value(TemplateText("a"), false) != token_value(TemplateText("b"), false));
+
+    // A raw template's indentation is the formatter's to change; a cooked one's is content.
+    assert(token_value(TemplateText("a\n  b"), true) == token_value(TemplateText("a\nb"), true));
+    assert(token_value(TemplateText("a\n  b"), false) != token_value(TemplateText("a\nb"), false));
 })
 
 # Every line of `self` with its leading spaces and tabs removed — the shape of a
@@ -427,8 +452,15 @@ fn token_fingerprint(lexed: LexResult<AiplTok>) -> TokenFingerprint {
     mut rest: str[] = [];
     mut statement: str[] = [];
     mut in_import = false;
+    // Whether each template open at this point is raw, innermost last.
+    mut raw_templates: bool[] = [];
     for (let t : lexed.tokens.filter(|t| !t.kind.is_layout())) {
-        let value = token_value(t.kind);
+        let value = token_value(t.kind, raw_templates.last().value_or(false));
+        if (let TemplateOpen(style) = t.kind) {
+            set raw_templates.push(style == TripleBacktick);
+        } else if (let TplClose = t.kind) {
+            set raw_templates = raw_templates.drop_last();
+        };
         if (in_import) {
             set statement.push(value);
             if (let Semi = t.kind) {

@@ -50,15 +50,7 @@ import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
-import { to_set } from sets;
-
-# How many spelled-out elements it takes before the string form wins.
-fn minimum_elements() -> u64 { 3 }
-
-# Every printable ASCII character but the blank, which the dedent of a raw block would eat.
-fn printable_without_blank() -> str {
-    """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""
-}
+import { has, to_set } from sets;
 
 # A hit for each unordered set literal in the function that is only characters, written on one line.
 pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
@@ -120,12 +112,13 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
     let kept: #{char} = #{'a', 'b', 'a', 'c'}; #[allow]
     let rewritten: #{char} = "abac".to_set();
-    assert(`{kept == rewritten} {len(kept) == 3}` == "true true");
+    assert(kept == rewritten);
+    assert(kept.len() == 3);
 
     // The escapes travel too: a quote and a backslash are escaped inside the
     // string, a `'` is not, and `\n`/`\t` keep the spelling they already had.
     let punct: #{char} = #{'"', '\\', '\'', '\n', '\t'}; #[allow]
-    assert(`{punct == "\"\\'\n\t".to_set()}` == "true");
+    assert(punct == `"\\'\n\t`.to_set());
 })
 
 # The hit for `self`, when it is a one-line unordered set of at least three character literals
@@ -133,7 +126,9 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
 fn spelled_out(self: Expr) -> UnfilledHit? {
     let SetLit(elements, order) = self.kind.as_case::<SetLit>()?;
     if (!order.is_case::<Unordered>()) { return none; };
-    if (elements.len() < minimum_elements() || self.source.contains('\n')) { return none; };
+    // How many spelled-out elements it takes before the string form wins.
+    let minimum_elements = 3;
+    if (elements.len() < minimum_elements || self.source.contains('\n')) { return none; };
 
     // Every element a char *literal*: that is what makes this a char set without asking the type
     // checker (lints run before it), and what lets the advice name the string it would become.
@@ -163,6 +158,7 @@ fn spelling(self: char) -> str? {
     if (self == '\n') { return some("""\n"""); };
     if (self == '\t') { return some("""\t"""); };
     if (self == '\r') { return some("""\r"""); };
-    if (self == ' ' || printable_without_blank().contains(self)) { return some(`{self}`); };
+    let printable = """! "#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".to_set();
+    if (printable.has(self)) { return some(`{self}`); };
     none
 }

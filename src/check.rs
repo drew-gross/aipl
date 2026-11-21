@@ -132,6 +132,34 @@ pub enum Formatting {
     RewriteFailed(String),
 }
 
+/// What the formatter's answer for a source means to `check`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FormatVerdict {
+    /// Nothing to say: the source is canonical, or it does not parse (loading it reports the
+    /// syntax error, which is the diagnostic that helps; "needs formatting" stacked on it is noise).
+    Clean,
+    /// The source parses and the formatter refused it, so it can never be brought to canonical
+    /// format. Reporting nothing would pass the file, so this is a failure.
+    Refused(String),
+    /// The canonical spelling of a source that is not in it.
+    Rewrite(String),
+}
+
+/// What `check` makes of `formatted`, the formatter's answer for `src`, with `parses` saying
+/// whether `src` is a program (asked only when the formatter refused).
+pub fn format_verdict(
+    src: &str,
+    formatted: Result<String, String>,
+    parses: impl FnOnce() -> bool,
+) -> FormatVerdict {
+    match formatted {
+        Ok(canonical) if canonical == src => FormatVerdict::Clean,
+        Ok(canonical) => FormatVerdict::Rewrite(canonical),
+        Err(refusal) if parses() => FormatVerdict::Refused(refusal),
+        Err(_) => FormatVerdict::Clean,
+    }
+}
+
 impl Formatting {
     /// Whether the file is still not in canonical format after this step.
     pub fn is_unformatted(&self) -> bool {
@@ -600,6 +628,36 @@ mod tests {
                 tests: true,
                 benchmarks: false
             })
+        );
+    }
+
+    /// A formatter that refuses a source that parses is reported, not passed: `check` once treated
+    /// every refusal as "nothing to format", so a file the formatter could not handle went through
+    /// as clean.
+    #[test]
+    fn a_source_the_formatter_refuses_but_the_parser_accepts_is_a_failure() {
+        let refusal = || Err("formatter would not preserve the token stream".to_string());
+        assert_eq!(
+            format_verdict("fn f() { }", refusal(), || true),
+            FormatVerdict::Refused("formatter would not preserve the token stream".to_string())
+        );
+        // A source that does not parse is the parser's to report.
+        assert_eq!(
+            format_verdict("fn (", refusal(), || false),
+            FormatVerdict::Clean
+        );
+        // The parse is only asked about when the formatter refused.
+        assert_eq!(
+            format_verdict("fn f(){}", Ok("fn f() {}\n".to_string()), || unreachable!()),
+            FormatVerdict::Rewrite("fn f() {}\n".to_string())
+        );
+        assert_eq!(
+            format_verdict(
+                "fn f() {}\n",
+                Ok("fn f() {}\n".to_string()),
+                || unreachable!()
+            ),
+            FormatVerdict::Clean
         );
     }
 

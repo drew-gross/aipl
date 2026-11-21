@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-first_error">first_error</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn first_error(__spat$6657: ParseFailure) -&#62; FmtError</code></pre>
+          <pre class="signature"><code>fn first_error(__spat$6997: ParseFailure) -&#62; FmtError</code></pre>
 
           <div class="doc"><p>The first error of a failed parse as the formatter's own. A formatter reports one: it has nothing to say about a file it could not read, and the rest of a parse's errors are <code>aipl check</code>'s to show.</p></div>
 
@@ -132,7 +132,7 @@
             <a class="anchor" href="#item-token_value">token_value</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn token_value(kind: AiplTok) -&#62; str</code></pre>
+          <pre class="signature"><code>fn token_value(kind: AiplTok, in_raw_template: bool) -&#62; str</code></pre>
 
           <div class="doc"><p>A token's value for the preservation check: <code>to_str</code> of its kind, except that a string's delimiter is not part of it — <code>&quot;a&quot;</code>, <code>`a`</code> and a <code>&quot;&quot;&quot;</code> block holding <code>a</code> are the same token, and respelling one as another (the walker's <code>requote</code>) is the one edit the formatter makes inside a literal.</p></div>
 
