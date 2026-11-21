@@ -12,6 +12,7 @@
 # so the lints, which take one, cannot be handed a program that skipped this pass.
 
 import {
+    as_case,
     collect_arms,
     collect_ok,
     contains,
@@ -26,9 +27,11 @@ import {
     BuiltinEntry,
     Callee,
     Err,
+    Len,
     Local,
     Ok,
     Some,
+    Union,
     User,
     builtin_imported,
     builtin_table,
@@ -78,7 +81,11 @@ import {
     binders,
     descendants_of_kind,
 } from "./expr.aipl";
-import { ParseFailure, aipl_parse_surface_file } from "./grammar_aipl.aipl";
+import {
+    ParseFailure,
+    aipl_parse_surface_file,
+    lower_aipl_block_surface,
+} from "./grammar_aipl.aipl";
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import {
     Builtins,
@@ -132,30 +139,30 @@ pub fn resolve_callees(self: Program) -> ResolvedProgram {
     // not matter.
     assert(called(
         "import { len as length } from builtins; fn f(x: i64[]) -> u64 { x.length() }",
-    )? == [Callee.Len]);
+    )? == [Len]);
     // A library's builtin, by the name that library gives it.
     assert(called("import { union } from sets; fn f(a: #{i64}) -> #{i64} { union(a, a) }")? == [
-        Callee.Union,
+        Union,
     ]);
 
     // A local that holds a function hides the import; the file's own function, or an import from
     // another file, of the same name is no builtin.
     assert(called(
         "import { len } from builtins; fn f(len: (i64[]) -> u64, x: i64[]) -> u64 { len(x) }",
-    )? == [Callee.Local("len")]);
+    )? == [Local("len")]);
     assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [
-        Callee.User("len"),
+        User("len"),
     ]);
     assert(called("""import { len } from "./a.aipl"; fn f(x: i64[]) -> u64 { len(x) }""")? == [
-        Callee.User("len"),
+        User("len"),
     ]);
 
     // The constructors the language reserves.
-    assert(called("fn f(x: i64) -> i64? { some(x) }")? == [Callee.Some]);
+    assert(called("fn f(x: i64) -> i64? { some(x) }")? == [Some]);
 
     // Defaults are resolved too: nothing in the program is left unresolved.
-    assert(called("fn f(x: u64 = len([1])) -> u64 { x }")? == [Callee.User("len")]);
-    assert(called("struct P { x: u64 = len([1]) }")? == [Callee.User("len")]);
+    assert(called("fn f(x: u64 = len([1])) -> u64 { x }")? == [User("len")]);
+    assert(called("struct P { x: u64 = len([1]) }")? == [User("len")]);
 })
 
 # The callee of each call in the program's functions and defaults, outermost first.
@@ -182,6 +189,24 @@ fn expressions(self: Item) -> Expr[] {
         _ => [],
     }
 }
+
+# `self` resolved as in a file that imports each of `names` from builtins under its own name and
+# has nothing else in scope: what a test of a helper over a bare block needs.
+pub fn resolved_with_builtins(self: Expr, names: str[]) -> ResolvedExpr {
+    let table = builtin_table();
+    let imported = names
+        .map(|name| ImportName { name, alias: none, span: 0..0 })
+        $imported_pair("builtins", table)
+        .collect_ok()
+        .to_dict();
+    self.resolved(imported, [])
+}.test({
+    let block = lower_aipl_block_surface("{ len(x) }")?;
+    let Call(_, _, _, callee) = block.resolved_with_builtins(["len"]).kind.as_case::<Call>()?;
+    assert(callee == Len);
+    let Call(_, _, _, other) = block.resolved_with_builtins([]).kind.as_case::<Call>()?;
+    assert(other == User("len"));
+})
 
 # What each import from a builtins library brings, by the name the file calls it.
 fn imported_callees(self: Item[]) -> #{str: Callee} {

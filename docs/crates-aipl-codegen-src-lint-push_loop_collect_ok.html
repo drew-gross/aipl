@@ -33,9 +33,9 @@ for (let x : xs) {
             <a class="anchor" href="#item-push_loop_collect_ok">push_loop_collect_ok</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn push_loop_collect_ok(__spat$2029: Function, items: Item[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn push_loop_collect_ok(self: LetMut) -&#62; UnfilledHit?</code></pre>
 
-          <div class="doc"><p>A hit for each array the program seeds empty and fills with a loop that pushes the answers that exist.</p></div>
+          <div class="doc"><p>The hit for the array the binding <code>self</code> seeds, when it seeds it empty and a loop pushes the answers that exist onto it.</p></div>
 
 
         </section>
@@ -54,7 +54,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-collected">collected</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn collected(self: SeededLoop, push: str) -&#62; UnfilledHit?</code></pre>
+          <pre class="signature"><code>fn collected(self: SeededLoop) -&#62; UnfilledHit?</code></pre>
 
           <div class="doc"><p><code>self</code> as the hit for an array filled with the answers that exist, when it is one.</p></div>
 

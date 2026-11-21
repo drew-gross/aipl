@@ -30,7 +30,7 @@ out
             <a class="anchor" href="#item-push_array_literal">push_array_literal</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn push_array_literal(__spat$2189: Function, items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn push_array_literal(__spat$2231: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each array the program binds <code>mut</code>, pushes onto and returns.</p></div>
 
@@ -65,7 +65,7 @@ out
             <a class="anchor" href="#item-literal">literal</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn literal(self: LetMut, push: str) -&#62; LintHit?</code></pre>
+          <pre class="signature"><code>fn literal(self: LetMut) -&#62; LintHit?</code></pre>
 
           <div class="doc"><p><code>self</code> as the hit for an array that is only pushed onto before it is returned, when it is one.</p></div>
 
@@ -79,7 +79,7 @@ out
             <a class="anchor" href="#item-pushes">pushes</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn pushes(self: Expr, acc: str, adder: str) -&#62; Pushes</code></pre>
+          <pre class="signature"><code>fn pushes(self: Expr, acc: str, adder: Callee) -&#62; Pushes</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

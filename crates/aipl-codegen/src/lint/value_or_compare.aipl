@@ -24,7 +24,7 @@ import {
     to_str,
     value_or,
 } from builtins;
-import { Callee } from "../builtin_table.aipl";
+import { Equal, NotEqual, ValueOr } from "../builtin_table.aipl";
 import { Bool, Call, Char, Expr, Num, Str } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
@@ -33,9 +33,9 @@ import { LintHit, hit } from "./lint_hit.aipl";
 # The hit for the comparison `self`, when it compares a `value_or` of one literal with a different
 # literal.
 pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
-    let operator = if (callee == Callee.Equal) {
+    let operator = if (callee == Equal) {
         "=="
-    } else if (callee == Callee.NotEqual) {
+    } else if (callee == NotEqual) {
         "!="
     } else {
         return none;
@@ -107,7 +107,7 @@ pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
 # `(optional, default, name)` when `self` is a call to `value_or`, spelled `name`.
 fn fill(self: Expr) -> (Expr, Expr, str)? {
     let Call(name, args, _, callee) = self.kind.as_case::<Call>()?;
-    if (callee != Callee.ValueOr) { return none; };
+    if (callee != ValueOr) { return none; };
     let [optional, default] = args else { return none; };
     some((optional, default, name))
 }

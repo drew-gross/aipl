@@ -4,21 +4,21 @@
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
 ; array-abi narrow
 ; set-abi wide
-; entry parse_test_section_header 850 str -> str?
-; entry strip_test_sections 928 str -> str
-; entry split_test_sections 927 str -> __tuple$str$str
-; entry source_loc 919 str __builtin_Span -> str
+; entry parse_test_section_header 852 str -> str?
+; entry strip_test_sections 931 str -> str
+; entry split_test_sections 930 str -> __tuple$str$str
+; entry source_loc 922 str __builtin_Span -> str
 ; entry caret_block 94 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 223 str #{str:str} -> unit!Error
-; entry normalize_output 822 str -> str
+; entry normalize_output 824 str -> str
 ; entry int_fits 506 i64 str -> bool
 ; entry is_operator_name 507 str -> bool
 ; entry builtin_table 93 -> __m19__BuiltinEntry[]
 ; entry aipl_token_scopes 558 str -> __m21__ScopeSpan[]!__m21__LexError
 ; entry find_files 224 str str -> str[]!Error
 ; entry companion_files 96 str -> __m27__Companion[]!str
-; entry parse_spec 843 str -> __m28__Spec!str
-; entry parse_and_partial_load 841 str -> __m113__PartialLoad!__m29__ParseFailure
+; entry parse_spec 845 str -> __m28__Spec!str
+; entry parse_and_partial_load 843 str -> __m113__PartialLoad!__m29__ParseFailure
 ; entry fn_role 237 str -> __m46__FnRole
 ; entry test_fn_name 228 str -> str
 ; entry format_source 258 str u64 -> str!__m116__FmtError
@@ -666,4 +666,4 @@
 ; data 507 __tostr_lit_101 66616c7365
 
 ; __builtin_int_parse
-; source-fingerprint 5970949749315411228
+; source-fingerprint 14195106827382043034

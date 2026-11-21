@@ -33,25 +33,34 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { ArrayLit, Ident, IfLet, Unit } from "../expr.aipl";
+import { Push } from "../builtin_table.aipl";
+import { ArrayLit, Ident, IfLet, LetMut, Unit, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import { SeededLoop, is_liftable, pipeline_hit, pushed, seeded_loops } from "./accumulation.aipl";
-import { UnfilledHit, imported_as, lint_in_unfilled_messages } from "./lint_hit.aipl";
+import { Function } from "../item.aipl";
+import {
+    SeededLoop,
+    is_liftable,
+    pipeline_hit,
+    plain_seeded_loop,
+    pushed,
+} from "./accumulation.aipl";
+import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
 
-# A hit for each array the program seeds empty and fills with a loop that pushes the
-# answers that exist.
-pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let some(push) = items.imported_as("push") else { return []; };
-    body.seeded_loops()$collected(push).collect_ok()
+# The hit for the array the binding `self` seeds, when it seeds it empty and a loop pushes the
+# answers that exist onto it.
+pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
+    self.plain_seeded_loop()?.collected()
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<LetMut>()$kind$push_loop_collect_ok().collect_ok()
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64[] \{ {body} }`,
-            push_loop_collect_ok,
+            flagged,
         )
     }
     let all = "push, map, collect_ok";
@@ -144,20 +153,20 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
     );
     // Shapes the lint must leave alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }""",
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
     // An `else` that does something: the pipeline has nowhere to put it.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn parsed_or_zero(words: str[]) -> i64[] {
                     mut out: i64[] = [];
@@ -171,12 +180,12 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
     // The loop does something else as well.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn logged(words: str[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -187,14 +196,14 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
 
     // The question reads the array being built, so it depends on how much the loop
     // has already done, which no `map` lambda can see.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn limited(words: str[]) -> i64[] {
                     mut out: i64[] = [];
@@ -204,12 +213,12 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
     // An indexed loop: `map` has no index to pass.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn at_even(words: str[]) -> u64[] {
                     mut out: u64[] = [];
@@ -219,14 +228,14 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
 
     // Shapes the lint flags, and what it says of them.
     // The answers kept as they are: a `map` of the question, then `collect_ok`.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn parsed(words: str[]) -> i64[] {
                     mut out: i64[] = [];
@@ -236,12 +245,12 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
     // The answers changed on the way in.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn doubled(words: str[]) -> i64[] {
                     mut out: i64[] = [];
@@ -251,12 +260,12 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
     // The iterable already holds the optionals, so there is nothing to map first.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn present(slots: i64?[]) -> i64[] {
                     mut out: i64[] = [];
@@ -266,13 +275,13 @@ pub fn push_loop_collect_ok(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_collect_ok,
+            flagged,
         )? == [],
     );
 })
 
 # `self` as the hit for an array filled with the answers that exist, when it is one.
-fn collected(self: SeededLoop, push: str) -> UnfilledHit? {
+fn collected(self: SeededLoop) -> UnfilledHit? {
     let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };
     let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case::<IfLet>()?;
@@ -280,7 +289,7 @@ fn collected(self: SeededLoop, push: str) -> UnfilledHit? {
     // `some` binds exactly its payload: `some(..)` binds nothing, and `_` is no name.
     let [bound] = arm.pattern.payload_binders()? else { return none; };
     if (bound == "_") { return none; };
-    let element = arm.body.lone_statement()?.pushed(self.name, push)?.element;
+    let element = arm.body.lone_statement()?.pushed(self.name, Push)?.element;
     if (!scrutinee.is_liftable(self.name) || !element.is_liftable(self.name)) { return none; };
 
     // Asking nothing of the element — the iterable already holds the optionals — leaves no

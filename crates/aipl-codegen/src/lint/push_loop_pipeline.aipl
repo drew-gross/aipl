@@ -27,22 +27,35 @@
 #
 # The hit points at the seed.
 
-import { equal as ==, filter, map } from builtins;
+import { collect_ok, equal as ==, logical_not as ! } from builtins;
+import { Push } from "../builtin_table.aipl";
+import { LetMut, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
-import { UnfilledHit, imported_as, lint_in_unfilled_messages } from "./lint_hit.aipl";
+import { Function } from "../item.aipl";
+import {
+    accumulation,
+    element_stages,
+    filled_hit,
+    is_advisable,
+    plain_seeded_loop,
+} from "./accumulation.aipl";
+import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
 
-# A hit for each array the program seeds empty and fills with a loop of `push`es.
-pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let some(push) = items.imported_as("push") else { return []; };
-    body.accumulations(push).filter(is_advisable).map(|loop| loop.filled_hit(loop.element_stages()))
+# The hit for the array the binding `self` seeds, when it seeds it empty and a loop of `push`es
+# fills it.
+pub fn push_loop_pipeline(self: LetMut) -> UnfilledHit? {
+    let filling = self.plain_seeded_loop()?.accumulation(Push)?;
+    if (!filling.is_advisable()) { return none; };
+    some(filling.filled_hit(filling.element_stages()))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<LetMut>()$kind$push_loop_pipeline().collect_ok()
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64[] \{ {body} }`,
-            push_loop_pipeline,
+            flagged,
         )
     }
     let all = "push, map, filter";
@@ -98,20 +111,20 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
     assert(messages("map", "mut out = []; for (let x : xs) { set out.push(x * 2); } out")? == []);
     // Shapes the lint must leave alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }""",
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
     // The loop does something else as well. A pipeline has nowhere to put it.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn logged(xs: i64[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -122,7 +135,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
@@ -131,7 +144,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
     // else is not one. Recognizing it would mean a second rule with a different
     // rewrite, so it is left alone rather than mis-advised.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn signs(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -145,7 +158,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
@@ -153,7 +166,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
     // already done — a "take the first two" loop, which no `filter` predicate can
     // express.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn first_two(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -163,14 +176,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // So does the pushed element: the running length is the index this element
     // lands at, which a `map` lambda cannot see.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn indexed(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -180,12 +193,12 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
     // The seed already holds something, so the array is not just the loop's output.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn with_head(xs: i64[]) -> i64[] {
                     mut out = [0];
@@ -195,7 +208,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
@@ -204,7 +217,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
     // to be the very next statement rather than reasoning about what a statement
     // there might do.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn offset(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -215,14 +228,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // Two pushes per element. The loop emits more elements than it consumes, which
     // is an `extend`, not a `map`.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn doubled_up(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -233,7 +246,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
@@ -242,7 +255,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
     // pushes somewhere else. The seed and the push have to name the same array,
     // and the loop has to be the seed's very next statement.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn nested_targets(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -253,14 +266,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     [..out, ..tmp]
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // A `while` loop. Its condition is not an iteration, so there is nothing to
     // build a pipeline over.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn counted(n: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -272,14 +285,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // A range with a guard. Only `map` takes a range, so there is no `filter` to
     // write.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn even_below(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -289,14 +302,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // A range pushed whole: the array of its values, which has no spelling the lint
     // could advise.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn upto(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -306,14 +319,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // Shapes the lint flags, and what it says of them.
     // Both: a guard and a transformed element.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn scaled_above(xs: i64[], lo: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -323,12 +336,12 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
     // No guard — every element is pushed, transformed. That is a `map` alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn doubled(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -338,7 +351,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
@@ -346,7 +359,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
     // `set out = out.push(x);` is the same statement written out, so it is flagged
     // the same way.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn above(xs: i64[], lo: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -356,14 +369,14 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 
     // Neither: the loop copies the array one element at a time, so the array itself
     // is the answer and there is no pipeline to build.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn copied(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -373,21 +386,18 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
-            "fn evens(n: i64) -> i64[] { [n, n * 2] }",
-            push_loop_pipeline,
-        )? == [],
+        lint_function_unfilled_messages("fn evens(n: i64) -> i64[] { [n, n * 2] }", flagged)? == [],
     );
 
     // A call-shaped iterable can't be quoted back into the advice — its span stops
     // before its parens — so the message names neither it nor a receiver, and the
     // chain reads as the method calls to append.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn from_call(n: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -397,12 +407,12 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
     // A range: `map` takes one, so a transformed push over it is a `map` alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn squares(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -412,7 +422,7 @@ pub fn push_loop_pipeline(Function { body }, items: Item[]) -> UnfilledHit[] {
                     out
                 }
             """,
-            push_loop_pipeline,
+            flagged,
         )? == [],
     );
 })

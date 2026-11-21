@@ -70,6 +70,20 @@ for (let x : xs) {
 
 
 
+        <section class="item" id="item-plain_seeded_loop">
+          <h3>
+            <a class="anchor" href="#item-plain_seeded_loop">plain_seeded_loop</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn plain_seeded_loop(self: LetMut) -&#62; SeededLoop?</code></pre>
+
+          <div class="doc"><p><code>self</code> as a [<code>SeededLoop</code>], when it is one whose loop is not indexed (see [<code>seeded_loops</code>]).</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Accumulation">
           <h3>
             <a class="anchor" href="#item-Accumulation">Accumulation</a>
@@ -89,9 +103,23 @@ for (let x : xs) {
             <a class="anchor" href="#item-accumulations">accumulations</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn accumulations(self: Expr, adder: str) -&#62; Accumulation[]</code></pre>
+          <pre class="signature"><code>pub fn accumulations(self: Expr, adder: Callee) -&#62; Accumulation[]</code></pre>
 
-          <div class="doc"><p>Every [<code>Accumulation</code>] in <code>self</code> and under it whose loop fills the array with <code>adder</code> — the local name of the builtin that adds to it (<code>push</code>, <code>extend</code>), so an aliased import is followed and a <em>user</em> function that happens to share the name is not.</p></div>
+          <div class="doc"><p>Every [<code>Accumulation</code>] in <code>self</code> and under it whose loop fills the array with <code>adder</code> — the builtin that adds to it (<code>Push</code>, <code>Extend</code>), however the file spells it, and not a <em>user</em> function that happens to share the name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-accumulation">
+          <h3>
+            <a class="anchor" href="#item-accumulation">accumulation</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn accumulation(self: SeededLoop, adder: Callee) -&#62; Accumulation?</code></pre>
+
+          <div class="doc"><p><code>self</code> as an [<code>Accumulation</code>], when it is one.</p></div>
 
 
         </section>
@@ -117,7 +145,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-pushed">pushed</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn pushed(self: Expr, acc: str, adder: str) -&#62; Pushed?</code></pre>
+          <pre class="signature"><code>pub fn pushed(self: Expr, acc: str, adder: Callee) -&#62; Pushed?</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -278,23 +306,9 @@ for (let x : xs) {
             <a class="anchor" href="#item-block_accumulations">block_accumulations</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn block_accumulations(src: str, adder: str) -&#62; str[]!ParseError</code></pre>
+          <pre class="signature"><code>fn block_accumulations(src: str, adder: Callee) -&#62; str[]!ParseError</code></pre>
 
           <div class="doc"><p>The name of each [<code>accumulations</code>] the block <code>src</code> holds.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-accumulation">
-          <h3>
-            <a class="anchor" href="#item-accumulation">accumulation</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn accumulation(self: SeededLoop, adder: str) -&#62; Accumulation?</code></pre>
-
-          <div class="doc"><p><code>self</code> as an [<code>Accumulation</code>], when it is one.</p></div>
 
 
         </section>
@@ -306,7 +320,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-block_pushes">block_pushes</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn block_pushes(src: str, acc: str, adder: str) -&#62; str[]!ParseError</code></pre>
+          <pre class="signature"><code>fn block_pushes(src: str, acc: str, adder: Callee) -&#62; str[]!ParseError</code></pre>
 
           <div class="doc"><p>The element of the push <code>src</code>, a block, starts with, as the dump of its expression.</p></div>
 

@@ -39,9 +39,10 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
+import { Push } from "../builtin_table.aipl";
 import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
+import { Function } from "../item.aipl";
 import { Ctor } from "../pat.aipl";
 import {
     SeededLoop,
@@ -51,18 +52,17 @@ import {
     pushed,
 } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { UnfilledHit, imported_as, lint_in_unfilled_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop pairing two arrays by
 # position.
-pub fn push_loop_zip_with(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let some(push) = items.imported_as("push") else { return []; };
-    body.indexed_seeded_loops()$zip_hit(push).collect_ok()
+pub fn push_loop_zip_with(Function { body }) -> UnfilledHit[] {
+    body.indexed_seeded_loops()$zip_hit().collect_ok()
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[], ys: i64[]) -> i64[] \{ {body} }`,
             push_loop_zip_with,
         )
@@ -146,7 +146,7 @@ pub fn push_loop_zip_with(Function { body }, items: Item[]) -> UnfilledHit[] {
 })
 
 # `self` as the advice for the loop it is, when it is a loop pairing two arrays by position.
-fn zip_hit(self: SeededLoop, push: str) -> UnfilledHit? {
+fn zip_hit(self: SeededLoop) -> UnfilledHit? {
     let some(position) = self.index else { return none; };
     let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };
@@ -165,7 +165,7 @@ fn zip_hit(self: SeededLoop, push: str) -> UnfilledHit? {
         return none;
     };
 
-    let added = arm.body.lone_statement()?.pushed(self.name, push)?.element;
+    let added = arm.body.lone_statement()?.pushed(self.name, Push)?.element;
     if (!added.is_liftable(self.name) || added.mentions_any([position], none)) { return none; };
     let stage = if (added.is_pair_of(self.variable, partner)) {
         ("zip", `({other})`)

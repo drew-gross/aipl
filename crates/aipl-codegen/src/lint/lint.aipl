@@ -5,7 +5,7 @@
 # a line in `lint`; the hits come back in the order the lints are listed.
 
 import { collect_ok, equal as ==, join, map } from builtins;
-import { Assign, Call, Construct, Expr, descendants_of_kind } from "../expr.aipl";
+import { Assign, Call, Construct, Expr, LetMut, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item, SuperProgram } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
@@ -95,18 +95,17 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.unfilled_hits(match_case_as_case).filled(items),
         ..functions.unfilled_hits(match_case_try_as_case).filled(items),
         ..functions.unfilled_hits(let_else_as_case).filled(items),
-        ..functions.unfilled_hits(|function| push_loop_pipeline(function, items)).filled(items),
-        ..functions.unfilled_hits(|function| extend_loop_map_join(function, items)).filled(items),
-        ..functions.unfilled_hits(|function| push_loop_collect_ok(function, items)).filled(items),
+        ..functions.hits(|function| let_mut_lints(function, items)),
+        ..functions.unfilled_hits(extend_loop_map_join).filled(items),
         ..functions.unfilled_hits(|function| union_loop_union_all(function, items)).filled(items),
-        ..functions.hits(|function| push_array_literal(function, items)),
+        ..functions.hits(push_array_literal),
         ..functions.unfilled_hits(return_loop_find_if).filled(items),
         ..functions.unfilled_hits(|function| return_loop_any_all(function, items)).filled(items),
         ..functions.hits(|function| eta_lambda(function, items)),
         ..functions.unfilled_hits(|function| map_find_if_some(function, items)).filled(items),
         ..functions.unfilled_hits(|function| map_constant_repeat(function, items)).filled(items),
         ..functions.unfilled_hits(|function| zip_with_pair_zip(function, items)).filled(items),
-        ..functions.unfilled_hits(|function| push_loop_zip_with(function, items)).filled(items),
+        ..functions.unfilled_hits(push_loop_zip_with).filled(items),
         ..functions.unfilled_hits(|function| with_value_or_self(function, items)).filled(items),
         ..functions.unfilled_hits(return_loop_find_index).filled(items),
         ..functions.hits(|function| interp_to_str(function, items)),
@@ -154,6 +153,16 @@ fn call_lints(Function { body }, items: Item[]) -> LintHit[] {
 # with it, and the call's own span is where that is pointed. (The lint is passed as its result
 # because a function type over a case, `(Call) -> Advice?`, is not typed yet.)
 fn hit_at(self: Expr<Call>, advice: Advice?) -> UnfilledHit? { some(advice?.at(self.span)) }
+
+# The lints over the `mut` bindings of `function`, which are found once for all of them: each is
+# about an array or set seeded and then filled by the loop that follows.
+fn let_mut_lints(Function { body }, items: Item[]) -> LintHit[] {
+    let seeds = body.descendants_of_kind::<LetMut>();
+    [
+        ..seeds$kind$push_loop_pipeline().collect_ok().filled(items),
+        ..seeds$kind$push_loop_collect_ok().collect_ok().filled(items),
+    ]
+}
 
 # The lints over the assignments of `function`, which are found once for all of them.
 fn assign_lints(Function { body }) -> LintHit[] {

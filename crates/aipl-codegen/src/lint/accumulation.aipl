@@ -35,6 +35,7 @@ import {
     value_or,
     zip_with,
 } from builtins;
+import { Callee, Extend, Push } from "../builtin_table.aipl";
 import {
     ArrayLit,
     Assign,
@@ -47,11 +48,12 @@ import {
     LetMut,
     Seq,
     Unit,
-    collect_expr_cases,
+    descendants_of_kind,
     show_expr,
 } from "../expr.aipl";
 import { ParseError } from "../grammar.aipl";
 import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
+import { resolved_with_builtins } from "../resolve_callees.aipl";
 import { Ty } from "../ty.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { Named, UnfilledHit } from "./lint_hit.aipl";
@@ -76,7 +78,7 @@ struct SeededLoop {
 # `map` and `filter` pass each element and have no index to pass with it, so the rewrite
 # would silently drop whatever the body did with it. [`indexed_seeded_loops`] has those.
 pub fn seeded_loops(self: Expr) -> SeededLoop[] {
-    self.collect_expr_cases(LetMut)$seeded_loop().collect_ok().filter(|l| !l.index.is_some())
+    self.descendants_of_kind::<LetMut>()$kind$plain_seeded_loop().collect_ok()
 }.test({
     assert(seeded_names("{ mut a = []; for (let x : xs) { g(x); } a }")? == ["a"]);
 
@@ -94,7 +96,11 @@ pub fn seeded_loops(self: Expr) -> SeededLoop[] {
 # [`seeded_loops`], for the lints whose rewrite takes a position from somewhere other
 # than the loop.
 pub fn indexed_seeded_loops(self: Expr) -> SeededLoop[] {
-    self.collect_expr_cases(LetMut)$seeded_loop().collect_ok().filter(|l| l.index.is_some())
+    self
+        .descendants_of_kind::<LetMut>()$kind
+        $seeded_loop()
+        .collect_ok()
+        .filter(|l| l.index.is_some())
 }.test({
     assert(indexed_names("{ mut a = []; for (let i, x : xs) { g(x); } a }")? == ["a"]);
     // A plain loop, a statement between the seed and the loop, and no loop at all.
@@ -113,6 +119,13 @@ fn seeded_names(src: str) -> str[]!ParseError {
     ok(lower_aipl_block_surface(src)?.seeded_loops()$name)
 }
 
+# `self` as a [`SeededLoop`], when it is one whose loop is not indexed (see [`seeded_loops`]).
+pub fn plain_seeded_loop(self: LetMut) -> SeededLoop? {
+    let seeded = self.seeded_loop()?;
+    if (seeded.index.is_some()) { return none; };
+    some(seeded)
+}
+
 # `self` as a [`SeededLoop`], when it is one.
 fn seeded_loop(self: LetMut(name, annotation, seed, rest)) -> SeededLoop? {
     let Seq(first, _) = rest.kind.as_case::<Seq>()?;
@@ -129,37 +142,40 @@ fn seeded_loop(self: LetMut(name, annotation, seed, rest)) -> SeededLoop? {
 struct Accumulation { seeded: SeededLoop, guard: Expr?, added: Expr }
 
 # Every [`Accumulation`] in `self` and under it whose loop fills the array with
-# `adder` — the local name of the builtin that adds to it (`push`, `extend`), so an
-# aliased import is followed and a *user* function that happens to share the name
-# is not.
-pub fn accumulations(self: Expr, adder: str) -> Accumulation[] {
+# `adder` — the builtin that adds to it (`Push`, `Extend`), however the file spells it, and
+# not a *user* function that happens to share the name.
+pub fn accumulations(self: Expr, adder: Callee) -> Accumulation[] {
     self.seeded_loops()$accumulation(adder).collect_ok()
 }.test({
     assert(block_accumulations(
         "{ mut out = []; for (let x : xs) { set out.push(f(x)); } out }",
-        "push",
+        Push,
     )? == ["out"]);
     // Later ones are found too, in order.
     assert(block_accumulations(
         "{ mut a = []; for (let x : xs) { set a.push(x); } mut b = []; for (let y : a) { set b.push(y); } b }",
-        "push",
+        Push,
     )? == ["a", "b"]);
     // The adder is the file's: a different name is another function.
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { set out.push(x); } out }",
-            "add",
+            Extend,
         )? == [],
     );
 })
 
 # The name of each [`accumulations`] the block `src` holds.
-fn block_accumulations(src: str, adder: str) -> str[]!ParseError {
-    ok(lower_aipl_block_surface(src)?.accumulations(adder)$seeded$name)
+fn block_accumulations(src: str, adder: Callee) -> str[]!ParseError {
+    ok(
+        lower_aipl_block_surface(src)?
+            .resolved_with_builtins(["push", "extend"])
+            .accumulations(adder)$seeded$name,
+    )
 }
 
 # `self` as an [`Accumulation`], when it is one.
-fn accumulation(self: SeededLoop, adder: str) -> Accumulation? {
+pub fn accumulation(self: SeededLoop, adder: Callee) -> Accumulation? {
     // `mut acc = [];` — the seed. An annotation is allowed (and usual: it is often
     // what gives the empty literal its element type) but says nothing about the
     // iterable, so it is not inspected.
@@ -183,7 +199,7 @@ fn accumulation(self: SeededLoop, adder: str) -> Accumulation? {
 }.test({
     assert(block_accumulations(
         "{ mut out: i64[] = []; for (let x : xs) { if (x > 0) { set out.push(x); }; } out }",
-        "push",
+        Push,
     )? == ["out"]);
 
     // Not the shape: a seed with elements, a statement between seed and loop, an
@@ -192,43 +208,43 @@ fn accumulation(self: SeededLoop, adder: str) -> Accumulation? {
     assert(
         block_accumulations(
             "{ mut out = [1]; for (let x : xs) { set out.push(x); } out }",
-            "push",
+            Push,
         )? == [],
     );
     assert(
         block_accumulations(
             "{ mut out = []; g(); for (let x : xs) { set out.push(x); } out }",
-            "push",
+            Push,
         )? == [],
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let i, x : xs) { set out.push(x); } out }",
-            "push",
+            Push,
         )? == [],
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { g(x); set out.push(x); } out }",
-            "push",
+            Push,
         )? == [],
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { if (c) { set out.push(x); } else { g(x); }; } out }",
-            "push",
+            Push,
         )? == [],
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { set out.push(out.len()); } out }",
-            "push",
+            Push,
         )? == [],
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { set out.push(g(x)?); } out }",
-            "push",
+            Push,
         )? == [],
     );
 })
@@ -237,29 +253,30 @@ fn accumulation(self: SeededLoop, adder: str) -> Accumulation? {
 # rest` — `acc = adder(acc, element)` — and nothing else.
 struct Pushed { element: Expr, rest: Expr }
 
-pub fn pushed(self: Expr, acc: str, adder: str) -> Pushed? {
+pub fn pushed(self: Expr, acc: str, adder: Callee) -> Pushed? {
     let Assign(target, value, rest) = self.kind.as_case::<Assign>()?;
-    let Call(callee, arguments, _, _) = value.kind.as_case::<Call>()?;
+    let Call(_, arguments, _, callee) = value.kind.as_case::<Call>()?;
     let [receiver, element] = arguments else { return none; };
     if (target.kind != Ident(acc) || callee != adder || receiver.kind != Ident(acc)) {
         return none;
     };
     some(Pushed { element, rest })
 }.test({
-    assert(block_pushes("{ set out.push(x); out }", "out", "push")? == ["x"]);
+    assert(block_pushes("{ set out.push(x); out }", "out", Push)? == ["x"]);
 
     // Another binding, another adder, another arity and another statement are not it.
-    assert(block_pushes("{ set other.push(x); out }", "out", "push")? == []);
-    assert(block_pushes("{ set out.push(x); out }", "out", "add")? == []);
-    assert(block_pushes("{ set out.push(x, y); out }", "out", "push")? == []);
-    assert(block_pushes("{ set out = g(x); out }", "out", "push")? == []);
-    assert(block_pushes("{ g(x); out }", "out", "push")? == []);
+    assert(block_pushes("{ set other.push(x); out }", "out", Push)? == []);
+    assert(block_pushes("{ set out.push(x); out }", "out", Extend)? == []);
+    assert(block_pushes("{ set out.push(x, y); out }", "out", Push)? == []);
+    assert(block_pushes("{ set out = g(x); out }", "out", Push)? == []);
+    assert(block_pushes("{ g(x); out }", "out", Push)? == []);
 })
 
 # The element of the push `src`, a block, starts with, as the dump of its expression.
-fn block_pushes(src: str, acc: str, adder: str) -> str[]!ParseError {
+fn block_pushes(src: str, acc: str, adder: Callee) -> str[]!ParseError {
     ok(
         lower_aipl_block_surface(src)?
+            .resolved_with_builtins(["push", "extend"])
             .pushed(acc, adder)
             .map(|found| [found.element.show_expr()])
             .value_or([]),

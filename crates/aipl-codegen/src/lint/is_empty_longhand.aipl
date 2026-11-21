@@ -23,7 +23,7 @@
 # closing paren, so splicing `len(f(x))`'s receiver would produce advice that does not parse.
 
 import { as_case, equal as ==, len, logical_or as ||, not_equal as != } from builtins;
-import { Callee } from "../builtin_table.aipl";
+import { Callee, Equal, IsNonempty, Len, LogicalNot } from "../builtin_table.aipl";
 import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
@@ -101,16 +101,16 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
 # The receiver of the test the one argument `self` negates, when `callee` is `!` and it is
 # `!x.is_nonempty()`.
 fn negated_nonempty(self: Expr[], callee: Callee) -> Expr? {
-    if (callee != Callee.LogicalNot) { return none; };
+    if (callee != LogicalNot) { return none; };
     let Call(_, args, _, inner) = self[0]?.kind.as_case::<Call>()?;
-    if (args.len() != 1 || inner != Callee.IsNonempty) { return none; };
+    if (args.len() != 1 || inner != IsNonempty) { return none; };
     args[0]
 }
 
 # The receiver of the length that the two arguments `self` compare with zero for equality, when
 # `callee` is `==`.
 fn length_equal_zero(self: Expr[], callee: Callee) -> Expr? {
-    if (callee != Callee.Equal) { return none; };
+    if (callee != Equal) { return none; };
     let [left, right] = self else { return none; };
     if (right.is_zero()) { return left.length_receiver(); };
     if (left.is_zero()) { return right.length_receiver(); };
@@ -121,6 +121,6 @@ fn length_equal_zero(self: Expr[], callee: Callee) -> Expr? {
 # free call `len(x)`.
 fn length_receiver(self: Expr) -> Expr? {
     let Call(_, args, _, callee) = self.kind.as_case::<Call>()?;
-    if (callee != Callee.Len || args.len() != 1) { return none; };
+    if (callee != Len || args.len() != 1) { return none; };
     args[0]
 }

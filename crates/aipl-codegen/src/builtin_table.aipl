@@ -246,7 +246,7 @@ struct BuiltinEntry {
 pub fn import_name(self: BuiltinEntry) -> str {
     self.public_name.value_or(self.callee["__builtin_".len()..])
 }.test({
-    let len = BuiltinEntry { arm: Callee.Len, callee: "__builtin_len", definition: Declared };
+    let len = BuiltinEntry { arm: Len, callee: "__builtin_len", definition: Declared };
     assert(len.import_name() == "len");
     assert(BuiltinEntry { ..len, public_name: some("size") }.import_name() == "size");
 })
@@ -256,9 +256,9 @@ pub fn builtin_imported(self: BuiltinEntry[], library: str, name: str) -> Builti
     self.find_if(|entry| entry.library == library && entry.import_name() == name)
 }.test({
     let table = builtin_table();
-    assert(table.builtin_imported("builtins", "len")$arm == some(Callee.Len));
-    assert(table.builtin_imported("sets", "union")$arm == some(Callee.Union));
-    assert(table.builtin_imported("json", "parse")$arm == some(Callee.ParseJson));
+    assert(table.builtin_imported("builtins", "len")$arm == some(Len));
+    assert(table.builtin_imported("sets", "union")$arm == some(Union));
+    assert(table.builtin_imported("json", "parse")$arm == some(ParseJson));
     assert(table.builtin_imported("sets", "len") == none);
     assert(table.builtin_imported("builtins", "__builtin_len") == none);
 })
@@ -266,653 +266,572 @@ pub fn builtin_imported(self: BuiltinEntry[], library: str, name: str) -> Builti
 # The whole table.
 pub fn builtin_table() -> BuiltinEntry[] {
     [
-        BuiltinEntry { arm: Callee.Print, callee: "__builtin_print", definition: Declared },
-        BuiltinEntry { arm: Callee.Put, callee: "__builtin_put", definition: Declared },
-        BuiltinEntry { arm: Callee.Split, callee: "__builtin_split", definition: Declared },
-        BuiltinEntry { arm: Callee.SplitLen, callee: "__builtin_split_len", definition: Declared },
-        BuiltinEntry { arm: Callee.Join, callee: "__builtin_join", definition: Declared },
+        BuiltinEntry { arm: Print, callee: "__builtin_print", definition: Declared },
+        BuiltinEntry { arm: Put, callee: "__builtin_put", definition: Declared },
+        BuiltinEntry { arm: Split, callee: "__builtin_split", definition: Declared },
+        BuiltinEntry { arm: SplitLen, callee: "__builtin_split_len", definition: Declared },
+        BuiltinEntry { arm: Join, callee: "__builtin_join", definition: Declared },
         BuiltinEntry {
-            arm: Callee.Intersperse,
+            arm: Intersperse,
             callee: "__builtin_intersperse",
             definition: Written("builtin_intersperse.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.TupleWindows,
+            arm: TupleWindows,
             callee: "__builtin_tuple_windows",
             definition: Written("builtin_tuple_windows.aipl"),
         },
-        BuiltinEntry { arm: Callee.SameCase, callee: "__builtin_same_case", definition: Declared },
-        BuiltinEntry { arm: Callee.CaseName, callee: "__builtin_case_name", definition: Declared },
-        BuiltinEntry { arm: Callee.CaseOf, callee: "__builtin_case_of", definition: Declared },
+        BuiltinEntry { arm: SameCase, callee: "__builtin_same_case", definition: Declared },
+        BuiltinEntry { arm: CaseName, callee: "__builtin_case_name", definition: Declared },
+        BuiltinEntry { arm: CaseOf, callee: "__builtin_case_of", definition: Declared },
         BuiltinEntry {
-            arm: Callee.CountIsLessThan,
+            arm: CountIsLessThan,
             callee: "__builtin_count_is_less_than",
             definition: Written("builtin_count_is_less_than.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIsAtMost,
+            arm: CountIsAtMost,
             callee: "__builtin_count_is_at_most",
             definition: Written("builtin_count_is_at_most.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIsGreaterThan,
+            arm: CountIsGreaterThan,
             callee: "__builtin_count_is_greater_than",
             definition: Written("builtin_count_is_greater_than.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIsAtLeast,
+            arm: CountIsAtLeast,
             callee: "__builtin_count_is_at_least",
             definition: Written("builtin_count_is_at_least.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIsEqual,
+            arm: CountIsEqual,
             callee: "__builtin_count_is_equal",
             definition: Written("builtin_count_is_equal.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIsNotEqual,
+            arm: CountIsNotEqual,
             callee: "__builtin_count_is_not_equal",
             definition: Written("builtin_count_is_not_equal.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIfIsLessThan,
+            arm: CountIfIsLessThan,
             callee: "__builtin_count_if_is_less_than",
             definition: Written("builtin_count_if_is_less_than.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIfIsAtMost,
+            arm: CountIfIsAtMost,
             callee: "__builtin_count_if_is_at_most",
             definition: Written("builtin_count_if_is_at_most.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIfIsGreaterThan,
+            arm: CountIfIsGreaterThan,
             callee: "__builtin_count_if_is_greater_than",
             definition: Written("builtin_count_if_is_greater_than.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIfIsAtLeast,
+            arm: CountIfIsAtLeast,
             callee: "__builtin_count_if_is_at_least",
             definition: Written("builtin_count_if_is_at_least.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIfIsEqual,
+            arm: CountIfIsEqual,
             callee: "__builtin_count_if_is_equal",
             definition: Written("builtin_count_if_is_equal.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIfIsNotEqual,
+            arm: CountIfIsNotEqual,
             callee: "__builtin_count_if_is_not_equal",
             definition: Written("builtin_count_if_is_not_equal.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.First,
+            arm: First,
             callee: "__builtin_first",
             definition: Written("builtin_first.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.GridGet,
+            arm: GridGet,
             callee: "__builtin_grid_get",
             definition: Written("builtin_grid_get.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.GridFrom,
+            arm: GridFrom,
             callee: "__builtin_grid_from",
             definition: Written("builtin_grid_from.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.GridOf,
+            arm: GridOf,
             callee: "__builtin_grid_of",
             definition: Written("builtin_grid_of.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.GridTrySet,
+            arm: GridTrySet,
             callee: "__builtin_grid_try_set",
             definition: Written("builtin_grid_try_set.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Width,
+            arm: Width,
             callee: "__builtin_width",
             definition: Written("builtin_width.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.SeededWithInt,
+            arm: SeededWithInt,
             callee: "__builtin_seeded_with_int",
             definition: Written("builtin_seeded_with_int.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.SeededWithClock,
+            arm: SeededWithClock,
             callee: "__builtin_seeded_with_clock",
             definition: Written("builtin_seeded_with_clock.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Height,
+            arm: Height,
             callee: "__builtin_height",
             definition: Written("builtin_height.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.IsInBoundsOf,
+            arm: IsInBoundsOf,
             callee: "__builtin_is_in_bounds_of",
             definition: Written("builtin_is_in_bounds_of.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.GridIsInBoundsOf,
+            arm: GridIsInBoundsOf,
             callee: "__builtin_grid_is_in_bounds_of",
             definition: Written("builtin_grid_is_in_bounds_of.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Last,
+            arm: Last,
             callee: "__builtin_last",
             definition: Written("builtin_last.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.NonemptyFirst,
+            arm: NonemptyFirst,
             callee: "__builtin_nonempty_first",
             definition: Written("builtin_nonempty_first.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.NonemptyLast,
+            arm: NonemptyLast,
             callee: "__builtin_nonempty_last",
             definition: Written("builtin_nonempty_last.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.EnsureNonempty,
+            arm: EnsureNonempty,
             callee: "__builtin_ensure_nonempty",
             definition: Written("builtin_ensure_nonempty.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.AssumeNonempty,
+            arm: AssumeNonempty,
             callee: "__builtin_assume_nonempty",
             definition: Declared,
         },
         BuiltinEntry {
-            arm: Callee.DropFirst,
+            arm: DropFirst,
             callee: "__builtin_drop_first",
             definition: Written("builtin_drop_first.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.DropLast,
+            arm: DropLast,
             callee: "__builtin_drop_last",
             definition: Written("builtin_drop_last.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.DropN,
+            arm: DropN,
             callee: "__builtin_drop_n",
             definition: Written("builtin_drop_n.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.DropLastN,
+            arm: DropLastN,
             callee: "__builtin_drop_last_n",
             definition: Written("builtin_drop_last_n.aipl"),
         },
-        BuiltinEntry { arm: Callee.ToStr, callee: "__builtin_to_str", definition: Declared },
-        BuiltinEntry { arm: Callee.ToStrLen, callee: "__builtin_to_str_len", definition: Declared },
-        BuiltinEntry { arm: Callee.Map, callee: "__builtin_map", definition: Declared },
+        BuiltinEntry { arm: ToStr, callee: "__builtin_to_str", definition: Declared },
+        BuiltinEntry { arm: ToStrLen, callee: "__builtin_to_str_len", definition: Declared },
+        BuiltinEntry { arm: Map, callee: "__builtin_map", definition: Declared },
         BuiltinEntry {
-            arm: Callee.TryMap,
+            arm: TryMap,
             callee: "__builtin_try_map",
             definition: Written("builtin_try_map.aipl"),
         },
-        BuiltinEntry { arm: Callee.Filter, callee: "__builtin_filter", definition: Declared },
+        BuiltinEntry { arm: Filter, callee: "__builtin_filter", definition: Declared },
+        BuiltinEntry { arm: FilterMap, callee: "__builtin_filter_map", definition: Declared },
+        BuiltinEntry { arm: All, callee: "__builtin_all", definition: Written("builtin_all.aipl") },
+        BuiltinEntry { arm: Any, callee: "__builtin_any", definition: Written("builtin_any.aipl") },
         BuiltinEntry {
-            arm: Callee.FilterMap,
-            callee: "__builtin_filter_map",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.All,
-            callee: "__builtin_all",
-            definition: Written("builtin_all.aipl"),
-        },
-        BuiltinEntry {
-            arm: Callee.Any,
-            callee: "__builtin_any",
-            definition: Written("builtin_any.aipl"),
-        },
-        BuiltinEntry {
-            arm: Callee.LeftFold,
+            arm: LeftFold,
             callee: "__builtin_left_fold",
             definition: Written("builtin_left_fold.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.RightFold,
+            arm: RightFold,
             callee: "__builtin_right_fold",
             definition: Written("builtin_right_fold.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.OptLeftFold,
+            arm: OptLeftFold,
             callee: "__builtin_opt_left_fold",
             definition: Written("builtin_opt_left_fold.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.OptRightFold,
+            arm: OptRightFold,
             callee: "__builtin_opt_right_fold",
             definition: Written("builtin_opt_right_fold.aipl"),
         },
-        BuiltinEntry { arm: Callee.ZipWith, callee: "__builtin_zip_with", definition: Declared },
+        BuiltinEntry { arm: ZipWith, callee: "__builtin_zip_with", definition: Declared },
+        BuiltinEntry { arm: Zip, callee: "__builtin_zip", definition: Written("builtin_zip.aipl") },
+        BuiltinEntry { arm: Trim, callee: "__builtin_trim", definition: Declared },
+        BuiltinEntry { arm: HeapStr, callee: "__builtin_heap_str", definition: Declared },
+        BuiltinEntry { arm: RopeStr, callee: "__builtin_rope_str", definition: Declared },
         BuiltinEntry {
-            arm: Callee.Zip,
-            callee: "__builtin_zip",
-            definition: Written("builtin_zip.aipl"),
-        },
-        BuiltinEntry { arm: Callee.Trim, callee: "__builtin_trim", definition: Declared },
-        BuiltinEntry { arm: Callee.HeapStr, callee: "__builtin_heap_str", definition: Declared },
-        BuiltinEntry { arm: Callee.RopeStr, callee: "__builtin_rope_str", definition: Declared },
-        BuiltinEntry {
-            arm: Callee.InlineStr,
+            arm: InlineStr,
             callee: "__builtin_inline_str",
             definition: Written("builtin_inline_str.aipl"),
         },
+        BuiltinEntry { arm: PackInline, callee: "__builtin_pack_inline", definition: Declared },
         BuiltinEntry {
-            arm: Callee.PackInline,
-            callee: "__builtin_pack_inline",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.InlineCapacity,
+            arm: InlineCapacity,
             callee: "__builtin_inline_capacity",
             definition: Declared,
         },
         BuiltinEntry {
-            arm: Callee.Measure,
+            arm: Measure,
             callee: "__builtin_measure",
             definition: Written("builtin_measure.aipl"),
         },
+        BuiltinEntry { arm: MeasureBegin, callee: "__builtin_measure_begin", definition: Declared },
         BuiltinEntry {
-            arm: Callee.MeasureBegin,
-            callee: "__builtin_measure_begin",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.MeasureConsume,
+            arm: MeasureConsume,
             callee: "__builtin_measure_consume",
             definition: Declared,
         },
+        BuiltinEntry { arm: MeasureEnd, callee: "__builtin_measure_end", definition: Declared },
+        BuiltinEntry { arm: MeasureRead, callee: "__builtin_measure_read", definition: Declared },
         BuiltinEntry {
-            arm: Callee.MeasureEnd,
-            callee: "__builtin_measure_end",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.MeasureRead,
-            callee: "__builtin_measure_read",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.IsAllWhitespace,
+            arm: IsAllWhitespace,
             callee: "__builtin_is_all_whitespace",
             definition: Written("builtin_is_all_whitespace.aipl"),
         },
+        BuiltinEntry { arm: StartsWith, callee: "__builtin_starts_with", definition: Declared },
         BuiltinEntry {
-            arm: Callee.StartsWith,
-            callee: "__builtin_starts_with",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.StartsWithAt,
+            arm: StartsWithAt,
             callee: "__builtin_starts_with_at",
             definition: Declared,
         },
-        BuiltinEntry { arm: Callee.EndsWith, callee: "__builtin_ends_with", definition: Declared },
-        BuiltinEntry { arm: Callee.Len, callee: "__builtin_len", definition: Declared },
+        BuiltinEntry { arm: EndsWith, callee: "__builtin_ends_with", definition: Declared },
+        BuiltinEntry { arm: Len, callee: "__builtin_len", definition: Declared },
         BuiltinEntry {
-            arm: Callee.Range,
+            arm: Range,
             callee: "__builtin_range",
             definition: Written("builtin_range.aipl"),
         },
+        BuiltinEntry { arm: IsNonempty, callee: "__builtin_is_nonempty", definition: Declared },
+        BuiltinEntry { arm: IsEmpty, callee: "__builtin_is_empty", definition: Declared },
+        BuiltinEntry { arm: Push, callee: "__builtin_push", definition: Declared },
+        BuiltinEntry { arm: Extend, callee: "__builtin_extend", definition: Declared },
         BuiltinEntry {
-            arm: Callee.IsNonempty,
-            callee: "__builtin_is_nonempty",
-            definition: Declared,
-        },
-        BuiltinEntry { arm: Callee.IsEmpty, callee: "__builtin_is_empty", definition: Declared },
-        BuiltinEntry { arm: Callee.Push, callee: "__builtin_push", definition: Declared },
-        BuiltinEntry { arm: Callee.Extend, callee: "__builtin_extend", definition: Declared },
-        BuiltinEntry {
-            arm: Callee.ExtendOptional,
+            arm: ExtendOptional,
             callee: "__builtin_extend_optional",
             definition: Written("builtin_extend_optional.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.ExtendMap,
+            arm: ExtendMap,
             callee: "__builtin_extend_map",
             definition: Written("builtin_extend_map.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.ExtendFilter,
+            arm: ExtendFilter,
             callee: "__builtin_extend_filter",
             definition: Written("builtin_extend_filter.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.ExtendFilterMap,
+            arm: ExtendFilterMap,
             callee: "__builtin_extend_filter_map",
             definition: Written("builtin_extend_filter_map.aipl"),
         },
-        BuiltinEntry { arm: Callee.Reserve, callee: "__builtin_reserve", definition: Declared },
-        BuiltinEntry { arm: Callee.IsSome, callee: "__builtin_is_some", definition: Declared },
+        BuiltinEntry { arm: Reserve, callee: "__builtin_reserve", definition: Declared },
+        BuiltinEntry { arm: IsSome, callee: "__builtin_is_some", definition: Declared },
         BuiltinEntry {
-            arm: Callee.IsSomeAnd,
+            arm: IsSomeAnd,
             callee: "__builtin_is_some_and",
             definition: Written("builtin_is_some_and.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.IsErrAnd,
+            arm: IsErrAnd,
             callee: "__builtin_is_err_and",
             definition: Written("builtin_is_err_and.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.MapErr,
+            arm: MapErr,
             callee: "__builtin_map_err",
             definition: Written("builtin_map_err.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.MapOk,
+            arm: MapOk,
             callee: "__builtin_map_ok",
             definition: Written("builtin_map_ok.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.IntParse,
+            arm: IntParse,
             callee: "__builtin_int_parse",
             definition: Written("builtin_int_parse.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.IntParseUnsigned,
+            arm: IntParseUnsigned,
             callee: "__builtin_int_parse_unsigned",
             definition: Written("builtin_int_parse_unsigned.aipl"),
         },
-        BuiltinEntry { arm: Callee.IsSpace, callee: "__builtin_is_space", definition: Declared },
+        BuiltinEntry { arm: IsSpace, callee: "__builtin_is_space", definition: Declared },
+        BuiltinEntry { arm: IsWhitespace, callee: "__builtin_is_whitespace", definition: Declared },
+        BuiltinEntry { arm: IsDigit, callee: "__builtin_is_digit", definition: Declared },
+        BuiltinEntry { arm: ToDigit, callee: "__builtin_to_digit", definition: Declared },
+        BuiltinEntry { arm: Narrow, callee: "__builtin_narrow", definition: Declared },
         BuiltinEntry {
-            arm: Callee.IsWhitespace,
-            callee: "__builtin_is_whitespace",
-            definition: Declared,
-        },
-        BuiltinEntry { arm: Callee.IsDigit, callee: "__builtin_is_digit", definition: Declared },
-        BuiltinEntry { arm: Callee.ToDigit, callee: "__builtin_to_digit", definition: Declared },
-        BuiltinEntry { arm: Callee.Narrow, callee: "__builtin_narrow", definition: Declared },
-        BuiltinEntry {
-            arm: Callee.TrimWhile,
+            arm: TrimWhile,
             callee: "__builtin_trim_while",
             definition: Written("builtin_trim_while.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Words,
+            arm: Words,
             callee: "__builtin_words",
             definition: Written("builtin_words.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CartesianProduct,
+            arm: CartesianProduct,
             callee: "__builtin_cartesian_product",
             definition: Written("builtin_cartesian_product.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Count,
+            arm: Count,
             callee: "__builtin_count",
             definition: Written("builtin_count.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountWhile,
+            arm: CountWhile,
             callee: "__builtin_count_while",
             definition: Written("builtin_count_while.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CountIf,
+            arm: CountIf,
             callee: "__builtin_count_if",
             definition: Written("builtin_count_if.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.FindIf,
+            arm: FindIf,
             callee: "__builtin_find_if",
             definition: Written("builtin_find_if.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CollectArms,
+            arm: CollectArms,
             callee: "__builtin_collect_arms",
             definition: Written("builtin_collect_arms.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.AsCase,
+            arm: AsCase,
             callee: "__builtin_as_case",
             definition: Written("builtin_as_case.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.IsCase,
+            arm: IsCase,
             callee: "__builtin_is_case",
             definition: Written("builtin_is_case.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.CollectOk,
+            arm: CollectOk,
             callee: "__builtin_collect_ok",
             definition: Written("builtin_collect_ok.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.MapFindIf,
+            arm: MapFindIf,
             callee: "__builtin_map_find_if",
             definition: Written("builtin_map_find_if.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.MapJoin,
+            arm: MapJoin,
             callee: "__builtin_map_join",
             definition: Written("builtin_map_join.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.JoinIsNonempty,
+            arm: JoinIsNonempty,
             callee: "__builtin_join_is_nonempty",
             definition: Written("builtin_join_is_nonempty.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.JoinIsEmpty,
+            arm: JoinIsEmpty,
             callee: "__builtin_join_is_empty",
             definition: Written("builtin_join_is_empty.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Reduce,
+            arm: Reduce,
             callee: "__builtin_reduce",
             definition: Written("builtin_reduce.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.MapReduce,
+            arm: MapReduce,
             callee: "__builtin_map_reduce",
             definition: Written("builtin_map_reduce.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.FilterMapReduce,
+            arm: FilterMapReduce,
             callee: "__builtin_filter_map_reduce",
             definition: Written("builtin_filter_map_reduce.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.SplitMap,
+            arm: SplitMap,
             callee: "__builtin_split_map",
             definition: Written("builtin_split_map.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.FindMap,
+            arm: FindMap,
             callee: "__builtin_find_map",
             definition: Written("builtin_find_map.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.ReverseFindMap,
+            arm: ReverseFindMap,
             callee: "__builtin_reverse_find_map",
             definition: Written("builtin_reverse_find_map.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.FindIndex,
+            arm: FindIndex,
             callee: "__builtin_find_index",
             definition: Written("builtin_find_index.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.ValueOr,
+            arm: ValueOr,
             callee: "__builtin_value_or",
             definition: Written("builtin_value_or.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.ValueOrErr,
+            arm: ValueOrErr,
             callee: "__builtin_value_or_err",
             definition: Written("builtin_value_or_err.aipl"),
         },
-        BuiltinEntry { arm: Callee.Contains, callee: "__builtin_contains", definition: Declared },
+        BuiltinEntry { arm: Contains, callee: "__builtin_contains", definition: Declared },
+        BuiltinEntry { arm: Has, callee: "__builtin_has", definition: Declared, library: "sets" },
         BuiltinEntry {
-            arm: Callee.Has,
-            callee: "__builtin_has",
-            definition: Declared,
-            library: "sets",
-        },
-        BuiltinEntry {
-            arm: Callee.ToArray,
+            arm: ToArray,
             callee: "__builtin_to_array",
             definition: Declared,
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.ToSet,
+            arm: ToSet,
             callee: "__builtin_to_set",
             definition: Declared,
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.ReadFileToString,
+            arm: ReadFileToString,
             callee: "__builtin_read_file_to_string",
             definition: Declared,
         },
         BuiltinEntry {
-            arm: Callee.WriteStringToFile,
+            arm: WriteStringToFile,
             callee: "__builtin_write_string_to_file",
             definition: Declared,
         },
+        BuiltinEntry { arm: ListFiles, callee: "__builtin_list_files", definition: Declared },
+        BuiltinEntry { arm: ReadLine, callee: "__builtin_read_line", definition: Declared },
+        BuiltinEntry { arm: ReadByte, callee: "__builtin_read_byte", definition: Declared },
         BuiltinEntry {
-            arm: Callee.ListFiles,
-            callee: "__builtin_list_files",
-            definition: Declared,
-        },
-        BuiltinEntry { arm: Callee.ReadLine, callee: "__builtin_read_line", definition: Declared },
-        BuiltinEntry { arm: Callee.ReadByte, callee: "__builtin_read_byte", definition: Declared },
-        BuiltinEntry {
-            arm: Callee.ClearTerminal,
+            arm: ClearTerminal,
             callee: "__builtin_clear_terminal",
             definition: Declared,
         },
-        BuiltinEntry { arm: Callee.MoveTo, callee: "__builtin_move_to", definition: Declared },
+        BuiltinEntry { arm: MoveTo, callee: "__builtin_move_to", definition: Declared },
         BuiltinEntry {
-            arm: Callee.EnterAlternateScreen,
+            arm: EnterAlternateScreen,
             callee: "__builtin_enter_alternate_screen",
             definition: Declared,
         },
         BuiltinEntry {
-            arm: Callee.LeaveAlternateScreen,
+            arm: LeaveAlternateScreen,
             callee: "__builtin_leave_alternate_screen",
             definition: Declared,
         },
+        BuiltinEntry { arm: ShimCellGet, callee: "__builtin_shim_cell_get", definition: Declared },
+        BuiltinEntry { arm: ShimCellSet, callee: "__builtin_shim_cell_set", definition: Declared },
         BuiltinEntry {
-            arm: Callee.ShimCellGet,
-            callee: "__builtin_shim_cell_get",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.ShimCellSet,
-            callee: "__builtin_shim_cell_set",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.ReadKey,
+            arm: ReadKey,
             callee: "__builtin_read_key",
             definition: Written("builtin_read_key.aipl"),
             exports: ["Key", "UpArrow", "DownArrow", "LeftArrow", "RightArrow", "Other"],
         },
         BuiltinEntry {
-            arm: Callee.ParseJson,
+            arm: ParseJson,
             callee: "__builtin_parse_json",
             definition: Written("builtin_parse_json.aipl"),
             exports: ["Json", "Member", "Null", "Bool", "Number", "String", "Array", "Object"],
             library: "json",
             public_name: some("parse"),
         },
+        BuiltinEntry { arm: RandomU64, callee: "__builtin_random_u64", definition: Declared },
+        BuiltinEntry { arm: NowNanos, callee: "__builtin_now_nanos", definition: Declared },
+        BuiltinEntry { arm: MonotonicNow, callee: "__builtin_monotonic_now", definition: Declared },
         BuiltinEntry {
-            arm: Callee.RandomU64,
-            callee: "__builtin_random_u64",
-            definition: Declared,
-        },
-        BuiltinEntry { arm: Callee.NowNanos, callee: "__builtin_now_nanos", definition: Declared },
-        BuiltinEntry {
-            arm: Callee.MonotonicNow,
-            callee: "__builtin_monotonic_now",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.ExecuteProgram,
+            arm: ExecuteProgram,
             callee: "__builtin_execute_program",
             definition: Declared,
         },
         BuiltinEntry {
-            arm: Callee.HttpGet,
+            arm: HttpGet,
             callee: "__builtin_http_get",
             definition: Declared,
             library: "network",
         },
         BuiltinEntry {
-            arm: Callee.Union,
+            arm: Union,
             callee: "__builtin_union",
             definition: Declared,
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.UnionAll,
+            arm: UnionAll,
             callee: "__builtin_union_all",
             definition: Written("builtin_union_all.aipl"),
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.SetMap,
+            arm: SetMap,
             callee: "__builtin_set_map",
             definition: Written("builtin_set_map.aipl"),
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.Difference,
+            arm: Difference,
             callee: "__builtin_difference",
             definition: Written("builtin_difference.aipl"),
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.Intersection,
+            arm: Intersection,
             callee: "__builtin_intersection",
             definition: Written("builtin_intersection.aipl"),
             library: "sets",
         },
         BuiltinEntry {
-            arm: Callee.Insert,
+            arm: Insert,
             callee: "__builtin_insert",
             definition: Written("builtin_insert.aipl"),
             library: "sets",
         },
-        BuiltinEntry { arm: Callee.Get, callee: "__builtin_get", definition: Declared },
+        BuiltinEntry { arm: Get, callee: "__builtin_get", definition: Declared },
+        BuiltinEntry { arm: ContainsKey, callee: "__builtin_contains_key", definition: Declared },
+        BuiltinEntry { arm: RemoveKey, callee: "__builtin_remove_key", definition: Declared },
+        BuiltinEntry { arm: InsertKey, callee: "__builtin_insert_key", definition: Declared },
         BuiltinEntry {
-            arm: Callee.ContainsKey,
-            callee: "__builtin_contains_key",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.RemoveKey,
-            callee: "__builtin_remove_key",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.InsertKey,
-            callee: "__builtin_insert_key",
-            definition: Declared,
-        },
-        BuiltinEntry {
-            arm: Callee.ToDict,
+            arm: ToDict,
             callee: "__builtin_to_dict",
             definition: Written("builtin_to_dict.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.MapToDict,
+            arm: MapToDict,
             callee: "__builtin_map_to_dict",
             definition: Written("builtin_map_to_dict.aipl"),
         },
-        BuiltinEntry { arm: Callee.Hash, callee: "__builtin_hash", definition: Declared },
-        BuiltinEntry { arm: Callee.Min, callee: "__builtin_min", definition: Declared },
-        BuiltinEntry { arm: Callee.Max, callee: "__builtin_max", definition: Declared },
+        BuiltinEntry { arm: Hash, callee: "__builtin_hash", definition: Declared },
+        BuiltinEntry { arm: Min, callee: "__builtin_min", definition: Declared },
+        BuiltinEntry { arm: Max, callee: "__builtin_max", definition: Declared },
         BuiltinEntry {
-            arm: Callee.Minimum,
+            arm: Minimum,
             callee: "__builtin_minimum",
             definition: Described(
                 "fn minimum<T: ord>(self: T[]) -> T?",
@@ -920,29 +839,29 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.Maximum,
+            arm: Maximum,
             callee: "__builtin_maximum",
             definition: Described(
                 "fn maximum<T: ord>(self: T[]) -> T?",
                 "The largest element, or `none` if the array is empty.",
             ),
         },
-        BuiltinEntry { arm: Callee.Reverse, callee: "__builtin_reverse", definition: Declared },
-        BuiltinEntry { arm: Callee.Sort, callee: "__builtin_sort", definition: Declared },
+        BuiltinEntry { arm: Reverse, callee: "__builtin_reverse", definition: Declared },
+        BuiltinEntry { arm: Sort, callee: "__builtin_sort", definition: Declared },
         BuiltinEntry {
-            arm: Callee.SortBy,
+            arm: SortBy,
             callee: "__builtin_sort_by",
             definition: Written("builtin_sort_by.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Repeat,
+            arm: Repeat,
             callee: "__builtin_repeat",
             definition: Written("builtin_repeat.aipl"),
         },
-        BuiltinEntry { arm: Callee.With, callee: "__builtin_with", definition: Declared },
-        BuiltinEntry { arm: Callee.TrySet, callee: "__builtin_try_set", definition: Declared },
+        BuiltinEntry { arm: With, callee: "__builtin_with", definition: Declared },
+        BuiltinEntry { arm: TrySet, callee: "__builtin_try_set", definition: Declared },
         BuiltinEntry {
-            arm: Callee.WrappingAdd,
+            arm: WrappingAdd,
             callee: "__builtin_wrapping_add",
             definition: Described(
                 "fn wrapping_add<T: int>(a: T, b: T) -> T",
@@ -950,7 +869,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.SaturatingAdd,
+            arm: SaturatingAdd,
             callee: "__builtin_saturating_add",
             definition: Described(
                 "fn saturating_add<T: int>(a: T, b: T) -> T",
@@ -958,7 +877,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.WrappingSub,
+            arm: WrappingSub,
             callee: "__builtin_wrapping_sub",
             definition: Described(
                 "fn wrapping_sub<T: int>(a: T, b: T) -> T",
@@ -966,7 +885,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.SaturatingSub,
+            arm: SaturatingSub,
             callee: "__builtin_saturating_sub",
             definition: Described(
                 "fn saturating_sub<T: int>(a: T, b: T) -> T",
@@ -974,7 +893,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.WrappingMul,
+            arm: WrappingMul,
             callee: "__builtin_wrapping_mul",
             definition: Described(
                 "fn wrapping_mul<T: int>(a: T, b: T) -> T",
@@ -982,7 +901,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.SaturatingDivide,
+            arm: SaturatingDivide,
             callee: "__builtin_saturating_divide",
             definition: Described(
                 "fn saturating_divide<T: int>(a: T, b: T) -> T",
@@ -990,7 +909,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.SaturatingRemainder,
+            arm: SaturatingRemainder,
             callee: "__builtin_saturating_remainder",
             definition: Described(
                 "fn saturating_remainder<T: int>(a: T, b: T) -> T",
@@ -998,7 +917,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.ToFloat,
+            arm: ToFloat,
             callee: "__builtin_to_float",
             definition: Described(
                 "fn to_float<T: int>(self: T) -> F",
@@ -1006,30 +925,30 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.Render,
+            arm: Render,
             callee: "__builtin_render",
             definition: Written("builtin_render.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Distinct,
+            arm: Distinct,
             callee: "__builtin_distinct",
             definition: Written("builtin_distinct.aipl"),
         },
         BuiltinEntry {
-            arm: Callee.Pad,
+            arm: Pad,
             callee: "__builtin_pad",
             definition: Written("builtin_pad.aipl"),
             exports: ["Direction", "Left", "Right"],
         },
         BuiltinEntry {
-            arm: Callee.Tabulate,
+            arm: Tabulate,
             callee: "__builtin_tabulate",
             definition: Written("builtin_tabulate.aipl"),
             exports: ["Column"],
             library: "tabulate",
         },
         BuiltinEntry {
-            arm: Callee.ToFixed,
+            arm: ToFixed,
             callee: "__builtin_to_fixed",
             definition: Described(
                 "fn to_fixed<F>(self: F, digits: u64) -> str",
@@ -1037,7 +956,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatAdd,
+            arm: FloatAdd,
             callee: "__builtin_float_add",
             definition: Described(
                 "fn float_add<T: float>(a: T, b: T) -> T",
@@ -1045,7 +964,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatSub,
+            arm: FloatSub,
             callee: "__builtin_float_sub",
             definition: Described(
                 "fn float_sub<T: float>(a: T, b: T) -> T",
@@ -1053,7 +972,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatMul,
+            arm: FloatMul,
             callee: "__builtin_float_mul",
             definition: Described(
                 "fn float_mul<T: float>(a: T, b: T) -> T",
@@ -1061,7 +980,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatDivide,
+            arm: FloatDivide,
             callee: "__builtin_float_div",
             definition: Described(
                 "fn float_div<T: float>(a: T, b: T) -> T",
@@ -1069,7 +988,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatEqual,
+            arm: FloatEqual,
             callee: "__builtin_float_equal",
             definition: Described(
                 "fn float_equal<T: float>(a: T, b: T) -> bool",
@@ -1077,7 +996,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatNotEqual,
+            arm: FloatNotEqual,
             callee: "__builtin_float_not_equal",
             definition: Described(
                 "fn float_not_equal<T: float>(a: T, b: T) -> bool",
@@ -1085,7 +1004,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatLessThan,
+            arm: FloatLessThan,
             callee: "__builtin_float_less_than",
             definition: Described(
                 "fn float_less_than<T: float>(a: T, b: T) -> bool",
@@ -1093,7 +1012,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatGreaterThan,
+            arm: FloatGreaterThan,
             callee: "__builtin_float_greater_than",
             definition: Described(
                 "fn float_greater_than<T: float>(a: T, b: T) -> bool",
@@ -1101,7 +1020,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatLessThanOrEqual,
+            arm: FloatLessThanOrEqual,
             callee: "__builtin_float_less_than_or_equal",
             definition: Described(
                 "fn float_less_than_or_equal<T: float>(a: T, b: T) -> bool",
@@ -1109,7 +1028,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.FloatGreaterThanOrEqual,
+            arm: FloatGreaterThanOrEqual,
             callee: "__builtin_float_greater_than_or_equal",
             definition: Described(
                 "fn float_greater_than_or_equal<T: float>(a: T, b: T) -> bool",
@@ -1117,7 +1036,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.Equal,
+            arm: Equal,
             callee: "__builtin_equal",
             definition: Described(
                 "fn equal<T: any>(a: T, b: T) -> bool",
@@ -1125,7 +1044,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.NotEqual,
+            arm: NotEqual,
             callee: "__builtin_not_equal",
             definition: Described(
                 "fn not_equal<T: any>(a: T, b: T) -> bool",
@@ -1133,7 +1052,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.LessThan,
+            arm: LessThan,
             callee: "__builtin_less_than",
             definition: Described(
                 "fn less_than<T: ord>(a: T, b: T) -> bool",
@@ -1141,7 +1060,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.GreaterThan,
+            arm: GreaterThan,
             callee: "__builtin_greater_than",
             definition: Described(
                 "fn greater_than<T: ord>(a: T, b: T) -> bool",
@@ -1149,7 +1068,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.LessThanOrEqual,
+            arm: LessThanOrEqual,
             callee: "__builtin_less_than_or_equal",
             definition: Described(
                 "fn less_than_or_equal<T: ord>(a: T, b: T) -> bool",
@@ -1157,7 +1076,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.GreaterThanOrEqual,
+            arm: GreaterThanOrEqual,
             callee: "__builtin_greater_than_or_equal",
             definition: Described(
                 "fn greater_than_or_equal<T: ord>(a: T, b: T) -> bool",
@@ -1165,7 +1084,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.LogicalAnd,
+            arm: LogicalAnd,
             callee: "__builtin_logical_and",
             definition: Described(
                 "fn logical_and(a: bool, b: bool) -> bool",
@@ -1173,7 +1092,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.LogicalOr,
+            arm: LogicalOr,
             callee: "__builtin_logical_or",
             definition: Described(
                 "fn logical_or(a: bool, b: bool) -> bool",
@@ -1181,7 +1100,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
             ),
         },
         BuiltinEntry {
-            arm: Callee.LogicalNot,
+            arm: LogicalNot,
             callee: "__builtin_logical_not",
             definition: Described(
                 "fn logical_not(a: bool) -> bool",
@@ -1195,7 +1114,7 @@ pub fn builtin_table() -> BuiltinEntry[] {
     assert(table$callee.distinct() == table$callee);
     assert(table$arm.distinct() == table$arm);
     assert(table[0]? == BuiltinEntry {
-        arm: Callee.Print,
+        arm: Print,
         callee: "__builtin_print",
         definition: Declared,
     });

@@ -25,7 +25,7 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Callee } from "../builtin_table.aipl";
+import { Callee, GreaterThan, IsEmpty, Len, LessThan, LogicalNot } from "../builtin_table.aipl";
 import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
@@ -109,9 +109,9 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> Advice? {
 # The receiver of the emptiness test the one argument `self` negates, when `callee` is `!` and it is
 # `!x.is_empty()`.
 fn negated_emptiness(self: Expr[], callee: Callee) -> Expr? {
-    if (callee != Callee.LogicalNot) { return none; };
+    if (callee != LogicalNot) { return none; };
     let Call(_, args, _, inner) = self[0]?.kind.as_case::<Call>()?;
-    if (args.len() != 1 || inner != Callee.IsEmpty) { return none; };
+    if (args.len() != 1 || inner != IsEmpty) { return none; };
     args[0]
 }
 
@@ -119,8 +119,8 @@ fn negated_emptiness(self: Expr[], callee: Callee) -> Expr? {
 # `x.len() > 0`, when `callee` is the comparison.
 fn length_against_zero(self: Expr[], callee: Callee) -> Expr? {
     let [left, right] = self else { return none; };
-    if (callee == Callee.LessThan && left.is_zero()) { return right.length_receiver(); };
-    if (callee == Callee.GreaterThan && right.is_zero()) { return left.length_receiver(); };
+    if (callee == LessThan && left.is_zero()) { return right.length_receiver(); };
+    if (callee == GreaterThan && right.is_zero()) { return left.length_receiver(); };
     none
 }
 
@@ -128,6 +128,6 @@ fn length_against_zero(self: Expr[], callee: Callee) -> Expr? {
 # free call `len(x)`.
 fn length_receiver(self: Expr) -> Expr? {
     let Call(_, args, _, callee) = self.kind.as_case::<Call>()?;
-    if (callee != Callee.Len || args.len() != 1) { return none; };
+    if (callee != Len || args.len() != 1) { return none; };
     args[0]
 }
