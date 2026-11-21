@@ -37,13 +37,7 @@ import { Push } from "../builtin_table.aipl";
 import { ArrayLit, Ident, IfLet, LetMut, Unit, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
-import {
-    SeededLoop,
-    is_liftable,
-    pipeline_hit,
-    plain_seeded_loop,
-    pushed,
-} from "./accumulation.aipl";
+import { is_liftable, pipeline_hit, plain_seeded_loop, pushed } from "./accumulation.aipl";
 import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
@@ -51,7 +45,34 @@ import { names_case, payload_binders } from "./option_match.aipl";
 # The hit for the array the binding `self` seeds, when it seeds it empty and a loop pushes the
 # answers that exist onto it.
 pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
-    self.plain_seeded_loop()?.collected()
+    let looped = self.plain_seeded_loop()?;
+    let ArrayLit(elements) = looped.seed.kind.as_case::<ArrayLit>()?;
+    if (elements.is_nonempty()) { return none; };
+    let IfLet(arm, scrutinee, otherwise) = looped.body.lone_statement()?.kind.as_case::<IfLet>()?;
+    if (otherwise.kind != Unit || !arm.pattern.names_case("some")) { return none; };
+    // `some` binds exactly its payload: `some(..)` binds nothing, and `_` is no name.
+    let [bound] = arm.pattern.payload_binders()? else { return none; };
+    if (bound == "_") { return none; };
+    let element = arm.body.lone_statement()?.pushed(looped.name, Push)?.element;
+    if (!scrutinee.is_liftable(looped.name) || !element.is_liftable(looped.name)) { return none; };
+
+    // Asking nothing of the element — the iterable already holds the optionals — leaves no
+    // first `map` to write, and pushing the bound name itself needs no second one.
+    let asks: (str, str)? = if (scrutinee.kind != Ident(looped.variable)) {
+        some(("map", `(|{looped.variable}| ..)`))
+    } else {
+        none
+    };
+    let maps: (str, str)? = if (element.kind != Ident(bound)) {
+        some(("map", `(|{bound}| ..)`))
+    } else {
+        none
+    };
+    some(looped.pipeline_hit(
+        "filled by this loop with the answers that exist and nothing else",
+        "",
+        [asks, some(("collect_ok", "()")), maps].collect_ok(),
+    ))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn flagged(Function { body }) -> UnfilledHit[] {
@@ -279,34 +300,3 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
         )? == [],
     );
 })
-
-# `self` as the hit for an array filled with the answers that exist, when it is one.
-fn collected(self: SeededLoop) -> UnfilledHit? {
-    let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
-    if (elements.is_nonempty()) { return none; };
-    let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case::<IfLet>()?;
-    if (otherwise.kind != Unit || !arm.pattern.names_case("some")) { return none; };
-    // `some` binds exactly its payload: `some(..)` binds nothing, and `_` is no name.
-    let [bound] = arm.pattern.payload_binders()? else { return none; };
-    if (bound == "_") { return none; };
-    let element = arm.body.lone_statement()?.pushed(self.name, Push)?.element;
-    if (!scrutinee.is_liftable(self.name) || !element.is_liftable(self.name)) { return none; };
-
-    // Asking nothing of the element — the iterable already holds the optionals — leaves no
-    // first `map` to write, and pushing the bound name itself needs no second one.
-    let asks: (str, str)? = if (scrutinee.kind != Ident(self.variable)) {
-        some(("map", `(|{self.variable}| ..)`))
-    } else {
-        none
-    };
-    let maps: (str, str)? = if (element.kind != Ident(bound)) {
-        some(("map", `(|{bound}| ..)`))
-    } else {
-        none
-    };
-    some(self.pipeline_hit(
-        "filled by this loop with the answers that exist and nothing else",
-        "",
-        [asks, some(("collect_ok", "()")), maps].collect_ok(),
-    ))
-}
