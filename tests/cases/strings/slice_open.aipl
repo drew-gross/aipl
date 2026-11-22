@@ -5,7 +5,7 @@
 import { equal as == } from builtins;
 
 fn drop_prefix(s: str, n: i64) -> str { s[n..] }.test({
-    // The whole-range form is what `slice_whole` flags — squelched here, since
+    // The whole-range form is what `redundant_slice_bound` flags — squelched here, since
     // exercising it *is* the point of these two lines.
     assert("hello"[0..] == "hello"); #[allow]
     // whole string

@@ -26,7 +26,7 @@ DRY is critical here. Before writing a helper, search for it:
 - `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `functions`,
   `hits`, `unfilled_hits`, the `lint_*` test drivers (`lint_in_messages` and
   `lint_in_unfilled_messages` for a lint that takes `items`).
-- `lint/field_uses.aipl`, `lint/slice_bounds.aipl`, `lint/option_match.aipl`,
+- `lint/field_uses.aipl`, `lint/slice_bounds.aipl` (reading a bound), `lint/option_match.aipl`,
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
   shape and its pipeline advice), `lint/interpolation.aipl` — shared shape recognizers.
 - The builtins and `crates/aipl-codegen/src/*.aipl` (expr walkers, `source`

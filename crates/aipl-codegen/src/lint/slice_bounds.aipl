@@ -1,6 +1,5 @@
-# What the three slice lints (`slice_whole`, `slice_to_len`, `slice_from_zero`) share:
-# how to read a slice's bounds. They divide the range forms between them, so they
-# must agree on what "runs to the end" and "starts at zero" mean.
+# How to read a bound: what `redundant_slice_bound` and the lints of a length compared with zero
+# share.
 
 import { equal as ==, logical_not as ! } from builtins;
 import { Unresolved } from "../builtin_table.aipl";

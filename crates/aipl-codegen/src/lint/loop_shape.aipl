@@ -63,7 +63,7 @@ fn block_statements(src: str) -> u64!ParseError {
 # Whether `self` is what the parser ends a statement-only block with: `()` for an
 # ordinary block, and an `0` with no location of its own — the loop expression's
 # result — for a loop body, which may not end in a value of its own at all. The
-# loop's zero is told from a written one by its empty span, the way `slice_from_zero`
+# loop's zero is told from a written one by its empty span, the way `redundant_slice_bound`
 # tells an elided slice bound from a typed one.
 fn is_block_tail(self: Expr) -> bool {
     match (self.kind) {

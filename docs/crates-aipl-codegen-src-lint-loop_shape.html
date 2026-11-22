@@ -141,7 +141,7 @@ none
           </h3>
           <pre class="signature"><code>fn is_block_tail(self: Expr) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether <code>self</code> is what the parser ends a statement-only block with: <code>()</code> for an ordinary block, and an <code>0</code> with no location of its own — the loop expression's result — for a loop body, which may not end in a value of its own at all. The loop's zero is told from a written one by its empty span, the way <code>slice_from_zero</code> tells an elided slice bound from a typed one.</p></div>
+          <div class="doc"><p>Whether <code>self</code> is what the parser ends a statement-only block with: <code>()</code> for an ordinary block, and an <code>0</code> with no location of its own — the loop expression's result — for a loop body, which may not end in a value of its own at all. The loop's zero is told from a written one by its empty span, the way <code>redundant_slice_bound</code> tells an elided slice bound from a typed one.</p></div>
 
 
         </section>
