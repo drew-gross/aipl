@@ -66,7 +66,9 @@ fn collect_binders(program: &TProgram) -> HashSet<&str> {
         for p in &f.sig.params {
             set.insert(p.name.as_str());
         }
-        collect_body_binders(&f.body, &mut set);
+        collect_body_binders(&f.body, &mut |name| {
+            set.insert(name);
+        });
     }
     set
 }

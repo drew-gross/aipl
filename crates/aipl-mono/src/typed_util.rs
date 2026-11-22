@@ -427,33 +427,30 @@ pub(crate) fn count_uses<'a, T: TyRepr>(
     }
 }
 
-/// Every name a `let`, `mut`, `for`, lambda parameter or `match` arm anywhere in `e` binds.
-pub(crate) fn collect_body_binders<'a, T: TyRepr>(e: &'a TExpr<T>, set: &mut HashSet<&'a str>) {
+/// Every name a `let`, `mut`, `for`, lambda parameter or `match` arm anywhere in `e` binds, handed
+/// to `sink` once per binding site.
+pub(crate) fn collect_body_binders<'a, T: TyRepr>(e: &'a TExpr<T>, sink: &mut dyn FnMut(&'a str)) {
     match &e.kind {
-        TExprKind::Let(n, _, _) | TExprKind::LetMut(n, _, _) => {
-            set.insert(n);
-        }
+        TExprKind::Let(n, _, _) | TExprKind::LetMut(n, _, _) => sink(n),
         TExprKind::For(n, index, _, _) => {
-            set.insert(n);
+            sink(n);
             if let Some(i) = index {
-                set.insert(i);
+                sink(i);
             }
         }
         TExprKind::Lambda(ps, _) => {
             for p in ps {
-                set.insert(&p.name);
+                sink(&p.name);
             }
         }
         TExprKind::Match(_, arms) => {
             for a in arms {
-                a.pattern.each_binding(&mut |b| {
-                    set.insert(b);
-                });
+                a.pattern.each_binding(&mut |b| sink(b));
             }
         }
         _ => {}
     }
-    each_child(e, &mut |c| collect_body_binders(c, set));
+    each_child(e, &mut |c| collect_body_binders(c, sink));
 }
 
 /// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic: one of the calls

@@ -35,13 +35,26 @@ pub(crate) fn expand_calls(
         if sites == Sites::First && replaced {
             break;
         }
-        if (skip_itself && g.name == f.name) || !references_name(&g.body, &f.name) {
+        if skip_itself && g.name == f.name {
             continue;
         }
-        let mut here = false;
-        replace_call(&mut g.body, &f.name, fparams, &f.body, &mut here, sites);
-        replaced |= here;
+        replaced |= expand_calls_in(g, f, fparams, sites);
     }
+    replaced
+}
+
+/// [`expand_calls`] in the one function `g`. Whether anything was rewritten.
+pub(crate) fn expand_calls_in(
+    g: &mut ConcreteFn,
+    f: &ConcreteFn,
+    fparams: &[InlineParam],
+    sites: Sites,
+) -> bool {
+    if !references_name(&g.body, &f.name) {
+        return false;
+    }
+    let mut replaced = false;
+    replace_call(&mut g.body, &f.name, fparams, &f.body, &mut replaced, sites);
     replaced
 }
 

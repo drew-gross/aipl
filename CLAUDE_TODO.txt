@@ -76,6 +76,7 @@ handoff / check speed (corpus now runs as `aipl check --baseline --shard` proces
   the 200 compiler-source files under crates/ are ~90% of the corpus cost; the other 874 cases are ~0.13s each
   optimizer: `inline_single_use_post_mono` is ~30% of a lint file's check (clones per call site, counts and binders recomputed every round); speeds up every compile, production builds included: plan in INLINE_SINGLE_USE_SPEED.md
   optimizer: pre-mono passes ~15% of a lint file's check
+  optimizer: `is_single_use_candidate` (inline_pinned.rs) still excludes `is_pub` functions; with explicit entries the roots are known, so a `pub` function that is not an entry could be inlined and elided
   Cranelift verifier is on (5% of a check): turn it off outside debug builds, if it isn't deliberate
   run the non-case nextest (~75s) at the same time as the shards instead of after them (they would slow each other)
   skip the baseline AOT build for a file whose sources, imports and compiler fingerprint are unchanged (cache the measurement; needs a trustworthy compiler fingerprint)

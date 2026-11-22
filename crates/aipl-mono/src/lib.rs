@@ -4505,14 +4505,13 @@ pub fn inline_single_use_post_mono(
 ) -> MonoProgram {
     let mut program = program.clone();
     let mut skip: HashSet<String> = HashSet::new();
+    let mut tally = SingleUseTally::of(&program);
 
     loop {
-        let counts = use_counts_mono(&program);
-        let binders = collect_binders_mono(&program);
         let candidate = program
             .fns
             .iter()
-            .find(|f| is_inline_candidate_mono(f, &counts, &binders, &skip))
+            .find(|f| is_inline_candidate_mono(f, &tally, &skip))
             .cloned();
         let Some(f) = candidate else { break };
 
@@ -4527,13 +4526,22 @@ pub fn inline_single_use_post_mono(
                 mutable: p.mutable,
             })
             .collect();
-        let replaced = inline_typed::expand_calls(
-            &mut program,
-            &f,
-            &fparam_names,
-            inline_typed::Sites::First,
-            false,
-        );
+        // The one caller: the function is used once.
+        let caller = program
+            .fns
+            .iter()
+            .position(|g| typed_util::references_name(&g.body, &f.name));
+        let replaced = caller.is_some_and(|caller| {
+            tally.remove(&program.fns[caller]);
+            let replaced = inline_typed::expand_calls_in(
+                &mut program.fns[caller],
+                &f,
+                &fparam_names,
+                inline_typed::Sites::First,
+            );
+            tally.add(&program.fns[caller]);
+            replaced
+        });
         if replaced {
             // Inlining and *eliding* are separate decisions. A function called
             // once from AIPL can be folded into that caller and still be
@@ -4542,6 +4550,8 @@ pub fn inline_single_use_post_mono(
             if entries.contains(&f.name) {
                 skip.insert(f.name.clone());
             } else {
+                tally.remove(&f);
+                tally.forget(&f.name);
                 program.fns.retain(|g| g.name != f.name);
             }
         } else {
@@ -4721,11 +4731,10 @@ fn is_inline_shape_typed(higher_order_or_variadic: bool, body: &typed_util::Type
 /// and monomorphization leaves no type parameters.
 fn is_inline_candidate_mono(
     f: &ConcreteFn,
-    counts: &HashMap<&str, usize>,
-    binders: &HashSet<&str>,
+    tally: &SingleUseTally,
     skip: &HashSet<String>,
 ) -> bool {
-    counts.get(f.name.as_str()) == Some(&1)
+    tally.counts.get(f.name.as_str()) == Some(&1)
         && f.name != "main"
         // A `.test` body is not an ordinary function: codegen dispatches on the
         // *name* `__test$<fn>` to make `?` fail the current test rather than
@@ -4736,7 +4745,7 @@ fn is_inline_candidate_mono(
         && !aipl_syntax::is_constant_initializer(&f.name)
         && f.name != "__test_main"
         && !skip.contains(f.name.as_str())
-        && !binders.contains(f.name.as_str())
+        && tally.binders.get(f.name.as_str()).is_none_or(|bound| *bound == 0)
         // A mutating method that *owns* its receiver is not inlinable: its body
         // is compiled against a transfer only a real call boundary performs —
         // the caller hands the slot's reference over (`__move`), the entry makes
@@ -4761,6 +4770,74 @@ fn is_inline_candidate_mono(
         && !f.is_directly_recursive()
 }
 
+/// The use counts and binder multiplicities [`inline_single_use_post_mono`] chooses by, kept across
+/// rounds. Each is a sum over the program's functions of what that function contributes, so a round
+/// that rewrites one function updates them by taking its old contribution off and its new one on,
+/// and they always equal a walk of the whole program.
+struct SingleUseTally {
+    /// How often each name is used outside a scope that binds it; every function's name is present.
+    counts: HashMap<String, usize>,
+    /// How many places bind each name: a parameter, a `let`, a loop variable, a lambda parameter or
+    /// a `match` arm's binding.
+    binders: HashMap<String, usize>,
+}
+
+impl SingleUseTally {
+    fn of(program: &MonoProgram) -> Self {
+        let mut tally = SingleUseTally {
+            counts: program.fns.iter().map(|f| (f.name.clone(), 0)).collect(),
+            binders: HashMap::new(),
+        };
+        for f in &program.fns {
+            tally.add(f);
+        }
+        tally
+    }
+
+    fn add(&mut self, f: &ConcreteFn) {
+        let (used, bound) = Self::contribution(f);
+        for name in used {
+            *self.counts.entry(name.to_string()).or_insert(0) += 1;
+        }
+        for name in bound {
+            *self.binders.entry(name.to_string()).or_insert(0) += 1;
+        }
+    }
+
+    fn remove(&mut self, f: &ConcreteFn) {
+        let (used, bound) = Self::contribution(f);
+        for name in used {
+            if let Some(count) = self.counts.get_mut(name) {
+                *count -= 1;
+            }
+        }
+        for name in bound {
+            if let Some(count) = self.binders.get_mut(name) {
+                *count -= 1;
+            }
+        }
+    }
+
+    /// `name` is no longer a function of the program.
+    fn forget(&mut self, name: &str) {
+        self.counts.remove(name);
+    }
+
+    /// The names `f` uses, once per use, and the names it binds, once per binding.
+    fn contribution(f: &ConcreteFn) -> (Vec<&str>, Vec<&str>) {
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        let mut parameters: HashSet<&str> = f.params.iter().map(|p| p.name.as_str()).collect();
+        typed_util::count_uses(&f.body, &mut parameters, &mut counts);
+        let used = counts
+            .into_iter()
+            .flat_map(|(name, count)| std::iter::repeat_n(name, count))
+            .collect();
+        let mut bound: Vec<&str> = f.params.iter().map(|p| p.name.as_str()).collect();
+        typed_util::collect_body_binders(&f.body, &mut |name| bound.push(name));
+        (used, bound)
+    }
+}
+
 /// [`use_counts`] for a [`MonoProgram`].
 fn use_counts_mono(program: &MonoProgram) -> HashMap<&str, usize> {
     let mut counts: HashMap<&str, usize> =
@@ -4779,7 +4856,9 @@ fn collect_binders_mono(program: &MonoProgram) -> HashSet<&str> {
         for p in &f.params {
             set.insert(p.name.as_str());
         }
-        typed_util::collect_body_binders(&f.body, &mut set);
+        typed_util::collect_body_binders(&f.body, &mut |name| {
+            set.insert(name);
+        });
     }
     set
 }
