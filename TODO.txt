@@ -856,6 +856,7 @@ coverage:
   make code coverage
 
 perfmon:
+  put top down and bottom up flamegraph in same svg
   be more selective about what tests run per: we should switch to only the tests that are designed for it, plus some things we really care about (e.g. the compiler itself). We need better perf coverage first though.
   figure out ways to make perfmon refresh faster, seems like it's often the long pole in handoff
   allow comments in report sections

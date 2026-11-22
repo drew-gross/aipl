@@ -7,7 +7,7 @@
 #     scripts/flamegraph_check.sh crates/aipl-mono/src tests/cases/lists
 #     OUT=/tmp/check.svg INTERVAL_MS=5 scripts/flamegraph_check.sh
 #
-# Writes `target/flamegraph/check.svg` (or `$OUT`), beside the raw `sample` output
+# Writes `target/flamegraph/check.svg` (or `$OUT`) and the same stacks with the leaves as roots as `check.reversed.svg`, beside the raw `sample` output
 # and the folded stacks it was drawn from. It uses macOS's `sample`, which profiles a
 # process you own without sudo, and `inferno` for the drawing (`cargo install inferno`).
 #
@@ -50,4 +50,7 @@ wait "$pid" || true
 
 inferno-collapse-sample <"$base.sample.txt" >"$base.folded"
 inferno-flamegraph --title "aipl check ${paths[*]}" --countname samples <"$base.folded" >"$out"
-echo "wrote $out" >&2
+# The same stacks reversed: the leaf (where the time is spent) is the root, its callers above it.
+inferno-flamegraph --reverse --title "aipl check ${paths[*]} (leaves as roots)" --countname samples \
+    <"$base.folded" >"$base.reversed.svg"
+echo "wrote $out and $base.reversed.svg" >&2
