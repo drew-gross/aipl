@@ -4506,13 +4506,23 @@ pub fn inline_single_use_post_mono(
     let mut program = program.clone();
     let mut skip: HashSet<String> = HashSet::new();
     let mut tally = SingleUseTally::of(&program);
+    let mut shape_failed: HashSet<String> = HashSet::new();
 
     loop {
-        let candidate = program
-            .fns
-            .iter()
-            .find(|f| is_inline_candidate_mono(f, &tally, &skip))
-            .cloned();
+        let mut candidate = None;
+        for f in &program.fns {
+            if shape_failed.contains(f.name.as_str())
+                || !is_inline_candidate_before_shape_mono(f, &tally, &skip)
+            {
+                continue;
+            }
+            if has_inline_shape_mono(f) {
+                candidate = Some(f.clone());
+                break;
+            }
+            // A body only changes when a call in it is inlined, which clears this.
+            shape_failed.insert(f.name.clone());
+        }
         let Some(f) = candidate else { break };
 
         let fparam_names: Vec<InlineParam> = f
@@ -4527,11 +4537,11 @@ pub fn inline_single_use_post_mono(
             })
             .collect();
         // The one caller: the function is used once.
-        let caller = program
-            .fns
-            .iter()
-            .position(|g| typed_util::references_name(&g.body, &f.name));
+        let caller = tally
+            .sole_user(&f.name)
+            .and_then(|user| program.fns.iter().position(|g| g.name == user));
         let replaced = caller.is_some_and(|caller| {
+            shape_failed.remove(program.fns[caller].name.as_str());
             tally.remove(&program.fns[caller]);
             let replaced = inline_typed::expand_calls_in(
                 &mut program.fns[caller],
@@ -4726,10 +4736,11 @@ fn is_inline_shape_typed(higher_order_or_variadic: bool, body: &typed_util::Type
         && !typed_util::contains_inplace_hof_intrinsic(body)
 }
 
-/// [`is_inline_candidate`] for a monomorphized [`ConcreteFn`]. It has no `is_pub`
+/// [`is_inline_candidate`] for a monomorphized [`ConcreteFn`], except that the body's shape is
+/// asked separately (see [`has_inline_shape_mono`]), since it is the expensive part. It has no `is_pub`
 /// or type parameters to rule out: nothing but `main` is reachable from outside,
 /// and monomorphization leaves no type parameters.
-fn is_inline_candidate_mono(
+fn is_inline_candidate_before_shape_mono(
     f: &ConcreteFn,
     tally: &SingleUseTally,
     skip: &HashSet<String>,
@@ -4754,15 +4765,6 @@ fn is_inline_candidate_mono(
         // short of what the writeback expects. An ordinary (lent) mutating method
         // is inlined (`optimizations/inline_mutating_method`).
         && !(f.is_mutating() && f.params.first().is_some_and(|p| p.owned))
-        // A higher-order function (one with a function-typed parameter) is not
-        // inlined. Variadic parameters need no check: `specialize_variadic` has
-        // already resolved them.
-        && is_inline_shape_typed(
-            f.params
-                .iter()
-                .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
-            &f.body,
-        )
         // Not recursive: the definition is dropped once its one call is inlined,
         // so a body that calls itself would be left calling a function that is
         // gone. (A candidate's name is never rebound — `binders` above — so a
@@ -4780,6 +4782,8 @@ struct SingleUseTally {
     /// How many places bind each name: a parameter, a `let`, a loop variable, a lambda parameter or
     /// a `match` arm's binding.
     binders: HashMap<String, usize>,
+    /// For each name, the functions that use it.
+    users: HashMap<String, HashSet<String>>,
 }
 
 impl SingleUseTally {
@@ -4787,6 +4791,7 @@ impl SingleUseTally {
         let mut tally = SingleUseTally {
             counts: program.fns.iter().map(|f| (f.name.clone(), 0)).collect(),
             binders: HashMap::new(),
+            users: HashMap::new(),
         };
         for f in &program.fns {
             tally.add(f);
@@ -4798,6 +4803,10 @@ impl SingleUseTally {
         let (used, bound) = Self::contribution(f);
         for name in used {
             *self.counts.entry(name.to_string()).or_insert(0) += 1;
+            self.users
+                .entry(name.to_string())
+                .or_default()
+                .insert(f.name.clone());
         }
         for name in bound {
             *self.binders.entry(name.to_string()).or_insert(0) += 1;
@@ -4810,6 +4819,9 @@ impl SingleUseTally {
             if let Some(count) = self.counts.get_mut(name) {
                 *count -= 1;
             }
+            if let Some(users) = self.users.get_mut(name) {
+                users.remove(f.name.as_str());
+            }
         }
         for name in bound {
             if let Some(count) = self.binders.get_mut(name) {
@@ -4821,6 +4833,14 @@ impl SingleUseTally {
     /// `name` is no longer a function of the program.
     fn forget(&mut self, name: &str) {
         self.counts.remove(name);
+        self.users.remove(name);
+    }
+
+    /// The one function that uses `name`, when exactly one does.
+    fn sole_user(&self, name: &str) -> Option<&str> {
+        let mut users = self.users.get(name)?.iter();
+        let user = users.next()?;
+        users.next().is_none().then_some(user.as_str())
     }
 
     /// The names `f` uses, once per use, and the names it binds, once per binding.
@@ -4836,6 +4856,19 @@ impl SingleUseTally {
         typed_util::collect_body_binders(&f.body, &mut |name| bound.push(name));
         (used, bound)
     }
+}
+
+/// The shape part of [`is_inline_candidate`] for a monomorphized [`ConcreteFn`].
+fn has_inline_shape_mono(f: &ConcreteFn) -> bool {
+    // A higher-order function (one with a function-typed parameter) is not
+    // inlined. Variadic parameters need no check: `specialize_variadic` has
+    // already resolved them.
+    is_inline_shape_typed(
+        f.params
+            .iter()
+            .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
+        &f.body,
+    )
 }
 
 /// [`use_counts`] for a [`MonoProgram`].
