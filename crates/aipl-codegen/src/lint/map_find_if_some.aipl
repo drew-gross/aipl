@@ -29,12 +29,12 @@ import { FindIf, FindMap, IsSome, Map, builtin_table } from "../builtin_table.ai
 import { Call, Expr, Ident, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { Named, UnfilledHit, lint_in_unfilled_messages } from "./lint_hit.aipl";
+import { Advice, Named, UnfilledHit, hit_at, lint_in_unfilled_messages } from "./lint_hit.aipl";
 import { Builtin, bound_to, is_builtin_named } from "./spelling.aipl";
 
-# The hit for `self`, when it is a `map(..).find_if(is_some)` chain in a file with these `items`.
-pub fn map_find_if_some(self: Expr<Call>, items: Item[]) -> UnfilledHit? {
-    let Call(_, arguments, _, FindIf) = self.kind else { return none; };
+# The advice for the call `self`, when it is a `map(..).find_if(is_some)` chain in a file with these `items`.
+pub fn map_find_if_some(self: Call(_, arguments, _, callee), items: Item[]) -> Advice? {
+    if (callee != FindIf) { return none; };
     let [mapped, predicate] = arguments else { return none; };
     let Call(_, inner_arguments, _, Map) = mapped.kind else { return none; };
     let Ident(predicate_name) = predicate.kind.as_case::<Ident>()?;
@@ -43,7 +43,7 @@ pub fn map_find_if_some(self: Expr<Call>, items: Item[]) -> UnfilledHit? {
     if (!Builtin(IsSome).is_builtin_named(items.bound_to(predicate_name)?, builtin_table())) {
         return none;
     };
-    some(UnfilledHit {
+    some(Advice {
         named: [
             Named { text: `"`, builtin: Builtin(Map) },
             Named { text: `" then "`, builtin: Builtin(FindIf) },
@@ -54,14 +54,13 @@ pub fn map_find_if_some(self: Expr<Call>, items: Item[]) -> UnfilledHit? {
             },
         ],
         tail: `(..)" over the mapping function, which hands the answer back once`,
-        span: self.span,
     })
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }, items: Item[]) -> UnfilledHit[] {
         body
             .descendants_of_kind::<Call>()
-            .map(|call: Expr<Call>| { call.map_find_if_some(items) })
+            .map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some(items)) })
             .collect_ok()
     }
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

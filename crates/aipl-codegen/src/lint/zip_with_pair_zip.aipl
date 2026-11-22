@@ -13,7 +13,13 @@
 # The hit points at the function, which begins on the line the `#[allow]` would be
 # written on.
 
-import { collect_ok, equal as ==, logical_and as &&, logical_not as ! } from builtins;
+import {
+    collect_ok,
+    equal as ==,
+    logical_and as &&,
+    logical_not as !,
+    not_equal as !=,
+} from builtins;
 import { Zip, ZipWith } from "../builtin_table.aipl";
 import {
     Call,
@@ -30,8 +36,8 @@ import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./li
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `zip_with` whose function only pairs its two arguments.
-pub fn zip_with_pair_zip(self: Expr<Call>) -> UnfilledHit? {
-    let Call(_, arguments, _, ZipWith) = self.kind else { return none; };
+pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
+    if (callee != ZipWith) { return none; };
     let [receiver, other, function] = arguments else { return none; };
     if (!function.only_pairs()) { return none; };
     some(UnfilledHit {
@@ -48,7 +54,7 @@ pub fn zip_with_pair_zip(self: Expr<Call>) -> UnfilledHit? {
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> UnfilledHit[] {
-        body.descendants_of_kind::<Call>()$zip_with_pair_zip().collect_ok()
+        body.descendants_of_kind::<Call>()$kind$zip_with_pair_zip().collect_ok()
     }
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {

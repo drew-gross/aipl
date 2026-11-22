@@ -92,6 +92,10 @@ pub fn advice(builtin: Callee, before: str, after: str) -> Advice {
     assert(advice(Len, "use ", "()").named == [Named { text: "use ", builtin: Builtin(Len) }]);
 })
 
+# `advice`, when there is one, as the hit at the node `self`: a lint of one node says what is wrong
+# with it, and the node's own span is where that is pointed.
+pub fn hit_at(self: Expr, advice: Advice?) -> UnfilledHit? { some(advice?.at(self.span)) }
+
 # The hit that `self` is when it is about the node whose span is `span`.
 pub fn at(self: Advice, span: Span) -> UnfilledHit {
     named: self.named,

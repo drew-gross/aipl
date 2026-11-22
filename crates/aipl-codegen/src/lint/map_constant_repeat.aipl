@@ -60,9 +60,10 @@ import { Function } from "../item.aipl";
 import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
-# The hit for `self`, when it is a `map` over a function that ignores its argument.
-pub fn map_constant_repeat(self: Expr<Call>) -> UnfilledHit? {
-    let Call(_, arguments, _, Map) = self.kind else { return none; };
+# The hit for the call `self`, when it is a `map` over a function that ignores its argument.
+pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
+    if (callee != Map) { return none; };
+
     let [receiver, lambda] = arguments else { return none; };
     let Lambda(parameters, constant) = lambda.kind.as_case::<Lambda>()?;
     let [parameter] = parameters else { return none; };
@@ -84,7 +85,7 @@ pub fn map_constant_repeat(self: Expr<Call>) -> UnfilledHit? {
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> UnfilledHit[] {
-        body.descendants_of_kind::<Call>()$map_constant_repeat().collect_ok()
+        body.descendants_of_kind::<Call>()$kind$map_constant_repeat().collect_ok()
     }
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {

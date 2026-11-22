@@ -33,7 +33,14 @@ import {
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { Named, UnfilledHit, lint_in_unfilled_messages, spans_its_text } from "./lint_hit.aipl";
+import {
+    Advice,
+    Named,
+    UnfilledHit,
+    hit_at,
+    lint_in_unfilled_messages,
+    spans_its_text,
+} from "./lint_hit.aipl";
 import { is_same_place } from "./places.aipl";
 import { Flavored } from "./spelling.aipl";
 import { stepped_operators } from "./step_by_one.aipl";
@@ -51,8 +58,7 @@ fn compound_of(self: str) -> str? {
 
 # The hit for `self`, when it is a `set` of a place to itself combined with something. `stepped` are
 # the operators whose `± 1` the step lint has advice for.
-pub fn compound_assign(self: Expr<Assign>, stepped: str[]) -> UnfilledHit? {
-    let Assign(target, value, _) = self.kind;
+pub fn compound_assign(self: Assign(target, value, _), stepped: str[]) -> Advice? {
     if (!target.spans_its_text()) { return none; };
     // An operator use is a call named for the spelling written.
     let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
@@ -71,7 +77,7 @@ pub fn compound_assign(self: Expr<Assign>, stepped: str[]) -> UnfilledHit? {
     // `set x = x ± 1;` is the step lint's when that lint can fire here.
     if (operand.kind == Num(1) && stepped.contains(written)) { return none; };
     let name = target.source;
-    some(UnfilledHit {
+    some(Advice {
         named: [
             Named {
                 text: `"{name}" accumulates onto itself — use the compound form "set {name} `,
@@ -79,7 +85,6 @@ pub fn compound_assign(self: Expr<Assign>, stepped: str[]) -> UnfilledHit? {
             },
         ],
         tail: ` ...;"`,
-        span: self.span,
     })
 }.test({
     // The hits for each function's `set`s.
@@ -87,7 +92,7 @@ pub fn compound_assign(self: Expr<Assign>, stepped: str[]) -> UnfilledHit? {
         let stepped = items.stepped_operators();
         body
             .descendants_of_kind::<Assign>()
-            .map(|assign: Expr<Assign>| { assign.compound_assign(stepped) })
+            .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.compound_assign(stepped)) })
             .collect_ok()
     }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {

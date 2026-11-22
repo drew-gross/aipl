@@ -35,12 +35,11 @@ import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
 import {
-    Advice,
     LintHit,
     UnfilledHit,
-    at,
     filled,
     functions,
+    hit_at,
     hits,
     hits_once,
     lint_hits,
@@ -149,20 +148,15 @@ fn call_lints(Function { body }) -> LintHit[] {
 fn call_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
     let calls = body.descendants_of_kind::<Call>();
     [
-        ..calls$map_constant_repeat(),
-        ..calls.map(|call: Expr<Call>| { call.map_find_if_some(items) }),
-        ..calls$zip_with_pair_zip(),
-        ..calls$with_value_or_self(),
+        ..calls$kind$map_constant_repeat(),
+        ..calls.map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some(items)) }),
+        ..calls$kind$zip_with_pair_zip(),
+        ..calls$kind$with_value_or_self(),
         ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),
         ..calls.map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) }),
         ..calls.map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) }),
     ].collect_ok()
 }
-
-# `advice`, when there is one, as the hit at the call `self`: a lint of one call says what is wrong
-# with it, and the call's own span is where that is pointed. (The lint is passed as its result
-# because a function type over a case, `(Call) -> Advice?`, is not typed yet.)
-fn hit_at(self: Expr<Call>, advice: Advice?) -> UnfilledHit? { some(advice?.at(self.span)) }
 
 # The lints over the `match`es of `function`, which are found once for all of them. One that is about
 # the function it is in takes it as well.
@@ -199,8 +193,10 @@ fn assign_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
     [
         ..assigns$kind$set_spread_insert(),
         ..assigns$kind$set_spread_push(),
-        ..assigns$step_by_one(),
-        ..assigns.map(|assign: Expr<Assign>| { assign.compound_assign(stepped) }),
+        ..assigns.map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) }),
+        ..assigns.map(|assign: Expr<Assign>| {
+            assign.hit_at(assign.kind.compound_assign(stepped))
+        }),
     ].collect_ok()
 }
 

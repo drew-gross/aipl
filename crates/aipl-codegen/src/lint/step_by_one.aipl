@@ -23,11 +23,19 @@ import {
     is_some_and,
     logical_and as &&,
     logical_not as !,
+    map,
 } from builtins;
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { Named, UnfilledHit, lint_in_unfilled_messages, spans_its_text } from "./lint_hit.aipl";
+import {
+    Advice,
+    Named,
+    UnfilledHit,
+    hit_at,
+    lint_in_unfilled_messages,
+    spans_its_text,
+} from "./lint_hit.aipl";
 import { is_same_place } from "./places.aipl";
 import { Flavored, can_flavor } from "./spelling.aipl";
 
@@ -53,8 +61,7 @@ pub fn stepped_operators(self: Item[]) -> str[] {
 }
 
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.
-pub fn step_by_one(self: Expr<Assign>) -> UnfilledHit? {
-    let Assign(target, value, _) = self.kind;
+pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
     if (!target.spans_its_text()) { return none; };
 
     // An operator use is a call whose callee is the spelling that was written, which is what this
@@ -76,7 +83,7 @@ pub fn step_by_one(self: Expr<Assign>) -> UnfilledHit? {
     } else {
         (`subtracting 1 from "{name}"`, "decrement")
     };
-    some(UnfilledHit {
+    some(Advice {
         named: [
             Named {
                 text: `{what} — use the {form} form "set {name}`,
@@ -84,12 +91,14 @@ pub fn step_by_one(self: Expr<Assign>) -> UnfilledHit? {
             },
         ],
         tail: `;"`,
-        span: self.span,
     })
 }.test({
     // The hits for each function's `set`s.
     fn flagged(Function { body }, items: Item[]) -> UnfilledHit[] {
-        body.descendants_of_kind::<Assign>()$step_by_one().collect_ok()
+        body
+            .descendants_of_kind::<Assign>()
+            .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) })
+            .collect_ok()
     }
     fn on_field(body: str) -> str[]!ParseFailure {
         lint_in_unfilled_messages(

@@ -18,7 +18,13 @@
 #
 # The hit points at the fallback.
 
-import { collect_ok, equal as ==, logical_and as &&, logical_not as ! } from builtins;
+import {
+    collect_ok,
+    equal as ==,
+    logical_and as &&,
+    logical_not as !,
+    not_equal as !=,
+} from builtins;
 import { TrySet, ValueOr, With } from "../builtin_table.aipl";
 import { Call, Expr, Field, Ident, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -27,8 +33,8 @@ import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./li
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `with(..)` the call falls back from to the array it replaces in.
-pub fn with_value_or_self(self: Expr<Call>) -> UnfilledHit? {
-    let Call(_, arguments, _, ValueOr) = self.kind else { return none; };
+pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
+    if (callee != ValueOr) { return none; };
     let [replaced, fallback] = arguments else { return none; };
     let Call(_, with_arguments, _, With) = replaced.kind else { return none; };
     let [receiver, _, _] = with_arguments else { return none; };
@@ -47,7 +53,7 @@ pub fn with_value_or_self(self: Expr<Call>) -> UnfilledHit? {
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> UnfilledHit[] {
-        body.descendants_of_kind::<Call>()$with_value_or_self().collect_ok()
+        body.descendants_of_kind::<Call>()$kind$with_value_or_self().collect_ok()
     }
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
