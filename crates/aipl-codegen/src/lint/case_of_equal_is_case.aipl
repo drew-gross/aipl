@@ -8,7 +8,7 @@
 # The hit points at the `==`, a short line the formatter keeps in place.
 
 import { collect_ok, count_if, equal as ==, len, not_equal as != } from builtins;
-import { CaseOf, Equal } from "../builtin_table.aipl";
+import { CaseOf, Equal, IsCase } from "../builtin_table.aipl";
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
@@ -17,7 +17,7 @@ import {
     UnfilledHit,
     advice,
     at,
-    filled_with,
+    filled_assuming,
     lint_function_unfilled_messages,
 } from "./lint_hit.aipl";
 
@@ -86,13 +86,11 @@ pub fn case_of_equal_is_case(self: Call(_, operands, _, callee)) -> Advice? {
 # `is_case` left for the caller to fill in.
 fn comparison_advice() -> Advice {
     advice(
-        "is_case",
+        IsCase,
         `this compares a value's case — write "<value>.`,
         `::<Case>()" instead of reading it with "case_of()"`,
     )
 }
 
 # The message `advice` comes to for a file that spells `is_case` as `spelled`.
-fn message(spelled: str?) -> str {
-    comparison_advice().at(0..0).filled_with(|name| spelled).message
-}
+fn message(spelled: str?) -> str { comparison_advice().at(0..0).filled_assuming(spelled) }

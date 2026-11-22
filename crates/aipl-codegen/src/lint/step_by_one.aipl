@@ -19,52 +19,41 @@ import {
     as_case,
     collect_ok,
     equal as ==,
-    find_if,
+    filter,
+    is_some_and,
     logical_and as &&,
     logical_not as !,
-    logical_or as ||,
-    map,
-    value_or,
 } from builtins;
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { LintHit, hit, lint_in_messages, spans_its_text } from "./lint_hit.aipl";
-import { Pairing, paired } from "./operator_pairs.aipl";
+import { Named, UnfilledHit, lint_in_unfilled_messages, spans_its_text } from "./lint_hit.aipl";
 import { is_same_place } from "./places.aipl";
+import { Flavored, can_flavor } from "./spelling.aipl";
 
-# The advice for one written operator: the step spelling that replaces it, whether the operation
-# reads in either operand order, and the builtin to import when the file does not have that spelling
-# yet (`none` when it does).
-struct Step { spelling: str, commutative: bool, missing: str? }
+# The step spelling that replaces a written operator, and whether the operation reads in either
+# operand order.
+struct Step { spelling: str, commutative: bool }
 
-# The operator spellings that add or subtract one, with the step each is advised to become.
-struct Written { operator: str, step: Step }
-
-# The advice for the operator `written`, when it has any in a file with these `items`.
-pub fn step_for(self: Item[], written: str) -> Step? {
-    let (spelling, commutative) = if (written == "+") {
-        ("++", true)
-    } else if (written == "+=") {
-        ("++", false)
-    } else if (written == "-" || written == "-=") {
-        ("--", false)
-    } else {
-        return none;
-    };
-    let Pairing { builtin, imported } = self.paired(written, spelling)?;
-    some(Step { spelling, commutative, missing: if (imported) { none } else { some(builtin) } })
+# The step the written operator `self` becomes, if it adds or subtracts.
+pub fn step_of(self: str) -> Step? {
+    match (self) {
+        "+" => some(Step { spelling: "++", commutative: true }),
+        "+=" => some(Step { spelling: "++", commutative: false }),
+        "-" | "-=" => some(Step { spelling: "--", commutative: false }),
+        _ => none,
+    }
 }
 
-# The written operators that have a step form in a file with these `items`.
-pub fn written_steps(self: Item[]) -> Written[] {
-    ["+", "+=", "-", "-="]
-        .map(|operator| self.step_for(operator).map(|step| Written { operator, step }))
-        .collect_ok()
+# The plain operators whose `± 1` this lint has advice for in a file with these `items`.
+pub fn stepped_operators(self: Item[]) -> str[] {
+    ["+", "-"].filter(
+        |operator| operator.step_of().is_some_and(|step| self.can_flavor(step.spelling, operator)),
+    )
 }
 
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.
-pub fn step_by_one(self: Expr<Assign>, steps: Written[]) -> LintHit? {
+pub fn step_by_one(self: Expr<Assign>) -> UnfilledHit? {
     let Assign(target, value, _) = self.kind;
     if (!target.spans_its_text()) { return none; };
 
@@ -72,42 +61,44 @@ pub fn step_by_one(self: Expr<Assign>, steps: Written[]) -> LintHit? {
     // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
     let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
     let [left, right] = args else { return none; };
-    let step = steps.find_if(|candidate| candidate.operator == written)$step?;
+    let Step { spelling, commutative } = written.step_of()?;
     let stepped = if (left.is_same_place(target)) {
         right.is_one()
     } else {
         // The other order is a step only where the operation is commutative: `1 + x` adds one to
         // `x`, `1 - x` does not subtract one from it.
-        step.commutative && left.is_one() && right.is_same_place(target)
+        commutative && left.is_one() && right.is_same_place(target)
     };
     if (!stepped) { return none; };
     let name = target.source;
-    let (what, form) = if (step.spelling == "++") {
+    let (what, form) = if (spelling == "++") {
         (`adding 1 to "{name}"`, "increment")
     } else {
         (`subtracting 1 from "{name}"`, "decrement")
     };
-    let missing = step.missing
-        .map(|builtin| `, importing \`{builtin} as {step.spelling}\` from builtins`)
-        .value_or("");
-    some(hit(`{what} — use the {form} form "set {name}{step.spelling};"{missing}`, self.span))
+    some(UnfilledHit {
+        named: [
+            Named {
+                text: `{what} — use the {form} form "set {name}`,
+                builtin: Flavored(spelling, written),
+            },
+        ],
+        tail: `;"`,
+        span: self.span,
+    })
 }.test({
     // The hits for each function's `set`s.
-    fn flagged(Function { body }, items: Item[]) -> LintHit[] {
-        let steps = items.written_steps();
-        body
-            .descendants_of_kind::<Assign>()
-            .map(|assign: Expr<Assign>| { assign.step_by_one(steps) })
-            .collect_ok()
+    fn flagged(Function { body }, items: Item[]) -> UnfilledHit[] {
+        body.descendants_of_kind::<Assign>()$step_by_one().collect_ok()
     }
     fn on_field(body: str) -> str[]!ParseFailure {
-        lint_in_messages(
+        lint_in_unfilled_messages(
             `import \{ wrapping_add as + } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
             flagged,
         )
     }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_messages(
+        lint_in_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
             flagged,
         )
@@ -161,7 +152,7 @@ pub fn step_by_one(self: Expr<Assign>, steps: Written[]) -> LintHit? {
 
     // An operator bound to one of the file's own functions is not the builtin, whatever it is called.
     assert(
-        lint_in_messages(
+        lint_in_unfilled_messages(
             """import { add as + } from "./mymath.aipl"; fn f(x: i64) -> i64 { mut n = x; set n = n + 1; n }""",
             flagged,
         )? == [],

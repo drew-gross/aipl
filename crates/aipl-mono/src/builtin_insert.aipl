@@ -17,10 +17,10 @@ import { has } from sets;
 # An ordered set (`#>{T}`, `#<{T}`) is refused: the grown set is written back as an
 # unordered one, and the checker reports it does not fit the ordered binding.
 pub fn insert<T: any>(mut self: #{T}, element: T) {
-    // `set_spread_insert` flags this line, correctly: it is the longhand the lint exists to
-    // replace. It is also the *implementation* of the shorthand, so taking the advice would
-    // have `insert` call itself.
-    set self = #{..self, element}; #[allow]
+    // This line is the longhand `set_spread_insert` asks to replace, and it is also the
+    // *implementation* of the shorthand. The lint says nothing here, since the file defines
+    // `insert` itself.
+    set self = #{..self, element};
 }.test({
     mut seen = #{1, 2};
     set seen.insert(3);

@@ -49,11 +49,13 @@ import {
     not_equal as !=,
     to_str,
 } from builtins;
+import { All, Any } from "../builtin_table.aipl";
 import { Bool, Call, Return, Seq } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { UnfilledHit, imported_as, lint_in_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { UnfilledHit, lint_in_unfilled_messages, unfilled } from "./lint_hit.aipl";
 import { is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
+import { imported_as } from "./spelling.aipl";
 
 # A hit for each loop in the program that reports whether some or every element passes a
 # test.
@@ -102,7 +104,7 @@ pub fn return_loop_any_all(Function { body }, items: Item[]) -> UnfilledHit[] {
             // part of the advice a reader could get backwards, so it is said.
             let note = if (returned) { "" } else { ` (the condition with its "!" removed)` };
             some(unfilled(
-                if (returned) { "any" } else { "all" },
+                if (returned) { Any } else { All },
                 `this loop reports {what} — write "return {found.iterable.iterable_text()}.`,
                 `(|{found.variable}| ..);"{note} and drop the loop`,
                 found.statement.span,

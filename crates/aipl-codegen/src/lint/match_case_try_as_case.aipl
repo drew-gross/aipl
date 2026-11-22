@@ -20,7 +20,7 @@
 # `#[allow]` squelches it.
 
 import { collect_ok, equal as ==, logical_not as !, map } from builtins;
-import { Some } from "../builtin_table.aipl";
+import { AsCase, Some } from "../builtin_table.aipl";
 import { Call, Match, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, is_give_up, statement_head, tail_matches } from "./case_match.aipl";
@@ -42,7 +42,7 @@ pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
                 if (wrapped$show_expr() == [scrutinee.show_expr()]) { return none; };
             };
             some(unfilled(
-                "as_case",
+                AsCase,
                 `this match gives up with none unless the value is {pattern.case}, and is the last thing the function does — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
                 `::<{pattern.case}>()?;" and continue with the arm's body`,
                 other_arm.span,

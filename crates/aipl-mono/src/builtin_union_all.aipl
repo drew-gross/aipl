@@ -15,10 +15,10 @@ import { union } from sets;
 # out.union(s); }` longhand, which is why `union_loop_union_all` flags that shape
 # and points here.
 pub fn union_all<T: any>(self: #{T}[]) -> #{T} {
-    // `union_loop_union_all` flags this loop, correctly: it is the longhand the
-    // lint exists to replace. It is also the *implementation* of the shorthand,
-    // so taking the advice would have `union_all` call itself.
-    mut out: #{T} = #{}; #[allow]
+    // This loop is the longhand `union_loop_union_all` asks to replace, and it is also the
+    // *implementation* of the shorthand. The lint says nothing here, since the file defines
+    // `union_all` itself.
+    mut out: #{T} = #{};
     for (let s : self) {
         set out = out.union(s);
     }

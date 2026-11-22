@@ -21,7 +21,7 @@ import { equal as ==, is_err_and, len, logical_not as !, map_err } from builtins
 pub fn map_ok<T: any, U: any, E: any>(self: T!E, f: (T) -> U) -> U!E {
     match (self) {
         ok(v) => ok(f(v)),
-        err(e) => err(e), #[allow]
+        err(e) => err(e),
     }
 }.test({
     // A named conversion, so the tests cover passing a function rather than a

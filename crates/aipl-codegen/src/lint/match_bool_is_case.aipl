@@ -30,12 +30,13 @@ import {
     logical_not as !,
     logical_or as ||,
 } from builtins;
+import { IsCase } from "../builtin_table.aipl";
 import { Bool, Match, MatchArm, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor, is_binder_name } from "../pat.aipl";
 import {
     UnfilledHit,
-    filled_with,
+    filled_assuming,
     lint_function_unfilled_messages,
     unfilled,
 } from "./lint_hit.aipl";
@@ -230,7 +231,7 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> UnfilledHit? {
 # of `is_case` left for the caller to fill in.
 fn advice(case: str, span: Span) -> UnfilledHit {
     unfilled(
-        "is_case",
+        IsCase,
         `this match only asks whether the value is {case} — write "<value>.`,
         `::<{case}>()" and drop the match`,
         span,
@@ -238,6 +239,4 @@ fn advice(case: str, span: Span) -> UnfilledHit {
 }
 
 # The message `advice` comes to for a file that spells `is_case` as `spelled`.
-fn message(case: str, spelled: str?) -> str {
-    advice(case, 0..0).filled_with(|name| spelled).message
-}
+fn message(case: str, spelled: str?) -> str { advice(case, 0..0).filled_assuming(spelled) }

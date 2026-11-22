@@ -63,14 +63,8 @@ import { ParseFailure } from "../grammar_aipl.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Function, Item, LoweredFn } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import {
-    LintHit,
-    hit,
-    imported_as,
-    imported_locals,
-    lint_in_messages,
-    quote,
-} from "./lint_hit.aipl";
+import { LintHit, hit, lint_in_messages, quote } from "./lint_hit.aipl";
+import { imported_as, imported_locals } from "./spelling.aipl";
 
 # A hit for each lambda in the program that adds nothing to what it forwards to.
 pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {

@@ -29,7 +29,7 @@ import {
     to_str,
     wrapping_add as +,
 } from builtins;
-import { Err, Ok } from "../builtin_table.aipl";
+import { Err, MapOk, Ok } from "../builtin_table.aipl";
 import { Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
@@ -50,7 +50,7 @@ pub fn match_map_ok(self: Match) -> UnfilledHit? {
         return none;
     };
     some(unfilled(
-        "map_ok",
+        MapOk,
         `this \`match\` rewrites the result's value side and passes its error through — write "{scrutinee.receiver_text()}.`,
         `(|{ok_binder}| ..)" instead`,
         err_body.span,

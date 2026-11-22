@@ -20,7 +20,7 @@
 # it is the arm that identifies the shape.
 
 import { collect_ok, equal as ==, logical_not as !, logical_or as || } from builtins;
-import { Err, Ok } from "../builtin_table.aipl";
+import { Err, MapErr, Ok } from "../builtin_table.aipl";
 import { Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
@@ -41,7 +41,7 @@ pub fn match_map_err(self: Match) -> UnfilledHit? {
         return none;
     };
     some(unfilled(
-        "map_err",
+        MapErr,
         `this \`match\` rewrites the result's error side and passes its value through — write "{scrutinee.receiver_text()}.`,
         `(|{err_binder}| ..)" instead`,
         ok_body.span,

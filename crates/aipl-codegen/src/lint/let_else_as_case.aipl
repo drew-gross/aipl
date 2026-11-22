@@ -22,6 +22,7 @@
 # place, so `#[allow]` squelches it.
 
 import { collect_ok, equal as ==, logical_or as ||, map, not_equal as != } from builtins;
+import { AsCase } from "../builtin_table.aipl";
 import { IfLet, None, Return, Seq, Unit } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, statement_head, tail_matches } from "./case_match.aipl";
@@ -41,7 +42,7 @@ pub fn let_else_as_case(Function { body }) -> UnfilledHit[] {
             let Return(value) = leave.kind else { return none; };
             if (rest.kind != Unit || value.kind != None) { return none; };
             some(unfilled(
-                "as_case",
+                AsCase,
                 `this \`else\` only gives up with none — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
                 `::<{pattern.case}>()?;" and drop the block`,
                 leave.span,

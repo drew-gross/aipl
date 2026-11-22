@@ -13,7 +13,7 @@ import { equal as ==, int_parse, push } from builtins;
 # The values inside the `some` elements of `self`, in order; the `none`s are dropped.
 pub fn collect_ok<T: any>(self: T?[]) -> T[] {
     // This is the loop `push_loop_collect_ok` advises replacing.
-    mut out: T[] = []; #[allow]
+    mut out: T[] = [];
     for (let x : self) {
         if (let some(v) = x) { set out.push(v); };
     }

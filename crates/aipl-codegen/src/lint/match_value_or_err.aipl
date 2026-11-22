@@ -45,7 +45,7 @@ import {
     logical_or as ||,
     value_or,
 } from builtins;
-import { Assert, Err, Ok } from "../builtin_table.aipl";
+import { Assert, Err, Ok, ValueOrErr } from "../builtin_table.aipl";
 import {
     Assign,
     Call,
@@ -137,7 +137,7 @@ pub fn match_value_or_err(self: Match, Function { sig, name }) -> UnfilledHit? {
     };
     let opening = if (leaves.is_some()) { `let {binder} = ` } else { "" };
     some(unfilled(
-        "value_or_err",
+        ValueOrErr,
         `this \`match\` turns an optional into a result — {if (named) { "write it as " } else { "write " }}"{opening}{scrutinee.receiver_text()}.`,
         after,
         leaves.value_or(none_body).span,

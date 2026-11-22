@@ -31,12 +31,13 @@ import {
     to_str,
     value_or,
 } from builtins;
+import { ValueOr } from "../builtin_table.aipl";
 import { Ident, Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_constant_default } from "./constant_default.aipl";
 import {
     UnfilledHit,
-    filled_with,
+    filled_assuming,
     hit,
     lint_function_unfilled_hits,
     lint_function_unfilled_messages,
@@ -262,7 +263,7 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
 # pointing at `span`.
 fn advice(receiver: str, default: str, span: Span) -> UnfilledHit {
     unfilled(
-        "value_or",
+        ValueOr,
         `this \`match\` hands back the optional's payload or a default — write "{receiver}.`,
         `({default})" instead`,
         span,
@@ -271,5 +272,5 @@ fn advice(receiver: str, default: str, span: Span) -> UnfilledHit {
 
 # The message for a file that does not import `value_or`, as the tests' sources do not.
 fn message(receiver: str, default: str) -> str {
-    advice(receiver, default, 0..0).filled_with(|name| none).message
+    advice(receiver, default, 0..0).filled_assuming(none)
 }

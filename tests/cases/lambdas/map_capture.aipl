@@ -9,7 +9,7 @@ import { equal as ==, push, wrapping_add as +, wrapping_mul as * } from builtins
 fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
     // A user-defined `map` — the builtin the push-loop lint recommends is what
     // this case exists to reimplement.
-    mut out = []; #[allow]
+    mut out = [];
     for (let x : xs) {
         set out.push(f(x));
     }

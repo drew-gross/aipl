@@ -12,7 +12,7 @@ import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
-import { compound_assign, compound_forms, stepped_operators } from "./compound_assign.aipl";
+import { compound_assign } from "./compound_assign.aipl";
 import { destructure } from "./destructure.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
 import { eta_lambda } from "./eta_lambda.aipl";
@@ -60,7 +60,7 @@ import { set_spread_push } from "./set_spread_push.aipl";
 import { slice_from_zero } from "./slice_from_zero.aipl";
 import { slice_to_len } from "./slice_to_len.aipl";
 import { slice_whole } from "./slice_whole.aipl";
-import { step_by_one, written_steps } from "./step_by_one.aipl";
+import { step_by_one, stepped_operators } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
 import { unused_functions } from "./unused_functions.aipl";
@@ -174,18 +174,18 @@ fn let_mut_lints(Function { body }, items: Item[]) -> LintHit[] {
 # The lints over the assignments of `function`, which are found once for all of them.
 fn assign_lints(Function { body }, items: Item[]) -> LintHit[] {
     let assigns = body.descendants_of_kind::<Assign>();
-    let steps = items.written_steps();
-    let compounds = items.compound_forms();
     let stepped = items.stepped_operators();
     [
         ..assigns$kind$set_spread_field().collect_ok(),
         ..[..assigns$kind$set_spread_insert(), ..assigns$kind$set_spread_push()]
             .collect_ok()
             .filled(items),
-        ..assigns.map(|assign: Expr<Assign>| { assign.step_by_one(steps) }).collect_ok(),
-        ..assigns
-            .map(|assign: Expr<Assign>| { assign.compound_assign(compounds, stepped) })
-            .collect_ok(),
+        ..[
+            ..assigns$step_by_one(),
+            ..assigns.map(|assign: Expr<Assign>| { assign.compound_assign(stepped) }),
+        ]
+            .collect_ok()
+            .filled(items),
     ]
 }
 

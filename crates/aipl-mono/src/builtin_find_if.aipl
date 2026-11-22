@@ -9,9 +9,9 @@
 # returns it. The optional is what carries the not-found case, so the empty
 # array needs no special handling.
 #
-# The `#[allow]` squelches `return_loop_find_if`, which flags exactly this
-# shape — a loop returning the first match — and asks for `find_if`. Here it
-# *is* `find_if`.
+# The shape — a loop returning the first match — is what `return_loop_find_if` asks to be
+# written as `find_if`. Here it *is* `find_if`, and the lint says nothing, since the file
+# defines that name itself.
 
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
@@ -23,9 +23,7 @@ import { equal as ==, filter, greater_than as >, logical_not as ! } from builtin
 # `first` for the unconditional first element.
 pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
     for (let x : self) {
-        if (pred(x)) {
-            return some(x); #[allow]
-        };
+        if (pred(x)) { return some(x); };
     }
     none
 }.test({

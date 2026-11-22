@@ -26,10 +26,12 @@ import {
     map,
     not_equal as !=,
 } from builtins;
+import { FindMap } from "../builtin_table.aipl";
 import { Call, Expr, Ident, Lambda, descendants, synthesized_name } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { UnfilledHit, imported_as, lint_in_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { UnfilledHit, lint_in_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { imported_as } from "./spelling.aipl";
 
 # A hit for each `map(..).find_if(is_some)` chain in the program.
 pub fn map_find_if_some(Function { body }, items: Item[]) -> UnfilledHit[] {
@@ -48,7 +50,7 @@ pub fn map_find_if_some(Function { body }, items: Item[]) -> UnfilledHit[] {
                 };
                 if (!predicate.is_the_function(is_some)) { return none; };
                 some(unfilled(
-                    "find_map",
+                    FindMap,
                     `"{map_name}" then "{find_if}({is_some})" is the first element with an answer, wrapped twice — write "`,
                     `(..)" over the mapping function, which hands the answer back once`,
                     chain.span,

@@ -20,7 +20,7 @@ import { equal as ==, is_err_and, logical_not as !, value_or_err } from builtins
 # `?` can propagate it.
 pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
     match (self) {
-        ok(v) => ok(v), #[allow]
+        ok(v) => ok(v),
         err(e) => err(f(e)),
     }
 }.test({

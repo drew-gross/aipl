@@ -11,11 +11,9 @@
 # no special handling — and `none` is a genuinely different answer from
 # `some(0)`, which is why the position cannot be reported as a bare `u64`.
 #
-# The `#[allow]` squelches `return_loop_find_index`, which flags exactly this
-# shape — an indexed loop returning the first match's position — and asks for
-# `find_index`. Here it *is* `find_index`. Without the marker the lint fires on
-# a builtin's own source, which panics the compiler for every program that
-# reaches it.
+# The shape — an indexed loop returning the first match's position — is what
+# `return_loop_find_index` asks to be written as `find_index`. Here it *is* `find_index`, and
+# the lint says nothing, since the file defines that name itself.
 
 import {
     equal as ==,
@@ -37,9 +35,7 @@ import {
 # name. See `any` for the same scan reporting only whether a match existed.
 pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
     for (let i, x : self) {
-        if (pred(x)) {
-            return some(i); #[allow]
-        };
+        if (pred(x)) { return some(i); };
     }
     none
 }.test({

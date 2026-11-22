@@ -33,7 +33,7 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Push } from "../builtin_table.aipl";
+import { Callee, CollectOk, Map, Push } from "../builtin_table.aipl";
 import { ArrayLit, Ident, IfLet, LetMut, Unit, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
@@ -58,20 +58,20 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
 
     // Asking nothing of the element — the iterable already holds the optionals — leaves no
     // first `map` to write, and pushing the bound name itself needs no second one.
-    let asks: (str, str)? = if (scrutinee.kind != Ident(looped.variable)) {
-        some(("map", `(|{looped.variable}| ..)`))
+    let asks: (Callee, str)? = if (scrutinee.kind != Ident(looped.variable)) {
+        some((Map, `(|{looped.variable}| ..)`))
     } else {
         none
     };
-    let maps: (str, str)? = if (element.kind != Ident(bound)) {
-        some(("map", `(|{bound}| ..)`))
+    let maps: (Callee, str)? = if (element.kind != Ident(bound)) {
+        some((Map, `(|{bound}| ..)`))
     } else {
         none
     };
     some(looped.pipeline_hit(
         "filled by this loop with the answers that exist and nothing else",
         "",
-        [asks, some(("collect_ok", "()")), maps].collect_ok(),
+        [asks, some((CollectOk, "()")), maps].collect_ok(),
     ))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.

@@ -34,6 +34,7 @@ import {
     map,
     not_equal as !=,
 } from builtins;
+import { Len, Repeat } from "../builtin_table.aipl";
 import {
     ArrayLit,
     Bool,
@@ -56,7 +57,8 @@ import {
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { Named, UnfilledHit, imported_as, lint_in_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Named, UnfilledHit, lint_in_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Builtin, imported_as } from "./spelling.aipl";
 
 # A hit for each `map` over a function that ignores its argument.
 pub fn map_constant_repeat(Function { body }, items: Item[]) -> UnfilledHit[] {
@@ -78,9 +80,9 @@ pub fn map_constant_repeat(Function { body }, items: Item[]) -> UnfilledHit[] {
                     named: [
                         Named {
                             text: `"{map_name}" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
-                            builtin: "repeat",
+                            builtin: Builtin(Repeat),
                         },
-                        Named { text: `({receiver.quote("<items>")}.`, builtin: "len" },
+                        Named { text: `({receiver.quote("<items>")}.`, builtin: Builtin(Len) },
                     ],
                     tail: `())"`,
                     span: lambda.span,

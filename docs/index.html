@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">226 files, 2216 items.</p>
+      <p class="summary">226 files, 2229 items.</p>
 
       <ul class="files">
 
@@ -2204,23 +2204,10 @@
           <p class="file-summary">The <code>compound_assign</code> lint: <code>set x = x + e;</code> — an accumulate written the long way; <code>set x += e;</code> is the form for it, and likewise <code>-=</code>, <code>*=</code>, <code>/=</code>.</p>
 
 
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-compound_assign.html#private">1 private</a></span>
+
 
           <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-Compound"><code>Compound</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-compound_forms"><code>compound_forms</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-stepped_operators"><code>stepped_operators</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
 
             <li>
               <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-compound_assign"><code>compound_assign</code></a>
@@ -2581,7 +2568,7 @@
           <p class="file-summary">What a lint reports: the message, and the span the caret goes under. The Rust side rebuilds each as an <code>aipl_syntax::Error</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">6 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-lint_hit.html#private">2 private</a></span>
 
 
           <ul class="items">
@@ -2632,6 +2619,11 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-filled_assuming"><code>filled_assuming</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-filled"><code>filled</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
@@ -2653,21 +2645,6 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-quote"><code>quote</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-imported_as"><code>imported_as</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-bound_to"><code>bound_to</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-imported_locals"><code>imported_locals</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2733,11 +2710,6 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-lint_in_unfilled_messages"><code>lint_in_unfilled_messages</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-lint_hit.html#item-library_of"><code>library_of</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -3003,31 +2975,6 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-match_value_or_err.html#item-match_value_or_err"><code>match_value_or_err</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-codegen-src-lint-operator_pairs.html">crates/aipl-codegen/src/lint/operator_pairs.aipl</a>
-
-          <p class="file-summary">Operators that come in more than one flavor (<code>wrapping_add</code> and <code>saturating_add</code>) are bound by import, and nothing fixes which flavor a file chose for <code>+</code>. A lint that advises another spelling of the same arithmetic — <code>set x = x + 1;</code> as <code>set x++;</code>, or as <code>set x += 1;</code> — is only right when the spelling it advises has the flavor the file's operator has, and it is the import that names it. This is where that is decided, so each such lint asks the same question the same way.</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-operator_pairs.html#private">1 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-operator_pairs.html#item-Pairing"><code>Pairing</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-operator_pairs.html#item-paired"><code>paired</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -3420,6 +3367,71 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-codegen-src-lint-spelling.html">crates/aipl-codegen/src/lint/spelling.aipl</a>
+
+          <p class="file-summary">How a lint's advice names the builtins its rewrite needs, and how the framework decides what to write for each.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-spelling.html#private">13 private</a></span>
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-Need"><code>Need</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-Request"><code>Request</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-Spelling"><code>Spelling</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-spelled"><code>spelled</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-can_flavor"><code>can_flavor</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-imported_as"><code>imported_as</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-bound_to"><code>bound_to</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-imported_locals"><code>imported_locals</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-Pairing"><code>Pairing</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-spelling.html#item-paired"><code>paired</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-codegen-src-lint-squelch.html">crates/aipl-codegen/src/lint/squelch.aipl</a>
 
           <p class="file-summary"><code>#[allow]</code> squelching: which lint hits an author has kept, and what is said about the rest.</p>
@@ -3456,17 +3468,12 @@
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-Written"><code>Written</code></a>
-              <span class="kind kind-struct">struct</span>
-            </li>
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-step_for"><code>step_for</code></a>
+              <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-step_of"><code>step_of</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-written_steps"><code>written_steps</code></a>
+              <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-stepped_operators"><code>stepped_operators</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -3651,6 +3658,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-operator_named_forms.html#item-operator_named_forms"><code>operator_named_forms</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-operator_named_forms.html#item-operator_spellings"><code>operator_spellings</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

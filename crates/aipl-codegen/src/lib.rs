@@ -1985,7 +1985,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/interp_literal.aipl",
     "./lint/interp_to_str.aipl",
     "./lint/places.aipl",
-    "./lint/operator_pairs.aipl",
+    "./lint/spelling.aipl",
     "./lint/arm_block_value.aipl",
     "./lint/char_set_literal.aipl",
     "./lint/field_init_shorthand.aipl",

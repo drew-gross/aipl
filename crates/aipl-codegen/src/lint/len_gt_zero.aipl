@@ -25,7 +25,15 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Callee, GreaterThan, IsEmpty, Len, LessThan, LogicalNot } from "../builtin_table.aipl";
+import {
+    Callee,
+    GreaterThan,
+    IsEmpty,
+    IsNonempty,
+    Len,
+    LessThan,
+    LogicalNot,
+} from "../builtin_table.aipl";
 import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
@@ -42,9 +50,9 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> Advice? {
         },
     };
     some(if (receiver.spans_its_text()) {
-        advice("is_nonempty", `{what} — use "{receiver.source}.`, `()"`)
+        advice(IsNonempty, `{what} — use "{receiver.source}.`, `()"`)
     } else {
-        advice("is_nonempty", `{what} — use "`, `" on the receiver`)
+        advice(IsNonempty, `{what} — use "`, `" on the receiver`)
     })
 }.test({
     // `lint_str` runs every lint, so each snippet imports exactly the names it uses; the ones that

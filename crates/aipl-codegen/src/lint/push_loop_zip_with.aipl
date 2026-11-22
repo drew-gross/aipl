@@ -39,7 +39,7 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Push } from "../builtin_table.aipl";
+import { Push, Zip, ZipWith } from "../builtin_table.aipl";
 import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
@@ -168,9 +168,9 @@ fn zip_hit(self: SeededLoop) -> UnfilledHit? {
     let added = arm.body.lone_statement()?.pushed(self.name, Push)?.element;
     if (!added.is_liftable(self.name) || added.mentions_any([position], none)) { return none; };
     let stage = if (added.is_pair_of(self.variable, partner)) {
-        ("zip", `({other})`)
+        (Zip, `({other})`)
     } else {
-        ("zip_with", `({other}, |{self.variable}, {partner}| ..)`)
+        (ZipWith, `({other}, |{self.variable}, {partner}| ..)`)
     };
     some(self.pipeline_hit("filled by this loop and nothing else", "", [stage]))
 }

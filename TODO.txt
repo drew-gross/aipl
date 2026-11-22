@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  operator_named_forms is info about builtins, it should be included in the info about builtins (also delete operator_spellings)
   leverage refinement types in resolve_callees so that an expr with unresolved calls and an expr with resolved calls are different types
   collect_ok should probably be collect_some()
   expr.aipl->mapped->Construct use ..i syntax. Also consider a lint for this?
@@ -566,7 +567,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  Lets add structure to the import recommendations in the lints. The eventual goal is automated fixes, but for now I just want to simplify the lint implementations and have a common UI for how import requests are handled. What I want is for the lints to returns a list of builtins that are necessary for the fix, and have the outer linter function display those. It is more capable of determining what is already imported, and with what names (individual lints shouldn't be responsible for checking that), it knows if those names are already in use, and it knows what the preferred name is for various builtins (e.g. that wrapping_add is typically imported as +, but also if saturating add is already imported as +, it knows not to recommend that)
+  Flavored shouldn't be a thing, if the lint sees n + 1 is wrapping add, the n++ replacement should use wrapping increment
   is_one doesn't deserve a whole function
   match_value_or_err shouldn't care about is_test_code.
   match_value_or_err should be able to leverage the actual can_defer (maybe this needs to go in a later stage? maybe can_defer needs to go earlier?)

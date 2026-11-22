@@ -6,7 +6,7 @@ import { equal as == } from builtins;
 
 fn value_or<T: any>(self: T?, default: T) -> T {
     match (self) {
-        some(v) => v, #[allow]
+        some(v) => v,
         none => default,
     }
 }.test({

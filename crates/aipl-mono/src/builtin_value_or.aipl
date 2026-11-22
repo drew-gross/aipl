@@ -21,7 +21,7 @@ import { equal as ==, len } from builtins;
 # optional is empty. Keep it cheap; reach for a `match` when it isn't.
 pub fn value_or<T: any>(self: T?, default: T) -> T {
     match (self) {
-        some(v) => v, #[allow]
+        some(v) => v,
         // `value_or` cannot be written in terms of itself
         none => default,
     }

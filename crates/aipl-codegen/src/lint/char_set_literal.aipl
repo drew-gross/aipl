@@ -45,6 +45,7 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
+import { ToSet } from "../builtin_table.aipl";
 import { Char, Expr, SetLit, descendants } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
@@ -58,7 +59,7 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
 }.test({
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_function_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f() -> #\{char} \{ {body} }`,
+            `import \{ {imports} } from sets; fn f() -> #\{char} \{ {body} }`,
             char_set_literal,
         )
     }
@@ -70,7 +71,7 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
     assert(messages("to_set as chars", "#{'a', 'b', 'c'}")? == [
         """a char set of 3 elements spelled out — write `"abc".chars()`""",
     ]);
-    assert(messages("len", "#{'a', 'b', 'c'}")? == [
+    assert(messages("union", "#{'a', 'b', 'c'}")? == [
         """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from sets""",
     ]);
 
@@ -137,7 +138,7 @@ fn spelled_out(self: Expr) -> UnfilledHit? {
     let spelled = characters$spelling().collect_ok();
     if (spelled.len() != characters.len()) { return none; };
     some(unfilled(
-        "to_set",
+        ToSet,
         `a char set of {elements.len()} elements spelled out — write \`"{spelled.join()}".`,
         "()`",
         self.span,

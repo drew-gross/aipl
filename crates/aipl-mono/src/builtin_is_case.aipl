@@ -19,7 +19,7 @@ variant Shape = Circle(i64) | Square(i64) | Dot
 # reading which case a single value is.
 pub fn is_case<T: variant>(self: T, arm: Case<T>) -> bool {
     // The comparison `case_of_equal_is_case` advises against is what `is_case` is.
-    self.case_of() == arm #[allow]
+    self.case_of() == arm
 }.test({
     assert(Circle(1).is_case::<Circle>());
     assert(!Square(2).is_case::<Circle>());

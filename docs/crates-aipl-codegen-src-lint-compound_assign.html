@@ -22,56 +22,14 @@
         <h2 id="public">Public</h2>
 
 
-        <section class="item" id="item-Compound">
-          <h3>
-            <a class="anchor" href="#item-Compound">Compound</a>
-            <span class="kind kind-struct">struct</span>
-          </h3>
-          <pre class="signature"><code>struct Compound</code></pre>
-
-          <div class="doc"><p>The compound spelling a plain operator is advised to become, and the builtin to import when the file lacks it (<code>none</code> when it has it).</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-compound_forms">
-          <h3>
-            <a class="anchor" href="#item-compound_forms">compound_forms</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn compound_forms(self: Item[]) -&#62; Compound[]</code></pre>
-
-          <div class="doc"><p>The plain operators that have a compound spelling in a file with these <code>items</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-stepped_operators">
-          <h3>
-            <a class="anchor" href="#item-stepped_operators">stepped_operators</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn stepped_operators(self: Item[]) -&#62; str[]</code></pre>
-
-          <div class="doc"><p>The plain operators whose <code>± 1</code> form <code>step_by_one</code> has advice for in a file with these <code>items</code>.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-compound_assign">
           <h3>
             <a class="anchor" href="#item-compound_assign">compound_assign</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn compound_assign(self: Expr&#60;Assign&#62;, compounds: Compound[], stepped: str[]) -&#62; LintHit?</code></pre>
+          <pre class="signature"><code>pub fn compound_assign(self: Expr&#60;Assign&#62;, stepped: str[]) -&#62; UnfilledHit?</code></pre>
 
-          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to itself combined with something.</p></div>
+          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to itself combined with something. <code>stepped</code> are the operators whose <code>± 1</code> the step lint has advice for.</p></div>
 
 
         </section>
@@ -79,6 +37,26 @@
 
       </section>
 
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-compound_of">
+          <h3>
+            <a class="anchor" href="#item-compound_of">compound_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn compound_of(self: str) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The compound spelling the plain operator <code>self</code> is advised to become.</p></div>
+
+
+        </section>
+
+
+      </section>
 
 
     </main>

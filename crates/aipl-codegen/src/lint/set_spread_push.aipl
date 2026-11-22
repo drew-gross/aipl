@@ -45,12 +45,14 @@ import {
     push,
     to_str,
 } from builtins;
+import { Extend, Push } from "../builtin_table.aipl";
 import { ArrayLit, Assign, Spread, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
+import { Builtin } from "./spelling.aipl";
 
 # The hit for the `set` `self`, when it sets a place to an array literal that starts by spreading it.
 pub fn set_spread_push(self: Assign(target, value, _)) -> UnfilledHit? {
@@ -75,10 +77,10 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> UnfilledHit? {
     for (let i, element : appended) {
         let separator = if (i == 0) { "" } else { " " };
         let (builtin, argument) = match (element.kind) {
-            Spread(inner) => ("extend", inner.quote("<array>")),
-            _ => ("push", element.quote("<element>")),
+            Spread(inner) => (Extend, inner.quote("<array>")),
+            _ => (Push, element.quote("<element>")),
         };
-        set named.push(Named { text: `{text}{separator}set {place}.`, builtin });
+        set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(builtin) });
         set text = `({argument});`;
     }
     some(UnfilledHit { named, tail: `{text}"`, span: spread.span })

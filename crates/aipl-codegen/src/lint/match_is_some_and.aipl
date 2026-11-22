@@ -31,11 +31,12 @@ import {
     not_equal as !=,
     to_str,
 } from builtins;
+import { IsSomeAnd } from "../builtin_table.aipl";
 import { Bool, Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
     UnfilledHit,
-    filled_with,
+    filled_assuming,
     hit,
     lint_function_unfilled_hits,
     lint_function_unfilled_messages,
@@ -214,7 +215,7 @@ pub fn match_is_some_and(self: Match) -> UnfilledHit? {
 # value its arm accepts, pointing at `span`.
 fn advice(receiver: str, binder: str, span: Span) -> UnfilledHit {
     unfilled(
-        "is_some_and",
+        IsSomeAnd,
         `this \`match\` only asks whether the optional holds a value the arm accepts — write "{receiver}.`,
         `(|{binder}| ..)" instead`,
         span,
@@ -223,5 +224,5 @@ fn advice(receiver: str, binder: str, span: Span) -> UnfilledHit {
 
 # The message for a file that does not import `is_some_and`, as the tests' sources do not.
 fn message(receiver: str, binder: str) -> str {
-    advice(receiver, binder, 0..0).filled_with(|name| none).message
+    advice(receiver, binder, 0..0).filled_assuming(none)
 }

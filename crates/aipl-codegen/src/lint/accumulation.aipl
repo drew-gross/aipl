@@ -35,7 +35,7 @@ import {
     value_or,
     zip_with,
 } from builtins;
-import { Callee, Extend, Push } from "../builtin_table.aipl";
+import { Callee, Extend, Filter, Map, Push } from "../builtin_table.aipl";
 import {
     ArrayLit,
     Assign,
@@ -58,6 +58,7 @@ import { Ty } from "../ty.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { Named, UnfilledHit } from "./lint_hit.aipl";
 import { is_lambda_safe, iterable_text, lone_statement } from "./loop_shape.aipl";
+import { Builtin } from "./spelling.aipl";
 
 # A binding `name` seeded at `seed` (annotated as `annotation`, when it is) and filled
 # by the loop right after it, which binds each element as `variable` (and its position
@@ -316,16 +317,16 @@ pub fn is_advisable(self: Accumulation) -> bool {
 # The stages of the pipeline that select and derive the loop's elements: a `filter`
 # for the guard, if there is one, then a `map` for what is added, if that is not the
 # element itself. Each is a builtin and the arguments it is written with.
-pub fn element_stages(self: Accumulation) -> (str, str)[] {
+pub fn element_stages(self: Accumulation) -> (Callee, str)[] {
     let lambda = `(|{self.seeded.variable}| ..)`;
-    let filter: (str, str)? = if (self.guard.is_some()) { some(("filter", lambda)) } else { none };
-    let map: (str, str)? = if (self.maps()) { some(("map", lambda)) } else { none };
+    let filter: (Callee, str)? = if (self.guard.is_some()) { some((Filter, lambda)) } else { none };
+    let map: (Callee, str)? = if (self.maps()) { some((Map, lambda)) } else { none };
     [filter, map].collect_ok()
 }
 
 # The hit for an array filled by one loop that is the pipeline of `stages` over its
 # iterable: each stage a builtin and the arguments it is written with.
-pub fn filled_hit(self: Accumulation, stages: (str, str)[]) -> UnfilledHit {
+pub fn filled_hit(self: Accumulation, stages: (Callee, str)[]) -> UnfilledHit {
     self.seeded.pipeline_hit("filled by this loop and nothing else", "", stages)
 }
 
@@ -341,7 +342,7 @@ pub fn pipeline_hit(
     self: SeededLoop,
     what: str,
     annotation: str,
-    stages: (str, str)[],
+    stages: (Callee, str)[],
 ) -> UnfilledHit {
     let lead = `"{self.name}" is seeded empty and {what} — `;
     let receiver = self.iterable.iterable_text();
@@ -360,7 +361,7 @@ pub fn pipeline_hit(
         named: zip_with(
             [opening, ..separators],
             stages,
-            |text: str, stage: (str, str)| Named { text, builtin: stage.0 },
+            |text: str, stage: (Callee, str)| Named { text, builtin: Builtin(stage.0) },
         ),
         tail: `{stages.last()$1.value_or("")};" and drop the loop`,
         span: self.seed.span,

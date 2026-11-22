@@ -215,7 +215,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-element_stages">element_stages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn element_stages(self: Accumulation) -&#62; (str, str)[]</code></pre>
+          <pre class="signature"><code>pub fn element_stages(self: Accumulation) -&#62; (Callee, str)[]</code></pre>
 
           <div class="doc"><p>The stages of the pipeline that select and derive the loop's elements: a <code>filter</code> for the guard, if there is one, then a <code>map</code> for what is added, if that is not the element itself. Each is a builtin and the arguments it is written with.</p></div>
 
@@ -229,7 +229,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-filled_hit">filled_hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn filled_hit(self: Accumulation, stages: (str, str)[]) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>pub fn filled_hit(self: Accumulation, stages: (Callee, str)[]) -&#62; UnfilledHit</code></pre>
 
           <div class="doc"><p>The hit for an array filled by one loop that is the pipeline of <code>stages</code> over its iterable: each stage a builtin and the arguments it is written with.</p></div>
 
@@ -243,7 +243,7 @@ for (let x : xs) {
             <a class="anchor" href="#item-pipeline_hit">pipeline_hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn pipeline_hit(self: SeededLoop, what: str, annotation: str, stages: (str, str)[]) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>pub fn pipeline_hit(self: SeededLoop, what: str, annotation: str, stages: (Callee, str)[]) -&#62; UnfilledHit</code></pre>
 
           <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the binding: <code>what</code> is how the loop fills it, as the message says, and <code>annotation</code> what follows the binding's name in the advice. Each stage is a builtin and the arguments it is written with. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
 

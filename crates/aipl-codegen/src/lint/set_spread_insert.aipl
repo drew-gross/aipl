@@ -42,6 +42,7 @@ import {
     push,
     to_str,
 } from builtins;
+import { Insert } from "../builtin_table.aipl";
 import { Assign, SetLit, Spread, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
@@ -49,6 +50,7 @@ import { Unordered } from "../ty.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
+import { Builtin } from "./spelling.aipl";
 import { insert } from sets;
 
 # The hit for the `set` `self`, when it sets a place to a set literal that starts by spreading it.
@@ -77,7 +79,7 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> UnfilledHit? {
     }}: "`;
     for (let i, element : added) {
         let separator = if (i == 0) { "" } else { " " };
-        set named.push(Named { text: `{text}{separator}set {place}.`, builtin: "insert" });
+        set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(Insert) });
         set text = `({element.quote("<element>")});`;
     }
     some(UnfilledHit { named, tail: `{text}"`, span: spread.span })

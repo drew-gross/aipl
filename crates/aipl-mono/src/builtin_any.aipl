@@ -10,13 +10,11 @@ import { equal as ==, filter, greater_than as >, logical_not as ! } from builtin
 # True when at least one element satisfies `pred`, short-circuiting at the first
 # element that does; an empty array is false.
 pub fn any<T: any>(self: T[], pred: (T) -> bool) -> bool {
-    // `return_loop_any_all` flags this loop, correctly: it is the longhand the
-    // lint exists to replace. It is also the *implementation* of the shorthand,
-    // so taking the advice would have `any` call itself.
+    // This loop is the longhand `return_loop_any_all` asks to replace, and it is also the
+    // *implementation* of the shorthand. The lint says nothing here, since the file defines
+    // `any` itself.
     for (let x : self) {
-        if (pred(x)) {
-            return true; #[allow]
-        };
+        if (pred(x)) { return true; };
     }
     false
 }.test({

@@ -22,10 +22,12 @@ import {
     map,
     not_equal as !=,
 } from builtins;
+import { Zip } from "../builtin_table.aipl";
 import { Call, Expr, Ident, Lambda, TupleLit, descendants, synthesized_name } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { Named, UnfilledHit, imported_as, lint_in_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Named, UnfilledHit, lint_in_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Builtin, imported_as } from "./spelling.aipl";
 
 # A hit for each `zip_with` whose function only pairs its two arguments.
 pub fn zip_with_pair_zip(Function { body }, items: Item[]) -> UnfilledHit[] {
@@ -41,7 +43,7 @@ pub fn zip_with_pair_zip(Function { body }, items: Item[]) -> UnfilledHit[] {
                     named: [
                         Named {
                             text: `"{zip_with_name}" with a function that only pairs its arguments is "{receiver.quote("<items>")}.`,
-                            builtin: "zip",
+                            builtin: Builtin(Zip),
                         },
                     ],
                     tail: `({other.quote("<other>")})"`,

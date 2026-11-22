@@ -20,7 +20,7 @@
 # The hit points at the seed.
 
 import { equal as ==, extend, filter, join, map, to_str } from builtins;
-import { Extend } from "../builtin_table.aipl";
+import { Extend, Join } from "../builtin_table.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
@@ -31,7 +31,7 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
     body
         .accumulations(Extend)
         .filter(is_advisable)
-        .map(|loop| loop.filled_hit([..loop.element_stages(), ("join", "()")]))
+        .map(|loop| loop.filled_hit([..loop.element_stages(), (Join, "()")]))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {

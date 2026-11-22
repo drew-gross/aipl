@@ -10,26 +10,39 @@ import {
     ends_with,
     equal as ==,
     filter,
-    first,
+    find_if,
     greater_than_or_equal as >=,
+    is_empty,
     is_err_and,
     is_nonempty,
-    is_some,
     join,
     len,
     logical_and as &&,
     logical_not as !,
     map,
-    map_join,
+    not_equal as !=,
     starts_with,
     value_or,
+    zip_with,
 } from builtins;
-import { Unresolved } from "../builtin_table.aipl";
+import {
+    Callee,
+    Filter,
+    IsCase,
+    Join,
+    Len,
+    Map,
+    Union,
+    Unresolved,
+    builtin_table,
+    import_name,
+} from "../builtin_table.aipl";
 import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
-import { Function, Import, ImportDecl, Item, LoweredFn, Program, local } from "../item.aipl";
+import { Function, Item, LoweredFn, Program } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
+import { Builtin, Flavored, Need, Request, Spelling, spelled } from "./spelling.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -41,32 +54,32 @@ pub fn hit(message: str, span: Span) -> LintHit { message, span }.test({
 # A hit whose message names builtins the way the file that was linted spells them.
 # A lint cannot say how: it reads one function, and the spelling is in the import
 # list, so it reports the message in parts — each stretch of text followed by the
-# name of a builtin, then a closing stretch — and the caller fills the names in. A
-# file that does not import a builtin is told to, which the lint need not know either.
+# builtin its rewrite uses, then a closing stretch — and the framework writes each in
+# the way the file can take (see `spelling.aipl`), adding the import the file lacks.
 struct UnfilledHit { named: Named[], tail: str, span: Span }
 
 # An [`UnfilledHit`] with nowhere to point yet: what a lint over one node says of it, the node being
 # the caller's to name. [`advised`] puts each at the node it is for.
 struct Advice { named: Named[], tail: str }
 
-# Some text and the builtin whose name follows it in the message.
-struct Named { text: str, builtin: str }
+# Some text and what its message goes on to name.
+struct Named { text: str, builtin: Need }
 
-# An unfilled hit at `span` for a message `before` + the builtin's name + `after`.
-pub fn unfilled(builtin: str, before: str, after: str, span: Span) -> UnfilledHit {
-    named: [Named { text: before, builtin }],
+# An unfilled hit at `span` for a message `before` + the builtin's spelling + `after`.
+pub fn unfilled(builtin: Callee, before: str, after: str, span: Span) -> UnfilledHit {
+    named: [Named { text: before, builtin: Builtin(builtin) }],
     tail: after,
     span,
 }.test({
-    assert(unfilled("len", "use ", "()", 1..2).span == 1..2);
+    assert(unfilled(Len, "use ", "()", 1..2).span == 1..2);
 })
 
-# An advice for a message `before` + the builtin's name + `after`.
-pub fn advice(builtin: str, before: str, after: str) -> Advice {
-    named: [Named { text: before, builtin }],
+# An advice for a message `before` + the builtin's spelling + `after`.
+pub fn advice(builtin: Callee, before: str, after: str) -> Advice {
+    named: [Named { text: before, builtin: Builtin(builtin) }],
     tail: after,
 }.test({
-    assert(advice("len", "use ", "()").named == [Named { text: "use ", builtin: "len" }]);
+    assert(advice(Len, "use ", "()").named == [Named { text: "use ", builtin: Builtin(Len) }]);
 })
 
 # The hit that `self` is when it is about the node whose span is `span`.
@@ -75,77 +88,138 @@ pub fn at(self: Advice, span: Span) -> UnfilledHit {
     tail: self.tail,
     span,
 }.test({
-    assert(advice("len", "use ", "()").at(1..2) == unfilled("len", "use ", "()", 1..2));
+    assert(advice(Len, "use ", "()").at(1..2) == unfilled(Len, "use ", "()", 1..2));
 })
 
-# `self` as the hit it is for a file that spells builtin `name` as `spelled(name)`,
-# or does not import it (`none`).
-pub fn filled_with(self: UnfilledHit, spelled: (str) -> str?) -> LintHit {
-    let text = self.named.map_join(
-        |part| `{part.text}{spelled(part.builtin).value_or(part.builtin)}`,
-    );
-    let missing = self.named$builtin.filter(|builtin| !spelled(builtin).is_some()).distinct();
-    let libraries = missing$library_of().distinct();
-    let hint = if (missing.is_nonempty()) {
-        `, importing {libraries.map(|library| `{missing.filter(|builtin| builtin.library_of() == library).quoted_list()} from {library}`).join(sep=", ", final_sep=" and ", only_sep=" and ")}`
+# `self` as the hit it is for a file that writes each thing it names as `spell` says, or `none`
+# when some of them cannot be written: the advice is dropped.
+pub fn filled_with(self: UnfilledHit, spell: (Need) -> Spelling?) -> LintHit? {
+    let spellings = self.named.map(|part| spell(part.builtin)).collect_ok();
+    if (spellings.len() != self.named.len()) { return none; };
+    let text = zip_with(
+        self.named,
+        spellings,
+        |part: Named, spelling: Spelling| { `{part.text}{spelling.text}` },
+    ).join();
+    let requests = spellings$request.collect_ok().distinct();
+    let libraries = requests$library.distinct();
+    let hint = if (requests.is_nonempty()) {
+        `, importing {libraries.map(|library| `{requests.filter(|request| request.library == library)$item.quoted_list()} from {library}`).join(sep=", ", final_sep=" and ", only_sep=" and ")}`
     } else {
         ""
     };
-    hit(`{text}{self.tail}{hint}`, self.span)
+    some(hit(`{text}{self.tail}{hint}`, self.span))
 }.test({
-    let advice = unfilled("is_case", "write ", "(x)", 4..5);
-    assert(advice.filled_with(|name| none) == hit(
-        "write is_case(x), importing `is_case` from builtins",
+    let advice = unfilled(IsCase, "write ", "(x)", 4..5);
+    assert(advice.filled_with(|need| some(Spelling {
+        text: "is_case",
+        request: some(Request { library: "builtins", item: "is_case" }),
+    })) == some(hit("write is_case(x), importing `is_case` from builtins", 4..5)));
+    assert(advice.filled_with(|need| some(Spelling { text: "isa", request: none })) == some(hit(
+        "write isa(x)",
         4..5,
-    ));
-    assert(advice.filled_with(|name| some("isa")) == hit("write isa(x)", 4..5));
+    )));
+
+    // Advice for what cannot be written is dropped.
+    assert(advice.filled_with(|need| none) == none);
 
     // Several missing imports read as a sentence: `a` and `b`, or `a`, `b` and `c`.
     let chain = UnfilledHit {
         named: [
-            Named { text: "", builtin: "filter" },
-            Named { text: ".", builtin: "map" },
-            Named { text: ".", builtin: "join" },
+            Named { text: "", builtin: Builtin(Filter) },
+            Named { text: ".", builtin: Builtin(Map) },
+            Named { text: ".", builtin: Builtin(Join) },
         ],
         tail: "",
         span: 0..1,
     };
     assert(
-        chain.filled_with(
-            |name| none,
-        ).message == "filter.map.join, importing `filter`, `map` and `join` from builtins",
+        chain.filled_with(|need| some(Spelling {
+            text: "x",
+            request: some(Request { library: "builtins", item: "x" }),
+        }))?.message == "x.x.x, importing `x` from builtins",
     );
     assert(
-        chain.filled_with(|name| if (name == "join") {
-            some("join")
-        } else {
-            none
-        }).message == "filter.map.join, importing `filter` and `map` from builtins",
+        chain.filled_with(|need| match (need) {
+            Builtin(Join) => some(Spelling { text: "join", request: none }),
+            Builtin(Filter) => some(Spelling {
+                text: "filter",
+                request: some(Request { library: "builtins", item: "filter" }),
+            }),
+            _ => some(Spelling {
+                text: "map",
+                request: some(Request { library: "builtins", item: "map" }),
+            }),
+        })?.message == "filter.map.join, importing `filter` and `map` from builtins",
     );
+
+    // Imports are grouped by the library they come from.
     let pair = UnfilledHit {
-        named: [Named { text: "a ", builtin: "map" }, Named { text: " b ", builtin: "value_or" }],
+        named: [
+            Named { text: "a ", builtin: Builtin(Map) },
+            Named { text: " b ", builtin: Builtin(Union) },
+        ],
         tail: " c",
         span: 1..2,
     };
     assert(
-        pair.filled_with(|name| if (name == "map") {
-            some("m")
-        } else {
-            none
-        }).message == "a m b value_or c, importing `value_or` from builtins",
+        pair.filled_with(|need| some(Spelling {
+            text: "n",
+            request: some(Request { library: "builtins", item: "n" }),
+        }))?.message == "a n b n c, importing `n` from builtins",
+    );
+})
+
+# `self` with each thing it names written as `spelled`, the spelling a file that imports them has
+# (`none`: it imports none, and the advice names the import). For a lint's own test of the message
+# it gives.
+pub fn filled_assuming(self: UnfilledHit, spelled: str?) -> str {
+    let table = builtin_table();
+    self
+        .filled_with(|need| match (need) {
+            Builtin(callee) => table
+                .find_if(|entry| entry.arm == callee)
+                .map(|entry| match (spelled) {
+                    some(text) => Spelling { text, request: none },
+                    none => Spelling {
+                        text: entry.import_name(),
+                        request: some(Request {
+                            library: entry.library,
+                            item: entry.import_name(),
+                        }),
+                    },
+                }),
+            Flavored(..) => none,
+        })$message
+        .value_or("")
+}.test({
+    assert(unfilled(Len, "use ", "()", 0..1).filled_assuming(some("size")) == "use size()");
+    assert(
+        unfilled(Len, "use ", "()", 0..1).filled_assuming(
+            none,
+        ) == "use len(), importing `len` from builtins",
     );
 })
 
 # `self` filled in for the file whose items are `items`.
 pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
-    self$filled_with(|name| items.imported_as(name))
+    if (self.is_empty()) { return []; };
+    let table = builtin_table();
+    self$filled_with(|need| need.spelled(items, table)).collect_ok()
 }.test({
     let items = aipl_parse_surface_file(
         "import { is_case as isa } from builtins;",
     )?.program.hoist_test_fns().items;
-    assert([unfilled("is_case", "write ", "(x)", 0..1), unfilled("len", "use ", "", 1..2)].filled(
+    assert([unfilled(IsCase, "write ", "(x)", 0..1), unfilled(Len, "use ", "", 1..2)].filled(
         items,
     )$message == ["write isa(x)", "use len, importing `len` from builtins"]);
+
+    // What the file cannot spell is not said.
+    assert(
+        [unfilled(Len, "use ", "", 1..2)].filled(
+            aipl_parse_surface_file("fn len() { }")?.program.hoist_test_fns().items,
+        ) == [],
+    );
 })
 
 # What `lint` reports for the program `src` parses to. The one way the lints'
@@ -221,73 +295,6 @@ pub fn quote(self: Expr, placeholder: str) -> str {
     );
     assert(Expr { ..expr(Str("a\nb")), source: `"a\nb"` }.quote("<element>") == "<element>");
 })
-
-# The name a file's `items` import builtin `name` under, if it does: the spelling a
-# lint's advice should use. `none` when the file does not import it, which is when
-# the advice has to say so.
-pub fn imported_as(self: Item[], name: str) -> str? {
-    self.collect_arms::<Import>()$builtin_locals(name).join().first()
-}.test({
-    let program = aipl_parse_surface_file(
-        "import { is_case as case_is, len } from builtins;",
-    )?.program.hoist_test_fns().items;
-    assert(program.imported_as("is_case") == some("case_is"));
-    assert(program.imported_as("len") == some("len"));
-    assert(program.imported_as("map") == none);
-    let from_a_file = aipl_parse_surface_file(
-        """import { is_case } from "./a.aipl";""",
-    )?.program.hoist_test_fns().items;
-    assert(from_a_file.imported_as("is_case") == none);
-})
-
-# The builtin a file's `items` import under the local name `local`, as builtins
-# exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
-# when that name is not bound by an import from builtins — unbound, or one of the file's own.
-pub fn bound_to(self: Item[], local: str) -> str? {
-    self.collect_arms::<Import>()$builtin_bound_to(local).join().first()
-}.test({
-    let items = aipl_parse_surface_file(
-        """import { wrapping_add as +, len } from builtins; import { less_than as < } from "./a.aipl";""",
-    )?.program.hoist_test_fns().items;
-    assert(items.bound_to("+") == some("wrapping_add"));
-    assert(items.bound_to("len") == some("len"));
-    assert(items.bound_to("<") == none);
-    assert(items.bound_to("map") == none);
-})
-
-# The name an import from builtins exports under the local name `local`.
-fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> str[] {
-    match (source) {
-        Builtins | Library(..) => names.filter(|n| n.local() == local)$name,
-        Path(..) => [],
-    }
-}
-
-# Every name a file's `items` import from builtins, as the file spells it.
-pub fn imported_locals(self: Item[]) -> str[] {
-    self.collect_arms::<Import>()$builtin_names().join()
-}.test({
-    let items = aipl_parse_surface_file(
-        """import { is_case as case_is, len } from builtins; import { a } from "./a.aipl";""",
-    )?.program.hoist_test_fns().items;
-    assert(items.imported_locals() == ["case_is", "len"]);
-})
-
-# What an import from builtins brings, as the file spells each.
-fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
-    match (source) {
-        Builtins | Library(..) => names$local(),
-        Path(..) => [],
-    }
-}
-
-# What an import brings under `name`, when it is from builtins.
-fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
-    match (source) {
-        Builtins | Library(..) => names.filter(|n| n.name == name)$local(),
-        Path(..) => [],
-    }
-}
 
 # Lints come in two kinds. A *program* lint is a function of the whole `Program`
 # (`unused_imports`, which compares the imports with every name the file
@@ -413,32 +420,6 @@ pub fn lint_in_unfilled_messages(
     src: str,
     lint: (Function, Item[]) -> UnfilledHit[],
 ) -> str[]!ParseFailure { ok(lint_in_unfilled_hits(src, lint)?$message) }
-
-# The library an import brings the builtin `name` from: `sets` for the set operations, the
-# main one for the rest. This mirrors the libraries `BUILTINS` assigns in
-# `aipl-syntax/src/builtin.rs`, which a lint cannot ask.
-pub fn library_of(self: str) -> str {
-    if (set_operations().contains(self)) { "sets" } else { "builtins" }
-}.test({
-    assert("union".library_of() == "sets");
-    assert("to_set".library_of() == "sets");
-    assert("len".library_of() == "builtins");
-})
-
-# The builtins of the `sets` library.
-fn set_operations() -> str[] {
-    [
-        "has",
-        "union",
-        "to_set",
-        "to_array",
-        "set_map",
-        "union_all",
-        "difference",
-        "intersection",
-        "insert",
-    ]
-}
 
 # `self` as backquoted names, read as a sentence: `a`, `a` and `b`, or `a`, `b` and `c`.
 fn quoted_list(self: str[]) -> str {

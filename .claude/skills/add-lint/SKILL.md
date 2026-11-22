@@ -12,7 +12,7 @@ function, the `.test` and `.benchmark` blocks included) and before desugaring (s
 the source forms are still there), returning hits. Most lints are a function of one
 `Function`, run over the program's functions (`lint()` lists them once) by `hits`, `hits_once`
 and `unfilled_hits`; one that needs
-the file's imports (the `imported_as` names it advises) takes the program's `items`
+the file's imports (to find a call by the name it was written under) takes the program's `items`
 beside the function, as `push_loop_pipeline` does. A lint of the whole program
 (`unused_imports`) takes the `Program`. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
 helpers), `case_of_equal_is_case.aipl` (a lint that names a builtin). The
@@ -23,7 +23,7 @@ CLAUDE.md and in the add-builtin skill's step 4.
 
 DRY is critical here. Before writing a helper, search for it:
 
-- `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `imported_as`, `functions`,
+- `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `functions`,
   `hits`, `unfilled_hits`, the `lint_*` test drivers (`lint_in_messages` and
   `lint_in_unfilled_messages` for a lint that takes `items`).
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl`, `lint/option_match.aipl`,
@@ -43,12 +43,19 @@ blocks with it, and add any new file to `DOGFOOD_SOURCE_FILES`.
 
 A "don't reimplement `foo()`" lint tells the author to call a function. The
 lint cannot know how the linted file spells it (alias, or not imported at all),
-so it must **not** hard-code the name in the message and must not take an
-import parameter. Return `UnfilledHit[]` — `unfilled(builtin, before, after,
-span)` — and let the caller hydrate it with `filled` / `unfilled_hits`,
-which fills in the file's spelling and adds the ", importing `X` from builtins"
-hint when it is not imported. Register the lint in `lint.aipl` in its
-unfilled form.
+and it must not try: it says **which** builtin by its tag (`Len`, `IsCase`, a
+`Callee` from `builtin_table.aipl`), never how it is written. Return
+`UnfilledHit[]` — `unfilled(IsCase, before, after, span)`; a message that names
+several builtins is a `Named { text, builtin: Builtin(Tag) }` per builtin — and
+let the caller hydrate it with `filled` / `unfilled_hits`. `spelling.aipl` then
+writes each builtin the way the file can take it (the name it already imports it
+under; else the preferred spelling — the operator for an operator builtin — with
+the import added to the message), and drops the advice when the file cannot
+(the name is bound to something else, or an operator's flavor does not match).
+A lint does not call `imported_as`/`bound_to` to decide what to *advise*; they
+are for finding a call by its written name. An operator form in the flavor of
+one the file uses is `Flavored("++", "+")` (see `step_by_one`). Register the
+lint in `lint.aipl` in its unfilled form.
 
 This covers **every builtin the message names, not only the one being
 introduced**: advice such as `write "x.value_or(d)"` or `"x.is_some_and(|v| ..)"`

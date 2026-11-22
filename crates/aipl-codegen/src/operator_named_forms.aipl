@@ -1,4 +1,4 @@
-import { equal as == } from builtins;
+import { all, equal as ==, is_nonempty } from builtins;
 
 # The named builtins that provide the operator `self` — the names it is
 # imported under (`wrapping_add as +`) — in the order the compiler declares
@@ -51,4 +51,33 @@ pub fn operator_named_forms(self: str) -> str[] {
     assert("wrapping_add".operator_named_forms() == []);
     assert("=".operator_named_forms() == []);
     assert("".operator_named_forms() == []);
+})
+
+# Every operator spelling that has named forms, in the order `operator_named_forms` lists them. A
+# name that provides an operator is found by asking each of these.
+pub fn operator_spellings() -> str[] {
+    [
+        "+",
+        "-",
+        "*",
+        "++",
+        "--",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "==",
+        "!=",
+        "<",
+        ">",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "!",
+        "/",
+        "%",
+    ]
+}.test({
+    assert(operator_spellings().all(|spelling| spelling.operator_named_forms().is_nonempty()));
 })

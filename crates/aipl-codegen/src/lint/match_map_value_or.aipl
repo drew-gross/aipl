@@ -27,7 +27,7 @@
 # arm's body is whatever the mapping is, and may run to several.
 
 import { Span, collect_ok, equal as ==, len, logical_not as !, logical_or as || } from builtins;
-import { Some } from "../builtin_table.aipl";
+import { Map, Some, ValueOr } from "../builtin_table.aipl";
 import { Bool, Call, Ident, Match, None, Unit, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_constant_default } from "./constant_default.aipl";
@@ -35,13 +35,14 @@ import { mentions_any } from "./field_uses.aipl";
 import {
     Named,
     UnfilledHit,
-    filled_with,
+    filled_assuming,
     hit,
     lint_function_unfilled_hits,
     lint_function_unfilled_messages,
     unfilled,
 } from "./lint_hit.aipl";
 import { OptionMatch, default_text, option_match, receiver_text } from "./option_match.aipl";
+import { Builtin } from "./spelling.aipl";
 
 # The hit for the `match` `self`, when it maps an optional's payload and falls back to a default.
 pub fn match_map_value_or(self: Match) -> UnfilledHit? {
@@ -266,7 +267,7 @@ pub fn match_map_value_or(self: Match) -> UnfilledHit? {
 # What is said of a `match` that maps the payload and keeps `none`, pointing at `span`.
 fn kept_none(receiver: str, binder: str, span: Span) -> UnfilledHit {
     unfilled(
-        "map",
+        Map,
         `this \`match\` maps the optional's payload and keeps \`none\` — write "{receiver}.`,
         `(|{binder}| ..)" with the value the \`some\` arm wraps`,
         span,
@@ -279,9 +280,9 @@ fn with_default(receiver: str, binder: str, default: str, span: Span) -> Unfille
     named: [
         Named {
             text: `this \`match\` transforms the optional's payload or falls back to a default — write "{receiver}.`,
-            builtin: "map",
+            builtin: Builtin(Map),
         },
-        Named { text: `(|{binder}| ..).`, builtin: "value_or" },
+        Named { text: `(|{binder}| ..).`, builtin: Builtin(ValueOr) },
     ],
     tail: `({default})" with the \`some\` arm's body as the mapping`,
     span,
@@ -290,9 +291,9 @@ fn with_default(receiver: str, binder: str, default: str, span: Span) -> Unfille
 # The messages for a file that does not import `map` or `value_or`, as the tests'
 # sources do not.
 fn message_kept_none(receiver: str, binder: str) -> str {
-    kept_none(receiver, binder, 0..0).filled_with(|name| none).message
+    kept_none(receiver, binder, 0..0).filled_assuming(none)
 }
 
 fn message_with_default(receiver: str, binder: str, default: str) -> str {
-    with_default(receiver, binder, default, 0..0).filled_with(|name| none).message
+    with_default(receiver, binder, default, 0..0).filled_assuming(none)
 }

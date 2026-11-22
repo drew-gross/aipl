@@ -38,7 +38,7 @@ import {
     map,
     to_str,
 } from builtins;
-import { Some } from "../builtin_table.aipl";
+import { FindIndex, Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
@@ -59,7 +59,7 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 return none;
             };
             some(unfilled(
-                "find_index",
+                FindIndex,
                 `this loop returns the position of the first element passing a test, and "none" otherwise — write "return {found.iterable.iterable_text()}.`,
                 `(|{found.variable}| ..);" and drop the loop`,
                 found.statement.span,

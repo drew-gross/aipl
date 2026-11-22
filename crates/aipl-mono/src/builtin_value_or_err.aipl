@@ -19,7 +19,7 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     match (self) {
         some(v) => ok(v),
         // `value_or_err` cannot be written in terms of itself
-        none => err(e), #[allow]
+        none => err(e),
     }
 }.test({
     // `?` on the result `value_or_err` builds: the `none` cases leave `digit_of`

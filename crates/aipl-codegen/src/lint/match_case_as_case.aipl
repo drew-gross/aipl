@@ -25,7 +25,7 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Some } from "../builtin_table.aipl";
+import { AsCase, Some } from "../builtin_table.aipl";
 import { Call, Match, descendants_of_kind, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { CasePattern, case_pattern, is_give_up } from "./case_match.aipl";
@@ -39,7 +39,7 @@ pub fn match_case_as_case(self: Match(scrutinee, arms)) -> UnfilledHit? {
     let Call(_, wrapped, _, Some) = case_arm.body.kind else { return none; };
     if (!other_arm.is_give_up() || wrapped$show_expr() != [scrutinee.show_expr()]) { return none; };
     some(unfilled(
-        "as_case",
+        AsCase,
         `this match only asks whether the value is {case} — write "{scrutinee.receiver_text()}.`,
         `::<{case}>()" and drop the match`,
         other_arm.span,

@@ -23,7 +23,7 @@
 # closing paren, so splicing `len(f(x))`'s receiver would produce advice that does not parse.
 
 import { as_case, equal as ==, len, logical_or as ||, not_equal as != } from builtins;
-import { Callee, Equal, IsNonempty, Len, LogicalNot } from "../builtin_table.aipl";
+import { Callee, Equal, IsEmpty, IsNonempty, Len, LogicalNot } from "../builtin_table.aipl";
 import { Call, Expr } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
@@ -39,9 +39,9 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
         args.length_equal_zero(callee)?
     };
     some(if (receiver.spans_its_text()) {
-        advice("is_empty", `emptiness asked the long way — use "{receiver.source}.`, `()"`)
+        advice(IsEmpty, `emptiness asked the long way — use "{receiver.source}.`, `()"`)
     } else {
-        advice("is_empty", `emptiness asked the long way — use "`, `" on the receiver`)
+        advice(IsEmpty, `emptiness asked the long way — use "`, `" on the receiver`)
     })
 }.test({
     // `lint_str` runs every lint, so each snippet imports exactly the names it uses; the ones that

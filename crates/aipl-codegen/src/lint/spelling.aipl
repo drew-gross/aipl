@@ -1,0 +1,368 @@
+# How a lint's advice names the builtins its rewrite needs, and how the framework decides what to
+# write for each.
+#
+# A lint says *which* builtin its advice uses (a [`Need`]: the builtin's tag) and never how the file
+# spells it. [`spelled`] decides, from the file's imports: the name the file already has one under,
+# or the preferred spelling (the operator for an operator builtin, else the builtin's own name)
+# with the import that makes it available. A spelling the file cannot take — the name is bound to
+# something else, or an operator's flavor does not match the file's — is no spelling at all, and the
+# advice that needed it is dropped, since a rewrite the file cannot write is no advice.
+#
+# Operators that come in more than one flavor (`wrapping_add` and `saturating_add`) are bound by
+# import, and nothing fixes which flavor a file chose for `+`. A lint that advises another spelling
+# of the same arithmetic — `set x = x + 1;` as `set x++;`, or as `set x += 1;` — is only right when
+# the spelling it advises has the flavor the file's operator has, and it is the import that names
+# it. That is decided here (`paired`), so each such lint asks the same question the same way.
+
+import {
+    collect_arms,
+    contains,
+    equal as ==,
+    filter,
+    find_if,
+    first,
+    is_some,
+    join,
+    len,
+    logical_not as !,
+    split,
+    value_or,
+} from builtins;
+import {
+    BuiltinEntry,
+    Callee,
+    Insert,
+    IsCase,
+    Len,
+    WrappingAdd,
+    builtin_table,
+    import_name,
+} from "../builtin_table.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { hoist_test_fns } from "../hoist_test_fns.aipl";
+import { is_operator_name } from "../is_operator_name.aipl";
+import { Function, Import, ImportDecl, Item, LoweredFn, local } from "../item.aipl";
+import { operator_named_forms, operator_spellings } from "../operator_named_forms.aipl";
+
+# What a lint's advice needs the file to have: a builtin, by its tag, or an operator in the flavor
+# of one the file already uses (`Flavored("++", "+")` is the increment that goes with the file's
+# `+`; no builtin has a tag for it, since which one it is depends on the file).
+variant Need = Builtin(callee: Callee) | Flavored(operator: str, like: str)
+
+# An import that makes a [`Spelling`] available: the item to import from `library`, as the import
+# list writes it (`wrapping_increment as ++`).
+struct Request { library: str, item: str }
+
+# What the file writes for a [`Need`], and the import it has still to make, if any.
+struct Spelling { text: str, request: Request? }
+
+# The spelling of `self` in a file with these `items`, or `none` when the file cannot take any.
+# `table` is the builtin table.
+pub fn spelled(self: Need, items: Item[], table: BuiltinEntry[]) -> Spelling? {
+    match (self) {
+        Builtin(callee) => items.spelled_builtin(table.find_if(|entry| entry.arm == callee)?),
+        Flavored(operator, like) => items.spelled_flavored(operator, like),
+    }
+}.test({
+    fn spelling(src: str, need: Need) -> Spelling?!ParseFailure {
+        ok(need.spelled(
+            aipl_parse_surface_file(src)?.program.hoist_test_fns().items,
+            builtin_table(),
+        ))
+    }
+    fn missing(library: str, item: str) -> Request? { some(Request { library, item }) }
+
+    // Imported already: the name the file gave it, with nothing left to import.
+    assert(spelling("import { is_case as isa } from builtins;", Builtin(IsCase))? == some(Spelling {
+        text: "isa",
+        request: none,
+    }));
+
+    // Not imported: its own name, and the import that supplies it, from the library it is in.
+    assert(spelling("fn f() { }", Builtin(Len))? == some(Spelling {
+        text: "len",
+        request: missing("builtins", "len"),
+    }));
+    assert(spelling("fn f() { }", Builtin(Insert))? == some(Spelling {
+        text: "insert",
+        request: missing("sets", "insert"),
+    }));
+
+    // The same name from another library is not the builtin.
+    assert(spelling("import { insert } from sets;", Builtin(Len))? == some(Spelling {
+        text: "len",
+        request: missing("builtins", "len"),
+    }));
+
+    // The name is the file's own, for something else: there is nothing to say.
+    assert(spelling("""import { len } from "./a.aipl";""", Builtin(Len))? == none);
+    assert(spelling("fn len() { }", Builtin(Len))? == none);
+
+    // An operator builtin is written as its operator, imported under that alias.
+    assert(spelling("fn f() { }", Builtin(WrappingAdd))? == some(Spelling {
+        text: "+",
+        request: missing("builtins", "wrapping_add as +"),
+    }));
+    assert(spelling(
+        "import { wrapping_add as + } from builtins;",
+        Builtin(WrappingAdd),
+    )? == some(Spelling { text: "+", request: none }));
+
+    // Imported by name only, it is still not available as an operator.
+    assert(spelling(
+        "import { wrapping_add } from builtins;",
+        Builtin(WrappingAdd),
+    )? == some(Spelling { text: "+", request: missing("builtins", "wrapping_add as +") }));
+
+    // The operator is another flavor's: the spelling is taken.
+    assert(
+        spelling("import { saturating_add as + } from builtins;", Builtin(WrappingAdd))? == none,
+    );
+
+    // The flavor of the operator the file uses picks the builtin an operator form stands for.
+    assert(spelling(
+        "import { saturating_add as + } from builtins;",
+        Flavored("++", "+"),
+    )? == some(Spelling {
+        text: "++",
+        request: missing("builtins", "saturating_increment as ++"),
+    }));
+    assert(spelling(
+        "import { saturating_add as +, saturating_increment as ++ } from builtins;",
+        Flavored("++", "+"),
+    )? == some(Spelling { text: "++", request: none }));
+    assert(spelling("fn f() { }", Flavored("++", "+"))? == none);
+})
+
+# The spelling of the builtin `entry` in a file with these `items`.
+fn spelled_builtin(self: Item[], entry: BuiltinEntry) -> Spelling? {
+    let name = entry.import_name();
+    let operator = name.operator_provided();
+    // An operator builtin is only usable under its operator spelling.
+    let usable = self
+        .imported_under(entry.library, name)
+        .filter(|local| match (operator) {
+            some(_) => local.is_operator_name(),
+            none => true,
+        });
+    match (usable.first()) {
+        some(text) => some(Spelling { text, request: none }),
+        none => self.importable(entry.library, name, operator.value_or(name)),
+    }
+}
+
+# The spelling `preferred` for the builtin `name` of `library`, with the import that supplies it,
+# when nothing else in the file has that name.
+fn importable(self: Item[], library: str, name: str, preferred: str) -> Spelling? {
+    if (self.bound_names().contains(preferred)) { return none; };
+    let item = if (preferred == name) { name } else { `{name} as {preferred}` };
+    some(Spelling { text: preferred, request: some(Request { library, item }) })
+}
+
+# Whether the operator `operator` can be written in the flavor of the operator `like`, which the
+# file has to use.
+pub fn can_flavor(self: Item[], operator: str, like: str) -> bool {
+    self.spelled_flavored(operator, like).is_some()
+}
+
+# The spelling of the operator `operator` in the flavor of the operator `like`, which the file has
+# to use.
+fn spelled_flavored(self: Item[], operator: str, like: str) -> Spelling? {
+    let Pairing { builtin, imported } = self.paired(like, operator)?;
+    let request = if (imported) {
+        none
+    } else {
+        some(Request { library: "builtins", item: `{builtin} as {operator}` })
+    };
+    some(Spelling { text: operator, request })
+}
+
+# The operator that the builtin `self` provides, when it provides one: `+` for `wrapping_add`.
+fn operator_provided(self: str) -> str? {
+    operator_spellings().find_if(|operator| operator.operator_named_forms().contains(self))
+}.test({
+    assert("wrapping_add".operator_provided() == some("+"));
+    assert("saturating_increment".operator_provided() == some("++"));
+    assert("len".operator_provided() == none);
+})
+
+# Every name the file binds itself: the locals of its imports, whatever they import, and its own
+# functions.
+fn bound_names(self: Item[]) -> str[] {
+    [
+        ..self.collect_arms::<Import>()$imported_locals_of().join(),
+        ..self.collect_arms::<LoweredFn>()$function_name(),
+    ]
+}
+
+fn imported_locals_of(self: Import(ImportDecl { names })) -> str[] { names$local() }
+
+fn function_name(self: LoweredFn(Function { name })) -> str { name.text }
+
+# What the file's imports from `library` bring the export `name` in as, each spelling.
+fn imported_under(self: Item[], library: str, name: str) -> str[] {
+    self.collect_arms::<Import>()$locals_from(library, name).join()
+}.test({
+    let items = aipl_parse_surface_file(
+        """import { len as size, len } from builtins; import { insert } from sets; import { len as mine } from "./a.aipl";""",
+    )?.program.hoist_test_fns().items;
+    assert(items.imported_under("builtins", "len") == ["size", "len"]);
+    assert(items.imported_under("sets", "insert") == ["insert"]);
+    assert(items.imported_under("sets", "len") == []);
+})
+
+fn locals_from(self: Import(ImportDecl { names, source }), library: str, name: str) -> str[] {
+    match (source) {
+        Builtins => if (library == "builtins") {
+            names.filter(|n| n.name == name)$local()
+        } else {
+            []
+        },
+        Library(named) => if (library == named) {
+            names.filter(|n| n.name == name)$local()
+        } else {
+            []
+        },
+        Path(..) => [],
+    }
+}
+
+# The name a file's `items` import builtin `name` under, if it does: the spelling a lint that
+# recognises a call by its written name must look for. `none` when the file does not import it.
+pub fn imported_as(self: Item[], name: str) -> str? {
+    self.collect_arms::<Import>()$builtin_locals(name).join().first()
+}.test({
+    let program = aipl_parse_surface_file(
+        "import { is_case as case_is, len } from builtins;",
+    )?.program.hoist_test_fns().items;
+    assert(program.imported_as("is_case") == some("case_is"));
+    assert(program.imported_as("len") == some("len"));
+    assert(program.imported_as("map") == none);
+    let from_a_file = aipl_parse_surface_file(
+        """import { is_case } from "./a.aipl";""",
+    )?.program.hoist_test_fns().items;
+    assert(from_a_file.imported_as("is_case") == none);
+})
+
+# The builtin a file's `items` import under the local name `local`, as builtins
+# exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
+# when that name is not bound by an import from builtins — unbound, or one of the file's own.
+pub fn bound_to(self: Item[], local: str) -> str? {
+    self.collect_arms::<Import>()$builtin_bound_to(local).join().first()
+}.test({
+    let items = aipl_parse_surface_file(
+        """import { wrapping_add as +, len } from builtins; import { less_than as < } from "./a.aipl";""",
+    )?.program.hoist_test_fns().items;
+    assert(items.bound_to("+") == some("wrapping_add"));
+    assert(items.bound_to("len") == some("len"));
+    assert(items.bound_to("<") == none);
+    assert(items.bound_to("map") == none);
+})
+
+# The name an import from builtins exports under the local name `local`.
+fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> str[] {
+    match (source) {
+        Builtins | Library(..) => names.filter(|n| n.local() == local)$name,
+        Path(..) => [],
+    }
+}
+
+# Every name a file's `items` import from builtins, as the file spells it.
+pub fn imported_locals(self: Item[]) -> str[] {
+    self.collect_arms::<Import>()$builtin_names().join()
+}.test({
+    let items = aipl_parse_surface_file(
+        """import { is_case as case_is, len } from builtins; import { a } from "./a.aipl";""",
+    )?.program.hoist_test_fns().items;
+    assert(items.imported_locals() == ["case_is", "len"]);
+})
+
+# What an import from builtins brings, as the file spells each.
+fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
+    match (source) {
+        Builtins | Library(..) => names$local(),
+        Path(..) => [],
+    }
+}
+
+# What an import brings under `name`, when it is from builtins.
+fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
+    match (source) {
+        Builtins | Library(..) => names.filter(|n| n.name == name)$local(),
+        Path(..) => [],
+    }
+}
+
+# The builtin that provides the operator `target` with the flavor of the operator `written`, as
+# this file binds it, and whether the file has imported it already.
+struct Pairing { builtin: str, imported: bool }
+
+# The flavor of the operator builtin `self`: `wrapping` for `wrapping_add_assign`.
+fn flavor(self: str) -> str { self.split("_").first().value_or("") }.test({
+    assert("wrapping_add_assign".flavor() == "wrapping");
+    assert("saturating_decrement".flavor() == "saturating");
+    assert("".flavor() == "");
+})
+
+# How `items` can be advised to write `target` where they write `written`, or `none` when there is
+# nothing that provably means the same.
+#
+# The written operator has to be the file's own and a builtin: a user function of that name has no
+# flavor to pair with. Where `target` has only one flavor there is nothing to choose and it is that
+# one; where it has several, the one sharing the written operator's flavor is the one that means the
+# same. A `target` the file already imports counts only if it is that builtin — one bound to the
+# other flavor, or to a function of the file's own, would not mean what the advice says.
+pub fn paired(self: Item[], written: str, target: str) -> Pairing? {
+    let written_name = self.bound_to(written)?;
+    if (!written.operator_named_forms().contains(written_name)) { return none; };
+    let forms = target.operator_named_forms();
+    let builtin = if (forms.len() == 1) {
+        forms.first()?
+    } else {
+        forms.find_if(|form| form.flavor() == written_name.flavor())?
+    };
+    match (self.bound_to(target)) {
+        none => some(Pairing { builtin, imported: false }),
+        some(bound) => if (bound == builtin) {
+            some(Pairing { builtin, imported: true })
+        } else {
+            none
+        },
+    }
+}.test({
+    fn pairing(src: str, written: str, target: str) -> Pairing?!ParseFailure {
+        ok(aipl_parse_surface_file(src)?.program.hoist_test_fns().items.paired(written, target))
+    }
+    // The flavor of the file's `+` picks the step, and the import is named until it is made.
+    assert(pairing("import { wrapping_add as + } from builtins;", "+", "++")? == some(Pairing {
+        builtin: "wrapping_increment",
+        imported: false,
+    }));
+    assert(pairing("import { saturating_add as + } from builtins;", "+", "++")? == some(Pairing {
+        builtin: "saturating_increment",
+        imported: false,
+    }));
+    assert(pairing(
+        "import { saturating_add as +, saturating_increment as ++ } from builtins;",
+        "+",
+        "++",
+    )? == some(Pairing { builtin: "saturating_increment", imported: true }));
+
+    // An operator with one flavor has nothing to choose.
+    assert(pairing("import { wrapping_mul as * } from builtins;", "*", "*=")? == some(Pairing {
+        builtin: "wrapping_mul_assign",
+        imported: false,
+    }));
+
+    // The other flavor already bound to the target, a function of the file's own, or no import at all.
+    assert(
+        pairing(
+            "import { saturating_add as +, wrapping_increment as ++ } from builtins;",
+            "+",
+            "++",
+        )? == none,
+    );
+    assert(pairing("import { wrapping_add as ++ } from builtins;", "+", "++")? == none);
+    assert(pairing("""import { plus as + } from "./a.aipl";""", "+", "++")? == none);
+    assert(pairing("fn f() { }", "+", "++")? == none);
+})
