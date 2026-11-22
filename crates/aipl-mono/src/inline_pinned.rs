@@ -100,10 +100,18 @@ fn is_single_use_candidate(
     counts: &HashMap<&str, usize>,
     binders: &HashSet<&str>,
     skip: &HashSet<String>,
+    entries: &HashSet<String>,
 ) -> bool {
     counts.get(f.name.text.as_str()) == Some(&1)
         && !f.is_pub
+        // Called from outside the program, so its definition has to stay.
         && f.name.text != "main"
+        && f.name.text != "__test_main"
+        && !entries.contains(&f.name.text)
+        // A `.test` body is not an ordinary function: codegen dispatches on the name `__test$<fn>`
+        // to make `?` fail the current test rather than propagate, so folding one into the driver
+        // would change what `?` means inside it.
+        && !aipl_syntax::is_test_body(&f.name.text)
         && !aipl_syntax::is_constant_initializer(&f.name.text)
         && !skip.contains(f.name.text.as_str())
         && !binders.contains(f.name.text.as_str())
@@ -114,11 +122,10 @@ fn is_single_use_candidate(
 }
 
 /// [`crate::inline_single_use`] on the pinned program.
-pub fn inline_single_use_pinned(program: &TProgram) -> TProgram {
-    let has_fn = |n: &str| functions(program).any(|f| f.name.text == n);
-    if !has_fn("main") || has_fn("__test_main") {
-        return program.clone();
-    }
+///
+/// A function is folded into its one caller and dropped unless something outside the program calls
+/// it: `main`, the `check` driver `__test_main`, or one of the `entries` the host calls by name.
+pub fn inline_single_use_pinned(program: &TProgram, entries: &HashSet<String>) -> TProgram {
     let mut program = program.clone();
     let mut skip: HashSet<String> = HashSet::new();
     loop {
@@ -126,7 +133,7 @@ pub fn inline_single_use_pinned(program: &TProgram) -> TProgram {
             let counts = use_counts(&program);
             let binders = collect_binders(&program);
             functions(&program)
-                .find(|f| is_single_use_candidate(f, &counts, &binders, &skip))
+                .find(|f| is_single_use_candidate(f, &counts, &binders, &skip, entries))
                 .cloned()
         };
         let Some(f) = candidate else { break };

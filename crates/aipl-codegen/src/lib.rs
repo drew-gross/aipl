@@ -3141,19 +3141,25 @@ fn lower_program(
     // pass that needs it rather than recomputed per pass per round.
     let effectful = aipl_mono::effectful_fns(&check_program.items);
     let max_exprs = inline_max_exprs();
+    // What a pass may not elide: the functions something outside the program calls (`main`, the
+    // `check` driver, and the `entries` the host calls by name).
+    let entry_set: std::collections::HashSet<String> = entries.iter().cloned().collect();
 
     // The pre-monomorphization optimization pipeline. The order is the
     // dependency order and is load-bearing; what is new is that the manager
     // runs the list *again* whenever a round rewrote something, because these
     // passes feed each other — see `aipl_mono::passes`.
     let pre_mono: Vec<Pass<aipl_syntax::typed::TProgram>> = vec![
-        // Inline single-use private functions (a no-op unless the program has
-        // a `main` — see `inline_single_use`). Runs on the checked source
-        // before monomorphization; mono's reachability then drops the
-        // inlined-away definitions. Whole-program: it picks its candidate by
+        // Inline single-use private functions that nothing outside the program
+        // calls (see `inline_single_use_pinned`). Runs on the checked source
+        // before monomorphization; the definition is dropped with its one call.
+        // Whole-program: it picks its candidate by
         // use count across the program and deletes the definition it inlined,
         // neither of which a scope naming callers can answer.
-        Pass::whole_program("inline_single_use", aipl_mono::inline_single_use_pinned),
+        Pass::whole_program("inline_single_use", {
+            let entry_set = entry_set.clone();
+            move |program| aipl_mono::inline_single_use_pinned(program, &entry_set)
+        }),
         // Inline a call into the `is_empty`/`is_nonempty`/index that
         // immediately inspects its result, however big the callee is — the
         // caller wants almost none of what the callee builds, and the passes
@@ -3289,7 +3295,6 @@ fn lower_program(
     // AIPL-implemented builtins, so there is a second crop of single-use
     // instances and a second crop of bindings only one branch reads — and the
     // passes feed each other here exactly as they do before mono.
-    let entry_set: std::collections::HashSet<String> = entries.iter().cloned().collect();
     let post_mono: Vec<Pass<aipl_mono::MonoProgram>> = vec![
         // Inline single-use instances: the lifted lambdas (each called from
         // exactly one specialization) and any other now-single-use instance,

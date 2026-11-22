@@ -105,13 +105,20 @@ fn use_counts_counts_function_value_references() {
     assert_eq!(c["map"], 1);
 }
 
-/// Function names remaining after inlining single-use private functions.
+/// Function names remaining after inlining single-use private functions, with nothing but `main`
+/// called from outside.
 fn inlined_names(src: &str) -> Vec<String> {
+    inlined_names_with(src, &[])
+}
+
+/// [`inlined_names`] when the host calls the functions in `entries` by name.
+fn inlined_names_with(src: &str, entries: &[&str]) -> Vec<String> {
     aipl::install_parser_hooks();
     let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
         .expect("load");
     let frontend = aipl::codegen::frontend(&prog).expect("frontend");
-    let inlined = inline_single_use_pinned(&frontend.pinned.program);
+    let entries = entries.iter().map(|e| e.to_string()).collect();
+    let inlined = inline_single_use_pinned(&frontend.pinned.program, &entries);
     let mut names: Vec<String> = inlined
         .items
         .iter()
@@ -185,14 +192,24 @@ fn inline_keeps_multiply_used_helper() {
 }
 
 #[test]
-fn inline_skips_no_main_program() {
-    // No `main` → FFI/library: every function stays callable by name.
-    let names = inlined_names(
+fn inline_keeps_an_entry_the_host_calls() {
+    // No `main`: a function the host calls by name keeps its definition, even though AIPL calls it once.
+    let src = "import { wrapping_add as + } from builtins;
+         fn helper(x: i64) -> i64 { x + 1 }
+         pub fn entry(x: i64) -> i64 { helper(x) }";
+    assert!(inlined_names_with(src, &["helper"]).contains(&"helper".to_string()));
+}
+
+#[test]
+fn inline_folds_a_private_helper_of_a_program_without_main() {
+    // Nothing outside calls `helper`, so a program without `main` has no reason to keep it.
+    let names = inlined_names_with(
         "import { wrapping_add as + } from builtins;
          fn helper(x: i64) -> i64 { x + 1 }
          pub fn entry(x: i64) -> i64 { helper(x) }",
+        &["entry"],
     );
-    assert!(names.contains(&"helper".to_string()));
+    assert!(!names.contains(&"helper".to_string()));
 }
 
 #[test]

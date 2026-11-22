@@ -23,8 +23,13 @@ fn compile(src: &str) -> Compilation {
     aipl::install_parser_hooks();
     let program = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
         .expect("load");
-    // Every function is an entry: the tests call whichever they define by name.
-    let entries = aipl::codegen::all_functions(&program);
+    // A program with a `main` is rooted at it. One without has every function as an entry, since
+    // the tests call whichever they define by name.
+    let entries = if aipl::codegen::all_functions(&program).contains(&"main") {
+        Vec::new()
+    } else {
+        aipl::codegen::all_functions(&program)
+    };
     Compilation::new(&program, DebugOptions::OFF, &entries).unwrap()
 }
 
