@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/use_field_projection.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/use_field_projection.aipl</code></h1>
+
+      <div class="module-doc"><p>The <code>use_field_projection</code> lint: a lambda in a <code>map</code> that does nothing but take its parameter through member reads and method calls is the <code>$</code> projection.</p><p>A lambda whose whole body is its parameter taken through a chain of member reads and method calls — <code>|x| x.name</code>, <code>|x| x.0</code>, <code>|x| x.f(args)</code>, <code>|x| x.a.f(b).c</code>, <code>|x| to_str(x)</code> — is <code>xs$name</code>, <code>xs$0</code>, <code>xs$f(args)</code>, <code>xs$a$f(b)$c</code> and <code>xs$to_str()</code>: each step written once, with no name for the element to introduce and then repeat. And a bare function name, <code>xs.map(f)</code>, is <code>xs$f()</code>.</p><p>Only the shape <code>$</code> stands for qualifies. The parameter has to be the root of the chain and appear nowhere else (<code>|x| x.f(x)</code> needs the name), it has to be unannotated, since <code>$</code> has no place to write a type, and every call in the chain has to be one <code>$</code> can make — a function of this file whose first parameter is named <code>self</code>, which is what method-call syntax is defined by, a lowercase builtin the file imports, or a call already written as a method. A function from another file is not known here — its parameters are not in view when a file is linted — so it is never advised. An operator is never a step: <code>|x| x + 1</code> does something with <code>x</code>.</p><p>The hit points at the lambda, or at the bare name — a short span that begins on the line the <code>#[allow]</code> would be written on. The lint runs before checking, so it cannot tell a sequence from an optional; <code>$</code> maps either, as <code>map</code> does.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-use_field_projection">
+          <h3>
+            <a class="anchor" href="#item-use_field_projection">use_field_projection</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn use_field_projection(function: Function, items: Item[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>A hit for each <code>map</code> in the program whose function is a <code>$</code> projection.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Projection">
+          <h3>
+            <a class="anchor" href="#item-Projection">Projection</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Projection</code></pre>
+
+          <div class="doc"><p>What the rule says about a <code>map</code> call, and the span of the lambda it advised on (none for a function name), so that a lint about lambdas can leave that lambda alone.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-projections">
+          <h3>
+            <a class="anchor" href="#item-projections">projections</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn projections(self: Function, items: Item[]) -&#62; Projection[]</code></pre>
+
+          <div class="doc"><p>The [<code>Projection</code>] of each <code>map</code> in <code>self</code>.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-methods_in_view">
+          <h3>
+            <a class="anchor" href="#item-methods_in_view">methods_in_view</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn methods_in_view(self: Item[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names a call can use as a <code>$</code> step: a function of this file whose first parameter is named <code>self</code>, which is what method-call syntax is defined by, and a lowercase builtin the file imports. A function from another file is not here — its parameters are not in view when a file is linted.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-method_name">
+          <h3>
+            <a class="anchor" href="#item-method_name">method_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn method_name(self: LoweredFn) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The name of the function <code>self</code>, when it takes a <code>self</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-projection">
+          <h3>
+            <a class="anchor" href="#item-projection">projection</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn projection(self: Expr&#60;Call&#62;, methods: str[]) -&#62; Projection?</code></pre>
+
+          <div class="doc"><p><code>self</code> as the projection for <code>recv.map(arg)</code>, if <code>arg</code> is a function name or a lambda <code>$</code> can say.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-chain">
+          <h3>
+            <a class="anchor" href="#item-chain">chain</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn chain(self: Expr, parameter: str, methods: str[]) -&#62; str[]?</code></pre>
+
+          <div class="doc"><p>The <code>$</code> steps <code>self</code> is made of, outermost last, when it is <code>parameter</code> taken through member reads and calls and nothing else; <code>none</code> otherwise. A call has to be one <code>$</code> can make — see <code>methods_in_view</code> — or already be written as a method call.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_shown">
+          <h3>
+            <a class="anchor" href="#item-slot_shown">slot_shown</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_shown(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A tuple slot is the field <code>_0</code>, written <code>0</code>; any other field is its own name.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

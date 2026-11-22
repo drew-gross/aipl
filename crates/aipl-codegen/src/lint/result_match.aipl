@@ -3,7 +3,6 @@
 # straight back from one that rebuilds it.
 
 import {
-    as_case,
     collect_ok,
     equal as ==,
     find_if,

@@ -1,10 +1,11 @@
-# The `eta_lambda` lint: a lambda that adds nothing to what it forwards its argument to.
+# The `use_field_projection` lint: a lambda in a `map` that does nothing but take its parameter
+# through member reads and method calls is the `$` projection.
 #
-# **In a `map`**, a lambda whose whole body is its parameter taken through a chain of
-# member reads and method calls — `|x| x.name`, `|x| x.0`, `|x| x.f(args)`,
-# `|x| x.a.f(b).c`, `|x| to_str(x)` — is `xs$name`, `xs$0`, `xs$f(args)`, `xs$a$f(b)$c` and
-# `xs$to_str()`: each step written once, with no name for the element to introduce and then
-# repeat. And a bare function name, `xs.map(f)`, is `xs$f()`.
+# A lambda whose whole body is its parameter taken through a chain of member reads and method
+# calls — `|x| x.name`, `|x| x.0`, `|x| x.f(args)`, `|x| x.a.f(b).c`, `|x| to_str(x)` — is
+# `xs$name`, `xs$0`, `xs$f(args)`, `xs$a$f(b)$c` and `xs$to_str()`: each step written once, with
+# no name for the element to introduce and then repeat. And a bare function name, `xs.map(f)`,
+# is `xs$f()`.
 #
 # Only the shape `$` stands for qualifies. The parameter has to be the root of the chain and
 # appear nowhere else (`|x| x.f(x)` needs the name), it has to be unannotated, since `$` has
@@ -14,9 +15,6 @@
 # method. A function from another file is not known here — its parameters are not in view
 # when a file is linted — so it is never advised. An operator is never a step: `|x| x + 1`
 # does something with `x`.
-#
-# **Anywhere else**, a lambda that only forwards its arguments to one call, `|x| to_str(x)`,
-# is the function itself: pass `to_str`.
 #
 # The hit points at the lambda, or at the bare name — a short span that begins on the line
 # the `#[allow]` would be written on. The lint runs before checking, so it cannot tell a
@@ -45,9 +43,7 @@ import {
     logical_not as !,
     logical_or as ||,
     map,
-    not_equal as !=,
     starts_with,
-    zip_with,
 } from builtins;
 import { Map } from "../builtin_table.aipl";
 import {
@@ -56,7 +52,6 @@ import {
     Field,
     Ident,
     Lambda,
-    LambdaParam,
     descendants_of_kind,
     name_at,
     synthesized_name,
@@ -68,28 +63,15 @@ import { mentions_any } from "./field_uses.aipl";
 import { LintHit, hit, lint_in_messages, quote } from "./lint_hit.aipl";
 import { imported_locals } from "./spelling.aipl";
 
-# A hit for each lambda in the program that adds nothing to what it forwards to.
-pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {
-    let methods = items.methods_in_view();
-    let advice = body
-        .descendants_of_kind::<Call>()
-        .map(|call: Expr<Call>| { call.map_advice(methods) })
-        .collect_ok();
-    // The lambdas the `map` advice already covers are not advised on again.
-    let advised = advice$lambda.collect_ok();
-    [
-        ..advice$hit,
-        ..body
-            .descendants_of_kind::<Lambda>()
-            .map(|lambda: Expr<Lambda>| { lambda.forwarded(advised) })
-            .collect_ok(),
-    ]
+# A hit for each `map` in the program whose function is a `$` projection.
+pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
+    function.projections(items)$hit
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_in_messages(
             `import \{ {imports} } from builtins; struct P \{ name: str } fn shout(self: str) -> str \{ self } fn f(xs: P[], ys: str[]) -> i64 \{ {body} }`,
-            eta_lambda,
+            use_field_projection,
         )
     }
 
@@ -127,25 +109,20 @@ pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {
     // a `map`'s argument.
     assert(messages("map", "ys.map(g)")? == []);
     assert(messages("filter", `xs.filter(|p| p.name == "a")`)? == []);
-
-    // A lambda that only forwards its arguments is the function itself, anywhere.
-    assert(messages("filter", "xs.filter(|p| g(p))")? == [
-        `lambda only forwards its argument(s) to "g" — pass "g" directly`,
-    ]);
-    assert(messages("", "h(|a, b| g(a, b))")? == [
-        `lambda only forwards its argument(s) to "g" — pass "g" directly`,
-    ]);
-    assert(messages("", "h(|a, b| g(b, a))")? == []);
-    assert(messages("wrapping_add as +", "h(|a, b| a + b)")? == []);
-    assert(messages("", "h(|a| a(a))")? == []);
-
-    // Shapes the lint flags, and what it says of them.
-    assert(lint_in_messages("fn is_big(x: i64) -> bool { x > 100 }", eta_lambda)? == []);
-    assert(lint_in_messages(
-        "fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }",
-        eta_lambda,
-    )? == [`lambda only forwards its argument(s) to "is_big" — pass "is_big" directly`]);
 })
+
+# What the rule says about a `map` call, and the span of the lambda it advised on (none for a
+# function name), so that a lint about lambdas can leave that lambda alone.
+struct Projection { hit: LintHit, lambda: Span? }
+
+# The [`Projection`] of each `map` in `self`.
+pub fn projections(self: Function, items: Item[]) -> Projection[] {
+    let methods = items.methods_in_view();
+    self.body
+        .descendants_of_kind::<Call>()
+        .map(|call: Expr<Call>| { call.projection(methods) })
+        .collect_ok()
+}
 
 # The names a call can use as a `$` step: a function of this file whose first parameter is
 # named `self`, which is what method-call syntax is defined by, and a lowercase builtin the
@@ -170,17 +147,13 @@ fn method_name(self: LoweredFn(Function { sig, name })) -> str? {
     }
 }
 
-# What the `map` rule says about a call, and the span of the lambda it advised on (none for a
-# function name), so that the lambda itself is not advised on again.
-struct MapAdvice { hit: LintHit, lambda: Span? }
-
-# `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
-fn map_advice(self: Expr<Call>, methods: str[]) -> MapAdvice? {
+# `self` as the projection for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
+fn projection(self: Expr<Call>, methods: str[]) -> Projection? {
     let Call(_, [receiver, argument], _, Map) = self.kind else { return none; };
     let items = receiver.quote("<items>");
     if (let Ident(function) = argument.kind) {
         if (!methods.contains(function)) { return none; };
-        return some(MapAdvice {
+        return some(Projection {
             hit: hit(
                 `"map" over the function "{function}" — write "{items}${function}()"`,
                 argument.span,
@@ -192,7 +165,7 @@ fn map_advice(self: Expr<Call>, methods: str[]) -> MapAdvice? {
     if (parameter.ty.is_some() || parameter.synthesized_name().contains('$')) { return none; };
     let steps = body.chain(parameter.synthesized_name(), methods)?;
     if (steps.is_empty()) { return none; };
-    some(MapAdvice {
+    some(Projection {
         hit: hit(
             `"map" with a lambda that only uses a member of its argument — write "{items}{steps.join()}"`,
             argument.span,
@@ -237,38 +210,4 @@ fn slot_shown(self: str) -> str {
     } else {
         self
     }
-}
-
-# A hit for `self` when it is a lambda that only forwards its argument(s) to one call, outside
-# a `map` that `map_advice` handles (`advised` is the lambdas it covered). A lambda the parser
-# wrote for `xs$f()` names its parameter with a `$`, which no source can; there is no longer
-# spelling for it to be advised into. An operator is left alone deliberately: the language does
-# accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
-# rather than an obviously better one, and this lint's job is the case where the lambda adds
-# *nothing* — `|x| to_str(x)` against `to_str`.
-fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
-    let Lambda(parameters, body) = self.kind;
-    if (advised.contains(self.span) || parameters.any(
-        |parameter| parameter.synthesized_name().contains('$'),
-    )) {
-        return none;
-    };
-    let Call(name, arguments, _, _) = body.kind.as_case::<Call>()?;
-    if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
-        |parameter| parameter.synthesized_name() == name,
-    )) {
-        return none;
-    };
-    let forwards = zip_with(
-        arguments,
-        parameters,
-        |argument: Expr, parameter: LambdaParam| argument.kind == Ident(
-            parameter.synthesized_name(),
-        ),
-    );
-    if (!forwards.all(|same| same)) { return none; };
-    some(hit(
-        `lambda only forwards its argument(s) to "{name}" — pass "{name}" directly`,
-        self.span,
-    ))
 }

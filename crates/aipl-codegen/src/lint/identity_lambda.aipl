@@ -1,0 +1,108 @@
+# The `identity_lambda` lint: a lambda that only forwards its arguments to one call, `|x| to_str(x)`,
+# is the function itself: pass `to_str`.
+#
+# The lambda has to pass every parameter on, in order and once, to a call that is not an operator, and
+# nothing else. A lambda a `map` can say as a `$` projection is `use_field_projection`'s, and is not
+# advised on here.
+#
+# The hit points at the lambda — a short span that begins on the line the `#[allow]` would be written on.
+
+import {
+    Span,
+    all,
+    any,
+    as_case,
+    collect_ok,
+    contains,
+    equal as ==,
+    len,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    zip_with,
+} from builtins;
+import {
+    Call,
+    Expr,
+    Ident,
+    Lambda,
+    LambdaParam,
+    descendants_of_kind,
+    synthesized_name,
+} from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { is_operator_name } from "../is_operator_name.aipl";
+import { Function, Item } from "../item.aipl";
+import { LintHit, hit, lint_in_messages } from "./lint_hit.aipl";
+import { projections } from "./use_field_projection.aipl";
+
+# A hit for each lambda in the program that only forwards its arguments.
+pub fn identity_lambda(function: Function, items: Item[]) -> LintHit[] {
+    // The lambdas the projection advice already covers are not advised on again.
+    let advised = function.projections(items)$lambda.collect_ok();
+    function.body
+        .descendants_of_kind::<Lambda>()
+        .map(|lambda: Expr<Lambda>| { lambda.forwarded(advised) })
+        .collect_ok()
+}.test({
+    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
+    fn messages(imports: str, body: str) -> str[]!ParseFailure {
+        lint_in_messages(
+            `import \{ {imports} } from builtins; struct P \{ name: str } fn shout(self: str) -> str \{ self } fn f(xs: P[], ys: str[]) -> i64 \{ {body} }`,
+            identity_lambda,
+        )
+    }
+
+    // A lambda that only forwards its arguments is the function itself, anywhere.
+    assert(messages("filter", "xs.filter(|p| g(p))")? == [
+        `lambda only forwards its argument(s) to "g" — pass "g" directly`,
+    ]);
+    assert(messages("", "h(|a, b| g(a, b))")? == [
+        `lambda only forwards its argument(s) to "g" — pass "g" directly`,
+    ]);
+    assert(messages("", "h(|a, b| g(b, a))")? == []);
+    assert(messages("wrapping_add as +", "h(|a, b| a + b)")? == []);
+    assert(messages("", "h(|a| a(a))")? == []);
+
+    // Shapes the lint flags, and what it says of them.
+    assert(lint_in_messages("fn is_big(x: i64) -> bool { x > 100 }", identity_lambda)? == []);
+    assert(lint_in_messages(
+        "fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }",
+        identity_lambda,
+    )? == [`lambda only forwards its argument(s) to "is_big" — pass "is_big" directly`]);
+})
+
+# A hit for `self` when it is a lambda that only forwards its argument(s) to one call, outside
+# a `map` that `use_field_projection` handles (`advised` is the lambdas it covered). A lambda the parser
+# wrote for `xs$f()` names its parameter with a `$`, which no source can; there is no longer
+# spelling for it to be advised into. An operator is left alone deliberately: the language does
+# accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
+# rather than an obviously better one, and this lint's job is the case where the lambda adds
+# *nothing* — `|x| to_str(x)` against `to_str`.
+fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
+    let Lambda(parameters, body) = self.kind;
+    if (advised.contains(self.span) || parameters.any(
+        |parameter| parameter.synthesized_name().contains('$'),
+    )) {
+        return none;
+    };
+    let Call(name, arguments, _, _) = body.kind.as_case::<Call>()?;
+    if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
+        |parameter| parameter.synthesized_name() == name,
+    )) {
+        return none;
+    };
+    let forwards = zip_with(
+        arguments,
+        parameters,
+        |argument: Expr, parameter: LambdaParam| argument.kind == Ident(
+            parameter.synthesized_name(),
+        ),
+    );
+    if (!forwards.all(|same| same)) { return none; };
+    some(hit(
+        `lambda only forwards its argument(s) to "{name}" — pass "{name}" directly`,
+        self.span,
+    ))
+}

@@ -25,10 +25,10 @@ import { char_set_literal } from "./char_set_literal.aipl";
 import { compound_assign } from "./compound_assign.aipl";
 import { destructure } from "./destructure.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
-import { eta_lambda } from "./eta_lambda.aipl";
 import { extend_loop_map_join } from "./extend_loop_map_join.aipl";
 import { field_init_shorthand } from "./field_init_shorthand.aipl";
 import { fn_body_type_stutter } from "./fn_body_type_stutter.aipl";
+import { identity_lambda } from "./identity_lambda.aipl";
 import { interp_literal } from "./interp_literal.aipl";
 import { interp_to_str } from "./interp_to_str.aipl";
 import { is_empty_longhand } from "./is_empty_longhand.aipl";
@@ -72,6 +72,7 @@ import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
 import { unused_functions } from "./unused_functions.aipl";
 import { unused_imports } from "./unused_imports.aipl";
+import { use_field_projection } from "./use_field_projection.aipl";
 import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
 import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
@@ -100,7 +101,8 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.hits(push_array_literal),
         ..functions.unfilled_hits(return_loop_find_if).filled(items),
         ..functions.unfilled_hits(return_loop_any_all).filled(items),
-        ..functions.hits(|function| eta_lambda(function, items)),
+        ..functions.hits(|function| identity_lambda(function, items)),
+        ..functions.hits(|function| use_field_projection(function, items)),
         ..functions.unfilled_hits(push_loop_zip_with).filled(items),
         ..functions.unfilled_hits(return_loop_find_index).filled(items),
         ..functions.hits(interp_to_str),

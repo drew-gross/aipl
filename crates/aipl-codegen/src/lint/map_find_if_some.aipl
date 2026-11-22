@@ -7,7 +7,7 @@
 # once: the chain's result is a `U??` whose outer layer every caller then peels
 # (`.value_or(none)`), while `find_map` returns the `U?` that was wanted.
 #
-# The predicate has to *be* `is_some` — the name; a lambda forwarding to it is `eta_lambda`'s
+# The predicate has to *be* `is_some` — the name; a lambda forwarding to it is `identity_lambda`'s
 # to turn into the name — since that is what makes the chain a `find_map` rather than a search over mapped values
 # (`map_find_if`'s shape, which the fusion pass takes care of). `map`, `find_if` and
 # `is_some` are the precondition, since the shape is theirs, and a file that has not
@@ -72,7 +72,7 @@ pub fn map_find_if_some(self: Call(_, arguments, _, callee), items: Item[]) -> A
     }
     let all = "map, find_if, is_some, find_map";
 
-    // The name itself; a lambda that forwards to it is `eta_lambda`'s to simplify first.
+    // The name itself; a lambda that forwards to it is `identity_lambda`'s to simplify first.
     assert(messages(all, "xs.map(g).find_if(is_some)")? == [
         `"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
     ]);

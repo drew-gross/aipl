@@ -21,7 +21,6 @@
 # The hit points at the `set` statement.
 
 import {
-    as_case,
     collect_ok,
     contains,
     equal as ==,

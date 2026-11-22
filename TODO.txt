@@ -570,7 +570,6 @@ skills:
 
 lint:
   slots_taken_apart should lint to a filter map
-  split eta_lambda into use_field_projection and pass_values_not_lambdas
   tag/resolve Idents the same way as calls, so that we can do the same kind of destructuring in lints
   free_name should gurarantee get a name. Try the preferred name, then builtin_<the preferred name>, then <the preferred name>2, then 3, etc. until found.
   "An operator can't be renamed, so a taken or wrong-flavor operator still drops the advice." <--- fix this restriction (if it's even real)

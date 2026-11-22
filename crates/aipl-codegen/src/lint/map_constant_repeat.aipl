@@ -25,7 +25,6 @@
 
 import {
     all,
-    as_case,
     collect_ok,
     ends_with,
     equal as ==,
