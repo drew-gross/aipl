@@ -372,6 +372,34 @@
 
 
 
+        <section class="item" id="item-lint_function_unfilled">
+          <h3>
+            <a class="anchor" href="#item-lint_function_unfilled">lint_function_unfilled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_unfilled(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the function lint <code>lint</code> says of the program <code>src</code> parses to, as it says it: the [<code>UnfilledHit</code>]s, before any file's imports decide how they are written. Every builtin counts as imported, so a lint's own tests are about the shape it finds and nothing about imports.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-shown">
+          <h3>
+            <a class="anchor" href="#item-shown">shown</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn shown(self: UnfilledHit[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p><code>self</code> as messages, each builtin the advice names written as its own name and no import named.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lint_in_hits">
           <h3>
             <a class="anchor" href="#item-lint_in_hits">lint_in_hits</a>
@@ -457,6 +485,20 @@
           <pre class="signature"><code>fn outside_its_definition(self: Function, hits: UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p><code>hits</code> less those that advise the builtin <code>self</code> is itself: a function written to be <code>any</code> holds the longhand that <code>any</code> replaces, and advising it to call <code>any</code> would have it call itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-plain_name">
+          <h3>
+            <a class="anchor" href="#item-plain_name">plain_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn plain_name(self: Need, table: BuiltinEntry[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name <code>self</code> is written with when no file decides: a builtin's own name, an operator's spelling.</p></div>
 
 
         </section>

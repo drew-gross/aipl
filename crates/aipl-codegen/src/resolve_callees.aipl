@@ -17,9 +17,13 @@ import {
     collect_ok,
     contains,
     equal as ==,
+    filter,
+    first,
     get,
     join,
+    logical_not as !,
     map,
+    push,
     to_dict,
     value_or,
 } from builtins;
@@ -27,6 +31,7 @@ import {
     Assert,
     BuiltinEntry,
     Callee,
+    Equal,
     Err,
     Len,
     Local,
@@ -36,6 +41,7 @@ import {
     User,
     builtin_imported,
     builtin_table,
+    import_name,
 } from "./builtin_table.aipl";
 import {
     ArrayLit,
@@ -113,6 +119,7 @@ import {
     VariantDecl,
     local,
 } from "./item.aipl";
+import { operator_named_forms, operator_spellings } from "./operator_named_forms.aipl";
 import { pat_bindings } from "./pat.aipl";
 
 # The tree the lints are handed: a program whose every call says what it is to.
@@ -167,6 +174,9 @@ pub fn resolve_callees(self: Program) -> ResolvedProgram {
     assert(called("struct P { x: u64 = len([1]) }")? == [User("len")]);
 })
 
+# The name of the function `self` declares.
+fn declared_name(self: LoweredFn(Function { name })) -> str { name.text }
+
 # The callee of each call in the program's functions and defaults, outermost first.
 fn callees_called(self: Item[]) -> Callee[] {
     self
@@ -191,6 +201,50 @@ fn expressions(self: Item) -> Expr[] {
         _ => [],
     }
 }
+
+# `self` resolved as if the file imported every builtin under its own name, and each operator as
+# the first named builtin that provides it, besides whatever it does import. A function of the
+# file's own hides a builtin of the same name. A lint's own tests read the calls this way, so they
+# say what the lint does with a shape and nothing about what the file imports.
+pub fn resolve_with_every_builtin(self: Program) -> ResolvedProgram {
+    let table = builtin_table();
+    let own = self.items.collect_arms::<LoweredFn>()$declared_name();
+    let named = table
+        .map(|entry| (entry.import_name(), entry.arm))
+        .filter(|(name, _)| !own.contains(name));
+    mut operators: (str, Callee)[] = [];
+    for (let operator : operator_spellings()) {
+        if (let some(form) = operator.operator_named_forms().first()) {
+            if (let some(BuiltinEntry { arm }) = table.builtin_imported("builtins", form)) {
+                set operators.push((operator, arm));
+            };
+        };
+    }
+    let imported = [
+        ..named,
+        ..operators,
+        ..self.items.collect_arms::<Import>()$imported_pairs(table).join(),
+    ].to_dict();
+    SuperProgram { items: self.items$resolved_item(imported), doc: self.doc }
+}.test({
+    fn called(source: str) -> Callee[]!ParseFailure {
+        let Program { items } = aipl_parse_surface_file(source)?.program
+            .hoist_test_fns()
+            .resolve_with_every_builtin();
+        ok(items.callees_called())
+    }
+
+    // Nothing is imported, and every builtin resolves, an operator as its first form.
+    assert(called("fn f(x: i64[]) -> u64 { x.len() }")? == [Len]);
+    assert(called("fn f(a: i64, b: i64) -> bool { a == b }")? == [Equal]);
+    // The file's own function of the same name is no builtin, and an alias still works.
+    assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [
+        User("len"),
+    ]);
+    assert(called("import { len as length } from builtins; fn f(x: i64[]) { length(x) }")? == [
+        Len,
+    ]);
+})
 
 # `self` resolved as in a file that imports each of `names` from builtins under its own name and
 # has nothing else in scope: what a test of a helper over a bare block needs.

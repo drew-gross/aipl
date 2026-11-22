@@ -27,9 +27,8 @@ import {
 } from builtins;
 import { TrySet, ValueOr, With } from "../builtin_table.aipl";
 import { Call, Expr, Field, Ident, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
-import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `with(..)` the call falls back from to the array it replaces in.
@@ -54,96 +53,31 @@ pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Call>()$kind$with_value_or_self().collect_ok()
     }
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[], ys: i64[], p: P) -> i64[] \{ {body} }`,
-            flagged,
-        )
+    // What the lint says of a replacement in `array`.
+    fn says(array: str) -> str {
+        `this \`value_or\` falls back to the array it is replacing in — write "{array}.try_set(..)" and drop the fallback`
     }
-    let all = "with, value_or, try_set";
 
-    // A binding and a field path off one are the same place as themselves.
-    assert(messages(all, "xs.with(0, 1).value_or(xs)")? == [
-        """this `value_or` falls back to the array it is replacing in — write "xs.try_set(..)" and drop the fallback""",
+    // A binding and a field path off one are the same place as themselves, in either call form.
+    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or(xs) }", flagged)?.shown() == [
+        says("xs"),
     ]);
-    assert(messages(all, "p.rows.with(0, 1).value_or(p.rows)")? == [
-        """this `value_or` falls back to the array it is replacing in — write "p.rows.try_set(..)" and drop the fallback""",
-    ]);
-
-    // Imports the file lacks are named, and an alias is followed.
-    assert(messages("with, value_or", "xs.with(0, 1).value_or(xs)")? == [
-        """this `value_or` falls back to the array it is replacing in — write "xs.try_set(..)" and drop the fallback, importing `try_set` from builtins""",
-    ]);
-    assert(messages("with, value_or as or_else, try_set", "xs.with(0, 1).or_else(xs)")? == [
-        """this `or_else` falls back to the array it is replacing in — write "xs.try_set(..)" and drop the fallback""",
+    assert(lint_function_unfilled(
+        "fn f() { p.rows.with(0, 1).value_or(p.rows) }",
+        flagged,
+    )?.shown() == [says("p.rows")]);
+    assert(lint_function_unfilled("fn f() { value_or(with(xs, 2, 5), xs) }", flagged)?.shown() == [
+        says("xs"),
     ]);
 
-    // Not the shape: another array, an empty one, a different field, and a file that has not
-    // imported what the shape is made of.
-    assert(messages(all, "xs.with(0, 1).value_or(ys)")? == []);
-    assert(messages(all, "xs.with(0, 1).value_or([])")? == []);
-    assert(messages(all, "p.rows.with(0, 1).value_or(p.cols)")? == []);
-    assert(messages("value_or, try_set", "xs.with(0, 1).value_or(xs)")? == []);
-
-    // Shapes the lint must leave alone.
-    // A different array: not "leave it alone".
-    assert(
-        lint_function_unfilled_messages(
-            "fn other(xs: i64[], ys: i64[]) -> i64[] { xs.with(0, 9).value_or(ys) }",
-            flagged,
-        )? == [],
-    );
-    // An empty fallback, for an index known to be in range.
-    assert(
-        lint_function_unfilled_messages(
-            "fn known_in_range(xs: i64[]) -> i64[] { xs.with(0, 9).value_or([]) }",
-            flagged,
-        )? == [],
-    );
-    // A fallback that is computed is not the receiver read again.
-    assert(
-        lint_function_unfilled_messages(
-            "fn computed(xs: i64[]) -> i64[] { xs.with(0, 9).value_or(xs[..1]) }",
-            flagged,
-        )? == [],
-    );
-    // `with` on its own, and `value_or` on something else.
-    assert(
-        lint_function_unfilled_messages(
-            "fn plain(xs: i64[]) -> i64[]? { xs.with(0, 9) }",
-            flagged,
-        )? == [],
-    );
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn agree() {}.test({
-                    assert(other([1], [2]) == [9]);
-                    assert(known_in_range([1]) == [9]);
-                    assert(computed([1, 2]) == [9, 2]);
-                    assert(plain([]) == none);
-                    let p = Pair { a: [1], b: [2] };
-                    assert(p.a.with(0, 9).value_or(p.b) == [9]);
-                })
-            """,
-            flagged,
-        )? == [],
-    );
-
-    // Shapes the lint flags, and what it says of them.
-    assert(
-        lint_function_unfilled_messages(
-            "fn local(xs: i64[]) -> i64[] { xs.with(1, 9).value_or(xs) }",
-            flagged,
-        )? == [],
-    );
-    assert(
-        lint_function_unfilled_messages(
-            "fn free_call(xs: i64[]) -> i64[] { value_or(with(xs, 2, 5), xs) }",
-            flagged,
-        )? == [],
-    );
+    // Not the shape: another array, an empty one, a different field, a computed fallback, `with`
+    // on its own, and `value_or` on something else.
+    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or(ys) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or([]) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { p.rows.with(0, 1).value_or(p.cols) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.with(0, 9).value_or(xs[..1]) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.with(0, 9) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { o.value_or(xs) }", flagged)? == []);
 })
 
 # Whether `self` and `other` read the same binding, or the same field path off one.

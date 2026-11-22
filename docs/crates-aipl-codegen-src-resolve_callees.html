@@ -92,6 +92,20 @@
 
 
 
+        <section class="item" id="item-resolve_with_every_builtin">
+          <h3>
+            <a class="anchor" href="#item-resolve_with_every_builtin">resolve_with_every_builtin</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn resolve_with_every_builtin(self: Program) -&#62; ResolvedProgram</code></pre>
+
+          <div class="doc"><p><code>self</code> resolved as if the file imported every builtin under its own name, and each operator as the first named builtin that provides it, besides whatever it does import. A function of the file's own hides a builtin of the same name. A lint's own tests read the calls this way, so they say what the lint does with a shape and nothing about what the file imports.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-resolved_with_builtins">
           <h3>
             <a class="anchor" href="#item-resolved_with_builtins">resolved_with_builtins</a>
@@ -223,6 +237,20 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-declared_name">
+          <h3>
+            <a class="anchor" href="#item-declared_name">declared_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn declared_name(self: LoweredFn) -&#62; str</code></pre>
+
+          <div class="doc"><p>The name of the function <code>self</code> declares.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-callees_called">

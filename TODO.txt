@@ -382,7 +382,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
-  more deeply nested destructuring e.g. let [Call(_, inner_arguments, _, Map), predicate] = arguments else { return none; }; (with lint)
+  make testonly functions
   allow destructuring of sets, in lints this can help with the "either of the arguments is X" paradigm (when functions are commutatitve, such as ==)
   syntax (and lint) that says you should not explicitly name a type argument if it's only used once, just use a bound directly in the non-type args or body
   support removing multiple arms via throughout at once

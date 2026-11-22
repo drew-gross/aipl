@@ -88,6 +88,11 @@ string and checks the messages, so the flagged shape, the near-miss and the mess
 code that produces them and run in-process with the file's other tests. A lint over one kind of expression (a function of one node, run by a helper in `lint.aipl`) is tested with `lint_str(src)` from `lint.aipl`, which runs every lint and returns the messages, so its snippets must be ones no other lint objects to. The three kinds:
 
 - **Flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [message(..)])`, what the lint says of the shape.
+  For a lint that returns `UnfilledHit`s, the driver is `lint_function_unfilled(src, lint)`, which
+  resolves every builtin as if imported and returns the hits as the lint made them; `.shown()`
+  writes each builtin as its own name with no import named. A lint's tests are about the shape it
+  finds, never about the file's imports (aliasing and the import hint are the framework's, tested in
+  `lint_hit.aipl` and `spelling.aipl`), so a test needs no `import` line. See `zip_with_pair_zip.aipl`.
 - **Not flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [])` for every near-miss, each with a comment
   saying *why* it must be left alone. These are most of a lint's tests; write the near-misses first.
 - **`#[allow]` and the rewrite agree:** helper functions declared in the test block, the longhand carrying

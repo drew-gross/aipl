@@ -30,9 +30,8 @@ import {
     descendants_of_kind,
     synthesized_name,
 } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
-import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `zip_with` whose function only pairs its two arguments.
@@ -56,43 +55,35 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Call>()$kind$zip_with_pair_zip().collect_ok()
     }
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[], ys: str[]) -> (i64, str)[] \{ {body} }`,
-            flagged,
-        )
+    // What the lint says of a `zip_with` of `items` and `other`.
+    fn says(items: str, other: str) -> str {
+        `"zip_with" with a function that only pairs its arguments is "{items}.zip({other})"`
     }
 
     // Flagged, in method and free-call form; the parameter names do not matter.
-    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (a, b) })")? == [
-        `"zip_with" with a function that only pairs its arguments is "xs.zip(ys)"`,
-    ]);
-    assert(messages("zip_with, zip", "zip_with(xs, ys, |left, right| { (left, right) })")? == [
-        `"zip_with" with a function that only pairs its arguments is "xs.zip(ys)"`,
-    ]);
-
-    // An import the file lacks is named, and an alias is followed.
-    assert(messages("zip_with", "xs.zip_with(ys, |a, b| { (a, b) })")? == [
-        ```"zip_with" with a function that only pairs its arguments is "xs.zip(ys)", importing `zip` from builtins```,
-    ]);
-    assert(messages("zip_with as pair_up, zip", "xs.pair_up(ys, |a, b| { (a, b) })")? == [
-        `"pair_up" with a function that only pairs its arguments is "xs.zip(ys)"`,
-    ]);
+    assert(lint_function_unfilled(
+        "fn f() { xs.zip_with(ys, |a, b| { (a, b) }) }",
+        flagged,
+    )?.shown() == [says("xs", "ys")]);
+    assert(lint_function_unfilled(
+        "fn f() { zip_with(xs, ys, |left, right| { (left, right) }) }",
+        flagged,
+    )?.shown() == [says("xs", "ys")]);
 
     // Receivers that cannot be quoted are placeholders.
-    assert(messages("zip_with, zip", "g().zip_with(h(), |a, b| { (a, b) })")? == [
-        `"zip_with" with a function that only pairs its arguments is "<items>.zip(<other>)"`,
-    ]);
+    assert(lint_function_unfilled(
+        "fn f() { g().zip_with(h(), |a, b| { (a, b) }) }",
+        flagged,
+    )?.shown() == [says("<items>", "<other>")]);
 
-    // Not the shape: the pair swapped (a different array), a body that computes
-    // something, a function over one value used twice, a `zip_with` the file never
-    // imported, and another function of the same shape.
-    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (b, a) })")? == []);
-    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (a + 1, b) })")? == []);
-    assert(messages("zip_with, zip", "xs.zip_with(ys, |a, b| { (a, a) })")? == []);
-    assert(messages("zip", "xs.zip_with(ys, |a, b| { (a, b) })")? == []);
-    assert(messages("zip_with, zip", "xs.map(|a| { (a, a) })")? == []);
+    // Not the shape: the pair swapped (a different array), a body that computes something, a
+    // function over one value used twice, and another function of the same shape.
+    assert(lint_function_unfilled("fn f() { xs.zip_with(ys, |a, b| { (b, a) }) }", flagged)? == []);
+    assert(
+        lint_function_unfilled("fn f() { xs.zip_with(ys, |a, b| { (a + 1, b) }) }", flagged)? == [],
+    );
+    assert(lint_function_unfilled("fn f() { xs.zip_with(ys, |a, b| { (a, a) }) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.map(|a| { (a, a) }) }", flagged)? == []);
 })
 
 # Whether `self` is a function of two parameters whose body is the pair of them, in order.

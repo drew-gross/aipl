@@ -54,9 +54,8 @@ import {
     descendants_of_kind,
     synthesized_name,
 } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
-import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for the call `self`, when it is a `map` over a function that ignores its argument.
@@ -85,69 +84,42 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> UnfilledHit? 
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Call>()$kind$map_constant_repeat().collect_ok()
     }
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[], c: i64) -> i64[] \{ {body} }`,
-            flagged,
-        )
+    // What the lint says of a `map` of `items` to `element`.
+    fn says(element: str, items: str) -> str {
+        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{element}].repeat({items}.len())"`
     }
-    let all = "map, repeat, len";
 
     // A literal, a name, a construction and an array literal of those are constant.
-    assert(messages(all, "xs.map(|x| 0)")? == [
-        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(xs.len())"`,
+    assert(lint_function_unfilled("fn f() { xs.map(|x| 0) }", flagged)?.shown() == [
+        says("0", "xs"),
     ]);
-    assert(messages(all, "xs.map(|x| c)")? == [
-        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[c].repeat(xs.len())"`,
+    assert(lint_function_unfilled("fn f() { xs.map(|x| c) }", flagged)?.shown() == [
+        says("c", "xs"),
     ]);
-    assert(messages(all, `xs.map(|x| "")`)? == [
-        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[""].repeat(xs.len())"`,
+    assert(lint_function_unfilled("""fn f() { xs.map(|x| "") }""", flagged)?.shown() == [
+        says(`""`, "xs"),
     ]);
-    assert(messages(all, "xs.map(|x| [c, 1])")? == [
-        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[<element>].repeat(xs.len())"`,
-    ]);
-
-    // An iterable that cannot be quoted is a placeholder, and imports the file lacks are
-    // named.
-    assert(messages(all, "g().map(|x| 0)")? == [
-        `"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(<items>.len())"`,
-    ]);
-    assert(messages("map", "xs.map(|x| 0)")? == [
-        ```"map" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].repeat(xs.len())", importing `repeat` and `len` from builtins```,
+    assert(lint_function_unfilled("fn f() { xs.map(|x| [c, 1]) }", flagged)?.shown() == [
+        says("<element>", "xs"),
     ]);
 
-    // Not the shape: a body that reads the parameter, a call, a range and a `map` the file
-    // never imported.
-    assert(messages(all, "xs.map(|x| x)")? == []);
-    assert(messages(all, "xs.map(|x| g())")? == []);
-    assert(messages(all, "(0..3).map(|x| 0)")? == []);
-    assert(messages("repeat, len", "xs.map(|x| 0)")? == []);
-    // Shapes the lint must leave alone.
-    assert(lint_function_unfilled_messages("fn next_id() -> i64 { 1 }", flagged)? == []);
+    // An iterable that cannot be quoted is a placeholder.
+    assert(lint_function_unfilled("fn f() { g().map(|x| 0) }", flagged)?.shown() == [
+        says("0", "<items>"),
+    ]);
 
-    // Shapes the lint flags, and what it says of them.
+    // The hit points at the function.
+    assert(lint_function_unfilled("fn f() { xs.map(|x| 0) }", flagged)?$span == [16..21]);
+
+    // Not the shape: a body that reads the parameter, a call, a range, a function that is not a
+    // lambda, and a `map` that is not the builtin.
+    assert(lint_function_unfilled("fn f() { xs.map(|x| x) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.map(|x| g()) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { (0..3).map(|x| 0) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.map(g) }", flagged)? == []);
     assert(
-        lint_function_unfilled_messages(
-            "fn zeros(xs: i64[]) -> i64[] { xs.map(|x| 0) }",
-            flagged,
-        )? == [],
-    );
-    assert(
-        lint_function_unfilled_messages(
-            """fn blanks(names: str[]) -> str[] { names.map(|_| "") }""",
-            flagged,
-        )? == [],
-    );
-    assert(
-        lint_function_unfilled_messages(
-            "fn defaults(xs: i64[], fallback: i64) -> i64[] { xs.map(|x| fallback) }",
-            flagged,
-        )? == [],
-    );
-    assert(
-        lint_function_unfilled_messages(
-            """fn cells(xs: i64[]) -> Cell[] { xs.map(|x| Cell { filled: false, label: "empty" }) }""",
+        lint_function_unfilled(
+            "fn map(xs: i64[], f: (i64) -> i64) { } fn f() { xs.map(|x| 0) }",
             flagged,
         )? == [],
     );
