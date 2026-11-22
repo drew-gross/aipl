@@ -23,8 +23,7 @@ pub fn interp_to_str(Function { body }) -> LintHit[] {
     body
         .interpolated_values()
         .map(|value| {
-            let Call(to_str, arguments, _, ToStr) = value.kind else { return none; };
-            let [argument] = arguments else { return none; };
+            let Call(to_str, [argument], _, ToStr) = value.kind else { return none; };
 
             // The argument is spliced into the advice only where its span is its text:
             // a call's span stops before its closing paren.

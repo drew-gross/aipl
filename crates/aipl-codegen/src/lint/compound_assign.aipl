@@ -61,8 +61,7 @@ fn compound_of(self: str) -> str? {
 pub fn compound_assign(self: Assign(target, value, _), stepped: str[]) -> Advice? {
     if (!target.spans_its_text()) { return none; };
     // An operator use is a call named for the spelling written.
-    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
-    let [left, right] = args else { return none; };
+    let Call(written, [left, right], _, _) = value.kind else { return none; };
     let spelling = written.compound_of()?;
 
     // The receiver on the left works for every operator; on the right only where the operation is

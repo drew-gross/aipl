@@ -1,0 +1,36 @@
+# An array pattern stands where any sub-pattern does: in a case's slot, in a `let` or a `match` arm.
+
+import { print, to_str, wrapping_add as + } from builtins;
+
+variant Shape = Pair(i64[]) | Labeled((str, i64[])) | Dot(i64)
+
+fn sum_of_pair(shape: Shape) -> i64 {
+    let Pair([first, second]) = shape else { return 0; };
+    first + second
+}
+
+fn describe(shape: Shape) -> str {
+    match (shape) {
+        Pair([first, second]) => `pair {first} {second}`,
+        Labeled((label, [only])) => `{label} {only}`,
+        Pair(..) | Labeled(..) | Dot(..) => "other",
+    }
+}
+
+fn main() !prints {
+    print(to_str(sum_of_pair(Pair([1, 2]))));
+    print(to_str(sum_of_pair(Pair([1]))));
+    print(to_str(sum_of_pair(Dot(3))));
+    print(describe(Pair([4, 5])));
+    print(describe(Labeled(("a", [6]))));
+    print(describe(Labeled(("a", [6, 7]))));
+    print(describe(Pair([1])));
+}
+--- stdout ---
+3
+0
+0
+pair 4 5
+a 6
+other
+other

@@ -89,14 +89,17 @@ import {
     Construct,
     Expr,
     ForPattern,
+    IfLet,
     Let,
     LetPattern,
+    MatchArm,
     Name,
     Read,
     descendants_of_kind,
     field_reads,
 } from "../expr.aipl";
 import { Function, One, Param, pattern_reads } from "../item.aipl";
+import { Array, ArrayNested, Ctor, Nested, is_binder_name, show_pat } from "../pat.aipl";
 import { Named, Ty } from "../ty.aipl";
 import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
 import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
@@ -120,6 +123,10 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         ..body
             .descendants_of_kind::<LetPattern>()$kind
             .map(|LetPattern(pattern, value, rest)| pattern.slot_hits(rest, reads, value.span))
+            .join(),
+        ..body
+            .descendants_of_kind::<IfLet>()$kind
+            .map(|IfLet(arm, _, _)| { arm.array_slot_hits() })
             .join(),
         ..body
             .descendants_of_kind::<ForPattern>()$kind
@@ -317,6 +324,29 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
     );
 
     // ---- a slot of a pattern ----
+    // A slot whose one use is the array pattern opening the rest of a `let .. else`.
+    assert(lint_function_messages(
+        "fn f(v: V) -> i64 { let Two(xs) = v else { return 0; }; let [a, b] = xs else { return 0; }; a + b }",
+        destructure,
+    )? == [slot_opening_message("xs", "Two([a, b])")]);
+    // A case with a literal slot still has its names.
+    assert(lint_function_messages(
+        "fn f(v: V) -> i64 { let Tag(1, xs) = v else { return 0; }; let [a, b] = xs else { return 0; }; a + b }",
+        destructure,
+    )? == [slot_opening_message("xs", "Tag(1, [a, b])")]);
+    // Used again, or not taken apart by an array, the name stays.
+    assert(
+        lint_function_messages(
+            "fn f(v: V) -> i64 { let Two(xs) = v else { return 0; }; let [a, b] = xs else { return 0; }; a + b + xs.len() }",
+            destructure,
+        )? == [],
+    );
+    assert(
+        lint_function_messages(
+            "fn f(v: V) -> i64 { let Two(xs) = v else { return 0; }; let Pair(a) = xs else { return 0; }; a }",
+            destructure,
+        )? == [],
+    );
     // A parameter's case payload that is only read by field.
     assert(lint_function_messages(
         "fn f(self: Fn(function), n: i64) -> i64 { function.sig + function.body }",
@@ -468,6 +498,44 @@ fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
         ByTuple(names) => names.slots_taken_apart(none, scope, reads, at),
         Alias(_, inner) => inner.slot_hits(scope, reads, at),
         _ => [],
+    }
+}
+
+# The hits for the slots of the case pattern a `let .. else` or `if let` arm matches, whose
+# one use is the array pattern that opens the arm's body: `let Two(xs) = v else { .. };
+# let [a, b] = xs else { .. };` is `let Two([a, b]) = v else { .. };`.
+fn array_slot_hits(self: MatchArm) -> LintHit[] {
+    // A slot that is a bare binder name, among the shown slots of the case pattern.
+    let (case_name, slots) = match (self.pattern) {
+        Ctor(case_name, bindings, _) => (case_name, bindings),
+        Nested(case_name, args) => (case_name, args$show_pat()),
+        _ => {
+            return [];
+        },
+    };
+    mut found: LintHit[] = [];
+    for (let name : slots) {
+        if (name != "_" && !name.contains("$") && name.is_binder_name()) {
+            if (let some((span, array)) = self.body.opening_array(name)) {
+                set found.push(hit(
+                    slot_opening_message(name, slot_pattern(some(case_name), slots, name, array)),
+                    span,
+                ));
+            };
+        };
+    }
+    found
+}
+
+# The span of `name` and the array pattern, as written, of the `if let` that is `self` when it
+# matches `name` against an array and is the only thing that mentions it.
+fn opening_array(self: Expr, name: str) -> (Span, str)? {
+    let IfLet(arm, value, _) = self.kind.as_case::<IfLet>()?;
+    let Uses { mentions, field_reads, shadowed } = self.uses_of(name);
+    if (!value.is_name(name) || shadowed || field_reads != 0 || mentions != 1) { return none; };
+    match (arm.pattern) {
+        Array(..) | ArrayNested(..) => some((value.span, arm.pattern.show_pat())),
+        _ => none,
     }
 }
 

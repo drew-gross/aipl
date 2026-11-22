@@ -154,8 +154,7 @@ fn zip_hit(self: SeededLoop) -> UnfilledHit? {
     // The body is the `if let` that stops at the shorter array, with nothing else in it.
     let IfLet(arm, scrutinee, otherwise) = self.body.lone_statement()?.kind.as_case::<IfLet>()?;
     if (otherwise.kind != Unit) { return none; };
-    let Ctor("some", bindings, _) = arm.pattern else { return none; };
-    let [partner] = bindings else { return none; };
+    let Ctor("some", [partner], _) = arm.pattern else { return none; };
 
     // `other[position]`, with `other` a name that is neither the array being built nor one
     // of the loop's own bindings.
@@ -177,7 +176,6 @@ fn zip_hit(self: SeededLoop) -> UnfilledHit? {
 
 # Whether `self` is the tuple of the names `first` and `second`, in that order.
 fn is_pair_of(self: Expr, first: str, second: str) -> bool {
-    let TupleLit(elements) = self.kind else { return false; };
-    let [left, right] = elements else { return false; };
+    let TupleLit([left, right]) = self.kind else { return false; };
     left.kind == Ident(first) && right.kind == Ident(second)
 }

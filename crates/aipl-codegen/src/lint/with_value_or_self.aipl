@@ -36,8 +36,7 @@ import { Builtin } from "./spelling.aipl";
 pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     if (callee != ValueOr) { return none; };
     let [replaced, fallback] = arguments else { return none; };
-    let Call(_, with_arguments, _, With) = replaced.kind else { return none; };
-    let [receiver, _, _] = with_arguments else { return none; };
+    let Call(_, [receiver, _, _], _, With) = replaced.kind else { return none; };
     if (!receiver.same_place(fallback)) { return none; };
     some(UnfilledHit {
         named: [

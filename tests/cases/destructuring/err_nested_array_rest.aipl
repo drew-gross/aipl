@@ -1,0 +1,15 @@
+# A `..` is only allowed at the top of an arm or `let`, not in an array pattern inside another pattern.
+
+variant Shape = Pair(i64[])
+
+fn first_of(shape: Shape) -> i64? {
+    let Pair([first, ..]) = shape else { return none; };
+    some(first)
+}
+
+--- check --compile ---
+error: an array pattern inside another pattern holds exactly its elements; a trailing `..` is only allowed at the top of an arm or `let`
+ --> ./tests/cases/destructuring/err_nested_array_rest.aipl:6:14
+  |
+6 |     let Pair([first, ..]) = shape else { return none; };
+  |              ^^^^^^^^^^^

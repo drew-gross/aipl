@@ -577,8 +577,7 @@ fn unioned(self: SeededLoop) -> UnfilledHit? {
     // The expression unioned into the accumulator by `value`, when `value` is a union of
     // the accumulator with exactly one other thing: `out.union(out)` is `out`, and a
     // union of two other things is not a fold onto this binding at all.
-    let Call(_, operands, _, Union) = value.kind else { return none; };
-    let [first, second] = operands else { return none; };
+    let Call(_, [first, second], _, Union) = value.kind else { return none; };
     let operand = if (first.kind == Ident(self.name) && second.kind != Ident(self.name)) {
         second
     } else if (second.kind == Ident(self.name) && first.kind != Ident(self.name)) {

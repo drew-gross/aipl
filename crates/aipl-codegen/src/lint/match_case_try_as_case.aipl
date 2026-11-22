@@ -33,8 +33,7 @@ pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
     body
         .tail_matches()
         .map(|tail| {
-            let Match(scrutinee, arms) = tail.kind else { return none; };
-            let [case_arm, other_arm] = arms else { return none; };
+            let Match(scrutinee, [case_arm, other_arm]) = tail.kind else { return none; };
             let some(pattern) = case_arm.pattern.case_pattern() else { return none; };
             if (!other_arm.is_give_up()) { return none; };
             // `K(..) => some(x)` of the matched value is `match_case_as_case`'s.

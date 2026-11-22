@@ -1457,6 +1457,9 @@ fn patterns() -> Production<AiplTok, Ast>[] {
         Term(CharTok),
         Term(IntLit),
         nest("(", Many(Named("pattern"), min=2, sep=Lit(","), trailing_sep=false), ")", strict()),
+        // An array pattern, written as a `match` arm writes one but standing where a
+        // sub-pattern does: `TupleLit([left, right])`.
+        Many(Named("pattern"), sep=Lit(","), nested_in=brackets(), style=loose()),
         // `..` is only a pattern at the end of an array arm's elements — `[a, ..]`
         // — where it says "and more". It is a pattern here so the elements are one
         // list, and `as_pat` refuses it everywhere that is not that end.
@@ -3287,6 +3290,17 @@ fn lower_pattern(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             // A tuple pattern: the parenthesized run of two or more patterns.
             if (head == "..") { return ok(ARest(sp)); };
             if (head == "(") { return ok(APat(PatTuple(kids.try_map(|k| as_pat(k, sp))?))); };
+            if (head == "[") {
+                if (kids.last().is_some_and(is_rest)) {
+                    return err(ParseError {
+                        message: "an array pattern inside another pattern holds exactly its elements; a trailing `..` is only allowed at the top of an arm or `let`",
+                        span: sp,
+                    });
+                };
+                return ok(APat(
+                    array_pattern(kids.try_map(|k| as_pat(k, sp))?, node.children, false, sp)?,
+                ));
+            };
             if (let some(n) = head.int_parse()) { return ok(APat(PatInt(n))); };
             if (toks[1] == some("{")) {
                 let FieldBinders { fields, names } = field_binders_of(toks, 2);

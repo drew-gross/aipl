@@ -30,7 +30,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-destructure">destructure</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure(__spat$4827: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure(__spat$4942: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each parameter, <code>let</code> and pattern slot in the program whose name is only ever taken apart.</p></div>
 
@@ -157,6 +157,34 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
           <pre class="signature"><code>fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The hits for the slots of <code>pattern</code>, the names it binds over <code>scope</code>, at <code>at</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-array_slot_hits">
+          <h3>
+            <a class="anchor" href="#item-array_slot_hits">array_slot_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn array_slot_hits(self: MatchArm) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hits for the slots of the case pattern a <code>let .. else</code> or <code>if let</code> arm matches, whose one use is the array pattern that opens the arm's body: <code>let Two(xs) = v else { .. }; let [a, b] = xs else { .. };</code> is <code>let Two([a, b]) = v else { .. };</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opening_array">
+          <h3>
+            <a class="anchor" href="#item-opening_array">opening_array</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opening_array(self: Expr, name: str) -&#62; (Span, str)?</code></pre>
+
+          <div class="doc"><p>The span of <code>name</code> and the array pattern, as written, of the <code>if let</code> that is <code>self</code> when it matches <code>name</code> against an array and is the only thing that mentions it.</p></div>
 
 
         </section>

@@ -66,8 +66,7 @@ pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
 
     // An operator use is a call whose callee is the spelling that was written, which is what this
     // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
-    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
-    let [left, right] = args else { return none; };
+    let Call(written, [left, right], _, _) = value.kind else { return none; };
     let Step { spelling, commutative } = written.step_of()?;
     let stepped = if (left.is_same_place(target)) {
         right.is_one()

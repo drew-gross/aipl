@@ -176,8 +176,7 @@ struct MapAdvice { hit: LintHit, lambda: Span? }
 
 # `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
 fn map_advice(self: Expr<Call>, methods: str[]) -> MapAdvice? {
-    let Call(_, arguments, _, Map) = self.kind else { return none; };
-    let [receiver, argument] = arguments else { return none; };
+    let Call(_, [receiver, argument], _, Map) = self.kind else { return none; };
     let items = receiver.quote("<items>");
     if (let Ident(function) = argument.kind) {
         if (!methods.contains(function)) { return none; };
@@ -189,8 +188,7 @@ fn map_advice(self: Expr<Call>, methods: str[]) -> MapAdvice? {
             lambda: none,
         });
     };
-    let Lambda(parameters, body) = argument.kind.as_case::<Lambda>()?;
-    let [parameter] = parameters else { return none; };
+    let Lambda([parameter], body) = argument.kind else { return none; };
     if (parameter.ty.is_some() || parameter.synthesized_name().contains('$')) { return none; };
     let steps = body.chain(parameter.synthesized_name(), methods)?;
     if (steps.is_empty()) { return none; };

@@ -46,7 +46,7 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 - `.join(sep=", ", final_sep=" and ", only_sep=" and ")` writes English lists. `T?[]` flattens with
   `.collect_ok()` (`xs$f().collect_ok()`); a function that finds at most one thing returns `T?`, never `T[]`.
 - `return` inside a lambda leaves the lambda.
-- No list patterns inside ctor patterns; `return` not allowed inside a match arm expression; a bare `none` can't be a tuple slot.
+- An array pattern may stand inside a ctor or tuple pattern (`let TupleLit([left, right]) = e else { .. };`, `Pair([a, b]) => ..`), but without a trailing `..`; `return` not allowed inside a match arm expression; a bare `none` can't be a tuple slot.
 - Struct patterns rename with `as` (`P { x as px }`, `Pushes { elements, rest as end }`), not `x: px`. A struct pattern names only the fields it reads (`let P { x } = p;` ignores the rest); `field as _` is refused. `struct`/`variant` are never `pub`. No `is_none`: write `!o.is_some()`.
 - The case of `is_case`/`as_case`/`collect_arms` is a type argument: `x.is_case::<Circle>()`, `x.as_case::<Circle>()` (`Circle?`), `xs.collect_arms::<Circle>()` (`Circle[]`); the constructor as an argument is refused. A case is a type, so `c: Circle` takes one, and its named payload slots are fields: `c.r`, `let Circle { r } = c;`.
 - `fn f<V: variant, A: arm of V>(..)` is generic over one case of `V`; write it as a type argument (`xs.f::<Circle>()`, or `::<Shape, Circle>`) when no argument says which.

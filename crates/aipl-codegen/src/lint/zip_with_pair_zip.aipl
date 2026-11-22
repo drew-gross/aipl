@@ -97,9 +97,7 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
 
 # Whether `self` is a function of two parameters whose body is the pair of them, in order.
 fn only_pairs(self: Expr) -> bool {
-    let Lambda(parameters, body) = self.kind else { return false; };
-    let [first, second] = parameters else { return false; };
-    let TupleLit(elements) = body.kind else { return false; };
-    let [left, right] = elements else { return false; };
+    let Lambda([first, second], body) = self.kind else { return false; };
+    let TupleLit([left, right]) = body.kind else { return false; };
     left.kind == Ident(first.synthesized_name()) && right.kind == Ident(second.synthesized_name())
 }

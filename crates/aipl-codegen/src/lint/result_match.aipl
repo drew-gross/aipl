@@ -88,8 +88,7 @@ pub fn rebuilds(self: Expr, constructor: Callee, binder: str) -> bool {
 
 # The one argument of `self`, when it is a call to `constructor`.
 pub fn wraps_with(self: Expr, constructor: Callee) -> Expr? {
-    let Call(_, arguments, _, callee) = self.kind.as_case::<Call>()?;
-    let [wrapped] = arguments else { return none; };
+    let Call(_, [wrapped], _, callee) = self.kind else { return none; };
     if (callee == constructor) { some(wrapped) } else { none }
 }
 

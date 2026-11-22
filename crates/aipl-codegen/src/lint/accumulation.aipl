@@ -254,8 +254,7 @@ struct Pushed { element: Expr, rest: Expr }
 
 pub fn pushed(self: Expr, acc: str, adder: Callee) -> Pushed? {
     let Assign(target, value, rest) = self.kind.as_case::<Assign>()?;
-    let Call(_, arguments, _, callee) = value.kind.as_case::<Call>()?;
-    let [receiver, element] = arguments else { return none; };
+    let Call(_, [receiver, element], _, callee) = value.kind else { return none; };
     if (target.kind != Ident(acc) || callee != adder || receiver.kind != Ident(acc)) {
         return none;
     };
