@@ -68,7 +68,6 @@ import { return_loop_find_index } from "./return_loop_find_index.aipl";
 import { set_spread_field } from "./set_spread_field.aipl";
 import { set_spread_insert } from "./set_spread_insert.aipl";
 import { set_spread_push } from "./set_spread_push.aipl";
-import { imported_as } from "./spelling.aipl";
 import { step_by_one, stepped_operators } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
@@ -98,14 +97,14 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.unfilled_hits(let_else_as_case).filled(items),
         ..functions.unfilled_hits(let_mut_lints).filled(items),
         ..functions.unfilled_hits(extend_loop_map_join).filled(items),
-        ..functions.unfilled_hits(|function| union_loop_union_all(function, items)).filled(items),
+        ..functions.unfilled_hits(union_loop_union_all).filled(items),
         ..functions.hits(push_array_literal),
         ..functions.unfilled_hits(return_loop_find_if).filled(items),
-        ..functions.unfilled_hits(|function| return_loop_any_all(function, items)).filled(items),
+        ..functions.unfilled_hits(return_loop_any_all).filled(items),
         ..functions.hits(|function| eta_lambda(function, items)),
         ..functions.unfilled_hits(push_loop_zip_with).filled(items),
         ..functions.unfilled_hits(return_loop_find_index).filled(items),
-        ..functions.hits(|function| interp_to_str(function, items)),
+        ..functions.hits(interp_to_str),
         ..functions.hits(interp_literal),
         ..functions.hits(slice_lints),
         ..functions.unfilled_hits(set_lints).filled(items),
@@ -149,10 +148,9 @@ fn call_lints(Function { body }) -> LintHit[] {
 # The lints over the calls of `function` that advise a builtin.
 fn call_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
     let calls = body.descendants_of_kind::<Call>();
-    let is_some = items.imported_as("is_some");
     [
         ..calls$map_constant_repeat(),
-        ..calls.map(|call: Expr<Call>| { call.map_find_if_some(is_some) }),
+        ..calls.map(|call: Expr<Call>| { call.map_find_if_some(items) }),
         ..calls$zip_with_pair_zip(),
         ..calls$with_value_or_self(),
         ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),

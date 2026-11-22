@@ -124,7 +124,6 @@ misc cleanup:
   printable_without_blank in char_set_literal lint needs some cleanup
   tests/cases/variants/err_as_case_value.aipl doens't need to exist, is_case &co can use the regular type checker errors
   unused_functions and go-to-def should be able to share some code once the lsp is in aipl
-  imported_as shoudln't accept a string name, it should accept a builting variant arm
   hoisting handles lambdas as well?
   Item's function should say it's kind (Fn, Test, Benchmark, maybe Main?) loader can use this to throw out the bits that aren't used (e.g. only write the test when running with --test) and test_body_source_name doesn't need to exist
   different representations don't belong in the type system (or if they do, it's in a separate pass after all type-system-relevant-things are done)
@@ -382,6 +381,8 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  more deeply nested destructuring e.g. let [Call(_, inner_arguments, _, Map), predicate] = arguments else { return none; }; (with lint)
+  allow destructuring of sets, in lints this can help with the "either of the arguments is X" paradigm (when functions are commutatitve, such as ==)
   syntax (and lint) that says you should not explicitly name a type argument if it's only used once, just use a bound directly in the non-type args or body
   support removing multiple arms via throughout at once
   spread optionals into arrays to make tabulate's widths computation simpler
@@ -567,6 +568,8 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  split eta_lambda into use_field_projection and pass_values_not_lambdas
+  tag/resolve Idents the same way as calls, so that we can do the same kind of destructuring in lints
   free_name should gurarantee get a name. Try the preferred name, then builtin_<the preferred name>, then <the preferred name>2, then 3, etc. until found.
   "An operator can't be renamed, so a taken or wrong-flavor operator still drops the advice." <--- fix this restriction (if it's even real)
   Flavored shouldn't be a thing, if the lint sees n + 1 is wrapping add, the n++ replacement should use wrapping increment
@@ -991,6 +994,10 @@ debugging:
   add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
 
 formatting:
+  """
+    .descendants_of_kind::<LetMut>()$kind
+    $seeded_loop()
+  """ <-- this should format the $kind on one line (mixed $/. chains should just format like . chains)
   exclude if expressions from being on same line as function it's result is passed to
   some way of wrapping really long string literals and template literals
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.

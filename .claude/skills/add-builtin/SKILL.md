@@ -170,7 +170,7 @@ and the worked example of matching a *desugared* shape), `match_value_or`,
 **Layout.** One lint per file, in AIPL: `crates/aipl-codegen/src/lint/<name>.aipl`, registered in
 `lint/lint.aipl` and listed in `DOGFOOD_SOURCE_FILES`. The add-lint skill is the recipe, and the
 helpers more than one lint shares live in `lint_hit.aipl` (`quote`, `spans_its_text`,
-`imported_as`, `bound_to`, `text_after`) and `places.aipl`. Name the lint `<bad shape>_<replacement>`.
+`bound_to`, `text_after`) and `places.aipl`. Name the lint `<bad shape>_<replacement>`.
 
 **Match exactly one shape, and bow out of every near-miss.** Before flagging,
 ask what the rewrite would silently change: work the builtin has nowhere to put
@@ -197,8 +197,8 @@ confirm `aipl check --fix` keeps the marker on that line.
  {, importing `find_if` from builtins} (or append #[allow] to this line to keep it)"
 ```
 
-Resolve the builtin's *local* name with `imported_as(program, "find_if")` so an
-alias is followed, and name the import when the file lacks one. Splice a receiver
+Name the builtin by its tag in the advice (`Named { text, builtin: Builtin(FindIf) }`), so the
+framework writes the file's spelling and the import the file lacks. Splice a receiver
 back into the advice only when `spans_its_text` says its span covers its text —
 otherwise write the `<iterable>` placeholder, because a call's span stops before
 its closing paren.

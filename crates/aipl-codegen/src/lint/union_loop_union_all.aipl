@@ -69,21 +69,19 @@ import {
     value_or,
     wrapping_add as +,
 } from builtins;
-import { Callee, Map, ToSet, UnionAll } from "../builtin_table.aipl";
+import { Callee, Map, ToSet, Union, UnionAll } from "../builtin_table.aipl";
 import { Assign, Call, Expr, Ident, SetLit } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
+import { Function } from "../item.aipl";
 import { Set, Unordered, type_text } from "../ty.aipl";
 import { SeededLoop, is_liftable, pipeline_hit, seeded_loops } from "./accumulation.aipl";
-import { UnfilledHit, lint_in_unfilled_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
-import { imported_as } from "./spelling.aipl";
 import { to_set, union, union_all } from sets;
 
 # A hit for each set the program seeds empty and grows with a loop of `union`s.
-pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let some(union) = items.imported_as("union") else { return []; };
-    body.seeded_loops()$unioned(union).collect_ok()
+pub fn union_loop_union_all(Function { body }) -> UnfilledHit[] {
+    body.seeded_loops()$unioned().collect_ok()
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     // The set operations come from `sets`, the rest from `builtins`.
@@ -103,7 +101,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
         } else {
             ""
         };
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `{from_sets} {from_builtins} fn f(xs: #\{i64}[]) -> #\{i64} \{ {body} }`,
             union_loop_union_all,
         )
@@ -198,7 +196,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     );
     // Shapes the lint must leave alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn show(s: #{i64}) -> str {
                     mut out: i64[] = []; #[allow]
@@ -213,7 +211,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     );
     // The loop does something else as well. `union_all` has nowhere to put it.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn logged(xs: #{i64}[]) !prints -> #{i64} {
                     mut out: #{i64} = #{};
@@ -232,7 +230,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // cannot express — it is `seq_labels` in `crates/aipl-codegen/src/parse.aipl`,
     // which unions each element's labels in until one of them is non-nullable.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn upto_three(xs: #{i64}[]) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -252,7 +250,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // than a predicate on elements — so this is left alone rather than advised on
     // the strength of a shape match.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn nonempty_only(xs: #{i64}[]) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -269,7 +267,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // The seed is not empty, so the fold starts from a value `union_all` has no
     // parameter for.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn merged_onto(xs: #{i64}[]) -> #{i64} {
                     mut out: #{i64} = #{99};
@@ -283,7 +281,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn take(s: #{i64}, n: u64) -> #{i64} { if (s.len() > n) { s } else { #{} } }",
             union_loop_union_all,
         )? == [],
@@ -292,7 +290,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // The unioned expression reads the set being built, so it depends on how much
     // the loop has already done — which no `map` lambda can see.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn while_small(xs: #{i64}[]) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -306,7 +304,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """fn lookup(s: #{i64}) -> #{i64}!str { if (s.is_nonempty()) { ok(s) } else { err("empty") } }""",
             union_loop_union_all,
         )? == [],
@@ -315,7 +313,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // A `?` in the unioned expression returns from *this* function; lifting it into
     // a lambda would return from the lambda instead.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn checked(xs: #{i64}[]) -> #{i64}!str {
                     mut out: #{i64} = #{};
@@ -332,7 +330,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // Neither operand is the accumulator, so the loop is not a fold onto it at all
     // — every iteration throws away what the last one wrote.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn last_wins(xs: #{i64}[], other: #{i64}) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -349,7 +347,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // A statement between the seed and the loop, which could read `out` while it is
     // still empty — an order the rewrite would not preserve.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn announced(xs: #{i64}[]) !prints -> #{i64} {
                     mut out: #{i64} = #{};
@@ -369,7 +367,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // element-at-a-time form (`#{x}`), which `to_set` can take in any order, is
     // advised on an ordered set.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn merged_desc(xs: #{i64}[]) -> #>{i64} {
                     mut out: #>{i64} = #{};
@@ -384,7 +382,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     );
     // Not a loop at all: a bounded fold written out. The lint wants a `for`.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn two(a: #{i64}, b: #{i64}) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -400,7 +398,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // Shapes the lint flags, and what it says of them.
     // The element unioned in unchanged — `union_all` alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn merged(xs: #{i64}[]) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -414,7 +412,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn ends(n: i64) -> #{i64} { #{n, n} }",
             union_loop_union_all,
         )? == [],
@@ -423,7 +421,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // Something derived from the element instead, which is the `map` the fold needs
     // first.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn all_ends(ns: i64[]) -> #{i64} {
                     mut acc: #{i64} = #{};
@@ -440,7 +438,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // The operands the other way round. Set union is commutative and its result is a
     // set, so this accumulates exactly the same set and gets the same advice.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn all_ends_flipped(ns: i64[]) -> #{i64} {
                     mut acc: #{i64} = #{};
@@ -454,7 +452,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn pair(n: i64) -> #{i64}[] { [#{n}, #{n, n}] }",
             union_loop_union_all,
         )? == [],
@@ -463,7 +461,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // A call-shaped iterable can't be quoted back into the advice — its span stops
     // before its parens — so the message writes a placeholder in its place.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn from_call(n: i64) -> #{i64} {
                     mut out: #{i64} = #{};
@@ -482,7 +480,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
     // `to_set` takes its order from it, so this fires for an ordered accumulator
     // too, where the set-at-a-time form (which builds an unordered set) would not.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn distinct(ns: i64[]) -> #{i64} {
                     mut seen: #{i64} = #{};
@@ -496,7 +494,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn powers_desc(ns: i64[]) -> #>{i64} {
                     mut out: #>{i64} = #{};
@@ -566,7 +564,7 @@ pub fn union_loop_union_all(Function { body }, items: Item[]) -> UnfilledHit[] {
 })
 
 # `self` as the hit for a set grown by unioning into it, when it is one.
-fn unioned(self: SeededLoop, union: str) -> UnfilledHit? {
+fn unioned(self: SeededLoop) -> UnfilledHit? {
     let SetLit(elements, order) = self.seed.kind.as_case::<SetLit>()?;
     if (elements.is_nonempty() || order != Unordered) { return none; };
     let ordered = self.annotation.is_some_and(|annotation| match (annotation) {
@@ -579,9 +577,8 @@ fn unioned(self: SeededLoop, union: str) -> UnfilledHit? {
     // The expression unioned into the accumulator by `value`, when `value` is a union of
     // the accumulator with exactly one other thing: `out.union(out)` is `out`, and a
     // union of two other things is not a fold onto this binding at all.
-    let Call(callee, operands, _, _) = value.kind.as_case::<Call>()?;
+    let Call(_, operands, _, Union) = value.kind else { return none; };
     let [first, second] = operands else { return none; };
-    if (callee != union) { return none; };
     let operand = if (first.kind == Ident(self.name) && second.kind != Ident(self.name)) {
         second
     } else if (second.kind == Ident(self.name) && first.kind != Ident(self.name)) {

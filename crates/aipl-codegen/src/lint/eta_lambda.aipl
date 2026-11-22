@@ -49,6 +49,7 @@ import {
     starts_with,
     zip_with,
 } from builtins;
+import { Map } from "../builtin_table.aipl";
 import {
     Call,
     Expr,
@@ -65,15 +66,14 @@ import { is_operator_name } from "../is_operator_name.aipl";
 import { Function, Item, LoweredFn } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { LintHit, hit, lint_in_messages, quote } from "./lint_hit.aipl";
-import { imported_as, imported_locals } from "./spelling.aipl";
+import { imported_locals } from "./spelling.aipl";
 
 # A hit for each lambda in the program that adds nothing to what it forwards to.
 pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {
-    let map_name = items.imported_as("map");
     let methods = items.methods_in_view();
     let advice = body
         .descendants_of_kind::<Call>()
-        .map(|call: Expr<Call>| { call.map_advice(map_name, methods) })
+        .map(|call: Expr<Call>| { call.map_advice(methods) })
         .collect_ok();
     // The lambdas the `map` advice already covers are not advised on again.
     let advised = advice$lambda.collect_ok();
@@ -175,10 +175,8 @@ fn method_name(self: LoweredFn(Function { sig, name })) -> str? {
 struct MapAdvice { hit: LintHit, lambda: Span? }
 
 # `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
-fn map_advice(self: Expr<Call>, map_name: str?, methods: str[]) -> MapAdvice? {
-    let name = map_name?;
-    let Call(callee, arguments, _, _) = self.kind;
-    if (callee != name) { return none; };
+fn map_advice(self: Expr<Call>, methods: str[]) -> MapAdvice? {
+    let Call(_, arguments, _, Map) = self.kind else { return none; };
     let [receiver, argument] = arguments else { return none; };
     let items = receiver.quote("<items>");
     if (let Ident(function) = argument.kind) {

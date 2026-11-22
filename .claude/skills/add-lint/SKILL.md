@@ -54,8 +54,9 @@ the import added to the message), and when the name is bound to something else i
 free one (`builtin_any`); an operator whose flavor does not match is not advised at all.
 Advice that names the builtin a function *is* (`any` inside `fn any`) is dropped, since it
 would have the function call itself.
-A lint does not call `imported_as`/`bound_to` to decide what to *advise*; they
-are for finding a call by its written name. An operator form in the flavor of
+A lint finds a call by its `callee` tag (`Call(_, args, _, Map)`), never by the name the file
+wrote, and does not call `bound_to` to decide what to *advise*; `bound_to` is for a function
+value (`Ident`), which carries no tag. An operator form in the flavor of
 one the file uses is `Flavored("++", "+")` (see `step_by_one`). Register the
 lint in `lint.aipl` in its unfilled form.
 

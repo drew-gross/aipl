@@ -266,23 +266,6 @@ fn locals_from(self: Import(ImportDecl { names, source }), library: str, name: s
     }
 }
 
-# The name a file's `items` import builtin `name` under, if it does: the spelling a lint that
-# recognises a call by its written name must look for. `none` when the file does not import it.
-pub fn imported_as(self: Item[], name: str) -> str? {
-    self.collect_arms::<Import>()$builtin_locals(name).join().first()
-}.test({
-    let program = aipl_parse_surface_file(
-        "import { is_case as case_is, len } from builtins;",
-    )?.program.hoist_test_fns().items;
-    assert(program.imported_as("is_case") == some("case_is"));
-    assert(program.imported_as("len") == some("len"));
-    assert(program.imported_as("map") == none);
-    let from_a_file = aipl_parse_surface_file(
-        """import { is_case } from "./a.aipl";""",
-    )?.program.hoist_test_fns().items;
-    assert(from_a_file.imported_as("is_case") == none);
-})
-
 # The builtin a file's `items` import under the local name `local`, as builtins
 # exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
 # when that name is not bound by an import from builtins — unbound, or one of the file's own.
@@ -320,14 +303,6 @@ pub fn imported_locals(self: Item[]) -> str[] {
 fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
     match (source) {
         Builtins | Library(..) => names$local(),
-        Path(..) => [],
-    }
-}
-
-# What an import brings under `name`, when it is from builtins.
-fn builtin_locals(self: Import(ImportDecl { names, source }), name: str) -> str[] {
-    match (source) {
-        Builtins | Library(..) => names.filter(|n| n.name == name)$local(),
         Path(..) => [],
     }
 }
