@@ -78,6 +78,20 @@
 
 
 
+        <section class="item" id="item-is_builtin_named">
+          <h3>
+            <a class="anchor" href="#item-is_builtin_named">is_builtin_named</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_builtin_named(self: Need, name: str, table: BuiltinEntry[]) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> asks for the builtin whose import name is <code>name</code>. <code>table</code> is the builtin table.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-spelled">
           <h3>
             <a class="anchor" href="#item-spelled">spelled</a>
@@ -204,7 +218,21 @@
           </h3>
           <pre class="signature"><code>fn importable(self: Item[], library: str, name: str, preferred: str) -&#62; Spelling?</code></pre>
 
-          <div class="doc"><p>The spelling <code>preferred</code> for the builtin <code>name</code> of <code>library</code>, with the import that supplies it, when nothing else in the file has that name.</p></div>
+          <div class="doc"><p>The spelling of the builtin <code>name</code> of <code>library</code> that the file can import: <code>preferred</code>, or when something else in the file has that name, the builtin under a name that is free (<code>builtin_any</code>). An operator has no other name to take, so there is nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-free_name">
+          <h3>
+            <a class="anchor" href="#item-free_name">free_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn free_name(self: Item[], candidate: str) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>candidate</code>, or the first name made of it by adding <code>_</code> that nothing in the file has.</p></div>
 
 
         </section>

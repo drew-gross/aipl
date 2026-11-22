@@ -567,6 +567,8 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  free_name should gurarantee get a name. Try the preferred name, then builtin_<the preferred name>, then <the preferred name>2, then 3, etc. until found.
+  "An operator can't be renamed, so a taken or wrong-flavor operator still drops the advice." <--- fix this restriction (if it's even real)
   Flavored shouldn't be a thing, if the lint sees n + 1 is wrapping add, the n++ replacement should use wrapping increment
   is_one doesn't deserve a whole function
   match_value_or_err shouldn't care about is_test_code.

@@ -22,9 +22,12 @@ import {
     find_if,
     first,
     is_some,
+    is_some_and,
     join,
     len,
+    logical_and as &&,
     logical_not as !,
+    not_equal as !=,
     split,
     value_or,
 } from builtins;
@@ -55,6 +58,20 @@ struct Request { library: str, item: str }
 
 # What the file writes for a [`Need`], and the import it has still to make, if any.
 struct Spelling { text: str, request: Request? }
+
+# Whether `self` asks for the builtin whose import name is `name`. `table` is the builtin table.
+pub fn is_builtin_named(self: Need, name: str, table: BuiltinEntry[]) -> bool {
+    match (self) {
+        Builtin(callee) => table
+            .find_if(|entry| entry.arm == callee)
+            .is_some_and(|entry| entry.import_name() == name),
+        Flavored(..) => false,
+    }
+}.test({
+    assert(Builtin(Len).is_builtin_named("len", builtin_table()));
+    assert(!Builtin(Len).is_builtin_named("any", builtin_table()));
+    assert(!Flavored("++", "+").is_builtin_named("++", builtin_table()));
+})
 
 # The spelling of `self` in a file with these `items`, or `none` when the file cannot take any.
 # `table` is the builtin table.
@@ -94,9 +111,15 @@ pub fn spelled(self: Need, items: Item[], table: BuiltinEntry[]) -> Spelling? {
         request: missing("builtins", "len"),
     }));
 
-    // The name is the file's own, for something else: there is nothing to say.
-    assert(spelling("""import { len } from "./a.aipl";""", Builtin(Len))? == none);
-    assert(spelling("fn len() { }", Builtin(Len))? == none);
+    // The name is the file's own, for something else: the builtin is imported under another one.
+    assert(spelling("""import { len } from "./a.aipl";""", Builtin(Len))? == some(Spelling {
+        text: "builtin_len",
+        request: missing("builtins", "len as builtin_len"),
+    }));
+    assert(spelling("fn len() { } fn builtin_len() { }", Builtin(Len))? == some(Spelling {
+        text: "builtin_len_",
+        request: missing("builtins", "len as builtin_len_"),
+    }));
 
     // An operator builtin is written as its operator, imported under that alias.
     assert(spelling("fn f() { }", Builtin(WrappingAdd))? == some(Spelling {
@@ -151,12 +174,28 @@ fn spelled_builtin(self: Item[], entry: BuiltinEntry) -> Spelling? {
     }
 }
 
-# The spelling `preferred` for the builtin `name` of `library`, with the import that supplies it,
-# when nothing else in the file has that name.
+# The spelling of the builtin `name` of `library` that the file can import: `preferred`, or when
+# something else in the file has that name, the builtin under a name that is free
+# (`builtin_any`). An operator has no other name to take, so there is nothing.
 fn importable(self: Item[], library: str, name: str, preferred: str) -> Spelling? {
-    if (self.bound_names().contains(preferred)) { return none; };
-    let item = if (preferred == name) { name } else { `{name} as {preferred}` };
-    some(Spelling { text: preferred, request: some(Request { library, item }) })
+    let text = if (!self.bound_names().contains(preferred)) {
+        preferred
+    } else {
+        self.free_name(`builtin_{name}`)
+    };
+    // An operator has no other name to take.
+    if (preferred != name && text != preferred) { return none; };
+    let item = if (text == name) { name } else { `{name} as {text}` };
+    some(Spelling { text, request: some(Request { library, item }) })
+}
+
+# `candidate`, or the first name made of it by adding `_` that nothing in the file has.
+fn free_name(self: Item[], candidate: str) -> str {
+    if (self.bound_names().contains(candidate)) {
+        self.free_name(`{candidate}_`)
+    } else {
+        candidate
+    }
 }
 
 # Whether the operator `operator` can be written in the flavor of the operator `like`, which the

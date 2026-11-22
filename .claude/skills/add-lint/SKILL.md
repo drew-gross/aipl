@@ -50,8 +50,10 @@ several builtins is a `Named { text, builtin: Builtin(Tag) }` per builtin — an
 let the caller hydrate it with `filled` / `unfilled_hits`. `spelling.aipl` then
 writes each builtin the way the file can take it (the name it already imports it
 under; else the preferred spelling — the operator for an operator builtin — with
-the import added to the message), and drops the advice when the file cannot
-(the name is bound to something else, or an operator's flavor does not match).
+the import added to the message), and when the name is bound to something else it imports the builtin under a
+free one (`builtin_any`); an operator whose flavor does not match is not advised at all.
+Advice that names the builtin a function *is* (`any` inside `fn any`) is dropped, since it
+would have the function call itself.
 A lint does not call `imported_as`/`bound_to` to decide what to *advise*; they
 are for finding a call by its written name. An operator form in the flavor of
 one the file uses is `Flavored("++", "+")` (see `step_by_one`). Register the

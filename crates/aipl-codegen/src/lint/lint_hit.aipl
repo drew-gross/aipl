@@ -3,6 +3,7 @@
 
 import {
     Span,
+    any,
     collect_arms,
     collect_ok,
     contains,
@@ -26,6 +27,7 @@ import {
     zip_with,
 } from builtins;
 import {
+    Any,
     Callee,
     Filter,
     IsCase,
@@ -42,7 +44,15 @@ import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { Function, Item, LoweredFn, Program } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
-import { Builtin, Flavored, Need, Request, Spelling, spelled } from "./spelling.aipl";
+import {
+    Builtin,
+    Flavored,
+    Need,
+    Request,
+    Spelling,
+    is_builtin_named,
+    spelled,
+} from "./spelling.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -214,12 +224,10 @@ pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
         items,
     )$message == ["write isa(x)", "use len, importing `len` from builtins"]);
 
-    // What the file cannot spell is not said.
-    assert(
-        [unfilled(Len, "use ", "", 1..2)].filled(
-            aipl_parse_surface_file("fn len() { }")?.program.hoist_test_fns().items,
-        ) == [],
-    );
+    // A name the file has for something else is not the builtin's: it is imported under another.
+    assert([unfilled(Len, "use ", "", 1..2)].filled(
+        aipl_parse_surface_file("fn len() { }")?.program.hoist_test_fns().items,
+    )$message == ["use builtin_len, importing `len as builtin_len` from builtins"]);
 })
 
 # What `lint` reports for the program `src` parses to. The one way the lints'
@@ -348,7 +356,22 @@ pub fn hits_once(self: Function[], lint: (Function) -> LintHit?) -> LintHit[] {
 
 # [`hits`] for a lint whose hits are [`UnfilledHit`]s, which [`filled`] fills in.
 pub fn unfilled_hits(self: Function[], lint: (Function) -> UnfilledHit[]) -> UnfilledHit[] {
-    self$lint().join()
+    self.map(|function| function.outside_its_definition(lint(function))).join()
+}.test({
+    // Advice to use `any` is not given inside the function that is `any`. Elsewhere in a file that
+    // defines it, `any` is imported under another name.
+    assert(lint_function_unfilled_messages(
+        "fn any() { } fn f() { }",
+        |function| { [unfilled(Any, `in {function.name.text}: use `, "", 0..1)] },
+    )? == ["in f: use builtin_any, importing `any as builtin_any` from builtins"]);
+})
+
+# `hits` less those that advise the builtin `self` is itself: a function written to be `any` holds
+# the longhand that `any` replaces, and advising it to call `any` would have it call itself.
+fn outside_its_definition(self: Function, hits: UnfilledHit[]) -> UnfilledHit[] {
+    if (hits.is_empty()) { return []; };
+    let table = builtin_table();
+    hits.filter(|hit| !hit.named.any(|part| part.builtin.is_builtin_named(self.name.text, table)))
 }
 
 # What the function lint `lint` reports for the program `src` parses to.

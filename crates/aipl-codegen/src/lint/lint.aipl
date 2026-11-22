@@ -84,10 +84,10 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.hits(destructure),
         ..functions.hits(unused_binding),
         ..functions.hits_once(fn_body_type_stutter),
-        ..functions.hits(|function| match_lints(function, items)),
+        ..functions.unfilled_hits(match_lints).filled(items),
         ..functions.unfilled_hits(match_case_try_as_case).filled(items),
         ..functions.unfilled_hits(let_else_as_case).filled(items),
-        ..functions.hits(|function| let_mut_lints(function, items)),
+        ..functions.unfilled_hits(let_mut_lints).filled(items),
         ..functions.unfilled_hits(extend_loop_map_join).filled(items),
         ..functions.unfilled_hits(|function| union_loop_union_all(function, items)).filled(items),
         ..functions.hits(push_array_literal),
@@ -108,8 +108,10 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.unfilled_hits(char_set_literal).filled(items),
         ..functions.hits(arm_block_value),
         ..functions.hits(construct_lints),
-        ..functions.hits(|function| assign_lints(function, items)),
-        ..functions.hits(|function| call_lints(function, items)),
+        ..functions.hits(assign_lints),
+        ..functions.unfilled_hits(|function| assign_advice(function, items)).filled(items),
+        ..functions.hits(call_lints),
+        ..functions.unfilled_hits(call_advice).filled(items),
     ]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()) == []);
@@ -122,23 +124,18 @@ fn construct_lints(Function { body }) -> LintHit[] {
 }
 
 # The lints over the calls of `function`, which are found once for all of them.
-fn call_lints(Function { body }, items: Item[]) -> LintHit[] {
+fn call_lints(Function { body }) -> LintHit[] {
+    body.descendants_of_kind::<Call>()$kind$value_or_compare().collect_ok()
+}
+
+# The lints over the calls of `function` that advise a builtin.
+fn call_advice(Function { body }) -> UnfilledHit[] {
     let calls = body.descendants_of_kind::<Call>();
     [
-        ..calls$kind$value_or_compare().collect_ok(),
-        ..calls
-            .map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) })
-            .collect_ok()
-            .filled(items),
-        ..calls
-            .map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) })
-            .collect_ok()
-            .filled(items),
-        ..calls
-            .map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) })
-            .collect_ok()
-            .filled(items),
-    ]
+        ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),
+        ..calls.map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) }),
+        ..calls.map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) }),
+    ].collect_ok()
 }
 
 # `advice`, when there is one, as the hit at the call `self`: a lint of one call says what is wrong
@@ -148,7 +145,7 @@ fn hit_at(self: Expr<Call>, advice: Advice?) -> UnfilledHit? { some(advice?.at(s
 
 # The lints over the `match`es of `function`, which are found once for all of them. One that is about
 # the function it is in takes it as well.
-fn match_lints(function: Function, items: Item[]) -> LintHit[] {
+fn match_lints(function: Function) -> UnfilledHit[] {
     let matches = function.body.descendants_of_kind::<Match>()$kind;
     [
         ..matches$match_bool_is_case(),
@@ -159,34 +156,31 @@ fn match_lints(function: Function, items: Item[]) -> LintHit[] {
         ..matches$match_map_err(),
         ..matches$match_map_ok(),
         ..matches$match_case_as_case(),
-    ]
-        .collect_ok()
-        .filled(items)
+    ].collect_ok()
 }
 
 # The lints over the `mut` bindings of `function`, which are found once for all of them: each is
 # about an array or set seeded and then filled by the loop that follows.
-fn let_mut_lints(Function { body }, items: Item[]) -> LintHit[] {
+fn let_mut_lints(Function { body }) -> UnfilledHit[] {
     let seeds = body.descendants_of_kind::<LetMut>()$kind;
-    [..seeds$push_loop_pipeline(), ..seeds$push_loop_collect_ok()].collect_ok().filled(items)
+    [..seeds$push_loop_pipeline(), ..seeds$push_loop_collect_ok()].collect_ok()
 }
 
 # The lints over the assignments of `function`, which are found once for all of them.
-fn assign_lints(Function { body }, items: Item[]) -> LintHit[] {
+fn assign_lints(Function { body }) -> LintHit[] {
+    body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
+}
+
+# The lints over the assignments of `function` that advise a builtin or an operator.
+fn assign_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
     let assigns = body.descendants_of_kind::<Assign>();
     let stepped = items.stepped_operators();
     [
-        ..assigns$kind$set_spread_field().collect_ok(),
-        ..[..assigns$kind$set_spread_insert(), ..assigns$kind$set_spread_push()]
-            .collect_ok()
-            .filled(items),
-        ..[
-            ..assigns$step_by_one(),
-            ..assigns.map(|assign: Expr<Assign>| { assign.compound_assign(stepped) }),
-        ]
-            .collect_ok()
-            .filled(items),
-    ]
+        ..assigns$kind$set_spread_insert(),
+        ..assigns$kind$set_spread_push(),
+        ..assigns$step_by_one(),
+        ..assigns.map(|assign: Expr<Assign>| { assign.compound_assign(stepped) }),
+    ].collect_ok()
 }
 
 # The messages every lint reports for the program `src` parses to, which is how a lint's own tests
