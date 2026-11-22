@@ -42,7 +42,7 @@ import {
     push,
     to_str,
 } from builtins;
-import { Assign, Expr, SetLit, Spread, descendants } from "../expr.aipl";
+import { Assign, SetLit, Spread, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
@@ -51,14 +51,45 @@ import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./li
 import { is_same_place, root_name } from "./places.aipl";
 import { insert } from sets;
 
-# A hit for each `set` in the program that rebuilds a set from itself to add to it.
-pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
-    self.body.descendants()$rebuild().collect_ok()
+# The hit for the `set` `self`, when it sets a place to a set literal that starts by spreading it.
+pub fn set_spread_insert(self: Assign(target, value, _)) -> UnfilledHit? {
+    let SetLit(elements, order) = value.kind.as_case::<SetLit>()?;
+    // `insert` writes back an unordered set, so an ordered literal is left as it is.
+    if (!order.is_case::<Unordered>()) { return none; };
+    let root = target.root_name()?;
+    let spread = elements.first()?;
+    let Spread(base) = spread.kind.as_case::<Spread>()?;
+    let added = elements.drop_first();
+    if (!base.is_same_place(target) || added.is_empty()) { return none; };
+    // A spread in the tail adds a whole set, which `insert` does not.
+    if (added.any(|element| element.kind.is_case::<Spread>())) { return none; };
+    if (added.len() > 1 && added.any(|element| element.mentions_any([root], none))) {
+        return none;
+    };
+    let place = target.source;
+
+    // The advice, a stretch of text at a time, each followed by the builtin it calls.
+    mut named: Named[] = [];
+    mut text = `this "set" rebuilds "{place}" from itself only to add to it — {if (added.len() == 1) {
+        "add in place"
+    } else {
+        "add each in place"
+    }}: "`;
+    for (let i, element : added) {
+        let separator = if (i == 0) { "" } else { " " };
+        set named.push(Named { text: `{text}{separator}set {place}.`, builtin: "insert" });
+        set text = `({element.quote("<element>")});`;
+    }
+    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
 }.test({
+    // The hits for each function's `set`s.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Assign>()$kind$set_spread_insert().collect_ok()
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_function_unfilled_messages(
             `import \{ {imports} } from sets; fn f(xs: #\{i64}, x: i64) -> #\{i64} \{ {body} }`,
-            set_spread_insert,
+            flagged,
         )
     }
     assert(messages("insert", "mut out = xs; set out = #{..out, x}; out")? == [
@@ -103,7 +134,7 @@ pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
                 set seen = #{..seen, 2, 3};
             }
         """,
-        set_spread_insert,
+        flagged,
     )? == [
         """this "set" rebuilds "seen" from itself only to add to it — add in place: "set seen.insert(1);", importing `insert` from sets""",
         """this "set" rebuilds "seen" from itself only to add to it — add each in place: "set seen.insert(2); set seen.insert(3);", importing `insert` from sets""",
@@ -114,7 +145,7 @@ pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
                 set self.seen = #{..self.seen, x};
             }
         """,
-        set_spread_insert,
+        flagged,
     )? == [
         """this "set" rebuilds "self.seen" from itself only to add to it — add in place: "set self.seen.insert(x);", importing `insert` from sets""",
     ]);
@@ -130,7 +161,7 @@ pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
                     set out = #{..out, out.len(), out.len()};
                 }
             """,
-            set_spread_insert,
+            flagged,
         )? == [],
     );
 
@@ -151,36 +182,3 @@ pub fn set_spread_insert(self: Function) -> UnfilledHit[] {
     assert(to_str(a == b) == "true");
     assert(a == #{1, 2, 3});
 })
-
-# The hit for `self`, when it is a `set` of a place to a set literal that starts by spreading it.
-fn rebuild(self: Expr) -> UnfilledHit? {
-    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
-    let SetLit(elements, order) = value.kind.as_case::<SetLit>()?;
-    // `insert` writes back an unordered set, so an ordered literal is left as it is.
-    if (!order.is_case::<Unordered>()) { return none; };
-    let root = target.root_name()?;
-    let spread = elements.first()?;
-    let Spread(base) = spread.kind.as_case::<Spread>()?;
-    let added = elements.drop_first();
-    if (!base.is_same_place(target) || added.is_empty()) { return none; };
-    // A spread in the tail adds a whole set, which `insert` does not.
-    if (added.any(|element| element.kind.is_case::<Spread>())) { return none; };
-    if (added.len() > 1 && added.any(|element| element.mentions_any([root], none))) {
-        return none;
-    };
-    let place = target.source;
-
-    // The advice, a stretch of text at a time, each followed by the builtin it calls.
-    mut named: Named[] = [];
-    mut text = `this "set" rebuilds "{place}" from itself only to add to it — {if (added.len() == 1) {
-        "add in place"
-    } else {
-        "add each in place"
-    }}: "`;
-    for (let i, element : added) {
-        let separator = if (i == 0) { "" } else { " " };
-        set named.push(Named { text: `{text}{separator}set {place}.`, builtin: "insert" });
-        set text = `({element.quote("<element>")});`;
-    }
-    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
-}

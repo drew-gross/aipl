@@ -20,14 +20,13 @@ import {
     collect_ok,
     equal as ==,
     find_if,
-    is_empty,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
     map,
     value_or,
 } from builtins;
-import { Assign, Call, Expr, Num, descendants } from "../expr.aipl";
+import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
 import { LintHit, hit, lint_in_messages, spans_its_text } from "./lint_hit.aipl";
@@ -57,24 +56,60 @@ pub fn step_for(self: Item[], written: str) -> Step? {
     some(Step { spelling, commutative, missing: if (imported) { none } else { some(builtin) } })
 }
 
-# A hit for each long-hand step by one in the program.
-pub fn step_by_one(Function { body }, items: Item[]) -> LintHit[] {
-    let steps = ["+", "+=", "-", "-="]
-        .map(|operator| items.step_for(operator).map(|step| Written { operator, step }))
-        .collect_ok();
-    if (steps.is_empty()) { return []; };
-    body.descendants()$long_step(steps).collect_ok()
+# The written operators that have a step form in a file with these `items`.
+pub fn written_steps(self: Item[]) -> Written[] {
+    ["+", "+=", "-", "-="]
+        .map(|operator| self.step_for(operator).map(|step| Written { operator, step }))
+        .collect_ok()
+}
+
+# The hit for `self`, when it is a `set` of a place to itself plus or minus one.
+pub fn step_by_one(self: Expr<Assign>, steps: Written[]) -> LintHit? {
+    let Assign(target, value, _) = self.kind;
+    if (!target.spans_its_text()) { return none; };
+
+    // An operator use is a call whose callee is the spelling that was written, which is what this
+    // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
+    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
+    let [left, right] = args else { return none; };
+    let step = steps.find_if(|candidate| candidate.operator == written)$step?;
+    let stepped = if (left.is_same_place(target)) {
+        right.is_one()
+    } else {
+        // The other order is a step only where the operation is commutative: `1 + x` adds one to
+        // `x`, `1 - x` does not subtract one from it.
+        step.commutative && left.is_one() && right.is_same_place(target)
+    };
+    if (!stepped) { return none; };
+    let name = target.source;
+    let (what, form) = if (step.spelling == "++") {
+        (`adding 1 to "{name}"`, "increment")
+    } else {
+        (`subtracting 1 from "{name}"`, "decrement")
+    };
+    let missing = step.missing
+        .map(|builtin| `, importing \`{builtin} as {step.spelling}\` from builtins`)
+        .value_or("");
+    some(hit(`{what} — use the {form} form "set {name}{step.spelling};"{missing}`, self.span))
 }.test({
+    // The hits for each function's `set`s.
+    fn flagged(Function { body }, items: Item[]) -> LintHit[] {
+        let steps = items.written_steps();
+        body
+            .descendants_of_kind::<Assign>()
+            .map(|assign: Expr<Assign>| { assign.step_by_one(steps) })
+            .collect_ok()
+    }
     fn on_field(body: str) -> str[]!ParseFailure {
         lint_in_messages(
             `import \{ wrapping_add as + } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
-            step_by_one,
+            flagged,
         )
     }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_in_messages(
             `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
-            step_by_one,
+            flagged,
         )
     }
     let wrapping = "wrapping_add as +, wrapping_sub as -, wrapping_increment as ++, wrapping_decrement as --";
@@ -128,39 +163,9 @@ pub fn step_by_one(Function { body }, items: Item[]) -> LintHit[] {
     assert(
         lint_in_messages(
             """import { add as + } from "./mymath.aipl"; fn f(x: i64) -> i64 { mut n = x; set n = n + 1; n }""",
-            step_by_one,
+            flagged,
         )? == [],
     );
 })
-
-# The hit for `self`, when it is a `set` of a place to itself plus or minus one.
-fn long_step(self: Expr, steps: Written[]) -> LintHit? {
-    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
-    if (!target.spans_its_text()) { return none; };
-
-    // An operator use is a call whose callee is the spelling that was written, which is what this
-    // lint keys on, since `+` and `+=` want different advice and are told apart by nothing else.
-    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
-    let [left, right] = args else { return none; };
-    let step = steps.find_if(|candidate| candidate.operator == written)$step?;
-    let stepped = if (left.is_same_place(target)) {
-        right.is_one()
-    } else {
-        // The other order is a step only where the operation is commutative: `1 + x` adds one to
-        // `x`, `1 - x` does not subtract one from it.
-        step.commutative && left.is_one() && right.is_same_place(target)
-    };
-    if (!stepped) { return none; };
-    let name = target.source;
-    let (what, form) = if (step.spelling == "++") {
-        (`adding 1 to "{name}"`, "increment")
-    } else {
-        (`subtracting 1 from "{name}"`, "decrement")
-    };
-    let missing = step.missing
-        .map(|builtin| `, importing \`{builtin} as {step.spelling}\` from builtins`)
-        .value_or("");
-    some(hit(`{what} — use the {form} form "set {name}{step.spelling};"{missing}`, self.span))
-}
 
 fn is_one(self: Expr) -> bool { self.kind == Num(1) }

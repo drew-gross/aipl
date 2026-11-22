@@ -64,14 +64,28 @@
 
 
 
+        <section class="item" id="item-written_steps">
+          <h3>
+            <a class="anchor" href="#item-written_steps">written_steps</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn written_steps(self: Item[]) -&#62; Written[]</code></pre>
+
+          <div class="doc"><p>The written operators that have a step form in a file with these <code>items</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-step_by_one">
           <h3>
             <a class="anchor" href="#item-step_by_one">step_by_one</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn step_by_one(__spat$2668: Function, items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn step_by_one(self: Expr&#60;Assign&#62;, steps: Written[]) -&#62; LintHit?</code></pre>
 
-          <div class="doc"><p>A hit for each long-hand step by one in the program.</p></div>
+          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to itself plus or minus one.</p></div>
 
 
         </section>
@@ -83,20 +97,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-long_step">
-          <h3>
-            <a class="anchor" href="#item-long_step">long_step</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn long_step(self: Expr, steps: Written[]) -&#62; LintHit?</code></pre>
-
-          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to itself plus or minus one.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-is_one">

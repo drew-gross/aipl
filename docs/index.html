@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">226 files, 2217 items.</p>
+      <p class="summary">226 files, 2216 items.</p>
 
       <ul class="files">
 
@@ -2204,14 +2204,22 @@
           <p class="file-summary">The <code>compound_assign</code> lint: <code>set x = x + e;</code> — an accumulate written the long way; <code>set x += e;</code> is the form for it, and likewise <code>-=</code>, <code>*=</code>, <code>/=</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-compound_assign.html#private">1 private</a></span>
-
 
           <ul class="items">
 
             <li>
               <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-Compound"><code>Compound</code></a>
               <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-compound_forms"><code>compound_forms</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-compound_assign.html#item-stepped_operators"><code>stepped_operators</code></a>
+              <span class="kind kind-fn">fn</span>
             </li>
 
             <li>
@@ -3298,8 +3306,6 @@
           <p class="file-summary">The <code>set_spread_insert</code> lint: <code>set seen = #{..seen, x};</code> — a set rebuilt from itself only to add to it. <code>set seen.insert(x);</code> is the addition spelled as one: it names the element added, and the set's other contents never come up.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-set_spread_insert.html#private">1 private</a></span>
-
 
           <ul class="items">
 
@@ -3317,8 +3323,6 @@
 
           <p class="file-summary">The <code>set_spread_push</code> lint: <code>set out = [..out, x];</code> — a binding rebuilt from itself only to append to it. <code>set out.push(x);</code> is the append spelled as one: it names the element added, and the array's other contents never come up.</p>
 
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-set_spread_push.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -3441,7 +3445,7 @@
           <p class="file-summary">The <code>step_by_one</code> lint: a step of one written the long way — <code>set x = x + 1;</code>, <code>set x += 1;</code>, and their <code>-</code> mirrors — where <code>set x++;</code> / <code>set x--;</code> is the form for it.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-step_by_one.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-step_by_one.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -3458,6 +3462,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-step_for"><code>step_for</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lint-step_by_one.html#item-written_steps"><code>written_steps</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

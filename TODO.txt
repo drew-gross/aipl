@@ -566,6 +566,9 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  Lets add structure to the import recommendations in the lints. The eventual goal is automated fixes, but for now I just want to simplify the lint implementations and have a common UI for how import requests are handled. What I want is for the lints to returns a list of builtins that are necessary for the fix, and have the outer linter function display those. It is more capable of determining what is already imported, and with what names (individual lints shouldn't be responsible for checking that), it knows if those names are already in use, and it knows what the preferred name is for various builtins (e.g. that wrapping_add is typically imported as +, but also if saturating add is already imported as +, it knows not to recommend that)
+  is_one doesn't deserve a whole function
+  match_value_or_err shouldn't care about is_test_code.
   match_value_or_err should be able to leverage the actual can_defer (maybe this needs to go in a later stage? maybe can_defer needs to go earlier?)
   const function should be const var most of the time
   make Call's Callee field non-optional
@@ -927,6 +930,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  make a graph based builder that doesn't rebuild, like bazel
   lets not actually store the project compilers in git, handoff can recreate them and we can .gitignore them, that way project development still works
   dynamic work queue for running tests to balance work across shards better
   have some progress report type thingy

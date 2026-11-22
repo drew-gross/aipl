@@ -45,21 +45,52 @@ import {
     push,
     to_str,
 } from builtins;
-import { ArrayLit, Assign, Expr, Spread, descendants } from "../expr.aipl";
+import { ArrayLit, Assign, Spread, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 
-# A hit for each `set` in the program that rebuilds an array from itself to append to it.
-pub fn set_spread_push(self: Function) -> UnfilledHit[] {
-    self.body.descendants()$rebuild().collect_ok()
+# The hit for the `set` `self`, when it sets a place to an array literal that starts by spreading it.
+pub fn set_spread_push(self: Assign(target, value, _)) -> UnfilledHit? {
+    let ArrayLit(elements) = value.kind.as_case::<ArrayLit>()?;
+    let root = target.root_name()?;
+    let spread = elements.first()?;
+    let Spread(base) = spread.kind.as_case::<Spread>()?;
+    let appended = elements.drop_first();
+    if (!base.is_same_place(target) || appended.is_empty()) { return none; };
+    if (appended.len() > 1 && appended.any(|element| element.mentions_any([root], none))) {
+        return none;
+    };
+    let place = target.source;
+
+    // The advice, a stretch of text at a time, each followed by the builtin it calls.
+    mut named: Named[] = [];
+    mut text = `this "set" rebuilds "{place}" from itself only to append to it — {if (appended.len() == 1) {
+        "append in place"
+    } else {
+        "append each in place"
+    }}: "`;
+    for (let i, element : appended) {
+        let separator = if (i == 0) { "" } else { " " };
+        let (builtin, argument) = match (element.kind) {
+            Spread(inner) => ("extend", inner.quote("<array>")),
+            _ => ("push", element.quote("<element>")),
+        };
+        set named.push(Named { text: `{text}{separator}set {place}.`, builtin });
+        set text = `({argument});`;
+    }
+    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
 }.test({
+    // The hits for each function's `set`s.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Assign>()$kind$set_spread_push().collect_ok()
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_function_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[], x: i64) -> i64[] \{ {body} }`,
-            set_spread_push,
+            flagged,
         )
     }
     assert(messages("push", "mut out = xs; set out = [..out, x]; out")? == [
@@ -100,7 +131,7 @@ pub fn set_spread_push(self: Function) -> UnfilledHit[] {
                 set out = [..out, ..more];
             }
         """,
-        set_spread_push,
+        flagged,
     )? == [
         """this "set" rebuilds "out" from itself only to append to it — append in place: "set out.push(1);", importing `push` from builtins""",
         """this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.push(2); set out.push(3);", importing `push` from builtins""",
@@ -112,7 +143,7 @@ pub fn set_spread_push(self: Function) -> UnfilledHit[] {
                 set self.hits = [..self.hits, x];
             }
         """,
-        set_spread_push,
+        flagged,
     )? == [
         """this "set" rebuilds "self.hits" from itself only to append to it — append in place: "set self.hits.push(x);", importing `push` from builtins""",
     ]);
@@ -129,7 +160,7 @@ pub fn set_spread_push(self: Function) -> UnfilledHit[] {
                     set out = [..out, out.len(), out.len()];
                 }
             """,
-            set_spread_push,
+            flagged,
         )? == [],
     );
     assert(
@@ -147,7 +178,7 @@ pub fn set_spread_push(self: Function) -> UnfilledHit[] {
                     print(to_str(us));
                 }
             """,
-            set_spread_push,
+            flagged,
         )? == [],
     );
 
@@ -180,36 +211,3 @@ pub fn set_spread_push(self: Function) -> UnfilledHit[] {
     assert(to_str(a) == "[1, 2, 3]");
     assert(to_str(c) == "[1, 2, 8, 9]");
 })
-
-# The hit for `self`, when it is a `set` of a place to an array literal that starts by spreading it.
-fn rebuild(self: Expr) -> UnfilledHit? {
-    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
-    let ArrayLit(elements) = value.kind.as_case::<ArrayLit>()?;
-    let root = target.root_name()?;
-    let spread = elements.first()?;
-    let Spread(base) = spread.kind.as_case::<Spread>()?;
-    let appended = elements.drop_first();
-    if (!base.is_same_place(target) || appended.is_empty()) { return none; };
-    if (appended.len() > 1 && appended.any(|element| element.mentions_any([root], none))) {
-        return none;
-    };
-    let place = target.source;
-
-    // The advice, a stretch of text at a time, each followed by the builtin it calls.
-    mut named: Named[] = [];
-    mut text = `this "set" rebuilds "{place}" from itself only to append to it — {if (appended.len() == 1) {
-        "append in place"
-    } else {
-        "append each in place"
-    }}: "`;
-    for (let i, element : appended) {
-        let separator = if (i == 0) { "" } else { " " };
-        let (builtin, argument) = match (element.kind) {
-            Spread(inner) => ("extend", inner.quote("<array>")),
-            _ => ("push", element.quote("<element>")),
-        };
-        set named.push(Named { text: `{text}{separator}set {place}.`, builtin });
-        set text = `({argument});`;
-    }
-    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
-}

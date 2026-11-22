@@ -27,7 +27,6 @@ import {
     equal as ==,
     filter,
     find_if,
-    is_empty,
     is_some,
     logical_and as &&,
     logical_not as !,
@@ -35,7 +34,7 @@ import {
     map,
     value_or,
 } from builtins;
-import { Assign, Call, Expr, Num, descendants } from "../expr.aipl";
+import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
 import { LintHit, hit, lint_in_messages, spans_its_text } from "./lint_hit.aipl";
@@ -47,11 +46,11 @@ import { step_for } from "./step_by_one.aipl";
 # lacks it (`none` when it has it).
 struct Compound { operator: str, spelling: str, missing: str? }
 
-# A hit for each long-hand accumulate in the program.
-pub fn compound_assign(Function { body }, items: Item[]) -> LintHit[] {
-    let compounds = [("+", "+="), ("-", "-="), ("*", "*="), ("/", "/=")]
+# The plain operators that have a compound spelling in a file with these `items`.
+pub fn compound_forms(self: Item[]) -> Compound[] {
+    [("+", "+="), ("-", "-="), ("*", "*="), ("/", "/=")]
         .map(
-            |(operator, spelling)| items
+            |(operator, spelling)| self
                 .paired(operator, spelling)
                 .map(|Pairing { builtin, imported }| Compound {
                     operator,
@@ -59,15 +58,58 @@ pub fn compound_assign(Function { body }, items: Item[]) -> LintHit[] {
                     missing: if (imported) { none } else { some(builtin) },
                 }),
         )
-        .collect_ok();
-    if (compounds.is_empty()) { return []; };
-    let stepped = ["+", "-"].filter(|operator| items.step_for(operator).is_some());
-    body.descendants()$long_accumulate(compounds, stepped).collect_ok()
+        .collect_ok()
+}
+
+# The plain operators whose `± 1` form `step_by_one` has advice for in a file with these `items`.
+pub fn stepped_operators(self: Item[]) -> str[] {
+    ["+", "-"].filter(|operator| self.step_for(operator).is_some())
+}
+
+# The hit for `self`, when it is a `set` of a place to itself combined with something.
+pub fn compound_assign(self: Expr<Assign>, compounds: Compound[], stepped: str[]) -> LintHit? {
+    let Assign(target, value, _) = self.kind;
+    if (!target.spans_its_text()) { return none; };
+    // An operator use is a call named for the spelling written.
+    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
+    let [left, right] = args else { return none; };
+    let Compound { operator, spelling, missing } = compounds.find_if(
+        |candidate| candidate.operator == written,
+    )?;
+
+    // The receiver on the left works for every operator; on the right only where the operation is
+    // commutative, since `k - x` and `k / x` are not accumulations of `x` at all.
+    let operand = if (left.is_same_place(target)) {
+        right
+    } else if (right.is_same_place(target) && (written == "+" || written == "*")) {
+        left
+    } else {
+        return none;
+    };
+    // `set x = x ± 1;` is the step lint's when that lint can fire here.
+    if (operand.kind == Num(1) && stepped.contains(written)) { return none; };
+    let name = target.source;
+    let hint = missing
+        .map(|builtin| `, importing \`{builtin} as {spelling}\` from builtins`)
+        .value_or("");
+    some(hit(
+        `"{name}" accumulates onto itself — use the compound form "set {name} {spelling} ...;"{hint}`,
+        self.span,
+    ))
 }.test({
+    // The hits for each function's `set`s.
+    fn flagged(Function { body }, items: Item[]) -> LintHit[] {
+        let compounds = items.compound_forms();
+        let stepped = items.stepped_operators();
+        body
+            .descendants_of_kind::<Assign>()
+            .map(|assign: Expr<Assign>| { assign.compound_assign(compounds, stepped) })
+            .collect_ok()
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_in_messages(
             `import \{ {imports} } from builtins; fn f(x: i64) -> i64 \{ mut n = x; {body} n }`,
-            compound_assign,
+            flagged,
         )
     }
     let all = "wrapping_add as +, wrapping_add_assign as +=, wrapping_sub as -, wrapping_sub_assign as -=, wrapping_mul as *, wrapping_mul_assign as *=";
@@ -99,7 +141,7 @@ pub fn compound_assign(Function { body }, items: Item[]) -> LintHit[] {
     fn on_field(body: str) -> str[]!ParseFailure {
         lint_in_messages(
             `import \{ wrapping_add as +, wrapping_add_assign as += } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
-            compound_assign,
+            flagged,
         )
     }
     assert(on_field("set c.n = c.n + 5;")? == [
@@ -111,39 +153,7 @@ pub fn compound_assign(Function { body }, items: Item[]) -> LintHit[] {
     assert(
         lint_in_messages(
             """import { add as +, wrapping_add_assign as += } from "./mymath.aipl"; fn f(x: i64) -> i64 { mut n = x; set n = n + x; n }""",
-            compound_assign,
+            flagged,
         )? == [],
     );
 })
-
-# The hit for `self`, when it is a `set` of a place to itself combined with something.
-fn long_accumulate(self: Expr, compounds: Compound[], stepped: str[]) -> LintHit? {
-    let Assign(target, value, _) = self.kind.as_case::<Assign>()?;
-    if (!target.spans_its_text()) { return none; };
-    // An operator use is a call named for the spelling written.
-    let Call(written, args, _, _) = value.kind.as_case::<Call>()?;
-    let [left, right] = args else { return none; };
-    let Compound { operator, spelling, missing } = compounds.find_if(
-        |candidate| candidate.operator == written,
-    )?;
-
-    // The receiver on the left works for every operator; on the right only where the operation is
-    // commutative, since `k - x` and `k / x` are not accumulations of `x` at all.
-    let operand = if (left.is_same_place(target)) {
-        right
-    } else if (right.is_same_place(target) && (written == "+" || written == "*")) {
-        left
-    } else {
-        return none;
-    };
-    // `set x = x ± 1;` is the step lint's when that lint can fire here.
-    if (operand.kind == Num(1) && stepped.contains(written)) { return none; };
-    let name = target.source;
-    let hint = missing
-        .map(|builtin| `, importing \`{builtin} as {spelling}\` from builtins`)
-        .value_or("");
-    some(hit(
-        `"{name}" accumulates onto itself — use the compound form "set {name} {spelling} ...;"{hint}`,
-        self.span,
-    ))
-}

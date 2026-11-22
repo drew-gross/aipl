@@ -27,36 +27,16 @@
             <a class="anchor" href="#item-set_spread_push">set_spread_push</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn set_spread_push(self: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn set_spread_push(self: Assign) -&#62; UnfilledHit?</code></pre>
 
-          <div class="doc"><p>A hit for each <code>set</code> in the program that rebuilds an array from itself to append to it.</p></div>
-
-
-        </section>
-
-
-      </section>
-
-
-      <section class="group private">
-        <h2 id="private">Private</h2>
-        <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-rebuild">
-          <h3>
-            <a class="anchor" href="#item-rebuild">rebuild</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn rebuild(self: Expr) -&#62; UnfilledHit?</code></pre>
-
-          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to an array literal that starts by spreading it.</p></div>
+          <div class="doc"><p>The hit for the <code>set</code> <code>self</code>, when it sets a place to an array literal that starts by spreading it.</p></div>
 
 
         </section>
 
 
       </section>
+
 
 
     </main>
