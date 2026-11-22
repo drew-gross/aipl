@@ -83,7 +83,7 @@
             <a class="anchor" href="#item-name_at">name_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5571: Span) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5562: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
 
@@ -707,20 +707,6 @@
           <pre class="signature"><code>pub fn descendants_of_kind(self: Expr, arm: Case&#60;ExprKind&#62;) -&#62; Expr[]</code></pre>
 
           <div class="doc"><p><code>self</code> and every expression under it whose kind is the case <code>arm</code>, outermost first. The case is written as a type argument, as <code>collect_arms</code> takes it, and the result is typed as that case alone: <code>body.descendants_of_kind::&lt;Slice&gt;()</code> is a list of <code>Expr&lt;Slice&gt;</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-collect_expr_cases">
-          <h3>
-            <a class="anchor" href="#item-collect_expr_cases">collect_expr_cases</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn collect_expr_cases(self: Expr, arm: Case&#60;ExprKind&#62;) -&#62; ExprKind[]</code></pre>
-
-          <div class="doc"><p>The kind of <code>self</code> and of every expression under it that is the case <code>arm</code>, outermost first. Written with the case as a constructor name, as <code>collect_arms</code> is, the result is typed as that case alone: <code>body.collect_expr_cases(Slice)</code> is a list of <code>Slice</code>s.</p></div>
 
 
         </section>

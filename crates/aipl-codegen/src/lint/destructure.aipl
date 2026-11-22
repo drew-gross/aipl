@@ -93,7 +93,7 @@ import {
     LetPattern,
     Name,
     Read,
-    descendants,
+    descendants_of_kind,
     field_reads,
 } from "../expr.aipl";
 import { Function, One, Param, pattern_reads } from "../item.aipl";
@@ -109,7 +109,25 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
     // parameters take their fields apart at the top of it, and their reads count the
     // same way.
     let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
-    [..sig.params$param_hits(body, reads).join(), ..body.descendants()$expr_hits(reads).join()]
+    [
+        ..sig.params$param_hits(body, reads).join(),
+        ..body
+            .descendants_of_kind::<Let>()$kind
+            .map(|Let(name, annotation, value, inner)| {
+                binding_hits(name, annotation, value, inner, reads)
+            })
+            .join(),
+        ..body
+            .descendants_of_kind::<LetPattern>()$kind
+            .map(|LetPattern(pattern, value, rest)| pattern.slot_hits(rest, reads, value.span))
+            .join(),
+        ..body
+            .descendants_of_kind::<ForPattern>()$kind
+            .map(|ForPattern(pattern, iterable, loop_body, _)| {
+                pattern.slot_hits(loop_body, reads, iterable.span)
+            })
+            .join(),
+    ]
 }.test({
     // ---- a parameter ----
     // Only fields are read: take the parameter apart in the signature.
@@ -420,17 +438,6 @@ fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
     match (taken) {
         Fields(..) => [hit(advice(Parameter(struct_name), name, taken), body.span)],
         Opening(span, _, _) => [hit(advice(Parameter(struct_name), name, taken), span)],
-    }
-}
-
-# The hits at one node: a `let` of a name, or the slots of a destructuring `let` or
-# `for`.
-fn expr_hits(self: Expr, reads: Read[]) -> LintHit[] {
-    match (self.kind) {
-        Let(name, annotation, value, inner) => binding_hits(name, annotation, value, inner, reads),
-        LetPattern(pattern, value, rest) => pattern.slot_hits(rest, reads, value.span),
-        ForPattern(pattern, iterable, body, _) => pattern.slot_hits(body, reads, iterable.span),
-        _ => [],
     }
 }
 

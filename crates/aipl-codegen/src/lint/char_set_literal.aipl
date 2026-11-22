@@ -46,21 +46,43 @@ import {
     not_equal as !=,
 } from builtins;
 import { ToSet } from "../builtin_table.aipl";
-import { Char, Expr, SetLit, descendants } from "../expr.aipl";
+import { Char, Expr, SetLit, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
 import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
 import { has, to_set } from sets;
 
-# A hit for each unordered set literal in the function that is only characters, written on one line.
-pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
-    body.descendants()$spelled_out().collect_ok()
+# The hit for `self`, when it is a one-line unordered set of at least three character literals
+# that a string can spell.
+pub fn char_set_literal(self: Expr<SetLit>) -> UnfilledHit? {
+    let SetLit(elements, order) = self.kind;
+    if (!order.is_case::<Unordered>()) { return none; };
+    // How many spelled-out elements it takes before the string form wins.
+    let minimum_elements = 3;
+    if (elements.len() < minimum_elements || self.source.contains('\n')) { return none; };
+
+    // Every element a char *literal*: that is what makes this a char set without asking the type
+    // checker (lints run before it), and what lets the advice name the string it would become.
+    let characters = elements$character().collect_ok();
+    if (characters.len() != elements.len()) { return none; };
+    let spelled = characters$spelling().collect_ok();
+    if (spelled.len() != characters.len()) { return none; };
+    some(unfilled(
+        ToSet,
+        `a char set of {elements.len()} elements spelled out — write \`"{spelled.join()}".`,
+        "()`",
+        self.span,
+    ))
 }.test({
+    // The hits for each function's set literals.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<SetLit>()$char_set_literal().collect_ok()
+    }
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
         lint_function_unfilled_messages(
             `import \{ {imports} } from sets; fn f() -> #\{char} \{ {body} }`,
-            char_set_literal,
+            flagged,
         )
     }
     assert(messages("to_set", "#{'a', 'b', 'c'}")? == [
@@ -103,7 +125,7 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
                 print(`{abc.has('b')} {digits.has('7')} {escapes.has('\n')}`);
             }
         """,
-        char_set_literal,
+        flagged,
     )? == [
         """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from sets""",
         """a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from sets""",
@@ -121,29 +143,6 @@ pub fn char_set_literal(Function { body }) -> UnfilledHit[] {
     let punct: #{char} = #{'"', '\\', '\'', '\n', '\t'}; #[allow]
     assert(punct == `"\\'\n\t`.to_set());
 })
-
-# The hit for `self`, when it is a one-line unordered set of at least three character literals
-# that a string can spell.
-fn spelled_out(self: Expr) -> UnfilledHit? {
-    let SetLit(elements, order) = self.kind.as_case::<SetLit>()?;
-    if (!order.is_case::<Unordered>()) { return none; };
-    // How many spelled-out elements it takes before the string form wins.
-    let minimum_elements = 3;
-    if (elements.len() < minimum_elements || self.source.contains('\n')) { return none; };
-
-    // Every element a char *literal*: that is what makes this a char set without asking the type
-    // checker (lints run before it), and what lets the advice name the string it would become.
-    let characters = elements$character().collect_ok();
-    if (characters.len() != elements.len()) { return none; };
-    let spelled = characters$spelling().collect_ok();
-    if (spelled.len() != characters.len()) { return none; };
-    some(unfilled(
-        ToSet,
-        `a char set of {elements.len()} elements spelled out — write \`"{spelled.join()}".`,
-        "()`",
-        self.span,
-    ))
-}
 
 # The character `self` is, when it is a character literal.
 fn character(self: Expr) -> char? {

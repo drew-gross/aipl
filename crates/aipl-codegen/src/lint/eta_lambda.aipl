@@ -44,6 +44,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map,
     not_equal as !=,
     starts_with,
     zip_with,
@@ -55,7 +56,7 @@ import {
     Ident,
     Lambda,
     LambdaParam,
-    descendants,
+    descendants_of_kind,
     name_at,
     synthesized_name,
 } from "../expr.aipl";
@@ -70,7 +71,19 @@ import { imported_as, imported_locals } from "./spelling.aipl";
 pub fn eta_lambda(Function { body }, items: Item[]) -> LintHit[] {
     let map_name = items.imported_as("map");
     let methods = items.methods_in_view();
-    body.lambda_hits(map_name, methods)
+    let advice = body
+        .descendants_of_kind::<Call>()
+        .map(|call: Expr<Call>| { call.map_advice(map_name, methods) })
+        .collect_ok();
+    // The lambdas the `map` advice already covers are not advised on again.
+    let advised = advice$lambda.collect_ok();
+    [
+        ..advice$hit,
+        ..body
+            .descendants_of_kind::<Lambda>()
+            .map(|lambda: Expr<Lambda>| { lambda.forwarded(advised) })
+            .collect_ok(),
+    ]
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
@@ -157,29 +170,14 @@ fn method_name(self: LoweredFn(Function { sig, name })) -> str? {
     }
 }
 
-# A hit for each lambda in `self` and under it that adds nothing: the `map` advice where
-# there is one, and the forwarding advice for the lambdas that advice did not already cover.
-fn lambda_hits(self: Expr, map_name: str?, methods: str[]) -> LintHit[] {
-    let nodes = self.descendants();
-    let advice = nodes$map_advice(map_name, methods);
-    let advised = advice.collect_ok()$lambda.collect_ok();
-    zip_with(
-        nodes,
-        advice,
-        |node: Expr, given: MapAdvice?| {
-            if (let some(found) = given) { some(found.hit) } else { node.forwarded(advised) }
-        },
-    ).collect_ok()
-}
-
 # What the `map` rule says about a call, and the span of the lambda it advised on (none for a
 # function name), so that the lambda itself is not advised on again.
 struct MapAdvice { hit: LintHit, lambda: Span? }
 
 # `self` as the advice for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
-fn map_advice(self: Expr, map_name: str?, methods: str[]) -> MapAdvice? {
+fn map_advice(self: Expr<Call>, map_name: str?, methods: str[]) -> MapAdvice? {
     let name = map_name?;
-    let Call(callee, arguments, _, _) = self.kind.as_case::<Call>()?;
+    let Call(callee, arguments, _, _) = self.kind;
     if (callee != name) { return none; };
     let [receiver, argument] = arguments else { return none; };
     let items = receiver.quote("<items>");
@@ -252,8 +250,8 @@ fn slot_shown(self: str) -> str {
 # accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.
-fn forwarded(self: Expr, advised: Span[]) -> LintHit? {
-    let Lambda(parameters, body) = self.kind.as_case::<Lambda>()?;
+fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
+    let Lambda(parameters, body) = self.kind;
     if (advised.contains(self.span) || parameters.any(
         |parameter| parameter.synthesized_name().contains('$'),
     )) {

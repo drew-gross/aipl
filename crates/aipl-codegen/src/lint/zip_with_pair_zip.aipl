@@ -13,51 +13,48 @@
 # The hit points at the function, which begins on the line the `#[allow]` would be
 # written on.
 
+import { collect_ok, equal as ==, logical_and as &&, logical_not as ! } from builtins;
+import { Zip, ZipWith } from "../builtin_table.aipl";
 import {
-    collect_ok,
-    equal as ==,
-    logical_and as &&,
-    logical_not as !,
-    logical_or as ||,
-    map,
-    not_equal as !=,
-} from builtins;
-import { Zip } from "../builtin_table.aipl";
-import { Call, Expr, Ident, Lambda, TupleLit, descendants, synthesized_name } from "../expr.aipl";
+    Call,
+    Expr,
+    Ident,
+    Lambda,
+    TupleLit,
+    descendants_of_kind,
+    synthesized_name,
+} from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import { Named, UnfilledHit, lint_in_unfilled_messages, quote } from "./lint_hit.aipl";
-import { Builtin, imported_as } from "./spelling.aipl";
+import { Function } from "../item.aipl";
+import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Builtin } from "./spelling.aipl";
 
-# A hit for each `zip_with` whose function only pairs its two arguments.
-pub fn zip_with_pair_zip(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let some(zip_with_name) = items.imported_as("zip_with") else { return []; };
-    body
-        .descendants()
-        .map(
-            |call| {
-                let Call(callee, arguments, _, _) = call.kind else { return none; };
-                let [receiver, other, function] = arguments else { return none; };
-                if (callee != zip_with_name || !function.only_pairs()) { return none; };
-                some(UnfilledHit {
-                    named: [
-                        Named {
-                            text: `"{zip_with_name}" with a function that only pairs its arguments is "{receiver.quote("<items>")}.`,
-                            builtin: Builtin(Zip),
-                        },
-                    ],
-                    tail: `({other.quote("<other>")})"`,
-                    span: function.span,
-                })
+# The hit for `self`, when it is a `zip_with` whose function only pairs its two arguments.
+pub fn zip_with_pair_zip(self: Expr<Call>) -> UnfilledHit? {
+    let Call(_, arguments, _, ZipWith) = self.kind else { return none; };
+    let [receiver, other, function] = arguments else { return none; };
+    if (!function.only_pairs()) { return none; };
+    some(UnfilledHit {
+        named: [
+            Named { text: `"`, builtin: Builtin(ZipWith) },
+            Named {
+                text: `" with a function that only pairs its arguments is "{receiver.quote("<items>")}.`,
+                builtin: Builtin(Zip),
             },
-        )
-        .collect_ok()
+        ],
+        tail: `({other.quote("<other>")})"`,
+        span: function.span,
+    })
 }.test({
+    // The hits for each function's calls.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Call>()$zip_with_pair_zip().collect_ok()
+    }
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[], ys: str[]) -> (i64, str)[] \{ {body} }`,
-            zip_with_pair_zip,
+            flagged,
         )
     }
 

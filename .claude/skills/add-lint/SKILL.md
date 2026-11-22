@@ -30,8 +30,8 @@ DRY is critical here. Before writing a helper, search for it:
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
   shape and its pipeline advice), `lint/interpolation.aipl` — shared shape recognizers.
 - The builtins and `crates/aipl-codegen/src/*.aipl` (expr walkers, `source`
-  quoting, spans). `body.collect_expr_cases(Slice)` is every `Slice` under `body`,
-  typed as that case alone, so a lambda can destructure it directly.
+  quoting, spans). `body.descendants_of_kind::<Slice>()` is every `Slice` under `body` as an
+  `Expr<Slice>` (its `kind` typed as that case alone, its span and source beside it).
 
 If it exists in a library, use it. **If the thing you need already exists as a
 private helper inside another lint's file, move it into a library file (or a

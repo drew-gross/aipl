@@ -30,7 +30,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-destructure">destructure</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure(__spat$4819: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure(__spat$4827: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each parameter, <code>let</code> and pattern slot in the program whose name is only ever taken apart.</p></div>
 
@@ -129,20 +129,6 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
           <pre class="signature"><code>fn param_hits(self: Param, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The hit for one parameter, or its pattern's slots.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-expr_hits">
-          <h3>
-            <a class="anchor" href="#item-expr_hits">expr_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn expr_hits(self: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hits at one node: a <code>let</code> of a name, or the slots of a destructuring <code>let</code> or <code>for</code>.</p></div>
 
 
         </section>

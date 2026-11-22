@@ -27,9 +27,9 @@
             <a class="anchor" href="#item-arm_block_value">arm_block_value</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn arm_block_value(__spat$1651: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn arm_block_value(self: Expr&#60;Match&#62;) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>A hit for each arm of a match in the function whose block holds nothing but its value.</p></div>
+          <div class="doc"><p>The hits for the arms of the match <code>self</code> whose block holds nothing but its value.</p></div>
 
 
         </section>
@@ -41,20 +41,6 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
-
-
-        <section class="item" id="item-block_arms">
-          <h3>
-            <a class="anchor" href="#item-block_arms">block_arms</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn block_arms(self: Expr) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The hits for the arms of <code>self</code>, when it is a match.</p></div>
-
-
-        </section>
-
 
 
         <section class="item" id="item-block_hit">

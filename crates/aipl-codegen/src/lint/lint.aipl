@@ -12,6 +12,7 @@ import {
     Expr,
     LetMut,
     Match,
+    SetLit,
     Slice,
     descendants_of_kind,
 } from "../expr.aipl";
@@ -67,6 +68,7 @@ import { return_loop_find_index } from "./return_loop_find_index.aipl";
 import { set_spread_field } from "./set_spread_field.aipl";
 import { set_spread_insert } from "./set_spread_insert.aipl";
 import { set_spread_push } from "./set_spread_push.aipl";
+import { imported_as } from "./spelling.aipl";
 import { step_by_one, stepped_operators } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
@@ -101,26 +103,32 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.unfilled_hits(return_loop_find_if).filled(items),
         ..functions.unfilled_hits(|function| return_loop_any_all(function, items)).filled(items),
         ..functions.hits(|function| eta_lambda(function, items)),
-        ..functions.unfilled_hits(|function| map_find_if_some(function, items)).filled(items),
-        ..functions.unfilled_hits(|function| map_constant_repeat(function, items)).filled(items),
-        ..functions.unfilled_hits(|function| zip_with_pair_zip(function, items)).filled(items),
         ..functions.unfilled_hits(push_loop_zip_with).filled(items),
-        ..functions.unfilled_hits(|function| with_value_or_self(function, items)).filled(items),
         ..functions.unfilled_hits(return_loop_find_index).filled(items),
         ..functions.hits(|function| interp_to_str(function, items)),
         ..functions.hits(interp_literal),
         ..functions.hits(slice_lints),
-        ..functions.unfilled_hits(char_set_literal).filled(items),
-        ..functions.hits(arm_block_value),
+        ..functions.unfilled_hits(set_lints).filled(items),
+        ..functions.hits(match_hits),
         ..functions.hits(construct_lints),
         ..functions.hits(assign_lints),
         ..functions.unfilled_hits(|function| assign_advice(function, items)).filled(items),
         ..functions.hits(call_lints),
-        ..functions.unfilled_hits(call_advice).filled(items),
+        ..functions.unfilled_hits(|function| call_advice(function, items)).filled(items),
     ]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()) == []);
 })
+
+# The lints over the `match`es of `function` that are not about what they say.
+fn match_hits(Function { body }) -> LintHit[] {
+    body.descendants_of_kind::<Match>()$arm_block_value().join()
+}
+
+# The lints over the set literals of `function`, which are found once for all of them.
+fn set_lints(Function { body }) -> UnfilledHit[] {
+    body.descendants_of_kind::<SetLit>()$char_set_literal().collect_ok()
+}
 
 # The lints over the slices of `function`, which are found once for all of them.
 fn slice_lints(Function { body }) -> LintHit[] {
@@ -139,9 +147,14 @@ fn call_lints(Function { body }) -> LintHit[] {
 }
 
 # The lints over the calls of `function` that advise a builtin.
-fn call_advice(Function { body }) -> UnfilledHit[] {
+fn call_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
     let calls = body.descendants_of_kind::<Call>();
+    let is_some = items.imported_as("is_some");
     [
+        ..calls$map_constant_repeat(),
+        ..calls.map(|call: Expr<Call>| { call.map_find_if_some(is_some) }),
+        ..calls$zip_with_pair_zip(),
+        ..calls$with_value_or_self(),
         ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),
         ..calls.map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) }),
         ..calls.map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) }),

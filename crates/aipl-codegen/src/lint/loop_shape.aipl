@@ -30,7 +30,7 @@ import {
     Seq,
     Try,
     Unit,
-    collect_expr_cases,
+    descendants_of_kind,
 } from "../expr.aipl";
 import { ParseError } from "../grammar.aipl";
 import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
@@ -76,7 +76,7 @@ fn is_block_tail(self: Expr) -> bool {
 # Whether `self` can move into a lambda in a rewritten pipeline: a `?` returns from
 # the function it is written in, so moved into a lambda it would return from the
 # lambda instead.
-pub fn is_lambda_safe(self: Expr) -> bool { self.collect_expr_cases(Try).is_empty() }.test({
+pub fn is_lambda_safe(self: Expr) -> bool { self.descendants_of_kind::<Try>().is_empty() }.test({
     assert(lower_aipl_block_surface("{ f(a) }")?.is_lambda_safe());
     assert(!lower_aipl_block_surface("{ f(a?) }")?.is_lambda_safe());
 })
@@ -112,7 +112,7 @@ struct SearchLoop {
 # The body is an else-less `if` around a lone `return`: an `else`, or a second
 # statement, is work a searching builtin has nowhere to put.
 pub fn search_loops(self: Expr) -> SearchLoop[] {
-    self.collect_expr_cases(Seq)$search_loop().collect_ok()
+    self.descendants_of_kind::<Seq>()$kind$search_loop().collect_ok()
 }.test({
     assert(search_variables("{ for (let x : xs) { if (c(x)) { return some(x); }; } none }")? == [
         "x",

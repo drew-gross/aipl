@@ -18,50 +18,42 @@
 #
 # The hit points at the fallback.
 
-import {
-    collect_ok,
-    equal as ==,
-    logical_and as &&,
-    logical_not as !,
-    logical_or as ||,
-    map,
-    not_equal as !=,
-} from builtins;
-import { TrySet } from "../builtin_table.aipl";
-import { Call, Expr, Field, Ident, descendants } from "../expr.aipl";
+import { collect_ok, equal as ==, logical_and as &&, logical_not as ! } from builtins;
+import { TrySet, ValueOr, With } from "../builtin_table.aipl";
+import { Call, Expr, Field, Ident, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import { UnfilledHit, lint_in_unfilled_messages, quote, unfilled } from "./lint_hit.aipl";
-import { imported_as } from "./spelling.aipl";
+import { Function } from "../item.aipl";
+import { Named, UnfilledHit, lint_function_unfilled_messages, quote } from "./lint_hit.aipl";
+import { Builtin } from "./spelling.aipl";
 
-# A hit for each `with(..)` the program falls back from to the array it replaces in.
-pub fn with_value_or_self(Function { body }, items: Item[]) -> UnfilledHit[] {
-    let some(with_name) = items.imported_as("with") else { return []; };
-    let some(value_or) = items.imported_as("value_or") else { return []; };
-    body
-        .descendants()
-        .map(|call| {
-            let Call(callee, arguments, _, _) = call.kind else { return none; };
-            let [replaced, fallback] = arguments else { return none; };
-            let Call(inner, with_arguments, _, _) = replaced.kind else { return none; };
-            let [receiver, _, _] = with_arguments else { return none; };
-            if (callee != value_or || inner != with_name || !receiver.same_place(fallback)) {
-                return none;
-            };
-            some(unfilled(
-                TrySet,
-                `this \`{value_or}\` falls back to the array it is replacing in — write "{receiver.quote("<array>")}.`,
-                `(..)" and drop the fallback`,
-                fallback.span,
-            ))
-        })
-        .collect_ok()
+# The hit for `self`, when it is a `with(..)` the call falls back from to the array it replaces in.
+pub fn with_value_or_self(self: Expr<Call>) -> UnfilledHit? {
+    let Call(_, arguments, _, ValueOr) = self.kind else { return none; };
+    let [replaced, fallback] = arguments else { return none; };
+    let Call(_, with_arguments, _, With) = replaced.kind else { return none; };
+    let [receiver, _, _] = with_arguments else { return none; };
+    if (!receiver.same_place(fallback)) { return none; };
+    some(UnfilledHit {
+        named: [
+            Named { text: "this `", builtin: Builtin(ValueOr) },
+            Named {
+                text: `\` falls back to the array it is replacing in — write "{receiver.quote("<array>")}.`,
+                builtin: Builtin(TrySet),
+            },
+        ],
+        tail: `(..)" and drop the fallback`,
+        span: fallback.span,
+    })
 }.test({
+    // The hits for each function's calls.
+    fn flagged(Function { body }) -> UnfilledHit[] {
+        body.descendants_of_kind::<Call>()$with_value_or_self().collect_ok()
+    }
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
     fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `import \{ {imports} } from builtins; fn f(xs: i64[], ys: i64[], p: P) -> i64[] \{ {body} }`,
-            with_value_or_self,
+            flagged,
         )
     }
     let all = "with, value_or, try_set";
@@ -92,34 +84,34 @@ pub fn with_value_or_self(Function { body }, items: Item[]) -> UnfilledHit[] {
     // Shapes the lint must leave alone.
     // A different array: not "leave it alone".
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn other(xs: i64[], ys: i64[]) -> i64[] { xs.with(0, 9).value_or(ys) }",
-            with_value_or_self,
+            flagged,
         )? == [],
     );
     // An empty fallback, for an index known to be in range.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn known_in_range(xs: i64[]) -> i64[] { xs.with(0, 9).value_or([]) }",
-            with_value_or_self,
+            flagged,
         )? == [],
     );
     // A fallback that is computed is not the receiver read again.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn computed(xs: i64[]) -> i64[] { xs.with(0, 9).value_or(xs[..1]) }",
-            with_value_or_self,
+            flagged,
         )? == [],
     );
     // `with` on its own, and `value_or` on something else.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn plain(xs: i64[]) -> i64[]? { xs.with(0, 9) }",
-            with_value_or_self,
+            flagged,
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             """
                 fn agree() {}.test({
                     assert(other([1], [2]) == [9]);
@@ -130,21 +122,21 @@ pub fn with_value_or_self(Function { body }, items: Item[]) -> UnfilledHit[] {
                     assert(p.a.with(0, 9).value_or(p.b) == [9]);
                 })
             """,
-            with_value_or_self,
+            flagged,
         )? == [],
     );
 
     // Shapes the lint flags, and what it says of them.
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn local(xs: i64[]) -> i64[] { xs.with(1, 9).value_or(xs) }",
-            with_value_or_self,
+            flagged,
         )? == [],
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "fn free_call(xs: i64[]) -> i64[] { value_or(with(xs, 2, 5), xs) }",
-            with_value_or_self,
+            flagged,
         )? == [],
     );
 })
