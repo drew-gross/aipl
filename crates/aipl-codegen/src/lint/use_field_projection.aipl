@@ -21,23 +21,17 @@
 
 import {
     Span,
-    all,
     any,
     as_case,
     collect_ok,
     drop_first,
     equal as ==,
     first,
-    greater_than as >,
-    is_digit,
     is_empty,
     is_some,
     join,
-    len,
-    logical_and as &&,
     logical_not as !,
     logical_or as ||,
-    starts_with,
 } from builtins;
 import { Map, is_method_callable } from "../builtin_table.aipl";
 import {
@@ -53,6 +47,7 @@ import { is_operator_name } from "../is_operator_name.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
+import { slot_shown } from "./places.aipl";
 
 # A hit for each `map` in the program whose function is a `$` projection.
 pub fn use_field_projection(function: Function) -> LintHit[] { function.projections()$hit }.test({
@@ -198,13 +193,4 @@ fn chain(self: Expr, parameter: str) -> str[]? {
     };
     let steps = target.chain(parameter)?;
     some([..steps, `${name}({if (rest.is_empty()) { "" } else { "..." }})`])
-}
-
-# A tuple slot is the field `_0`, written `0`; any other field is its own name.
-fn slot_shown(self: str) -> str {
-    if (self.starts_with("_") && self.len() > 1 && self.drop_first().all(is_digit)) {
-        self.drop_first()
-    } else {
-        self
-    }
 }

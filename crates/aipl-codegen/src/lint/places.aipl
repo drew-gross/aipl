@@ -1,7 +1,18 @@
 # A *place* is what a `set` can write to: a name, or a field path off one (`p`, `p.a.b`). The lints
 # that advise a different spelling of a `set` ask the same questions of its target, and ask them here.
 
-import { equal as ==, logical_and as &&, logical_not as ! } from builtins;
+import {
+    all,
+    as_case,
+    drop_first,
+    equal as ==,
+    greater_than as >,
+    is_digit,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    starts_with,
+} from builtins;
 import { Expr, Field, Ident, Neg, expr, ident } from "../expr.aipl";
 
 # The name a place is rooted in: `p` for `p` and for `p.a.b`, and `none` for anything that is not a place.
@@ -34,4 +45,32 @@ pub fn is_same_place(self: Expr, other: Expr) -> bool {
     assert(path.is_same_place(Expr { ..path, span: 1..4 }));
     assert(!path.is_same_place(expr(Field(ident("p"), "b"))));
     assert(!path.is_same_place(ident("p")));
+})
+
+# A tuple slot is the field `_0`, written `0`; any other field is its own name.
+pub fn slot_shown(self: str) -> str {
+    if (self.starts_with("_") && self.len() > 1 && self.drop_first().all(is_digit)) {
+        self.drop_first()
+    } else {
+        self
+    }
+}.test({
+    assert("_0".slot_shown() == "0");
+    assert("_12".slot_shown() == "12");
+    assert("_".slot_shown() == "_");
+    assert("_a".slot_shown() == "_a");
+    assert("name".slot_shown() == "name");
+})
+
+# The text that writes the place `self`, as a `set` would: `p` and `p.a.b`, a tuple slot by its
+# number (`t.0`). `none` for anything that is not a place.
+pub fn place_text(self: Expr) -> str? {
+    if (let Ident(name, _) = self.kind) { return some(name); };
+    let Field(receiver, name) = self.kind.as_case::<Field>()?;
+    some(`{receiver.place_text()?}.{name.slot_shown()}`)
+}.test({
+    assert(ident("p").place_text() == some("p"));
+    assert(expr(Field(expr(Field(ident("p"), "a")), "b")).place_text() == some("p.a.b"));
+    assert(expr(Field(ident("t"), "_0")).place_text() == some("t.0"));
+    assert(expr(Neg(ident("p"))).place_text() == none);
 })

@@ -53,9 +53,8 @@ import {
     lint_in_unfilled,
     lint_in_unfilled_messages,
     shown,
-    spans_its_text,
 } from "./lint_hit.aipl";
-import { is_same_place } from "./places.aipl";
+import { is_same_place, place_text } from "./places.aipl";
 import { Builtin, spelled } from "./spelling.aipl";
 
 # The step builtin that replaces an operator builtin, whether it adds, and whether the operation
@@ -103,7 +102,7 @@ pub fn stepped_operators(self: Item[]) -> Callee[] {
 
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.
 pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
-    if (!target.spans_its_text()) { return none; };
+    let name = target.place_text()?;
 
     // An operator use is a call of the builtin, whatever the file calls it: `+` and `+=` want
     // different advice and are told apart by their tags.
@@ -117,7 +116,6 @@ pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
         commutative && left.is_one() && right.is_same_place(target)
     };
     if (!stepped) { return none; };
-    let name = target.source;
     let (what, form) = if (adds) {
         (`adding 1 to "{name}"`, "increment")
     } else {

@@ -313,7 +313,6 @@ lsp:
 
 bugs:
   import wrapping_add as ++ should work
-  lint quirk: Equivalence assumption: the ++/+= flavor matching uses the wrapping_/saturating_ name prefix instead of Rust's canonical-callee table. It is equivalent for every real import. It differs only for an absurd alias such as wrapping_add as ++.
   improve error message for unshimmed effects in tests
   set tracker = params; from inside a shim closure should work
   Printing a call that constant-folds to none (for example print({f(0)}) with f returning None) fails with "to_str: rendering none is not yet supported"
@@ -577,6 +576,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  the fn flagged() functions all over the lint tests seem non-DRY. Is that function basically just calling the linter on the string? Why not do that directly?
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map
