@@ -419,6 +419,18 @@
 
             </li>
 
+            <li id="item-FieldProjection"><code>FieldProjection(receiver: Expr, name: str)</code>
+
+              <div class="doc"><p><code>receiver$name</code> and <code>receiver$name(args)</code>: the field read, or the method called, on each element of <code>receiver</code>. Written syntax, kept as it was written so the lints see the projection rather than the <code>map</code> and lambda it means; <code>desugar.aipl</code> lowers it to <code>receiver.map(|element| element.name)</code> and nothing downstream of it ever sees the node. The projection's <code>name_span</code> is the step's name.</p></div>
+
+
+            </li>
+
+            <li id="item-MethodProjection"><code>MethodProjection(receiver: Expr, name: str, args: Expr[])</code>
+
+
+            </li>
+
           </ul>
 
         </section>

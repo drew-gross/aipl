@@ -14,6 +14,7 @@
 
 import {
     Span,
+    as_case,
     contains,
     equal as ==,
     extend,
@@ -44,6 +45,7 @@ import {
     Expr,
     ExprKind,
     Field,
+    FieldProjection,
     For,
     ForPattern,
     Ident,
@@ -55,6 +57,7 @@ import {
     LetPattern,
     Match,
     MatchArm,
+    MethodProjection,
     Name,
     ProviderShim,
     Seq,
@@ -68,6 +71,7 @@ import {
     join_spans,
     mapped,
     name_at,
+    named_at,
     show_expr,
     struct_written,
 } from "./expr.aipl";
@@ -172,9 +176,44 @@ pub fn desugared(self: Expr) -> CoreExpr {
             body.desugared(),
             self.span,
         ),
+        FieldProjection(receiver, name) => receiver
+            .desugared()
+            .projected(self, |element: CoreExpr| core_at(Field(element, name), self.span)),
+        MethodProjection(receiver, name, args) => {
+            let lowered = args$desugared();
+            receiver
+                .desugared()
+                .projected(
+                    self,
+                    |element: CoreExpr| core_at(
+                        Call(name, [element, ..lowered], true, Unresolved),
+                        self.span,
+                    ),
+                )
+        },
         _ => core_with_kind(self, mapped(kind, desugared)).with_binders_lowered(),
     }
 }.test({
+    // A projection is a `map` over a lambda whose element is named for where the projection is.
+    assert(
+        expr(FieldProjection(ident("p"), "x"))
+            .desugared()
+            .show_expr() == "p.__builtin_map(Lambda([__map$0_0], __map$0_0.x))",
+    );
+    assert(
+        expr(MethodProjection(ident("p"), "f", [ident("a")]))
+            .desugared()
+            .show_expr() == "p.__builtin_map(Lambda([__map$0_0], __map$0_0.f(a)))",
+    );
+
+    // The element sits where the step's name is written, so an error about it points at the name.
+    let named = expr(FieldProjection(ident("p"), "x")).named_at(5..6);
+    let Call(_, arguments, _, _) = named.desugared().kind.as_case::<Call>()?;
+    let Lambda(_, step) = arguments[1]?.kind.as_case::<Lambda>()?;
+    assert(step.name_span == 5..6);
+    let Field(element, _) = step.kind.as_case::<Field>()?;
+    assert(element.span == 5..6);
+
     // A tuple pattern binds a slot at a time, off a temporary named for the value.
     let tuple = expr(LetPattern(ByTuple(["a", "b"]), ident("v"), ident("a")));
     assert(
@@ -467,19 +506,46 @@ variant NoLetPatternExpr = Expr without LetPattern throughout
 
 variant NoForPatternExpr = NoLetPatternExpr without ForPattern throughout
 
-variant CoreExpr = NoForPatternExpr without ProviderShim throughout
+variant NoProviderShimExpr = NoForPatternExpr without ProviderShim throughout
+
+variant NoFieldProjectionExpr = NoProviderShimExpr without FieldProjection throughout
+
+variant CoreExpr = NoFieldProjectionExpr without MethodProjection throughout
 
 variant NoLetPatternKind = ExprKind without LetPattern throughout
 
 variant NoForPatternKind = NoLetPatternKind without ForPattern throughout
 
-variant CoreKind = NoForPatternKind without ProviderShim throughout
+variant NoProviderShimKind = NoForPatternKind without ProviderShim throughout
+
+variant NoFieldProjectionKind = NoProviderShimKind without FieldProjection throughout
+
+variant CoreKind = NoFieldProjectionKind without MethodProjection throughout
 
 variant NoLetPatternArm = MatchArm without LetPattern throughout
 
 variant NoForPatternArm = NoLetPatternArm without ForPattern throughout
 
-variant CoreMatchArm = NoForPatternArm without ProviderShim throughout
+variant NoProviderShimArm = NoForPatternArm without ProviderShim throughout
+
+variant NoFieldProjectionArm = NoProviderShimArm without FieldProjection throughout
+
+variant CoreMatchArm = NoFieldProjectionArm without MethodProjection throughout
+
+# What `receiver$step` means: `receiver.map(|e| step)`, where `step` is the projection written
+# against the element `e`, which sits where the step's name is written so an error about it points
+# at the name. The element's name has a `$` in it, so no source can spell it and an argument of
+# the step can never mean it by accident; it carries the projection's span, so no two projections
+# of a function name their element alike.
+fn projected(self: CoreExpr, Expr { span, name_span }, step: (CoreExpr) -> CoreExpr) -> CoreExpr {
+    let name = `__map${span.start}_{span.end}`;
+    let element = LambdaParam { binding: Name(name), ty: none, span };
+    let body = step(core_at(Ident(name), name_span)).core_named_at(name_span);
+    core_at(
+        Call("__builtin_map", [self, core_at(Lambda([element], body), span)], true, Unresolved),
+        span,
+    )
+}
 
 # `at`, for a kind that holds no surface form, so what it builds holds none either.
 fn core_at(kind: CoreKind, span: Span) -> CoreExpr {

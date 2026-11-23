@@ -25,7 +25,6 @@ import {
     any,
     as_case,
     collect_ok,
-    contains,
     drop_first,
     equal as ==,
     first,
@@ -152,7 +151,7 @@ fn projection(self: Expr<Call>) -> Projection? {
         });
     };
     let Lambda([parameter], body) = argument.kind else { return none; };
-    if (parameter.ty.is_some() || parameter.synthesized_name().contains('$')) { return none; };
+    if (parameter.ty.is_some()) { return none; };
     let steps = body.chain(parameter.synthesized_name())?;
     if (steps.is_empty()) { return none; };
     some(Projection {
@@ -179,10 +178,10 @@ fn chain(self: Expr, parameter: str) -> str[]? {
     let target = arguments.first()?;
     let rest = arguments.drop_first();
 
-    // An operator use is a call named for its spelling. A call named `__builtin_..` is
-    // what the parser made of a `$` the author wrote inside the lambda (`p.a$f()` is a
-    // `map` of its own, over the optional or sequence `p.a`); that is a level of mapping
-    // of its own, not a step of this chain, and has no spelling here.
+    // An operator use is a call named for its spelling. A call named `__builtin_..` is what the
+    // parser made of a form (`p[i, j]` is `__builtin_grid_get`), not a function a `$` step could
+    // name. A `$` the author wrote inside the lambda is a projection node, not a call, so it is
+    // not a step of this chain either.
     if (name.starts_with(
         "__builtin_",
     ) || name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(

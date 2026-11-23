@@ -55,6 +55,7 @@ import {
     ExprKind,
     Field,
     FieldInit,
+    FieldProjection,
     FloatLit,
     For,
     ForPattern,
@@ -69,6 +70,7 @@ import {
     LetPattern,
     Match,
     MatchArm,
+    MethodProjection,
     Neg,
     None,
     Num,
@@ -499,6 +501,15 @@ fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -> Res
             binding,
             value.resolved(imported, locals),
             body.resolved(imported, [..locals, ..binding.binders()]),
+        ),
+        FieldProjection(receiver, name) => FieldProjection(
+            receiver.resolved(imported, locals),
+            name,
+        ),
+        MethodProjection(receiver, name, args) => MethodProjection(
+            receiver.resolved(imported, locals),
+            name,
+            args$resolved(imported, locals),
         ),
         ProviderShim(provider, args, body) => ProviderShim(
             provider,

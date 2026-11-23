@@ -1,19 +1,17 @@
 # One postfix step of AIPL's syntax tree and what applying it to a receiver
 # means. One of the files the AST is declared across; see `ast.aipl`.
 
-import { Span, equal as ==, value_or } from builtins;
+import { Span, equal as == } from builtins;
 import { Unresolved } from "./builtin_table.aipl";
 import {
-    Binding,
     Call,
     Construct,
     Expr,
     Field as FieldExpr,
     FieldInit,
-    Ident,
+    FieldProjection,
     Index as IndexExpr,
-    Lambda,
-    LambdaParam,
+    MethodProjection,
     Slice,
     Try as TryExpr,
     TypeArgs,
@@ -70,25 +68,9 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         SliceFrom(lo) => at(Slice(recv, some(lo), none), span),
         SliceTo(hi) => at(Slice(recv, none, some(hi)), span),
         Try => at(TryExpr(recv), span),
-        MapField(name) => mapped(
-            recv,
-            at(FieldExpr(at(Ident(mapped_element(span)), name.span), name.text), span).named_at(
-                name.span,
-            ),
-            span,
-        ),
-        MapMethod(name, args) => mapped(
-            recv,
-            at(
-                Call(
-                    name.text,
-                    [at(Ident(mapped_element(span)), name.span), ..args],
-                    true,
-                    Unresolved,
-                ),
-                span,
-            ).named_at(name.span),
-            span,
+        MapField(name) => at(FieldProjection(recv, name.text), span).named_at(name.span),
+        MapMethod(name, args) => at(MethodProjection(recv, name.text, args), span).named_at(
+            name.span,
         ),
     }
 }.test({
@@ -112,46 +94,16 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
 
     // `$` maps the step over the receiver: `p$x` is `p.map(|x| x.x)`, with the
     // element named by something no source can spell.
-    assert(
-        apply_suffix(
-            p,
-            MapField(spelled("x")),
-            0..0,
-        ).show_expr() == "p.__builtin_map(Lambda([__map$0_0], __map$0_0.x))",
-    );
-    assert(
-        apply_suffix(
-            p,
-            MapMethod(spelled("f"), [num(1)]),
-            0..0,
-        ).show_expr() == "p.__builtin_map(Lambda([__map$0_0], __map$0_0.f(1)))",
-    );
+    assert(apply_suffix(p, MapField(spelled("x")), 0..0).show_expr() == "p$x");
+    assert(apply_suffix(p, MapMethod(spelled("f"), [num(1)]), 0..0).show_expr() == "p$f(1)");
 
     // The name's own span rides on the node it names: the field in `p.x` and in
-    // `p$x`'s element, the callee in `p.f(1)`.
+    // `p$x`, the callee in `p.f(1)`.
     let at_5 = SpanStr { text: "x", span: 5..6 };
     assert(apply_suffix(p, Field(at_5), 0..6).name_span == 5..6);
     assert(apply_suffix(p, Method(at_5, []), 0..8).name_span == 5..6);
-    match (apply_suffix(p, MapField(at_5), 0..6).kind) {
-        Call(_, args, _, _) => match (args[1].value_or(p).kind) {
-            Lambda(_, step) => assert(step.name_span == 5..6),
-            _ => assert(false),
-        },
-        _ => assert(false),
-    };
-
-    // The element a step reads sits where the step's name is written, so an error
-    // about it points at the name.
-    match (apply_suffix(p, MapField(at_5), 0..6).kind) {
-        Call(_, args, _, _) => match (args[1].value_or(p).kind) {
-            Lambda(_, step) => match (step.kind) {
-                FieldExpr(element, _) => assert(element.span == 5..6),
-                _ => assert(false),
-            },
-            _ => assert(false),
-        },
-        _ => assert(false),
-    };
+    assert(apply_suffix(p, MapField(at_5), 0..6).name_span == 5..6);
+    assert(apply_suffix(p, MapMethod(at_5, []), 0..8).name_span == 5..6);
     // A range literal written as an index is the closed slice form.
     let range = at(
         Construct(
@@ -165,17 +117,6 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
 
 # A name as it would be written at no particular place — the tests' spelling.
 fn spelled(text: str) -> SpanStr { text, span: 0..0 }
-
-# What `recv$step` means: `recv.map(|e| step)`, where `step` is the postfix step
-# written against the element `e`. The element's name has a `$` in it, so no
-# source can spell it and an argument of the step can never mean it by accident.
-# It carries the step's span, so no two steps of a function name their element alike.
-fn mapped_element(Span { start, end }) -> str { `__map${start}_{end}` }
-
-fn mapped(recv: Expr, step: Expr, span: Span) -> Expr {
-    let element = LambdaParam { binding: Binding.Name(mapped_element(span)), ty: none, span };
-    at(Call("__builtin_map", [recv, at(Lambda([element], step), span)], true, Unresolved), span)
-}
 
 # `recv[a..b]` — a range literal written *as* an index is the closed slice form,
 # folded straight into a `Slice` rather than constructing a `Span` only to

@@ -117,7 +117,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  field projetion and identity lambda lints shouldn't have .contains('$'), those shouldn't exist at this stage
+  unary negate should be named operator and support import_as and be less special cased
+  remove parameter.ty.is_some() check from use_field_projection. It's there in case the user specifies a type and the linter doesn't want to erase it, but our type system should be strong enough to handle that.
   Ident should maybe be a variant rather than having an optional Callee
   merge Let and LetMut in ExprKind (with a "mutable" flag)
   operator_named_forms is info about builtins, it should be included in the info about builtins (also delete operator_spellings)
@@ -205,7 +206,7 @@ misc cleanup:
   optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
   go through and remove all comments that talk about how the code used to work.
   Tpl and Tok should not be abbreviated
-  get rid of convention of using 0..0 span as a substitute for none
+  get rid of convention of using 0..0 span as a substitute for none (use a variant with a "synthetic" arm)
   unordered set needs some way to convert to array
   fn nest and fn one have a lot of overlap
   link should return a Grammar without Named, rule_first and rule_labels should use it
@@ -384,6 +385,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  let Expr { kind, span } = body; let Construct(name, inits) = kind.as_case::<Construct>()?; ---> support let Expr { kind: Construct(name, inits), span } = body; destructuring
   make testonly functions
   allow destructuring of sets, in lints this can help with the "either of the arguments is X" paradigm (when functions are commutatitve, such as ==)
   syntax (and lint) that says you should not explicitly name a type argument if it's only used once, just use a bound directly in the non-type args or body

@@ -27,7 +27,18 @@
 
 import { Span, equal as ==, get, is_empty, join, map, to_dict, value_or } from builtins;
 import { Unresolved } from "./builtin_table.aipl";
-import { Call, Expr, Ident, Unit, at, expr, ident, map_subexprs, show_expr } from "./expr.aipl";
+import {
+    Call,
+    Expr,
+    Ident,
+    MethodProjection,
+    Unit,
+    at,
+    expr,
+    ident,
+    map_subexprs,
+    show_expr,
+} from "./expr.aipl";
 import {
     Benchmark,
     benchmark_fn_name,
@@ -156,6 +167,11 @@ fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
             method_style,
             Unresolved,
         ),
+        MethodProjection(receiver, name, args) => MethodProjection(
+            receiver,
+            name.renamed(renames),
+            args,
+        ),
         _ => self.kind,
     };
     Expr { ..self, kind }.map_subexprs(|child| child.rename_uses(renames))
@@ -170,6 +186,12 @@ fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     ));
     assert(
         used.rename_uses(renames).show_expr() == "__test$f$four(__test$f$four, g(__test$f$four))",
+    );
+    // A projection's method is a call of it.
+    assert(
+        expr(MethodProjection(ident("x"), "four", []))
+            .rename_uses(renames)
+            .show_expr() == "x$__test$f$four()",
     );
     // A name that is not renamed, and a method-style call's receiver.
     assert(ident("other").rename_uses(renames).show_expr() == "other");

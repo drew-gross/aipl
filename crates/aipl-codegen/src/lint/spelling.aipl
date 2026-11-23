@@ -289,24 +289,6 @@ fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> s
     }
 }
 
-# Every name a file's `items` import from builtins, as the file spells it.
-pub fn imported_locals(self: Item[]) -> str[] {
-    self.collect_arms::<Import>()$builtin_names().join()
-}.test({
-    let items = aipl_parse_surface_file(
-        """import { is_case as case_is, len } from builtins; import { a } from "./a.aipl";""",
-    )?.program.hoist_test_fns().items;
-    assert(items.imported_locals() == ["case_is", "len"]);
-})
-
-# What an import from builtins brings, as the file spells each.
-fn builtin_names(self: Import(ImportDecl { names, source })) -> str[] {
-    match (source) {
-        Builtins | Library(..) => names$local(),
-        Path(..) => [],
-    }
-}
-
 # The builtin that provides the operator `target` with the flavor of the operator `written`, as
 # this file binds it, and whether the file has imported it already.
 struct Pairing { builtin: str, imported: bool }

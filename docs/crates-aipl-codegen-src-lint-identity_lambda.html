@@ -50,7 +50,7 @@
           </h3>
           <pre class="signature"><code>fn forwarded(self: Expr&#60;Lambda&#62;, advised: Span[]) -&#62; LintHit?</code></pre>
 
-          <div class="doc"><p>A hit for <code>self</code> when it is a lambda that only forwards its argument(s) to one call, outside a <code>map</code> that <code>use_field_projection</code> handles (<code>advised</code> is the lambdas it covered). A lambda the parser wrote for <code>xs$f()</code> names its parameter with a <code>$</code>, which no source can; there is no longer spelling for it to be advised into. An operator is left alone deliberately: the language does accept <code>+</code> as a value, but <code>xs.fold(0, +)</code> is a different reading from <code>|acc, x| acc + x</code> rather than an obviously better one, and this lint's job is the case where the lambda adds <em>nothing</em> — <code>|x| to_str(x)</code> against <code>to_str</code>.</p></div>
+          <div class="doc"><p>A hit for <code>self</code> when it is a lambda that only forwards its argument(s) to one call, outside a <code>map</code> that <code>use_field_projection</code> handles (<code>advised</code> is the lambdas it covered). An operator is left alone deliberately: the language does accept <code>+</code> as a value, but <code>xs.fold(0, +)</code> is a different reading from <code>|acc, x| acc + x</code> rather than an obviously better one, and this lint's job is the case where the lambda adds <em>nothing</em> — <code>|x| to_str(x)</code> against <code>to_str</code>.</p></div>
 
 
         </section>

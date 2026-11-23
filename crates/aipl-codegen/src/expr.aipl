@@ -306,6 +306,13 @@ variant ExprKind =
     # is the checker's to decide, from the position it sits in, and a literal has to be
     # rounded once, to the width it lands at.
     | FloatLit(str)
+    # `receiver$name` and `receiver$name(args)`: the field read, or the method called, on each
+    # element of `receiver`. Written syntax, kept as it was written so the lints see the
+    # projection rather than the `map` and lambda it means; `desugar.aipl` lowers it to
+    # `receiver.map(|element| element.name)` and nothing downstream of it ever sees the node. The
+    # projection's `name_span` is the step's name.
+    | FieldProjection(receiver: Expr, name: str)
+    | MethodProjection(receiver: Expr, name: str, args: Expr[])
 
 # What a `let`, a `for` or a parameter binds a value to, as written. A plain name
 # is the simplest binding; the rest take the value apart. A tuple's slots are its
@@ -394,6 +401,8 @@ pub fn show_expr(self: Expr) -> str {
         },
         LetPattern(binding, value, body) => `LetPattern({binding.show_binding()}, {value.show_expr()}, {body.show_expr()})`,
         ProviderShim(provider, args, body) => `ProviderShim({provider}, [{show_exprs(args)}], {body.show_expr()})`,
+        FieldProjection(receiver, name) => `{receiver.show_expr()}${name}`,
+        MethodProjection(receiver, name, args) => `{receiver.show_expr()}${name}({show_exprs(args)})`,
         ForPattern(binding, iterable, body, index) => match (index) {
             some(i) => `ForPattern([{i}], {binding.show_binding()}, {iterable.show_expr()}, {body.show_expr()})`,
             none => `ForPattern({binding.show_binding()}, {iterable.show_expr()}, {body.show_expr()})`,
@@ -669,6 +678,8 @@ pub fn mapped<X: cases>(
         TypeArgs(x, types) => TypeArgs(f(x), types),
         LetPattern(pattern, value, body) => LetPattern(pattern, f(value), f(body)),
         ProviderShim(provider, args, body) => ProviderShim(provider, args.map(f), f(body)),
+        FieldProjection(receiver, name) => FieldProjection(f(receiver), name),
+        MethodProjection(receiver, name, args) => MethodProjection(f(receiver), name, args.map(f)),
         ForPattern(pattern, iterable, body, index) => ForPattern(
             pattern,
             f(iterable),
@@ -775,8 +786,10 @@ pub fn subexprs(self: Expr) -> Expr[] {
         Num(..) | FloatLit(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | None | Unit => [],
         Call(_, args, _, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
         ProviderShim(_, args, body) => [..args, body],
+        MethodProjection(receiver, _, args) => [receiver, ..args],
         Neg(x)
         | Field(x, _)
+        | FieldProjection(x, _)
         | Try(x)
         | Return(x)
         | KwArg(_, x, _)

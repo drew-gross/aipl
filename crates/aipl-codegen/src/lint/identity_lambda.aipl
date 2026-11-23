@@ -89,19 +89,13 @@ pub fn identity_lambda(function: Function) -> LintHit[] {
 })
 
 # A hit for `self` when it is a lambda that only forwards its argument(s) to one call, outside
-# a `map` that `use_field_projection` handles (`advised` is the lambdas it covered). A lambda the parser
-# wrote for `xs$f()` names its parameter with a `$`, which no source can; there is no longer
-# spelling for it to be advised into. An operator is left alone deliberately: the language does
+# a `map` that `use_field_projection` handles (`advised` is the lambdas it covered). An operator is left alone deliberately: the language does
 # accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.
 fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
     let Lambda(parameters, body) = self.kind;
-    if (advised.contains(self.span) || parameters.any(
-        |parameter| parameter.synthesized_name().contains('$'),
-    )) {
-        return none;
-    };
+    if (advised.contains(self.span)) { return none; };
     let Call(name, arguments, _, _) = body.kind.as_case::<Call>()?;
     if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(
         |parameter| parameter.synthesized_name() == name,

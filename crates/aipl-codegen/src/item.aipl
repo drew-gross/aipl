@@ -446,6 +446,8 @@ pub fn own_names(self: Expr) -> #{str} {
         Shim(effect, bindings, _) => #{effect, ..bindings$to_set().union_all()},
         // A provider shim names the provider function it calls.
         ProviderShim(provider, _, _) => #{provider},
+        // A projection's method is a call of it.
+        MethodProjection(_, name, _) => #{name},
         Let(_, ty, _, _) | LetMut(_, ty, _, _) => ty.optional_ty_names(),
         Lambda(params, _) => #{
             ..params$ty$optional_ty_names().union_all(),
@@ -466,6 +468,7 @@ pub fn own_names(self: Expr) -> #{str} {
         | Unit
         | If(..)
         | Field(..)
+        | FieldProjection(..)
         | Assign(..)
         | For(..)
         | While(..)
