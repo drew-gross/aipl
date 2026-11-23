@@ -28,7 +28,6 @@ import {
 } from builtins;
 import {
     Any,
-    BuiltinEntry,
     Callee,
     Filter,
     IsCase,
@@ -383,15 +382,28 @@ fn outside_its_definition(self: Function, hits: UnfilledHit[]) -> UnfilledHit[] 
     hits.filter(|hit| !hit.named.any(|part| part.builtin.is_builtin_named(self.name.text, table)))
 }
 
-# What the function lint `lint` reports for the program `src` parses to.
+# What the function lint `lint` reports for the program `src` parses to, with every builtin
+# counting as imported: a lint's own tests are about the shape it finds, not the file's imports.
 pub fn lint_function_hits(src: str, lint: (Function) -> LintHit[]) -> LintHit[]!ParseFailure {
-    lint_hits(src, |program: ResolvedProgram| { program.functions().hits(lint) })
+    ok(
+        aipl_parse_surface_file(src)?.program
+            .hoist_test_fns()
+            .resolve_with_every_builtin()
+            .functions()
+            .hits(lint),
+    )
 }
 
 # What the lint `lint`, which reports at most one hit for a function, reports for the program
 # `src` parses to.
 pub fn lint_function_once_hits(src: str, lint: (Function) -> LintHit?) -> LintHit[]!ParseFailure {
-    lint_hits(src, |program: ResolvedProgram| { program.functions().hits_once(lint) })
+    ok(
+        aipl_parse_surface_file(src)?.program
+            .hoist_test_fns()
+            .resolve_with_every_builtin()
+            .functions()
+            .hits_once(lint),
+    )
 }
 
 # [`lint_function_hits`], keeping only the messages.
@@ -431,45 +443,39 @@ pub fn lint_function_unfilled(
     )
 }
 
-# `self` as messages, each builtin the advice names written as its own name and no import named.
+# `self` as messages: each stretch of text followed by the builtin it names as `to_str` shows it,
+# then the closing stretch. Not what a file's author is shown, which is `filled`'s, but enough for a
+# lint's tests to say what advice it gives.
 pub fn shown(self: UnfilledHit[]) -> str[] {
-    let table = builtin_table();
-    self
-        $filled_with(|need| some(Spelling { text: need.plain_name(table), request: none }))
-        .collect_ok()$message
+    self.map(|hit| `{hit.named.map(|part| `{part.text}{part.builtin}`).join()}{hit.tail}`)
 }.test({
-    assert([unfilled(Len, "use ", "()", 1..2)].shown() == ["use len()"]);
-    assert([
-        UnfilledHit {
-            named: [Named { text: "write ", builtin: Flavored("++", "+") }],
-            tail: "",
-            span: 0..1,
-        },
-    ].shown() == ["write ++"]);
+    assert([unfilled(Len, "use ", "()", 1..2)].shown() == ["use Builtin(Len)()"]);
 })
-
-# The name `self` is written with when no file decides: a builtin's own name, an operator's spelling.
-fn plain_name(self: Need, table: BuiltinEntry[]) -> str {
-    match (self) {
-        Builtin(callee) => table.find_if(|entry| entry.arm == callee)$import_name().value_or(""),
-        Flavored(operator, _) => operator,
-    }
-}
 
 # What the function lint `lint`, which also reads the file's items, reports for the program
 # `src` parses to.
 pub fn lint_in_hits(src: str, lint: (Function, Item[]) -> LintHit[]) -> LintHit[]!ParseFailure {
-    lint_hits(
-        src,
-        |program: ResolvedProgram| {
-            program.functions().hits(|function| lint(function, program.items))
-        },
-    )
+    let program = aipl_parse_surface_file(src)?.program
+        .hoist_test_fns()
+        .resolve_with_every_builtin();
+    ok(program.functions().hits(|function| lint(function, program.items)))
 }
 
 # [`lint_in_hits`], keeping only the messages.
 pub fn lint_in_messages(src: str, lint: (Function, Item[]) -> LintHit[]) -> str[]!ParseFailure {
     ok(lint_in_hits(src, lint)?$message)
+}
+
+# What the lint `lint`, which also reads the file's items, says of the program `src` parses to: the
+# [`UnfilledHit`]s as [`lint_function_unfilled`] gives them.
+pub fn lint_in_unfilled(
+    src: str,
+    lint: (Function, Item[]) -> UnfilledHit[],
+) -> UnfilledHit[]!ParseFailure {
+    let program = aipl_parse_surface_file(src)?.program
+        .hoist_test_fns()
+        .resolve_with_every_builtin();
+    ok(program.functions().unfilled_hits(|function| lint(function, program.items)))
 }
 
 # [`lint_in_hits`] for a lint whose hits are [`UnfilledHit`]s, filled in for the imports `src` has.

@@ -32,6 +32,7 @@ import {
     collect_ok,
     equal as ==,
     find_index,
+    is_empty,
     less_than as <,
     logical_not as !,
     logical_or as ||,
@@ -41,7 +42,7 @@ import {
 import { FindIndex, Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
 import { passes_through } from "./result_match.aipl";
 
@@ -69,50 +70,56 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
 }.test({
     // The `return` is what the advice points at, with `none` at the end of the block or
     // returned.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i); }; } none }",
         return_loop_find_index,
-    )? == [message("xs", "x")]);
-    assert(lint_function_unfilled_messages(
+    )?.shown() == [
+        `this loop returns the position of the first element passing a test, and "none" otherwise — write "return xs.Builtin(FindIndex)(|x| ..);" and drop the loop`,
+    ]);
+    assert(lint_function_unfilled(
         "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i); }; } return none; }",
         return_loop_find_index,
-    )? == [message("xs", "x")]);
-    assert(lint_function_unfilled_messages(
+    )?.shown() == [
+        `this loop returns the position of the first element passing a test, and "none" otherwise — write "return xs.Builtin(FindIndex)(|x| ..);" and drop the loop`,
+    ]);
+    assert(lint_function_unfilled(
         "fn f() -> u64? { for (let i, x : g()) { if (x > 1) { return some(i); }; } none }",
         return_loop_find_index,
-    )? == [message("<iterable>", "x")]);
+    )?.shown() == [
+        `this loop returns the position of the first element passing a test, and "none" otherwise — write "return <iterable>.Builtin(FindIndex)(|x| ..);" and drop the loop`,
+    ]);
 
     // Not the shape: the element's loop, an adjusted index, a test that reads the index,
     // work after the loop, and a test that propagates with `?`.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } none }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i + 1); }; } none }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (i > 0 && x > 1) { return some(i); }; } none }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (x > 1) { return some(i); }; } g(); none }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> u64? { for (let i, x : xs) { if (g(x)?) { return some(i); }; } none }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
@@ -120,7 +127,7 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
     // nothing else, so there is nowhere for `i` to go: this is a scan the builtin
     // cannot express, and mis-advising it would silently change what is searched.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn later_big(xs: i64[], lo: i64) -> u64? {
                     for (let i, x : xs) {
@@ -130,13 +137,13 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The position is adjusted on the way out — a `find_index` *and* an arithmetic
     // step, which is two things the one-line advice doesn't spell.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn one_past_big(xs: i64[], lo: i64) -> u64? {
                     for (let i, x : xs) {
@@ -146,14 +153,14 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The *element* is returned, not the index. That is `return_loop_find_if`'s
     // shape, and this lint leaves it to that one — a loop returns one or the other,
     // never both, so the two lints never fire on the same loop.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn first_big(xs: i64[], lo: i64) -> i64? {
                     for (let i, x : xs) {
@@ -163,13 +170,13 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // An `if`/`else`: the loop returns on every element, so it never runs past the
     // first one and is not a search at all.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn head_sign(xs: i64[]) -> u64? {
                     for (let i, x : xs) {
@@ -183,11 +190,11 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
     // A second statement in the loop body — work `find_index` has nowhere to put.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn noisy(xs: i64[], lo: i64) !prints -> u64? {
                     for (let i, x : xs) {
@@ -198,13 +205,13 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The fall-through is not the not-found answer: falling off the end does work,
     // so the loop is not simply a search.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn index_or_len(xs: i64[], lo: i64) -> u64? {
                     for (let i, x : xs) {
@@ -214,13 +221,13 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // A plain (unindexed) loop returning a *count* it kept itself. There is no
     // index binding to match, and the counter is the user's, not the fold's.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn count_to_big(xs: i64[], lo: i64) -> u64? {
                     mut n: u64 = 0;
@@ -232,19 +239,19 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
                 }
             """,
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
     // The rewrite itself, which of course must not fire.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn index_of_big(xs: i64[], lo: i64) -> u64? { xs.find_index(|x| lo < x) }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
     // The `none` as the block's tail.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn index_of_big(xs: i64[], lo: i64) -> u64? {
                 for (let i, x : xs) {
@@ -254,13 +261,13 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
             }
         """,
         return_loop_find_index,
-    )? == [
-        """this loop returns the position of the first element passing a test, and "none" otherwise — write "return xs.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins""",
+    )?.shown() == [
+        `this loop returns the position of the first element passing a test, and "none" otherwise — write "return xs.Builtin(FindIndex)(|x| ..);" and drop the loop`,
     ]);
 
     // An explicit `return none;` is the same shape — a reader can't tell the two
     // apart either — so it is flagged the same way.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn index_of_go(names: str[]) -> u64? {
                 for (let i, n : names) {
@@ -270,19 +277,19 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
             }
         """,
         return_loop_find_index,
-    )? == [
-        """this loop returns the position of the first element passing a test, and "none" otherwise — write "return names.find_index(|n| ..);" and drop the loop, importing `find_index` from builtins""",
+    )?.shown() == [
+        `this loop returns the position of the first element passing a test, and "none" otherwise — write "return names.Builtin(FindIndex)(|n| ..);" and drop the loop`,
     ]);
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn evens(n: i64) -> i64[] { [n, n * 2] }",
             return_loop_find_index,
-        )? == [],
+        )?.is_empty(),
     );
 
     // A call-shaped iterable can't be quoted back into the advice — its span stops
     // before its parens — so the message leaves a placeholder where it would go.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn index_of_even_over(n: i64, lo: i64) -> u64? {
                 for (let i, x : evens(n)) {
@@ -292,8 +299,8 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
             }
         """,
         return_loop_find_index,
-    )? == [
-        """this loop returns the position of the first element passing a test, and "none" otherwise — write "return <iterable>.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins""",
+    )?.shown() == [
+        `this loop returns the position of the first element passing a test, and "none" otherwise — write "return <iterable>.Builtin(FindIndex)(|x| ..);" and drop the loop`,
     ]);
 
     // `#[allow]` keeps the longhand and the rewrite agrees with it.
@@ -318,9 +325,3 @@ pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
     assert(index_of_big(xs, 99).to_str() == "none");
     assert((index_of_big_loop(xs, 2) == index_of_big(xs, 2)).to_str() == "true");
 })
-
-# What is said of a loop over `receiver` binding `variable`, for a file that does not
-# import `find_index`, as the tests' sources do not.
-fn message(receiver: str, variable: str) -> str {
-    `this loop returns the position of the first element passing a test, and "none" otherwise — write "return {receiver}.find_index(|{variable}| ..);" and drop the loop, importing \`find_index\` from builtins`
-}

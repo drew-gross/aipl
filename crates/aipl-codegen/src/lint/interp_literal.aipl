@@ -15,6 +15,7 @@ import {
     collect_ok,
     equal as ==,
     is_case,
+    is_empty,
     logical_and as &&,
     logical_not as !,
     map,
@@ -54,15 +55,18 @@ pub fn interp_literal(Function { body }) -> LintHit[] {
     // A literal that is only part of the interpolation computes something, a
     // `"""` literal is raw text a template cannot say, and a name is not a literal.
     assert(
-        lint_function_messages("""fn f(s: str) -> str { `{"a" == s}` }""", interp_literal)? == [],
+        lint_function_messages(
+            """fn f(s: str) -> str { `{"a" == s}` }""",
+            interp_literal,
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f() -> str { `{\"\"\"back\\slash\"\"\"}` }",
             interp_literal,
-        )? == [],
+        )?.is_empty(),
     );
-    assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", interp_literal)? == []);
+    assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", interp_literal)?.is_empty());
     // Shapes the lint must leave alone.
 })
 

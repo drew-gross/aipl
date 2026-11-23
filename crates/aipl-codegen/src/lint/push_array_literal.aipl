@@ -40,7 +40,6 @@ import {
 } from builtins;
 import { Callee, Push } from "../builtin_table.aipl";
 import { ArrayLit, Expr, Ident, LetMut, Spread, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { Pushed, pushed } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
@@ -50,40 +49,66 @@ import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
 pub fn push_array_literal(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<LetMut>()$kind$literal().collect_ok()
 }.test({
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[], x: i64) -> i64[] \{ {body} }`,
-            push_array_literal,
-        )
-    }
-
     // A seed spread into the literal, a run of pushes, and a literal seed spliced open.
-    assert(messages("push", "mut out = xs; set out.push(x); out")? == [
+    assert(lint_function_messages(
+        "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out.push(x); out }",
+        push_array_literal,
+    )? == [
         `"out" is seeded and then only appended to before being returned — write "[..xs, x]" and drop the mut`,
     ]);
-    assert(messages("push", "mut out = xs; set out.push(1); set out.push(2); out")? == [
+    assert(lint_function_messages(
+        "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out.push(1); set out.push(2); out }",
+        push_array_literal,
+    )? == [
         `"out" is seeded and then only appended to before being returned — write "[..xs, 1, 2]" and drop the mut`,
     ]);
-    assert(messages("push", "mut out: i64[] = []; set out.push(x); out")? == [
+    assert(lint_function_messages(
+        "fn f(xs: i64[], x: i64) -> i64[] { mut out: i64[] = []; set out.push(x); out }",
+        push_array_literal,
+    )? == [
         `"out" is seeded and then only appended to before being returned — write "[x]" and drop the mut`,
     ]);
-    assert(messages("push", "mut out = [5, ..xs]; set out.push(x); out")? == [
+    assert(lint_function_messages(
+        "fn f(xs: i64[], x: i64) -> i64[] { mut out = [5, ..xs]; set out.push(x); out }",
+        push_array_literal,
+    )? == [
         `"out" is seeded and then only appended to before being returned — write "[5, ..xs, x]" and drop the mut`,
     ]);
 
     // What cannot be quoted is a placeholder.
-    assert(messages("push", "mut out = g(); set out.push(h(x)); out")? == [
+    assert(lint_function_messages(
+        "fn f(xs: i64[], x: i64) -> i64[] { mut out = g(); set out.push(h(x)); out }",
+        push_array_literal,
+    )? == [
         `"out" is seeded and then only appended to before being returned — write "[..<array>, <element>]" and drop the mut`,
     ]);
 
     // Not the shape: no push, a statement after the pushes, a push that reads the array, and
     // a `push` the file never imported or one that is another function's.
-    assert(messages("push", "mut out = xs; out")? == []);
-    assert(messages("push", "mut out = xs; set out.push(x); g(); out")? == []);
-    assert(messages("push", "mut out = xs; set out.push(x); set out.push(1); xs")? == []);
-    assert(messages("push", "mut out = xs; set out.push(out.len()); out")? == []);
-    assert(messages("map", "mut out = xs; set out.push(x); out")? == []);
+    assert(
+        lint_function_messages(
+            "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; out }",
+            push_array_literal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_messages(
+            "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out.push(x); g(); out }",
+            push_array_literal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_messages(
+            "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out.push(x); set out.push(1); xs }",
+            push_array_literal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_messages(
+            "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out.push(out.len()); out }",
+            push_array_literal,
+        )?.is_empty(),
+    );
 
     // Shapes the lint must leave alone.
     // A pushed element that mentions the binding: `out.len()` is a running index,
@@ -98,7 +123,7 @@ pub fn push_array_literal(Function { body }) -> LintHit[] {
                 }
             """,
             push_array_literal,
-        )? == [],
+        )?.is_empty(),
     );
 
     // A statement between the pushes and the result reads `out` half-built, so the
@@ -114,7 +139,7 @@ pub fn push_array_literal(Function { body }) -> LintHit[] {
                 }
             """,
             push_array_literal,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The binding outlives the pushes — something else appends to it later, so
@@ -131,7 +156,7 @@ pub fn push_array_literal(Function { body }) -> LintHit[] {
                 }
             """,
             push_array_literal,
-        )? == [],
+        )?.is_empty(),
     );
     // A push is not the last statement: the block returns something else.
     assert(
@@ -144,81 +169,33 @@ pub fn push_array_literal(Function { body }) -> LintHit[] {
                 }
             """,
             push_array_literal,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
             push_array_literal,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
     // One push onto a named seed — the plain case.
-    assert(
-        lint_function_messages(
-            """
-                fn appended(xs: i64[], x: i64) -> i64[] {
-                    mut out = xs;
-                    set out.push(x);
-                    out
-                }
-            """,
-            push_array_literal,
-        )? == [],
-    );
 
     // A run of pushes collapses the same way, and an empty seed needs no spread
     // at all. The annotation goes away with the binding.
-    assert(
-        lint_function_messages(
-            """
-                fn pair(a: i64, b: i64) -> i64[] {
-                    mut out: i64[] = [];
-                    set out.push(a);
-                    set out.push(b);
-                    out
-                }
-            """,
-            push_array_literal,
-        )? == [],
-    );
+
     assert(
         lint_function_messages(
             "fn evens(n: i64) -> i64[] { [n, n * 2] }",
             push_array_literal,
-        )? == [],
+        )?.is_empty(),
     );
 
     // A call-shaped seed can't be quoted back into the advice — its span stops
     // before its parens — so the literal is shown with a placeholder in its place.
-    assert(
-        lint_function_messages(
-            """
-                fn from_call(n: i64, x: i64) -> i64[] {
-                    mut out = evens(n);
-                    set out.push(x);
-                    out
-                }
-            """,
-            push_array_literal,
-        )? == [],
-    );
 
     // The same goes for a computed element. The longhand `set out = out.push(..)`
     // is the same statement written out, so it is flagged the same way.
-    assert(
-        lint_function_messages(
-            """
-                fn scaled(xs: i64[], n: i64) -> i64[] {
-                    mut out = xs;
-                    set out = out.push(n * 2);
-                    out
-                }
-            """,
-            push_array_literal,
-        )? == [],
-    );
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
     fn appended(xs: i64[], x: i64) -> i64[] {

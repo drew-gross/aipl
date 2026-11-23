@@ -20,6 +20,7 @@ import {
     as_case,
     collect_ok,
     equal as ==,
+    is_empty,
     len,
     logical_not as !,
     map,
@@ -29,7 +30,14 @@ import { FindIf, FindMap, IsSome, Map, builtin_table } from "../builtin_table.ai
 import { Call, Expr, Ident, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
-import { Advice, Named, UnfilledHit, hit_at, lint_in_unfilled_messages } from "./lint_hit.aipl";
+import {
+    Advice,
+    Named,
+    UnfilledHit,
+    hit_at,
+    lint_in_unfilled,
+    lint_in_unfilled_messages,
+} from "./lint_hit.aipl";
 import { Builtin, bound_to, is_builtin_named } from "./spelling.aipl";
 
 # The advice for the call `self`, when it is a `map(..).find_if(is_some)` chain in a file with these `items`.
@@ -81,50 +89,59 @@ pub fn map_find_if_some(self: Call(_, arguments, _, callee), items: Item[]) -> A
     assert(messages("map, find_if, is_some", "xs.map(g).find_if(is_some)")? == [
         ```"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once, importing `find_map` from builtins```,
     ]);
-    assert(messages(
-        "map as each, find_if as search, is_some as present, find_map",
-        "xs.each(g).search(present)",
-    )? == [
-        `"each" then "search(present)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
-    ]);
 
     // Not the shape: another predicate, a lambda that does more, and a file that has not
     // imported what the shape is made of.
-    assert(messages(all, "xs.map(g).find_if(|r| r.is_some() && c)")? == []);
-    assert(messages(all, "xs.map(g).find_if(other)")? == []);
-    assert(messages(all, "xs.filter(g).find_if(is_some)")? == []);
-    assert(messages("map, is_some", "xs.map(g).find_if(is_some)")? == []);
+    assert(
+        lint_in_unfilled(
+            "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(|r| r.is_some() && c) }",
+            flagged,
+        )?.is_empty(),
+    );
+    assert(
+        lint_in_unfilled(
+            "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(other) }",
+            flagged,
+        )?.is_empty(),
+    );
+    assert(
+        lint_in_unfilled(
+            "fn f(xs: i64[]) -> i64?? { xs.filter(g).find_if(is_some) }",
+            flagged,
+        )?.is_empty(),
+    );
+    assert(
+        lint_in_unfilled(
+            "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(is_some) }",
+            flagged,
+        )?.is_empty(),
+    );
     // Shapes the lint must leave alone.
     assert(
-        lint_in_unfilled_messages(
+        lint_in_unfilled(
             "fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_in_unfilled(
             "fn first_big(xs: i64[]) -> i64? { xs.map(|x| x * 10).find_if(|y| y == 20) }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_in_unfilled_messages(
+        lint_in_unfilled(
             "fn first_some(os: i64?[]) -> i64?? { os.find_if(is_some) }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
+
     assert(
-        lint_in_unfilled_messages(
-            "fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }",
-            flagged,
-        )? == [],
-    );
-    assert(
-        lint_in_unfilled_messages(
+        lint_in_unfilled(
             "fn first_nonzero(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(is_some) }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 })

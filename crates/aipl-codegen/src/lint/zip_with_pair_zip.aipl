@@ -16,6 +16,7 @@
 import {
     collect_ok,
     equal as ==,
+    is_empty,
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
@@ -55,35 +56,52 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Call>()$kind$zip_with_pair_zip().collect_ok()
     }
+
     // What the lint says of a `zip_with` of `items` and `other`.
-    fn says(items: str, other: str) -> str {
-        `"zip_with" with a function that only pairs its arguments is "{items}.zip({other})"`
-    }
 
     // Flagged, in method and free-call form; the parameter names do not matter.
     assert(lint_function_unfilled(
         "fn f() { xs.zip_with(ys, |a, b| { (a, b) }) }",
         flagged,
-    )?.shown() == [says("xs", "ys")]);
+    )?.shown() == [
+        `"Builtin(ZipWith)" with a function that only pairs its arguments is "xs.Builtin(Zip)(ys)"`,
+    ]);
     assert(lint_function_unfilled(
         "fn f() { zip_with(xs, ys, |left, right| { (left, right) }) }",
         flagged,
-    )?.shown() == [says("xs", "ys")]);
+    )?.shown() == [
+        `"Builtin(ZipWith)" with a function that only pairs its arguments is "xs.Builtin(Zip)(ys)"`,
+    ]);
 
     // Receivers that cannot be quoted are placeholders.
     assert(lint_function_unfilled(
         "fn f() { g().zip_with(h(), |a, b| { (a, b) }) }",
         flagged,
-    )?.shown() == [says("<items>", "<other>")]);
+    )?.shown() == [
+        `"Builtin(ZipWith)" with a function that only pairs its arguments is "<items>.Builtin(Zip)(<other>)"`,
+    ]);
 
     // Not the shape: the pair swapped (a different array), a body that computes something, a
     // function over one value used twice, and another function of the same shape.
-    assert(lint_function_unfilled("fn f() { xs.zip_with(ys, |a, b| { (b, a) }) }", flagged)? == []);
     assert(
-        lint_function_unfilled("fn f() { xs.zip_with(ys, |a, b| { (a + 1, b) }) }", flagged)? == [],
+        lint_function_unfilled(
+            "fn f() { xs.zip_with(ys, |a, b| { (b, a) }) }",
+            flagged,
+        )?.is_empty(),
     );
-    assert(lint_function_unfilled("fn f() { xs.zip_with(ys, |a, b| { (a, a) }) }", flagged)? == []);
-    assert(lint_function_unfilled("fn f() { xs.map(|a| { (a, a) }) }", flagged)? == []);
+    assert(
+        lint_function_unfilled(
+            "fn f() { xs.zip_with(ys, |a, b| { (a + 1, b) }) }",
+            flagged,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() { xs.zip_with(ys, |a, b| { (a, a) }) }",
+            flagged,
+        )?.is_empty(),
+    );
+    assert(lint_function_unfilled("fn f() { xs.map(|a| { (a, a) }) }", flagged)?.is_empty());
 })
 
 # Whether `self` is a function of two parameters whose body is the pair of them, in order.

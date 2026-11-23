@@ -11,7 +11,7 @@
 #
 # The hit points at the `to_str` call.
 
-import { collect_ok, equal as ==, map } from builtins;
+import { collect_ok, equal as ==, is_empty, map } from builtins;
 import { ToStr } from "../builtin_table.aipl";
 import { Call } from "../expr.aipl";
 import { Function } from "../item.aipl";
@@ -64,17 +64,18 @@ pub fn interp_to_str(Function { body }) -> LintHit[] {
         lint_function_messages(
             "import { to_str } from builtins; fn f(n: i64) -> str { to_str(n) }",
             interp_to_str,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             """import { equal as ==, to_str } from builtins; fn f(n: i64) -> str { `{to_str(n) == "5"}` }""",
             interp_to_str,
-        )? == [],
+        )?.is_empty(),
     );
-    assert(lint_function_messages("fn f(n: i64) -> str { `{to_str(n)}` }", interp_to_str)? == []);
     // Shapes the lint must leave alone.
-    assert(lint_function_messages("fn shown(n: i64) -> str { to_str(n) }", interp_to_str)? == []);
+    assert(
+        lint_function_messages("fn shown(n: i64) -> str { to_str(n) }", interp_to_str)?.is_empty(),
+    );
 })
 
 # What is said of an interpolated `to_str` that the file spells `to_str`, with

@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  is_method flag on Signature (then clean up destructure, use_field_projection, and Rust side: aipl-syntax (p.name == "self") and aipl-mono/pin.rs (f.sig.params[0].name != "self"))
   merge Let and LetMut in ExprKind (with a "mutable" flag)
   operator_named_forms is info about builtins, it should be included in the info about builtins (also delete operator_spellings)
   leverage refinement types in resolve_callees so that an expr with unresolved calls and an expr with resolved calls are different types
@@ -569,6 +570,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map
   tag/resolve Idents the same way as calls, so that we can do the same kind of destructuring in lints
   free_name should gurarantee get a name. Try the preferred name, then builtin_<the preferred name>, then <the preferred name>2, then 3, etc. until found.
@@ -988,6 +990,7 @@ indent.aipl:
   pre-reserve target*lines + self.len() space
 
 debugging:
+  expression debugger that assert can use when they fail to show an expression at every substep
   trace()/dbg_expr() function
   make a debugger
   line numbers on test assertion failures, err/none propagations, etc.

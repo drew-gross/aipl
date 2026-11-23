@@ -32,10 +32,24 @@
 # own, where it squelches nothing). `return some(x);` is a short statement that always
 # occupies one line, and it is the line that makes this a search for the first match.
 
-import { collect_ok, equal as ==, is_some, logical_not as !, logical_or as ||, map } from builtins;
+import {
+    collect_ok,
+    equal as ==,
+    is_empty,
+    is_some,
+    logical_not as !,
+    logical_or as ||,
+    map,
+} from builtins;
 import { FindIf, Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
-import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import {
+    UnfilledHit,
+    lint_function_unfilled,
+    lint_function_unfilled_messages,
+    shown,
+    unfilled,
+} from "./lint_hit.aipl";
 import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
 import { passes_through } from "./result_match.aipl";
 
@@ -64,52 +78,58 @@ pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
 }.test({
     // The `return` is what the advice points at, with the loop dropped and `none` at the
     // end of the block or returned.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } none }",
         return_loop_find_if,
-    )? == [message("xs", "x")]);
-    assert(lint_function_unfilled_messages(
+    )?.shown() == [
+        `this loop returns the first element passing a test, and "none" otherwise — write "return xs.Builtin(FindIf)(|x| ..);" and drop the loop`,
+    ]);
+    assert(lint_function_unfilled(
         "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } return none; }",
         return_loop_find_if,
-    )? == [message("xs", "x")]);
+    )?.shown() == [
+        `this loop returns the first element passing a test, and "none" otherwise — write "return xs.Builtin(FindIf)(|x| ..);" and drop the loop`,
+    ]);
 
     // An iterable that cannot be quoted is a placeholder.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         "fn f() -> i64? { for (let x : g()) { if (x > 1) { return some(x); }; } none }",
         return_loop_find_if,
-    )? == [message("<iterable>", "x")]);
+    )?.shown() == [
+        `this loop returns the first element passing a test, and "none" otherwise — write "return <iterable>.Builtin(FindIf)(|x| ..);" and drop the loop`,
+    ]);
 
     // Not the shape: a mapped result, another variable, an `else`, work after the loop, an
     // indexed loop, and a test that propagates with `?`.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x + 1); }; } none }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(y); }; } none }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { return some(x); }; } g(); none }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { for (let i, x : xs) { if (x > 1) { return some(x); }; } none }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (g(x)?) { return some(x); }; } none }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
 
     // An `if`/`else` returns on every element, so it is no search; a fall-through that is not `none`
@@ -127,21 +147,15 @@ pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
     // `any`'s shape reports only that a match existed, which is another lint's, and the rewrite
     // itself must not flag.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> bool { for (let x : xs) { if (x > 1) { return true; }; } false }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64? { xs.find_if(|x| x > 1) }",
             return_loop_find_if,
-        )? == [],
+        )?.is_empty(),
     );
 })
-
-# What is said of a loop over `receiver` binding `variable`, for a file that does not
-# import `find_if`, as the tests' sources do not.
-fn message(receiver: str, variable: str) -> str {
-    `this loop returns the first element passing a test, and "none" otherwise — write "return {receiver}.find_if(|{variable}| ..);" and drop the loop, importing \`find_if\` from builtins`
-}

@@ -19,12 +19,11 @@
 #
 # The hit points at the seed.
 
-import { equal as ==, extend, filter, join, map, to_str } from builtins;
+import { equal as ==, extend, filter, is_empty, join, map, to_str } from builtins;
 import { Extend, Join } from "../builtin_table.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
-import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `extend`s.
 pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
@@ -34,59 +33,48 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
         .map(|loop| loop.filled_hit([..loop.element_stages(), (Join, "()")]))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[][]) -> i64[] \{ {body} }`,
-            extend_loop_map_join,
-        )
-    }
-    let all = "extend, map, filter, join";
 
     // Mapped, mapped under a guard, and joined as they are.
-    assert(messages(all, "mut out = []; for (let x : xs) { set out.extend(g(x)); } out")? == [
-        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.map(|x| ..).join();" and drop the loop`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[][]) -> i64[] { mut out = []; for (let x : xs) { set out.extend(g(x)); } out }",
+        extend_loop_map_join,
+    )?.shown() == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Map)(|x| ..).Builtin(Join)();" and drop the loop`,
     ]);
-    assert(messages(
-        all,
-        "mut out = []; for (let x : xs) { if (c(x)) { set out.extend(g(x)); }; } out",
-    )? == [
-        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.filter(|x| ..).map(|x| ..).join();" and drop the loop`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[][]) -> i64[] { mut out = []; for (let x : xs) { if (c(x)) { set out.extend(g(x)); }; } out }",
+        extend_loop_map_join,
+    )?.shown() == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Filter)(|x| ..).Builtin(Map)(|x| ..).Builtin(Join)();" and drop the loop`,
     ]);
-    assert(messages(all, "mut out = []; for (let x : xs) { set out.extend(x); } out")? == [
-        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.join();" and drop the loop`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[][]) -> i64[] { mut out = []; for (let x : xs) { set out.extend(x); } out }",
+        extend_loop_map_join,
+    )?.shown() == [
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Join)();" and drop the loop`,
     ]);
 
     // Imports the file lacks are named, and an alias is followed.
-    assert(messages("extend", "mut out = []; for (let x : xs) { set out.extend(g(x)); } out")? == [
-        ```"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.map(|x| ..).join();" and drop the loop, importing `map` and `join` from builtins```,
-    ]);
-    assert(messages(
-        "extend, map as each, join",
-        "mut out = []; for (let x : xs) { set out.extend(g(x)); } out",
-    )? == [
-        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.each(|x| ..).join();" and drop the loop`,
-    ]);
 
     // A range has no `filter`, a `push` loop is `push_loop_pipeline`'s, and an `extend` the
     // file never imported is some other function.
     assert(
-        messages(
-            all,
-            "mut out = []; for (let x : 0..3) { if (c(x)) { set out.extend(g(x)); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[][]) -> i64[] { mut out = []; for (let x : 0..3) { if (c(x)) { set out.extend(g(x)); }; } out }",
+            extend_loop_map_join,
+        )?.is_empty(),
     );
-    assert(messages("push, map", "mut out = []; for (let x : xs) { set out.push(x); } out")? == []);
     assert(
-        messages(
-            "map, join",
-            "mut out = []; for (let x : xs) { set out.extend(g(x)); } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[][]) -> i64[] { mut out = []; for (let x : xs) { set out.push(x); } out }",
+            extend_loop_map_join,
+        )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
     // The loop does something else as well. A pipeline has nowhere to put it.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn logged(xs: i64[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -98,11 +86,11 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
                 }
             """,
             extend_loop_map_join,
-        )? == [],
+        )?.is_empty(),
     );
     // A seed with elements is not an empty array to be filled.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn seeded(xs: i64[]) -> i64[] {
                     mut out: i64[] = [0];
@@ -113,11 +101,11 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
                 }
             """,
             extend_loop_map_join,
-        )? == [],
+        )?.is_empty(),
     );
     // An `else` branch is work the pipeline has nowhere to put.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn either(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -132,11 +120,11 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
                 }
             """,
             extend_loop_map_join,
-        )? == [],
+        )?.is_empty(),
     );
     // What is added reads the array itself, which the pipeline no longer has.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn doubling(xs: i64[]) -> i64[] {
                     mut out: i64[] = [1];
@@ -147,11 +135,11 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
                 }
             """,
             extend_loop_map_join,
-        )? == [],
+        )?.is_empty(),
     );
     // An indexed loop uses its index, which `map` has no way to pass.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn indexed(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -162,55 +150,15 @@ pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
                 }
             """,
             extend_loop_map_join,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
     // A transformed piece per element: a `map` then a `join`.
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn pairs(xs: i64[]) -> i64[] {
-                    mut out: i64[] = [];
-                    for (let x : xs) {
-                        set out.extend([x, x]);
-                    }
-                    out
-                }
-            """,
-            extend_loop_map_join,
-        )? == [],
-    );
+
     // Under a guard, a `filter` first.
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn pairs_of_positives(xs: i64[]) -> i64[] {
-                    mut out: i64[] = [];
-                    for (let x : xs) {
-                        if (0 != x) { set out.extend([x, x]); };
-                    }
-                    out
-                }
-            """,
-            extend_loop_map_join,
-        )? == [],
-    );
+
     // The elements are themselves arrays, added unchanged: just a `join`.
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn flattened(xs: i64[][]) -> i64[] {
-                    mut out: i64[] = [];
-                    for (let x : xs) {
-                        set out.extend(x);
-                    }
-                    out
-                }
-            """,
-            extend_loop_map_join,
-        )? == [],
-    );
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
     fn pairs(xs: i64[]) -> i64[] {

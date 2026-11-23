@@ -76,39 +76,73 @@ pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
     }
 
     // A member read, a method call with arguments, a chain, a builtin and a function name.
-    assert(messages("map", "xs.map(|p| p.name)")? == [
-        `"map" with a lambda that only uses a member of its argument — write "xs$name"`,
-    ]);
-    assert(messages("map", "xs.map(|p| p.f(1, 2))")? == [
-        `"map" with a lambda that only uses a member of its argument — write "xs$f(...)"`,
-    ]);
-    assert(messages("map", "xs.map(|p| p.a.f().c)")? == [
-        `"map" with a lambda that only uses a member of its argument — write "xs$a$f()$c"`,
-    ]);
+    assert(lint_in_messages(
+        "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.name) }",
+        use_field_projection,
+    )? == [`"map" with a lambda that only uses a member of its argument — write "xs$name"`]);
+    assert(lint_in_messages(
+        "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.f(1, 2)) }",
+        use_field_projection,
+    )? == [`"map" with a lambda that only uses a member of its argument — write "xs$f(...)"`]);
+    assert(lint_in_messages(
+        "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.a.f().c) }",
+        use_field_projection,
+    )? == [`"map" with a lambda that only uses a member of its argument — write "xs$a$f()$c"`]);
     assert(messages("map, to_str", "ys.map(|n| to_str(n))")? == [
         `"map" with a lambda that only uses a member of its argument — write "ys$to_str()"`,
     ]);
-    assert(messages("map", "ys.map(shout)")? == [
-        `"map" over the function "shout" — write "ys$shout()"`,
-    ]);
-    assert(messages("map", "g().map(|p| p.name)")? == [
-        `"map" with a lambda that only uses a member of its argument — write "<items>$name"`,
-    ]);
+    assert(lint_in_messages(
+        "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(shout) }",
+        use_field_projection,
+    )? == [`"map" over the function "shout" — write "ys$shout()"`]);
+    assert(lint_in_messages(
+        "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { g().map(|p| p.name) }",
+        use_field_projection,
+    )? == [`"map" with a lambda that only uses a member of its argument — write "<items>$name"`]);
 
     // Not a step `$` can make: an annotated parameter, the parameter used twice, an operator,
     // a function from elsewhere, and a `map` the file never imported.
-    assert(messages("map", "xs.map(|p: P| p.name)")? == []);
-    assert(messages("map", "xs.map(|p| p.f(p))")? == []);
-    assert(messages("map, wrapping_add as +", "xs.map(|n| n + 1)")? == []);
-    assert(messages("", "xs.map(|p| p.name)")? == []);
+    assert(
+        lint_in_messages(
+            "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p: P| p.name) }",
+            use_field_projection,
+        )?.is_empty(),
+    );
+    assert(
+        lint_in_messages(
+            "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.f(p)) }",
+            use_field_projection,
+        )?.is_empty(),
+    );
 
     // A `$` inside the lambda maps its own receiver, so it is not a step of the outer chain.
-    assert(messages("map", "xs.map(|p| p.name$shout().len())")? == []);
+    assert(
+        lint_in_messages(
+            "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.name$shout().len()) }",
+            use_field_projection,
+        )?.is_empty(),
+    );
 
     // A name that is no method of this file (`g` is nothing declared here), and a lambda that is not
     // a `map`'s argument.
-    assert(messages("map", "ys.map(g)")? == []);
-    assert(messages("filter", `xs.filter(|p| p.name == "a")`)? == []);
+    assert(
+        lint_in_messages(
+            "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(g) }",
+            use_field_projection,
+        )?.is_empty(),
+    );
+    assert(
+        lint_in_messages(
+            """struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.filter(|p| p.name == "a") }""",
+            use_field_projection,
+        )?.is_empty(),
+    );
+    assert(
+        lint_in_messages(
+            "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|n| n + 1) }",
+            use_field_projection,
+        )?.is_empty(),
+    );
 })
 
 # What the rule says about a `map` call, and the span of the lambda it advised on (none for a

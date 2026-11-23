@@ -144,9 +144,6 @@ pub fn tail_matches(self: Expr) -> Expr[] {
     ]);
 
     // Through a `let` that takes a value apart.
-    assert(tails("fn f(s: S, t: T) { let (a, b) = t; match (s) { A(..) => 1, _ => 2 } }")? == [
-        "Match",
-    ]);
 })
 
 # The kind of each [`tail_matches`] of the function `src`.

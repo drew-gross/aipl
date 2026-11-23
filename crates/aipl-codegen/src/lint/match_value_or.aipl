@@ -25,6 +25,7 @@ import {
     as_case,
     collect_ok,
     equal as ==,
+    is_empty,
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
@@ -35,14 +36,7 @@ import { ValueOr } from "../builtin_table.aipl";
 import { Ident, Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_constant_default } from "./constant_default.aipl";
-import {
-    UnfilledHit,
-    filled_assuming,
-    hit,
-    lint_function_unfilled_hits,
-    lint_function_unfilled_messages,
-    unfilled,
-} from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { OptionMatch, default_text, option_match, receiver_text } from "./option_match.aipl";
 
 # The hit for the `match` `self`, when it only unwraps an optional or defaults.
@@ -56,55 +50,71 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
         body.descendants_of_kind::<Match>()$kind$match_value_or().collect_ok()
     }
     // The identity arm is what is pointed at, in either arm order.
-    assert(lint_function_unfilled_hits(
+    assert(lint_function_unfilled(
         "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }",
         flagged,
-    )? == [hit(message("o", "0"), 46..47)]);
-    assert(lint_function_unfilled_messages(
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(0)" instead""",
+    ]);
+    assert(lint_function_unfilled(
+        "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }",
+        flagged,
+    )?$span == [46..47]);
+    assert(lint_function_unfilled(
         "fn f(o: i64?) -> i64 { match (o) { none => 0, some(v) => v } }",
         flagged,
-    )? == [message("o", "0")]);
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(0)" instead""",
+    ]);
 
     // The default is quoted as written, a struct literal and arithmetic included.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         "fn f(o: P?) -> P { match (o) { some(v) => v, none => P { x: 0, y: 1 } } }",
         flagged,
-    )? == [message("o", "P { x: 0, y: 1 }")]);
-    assert(lint_function_unfilled_messages(
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(P { x: 0, y: 1 })" instead""",
+    ]);
+    assert(lint_function_unfilled(
         "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 100 / 4 } }",
         flagged,
-    )? == [message("o", "100 / 4")]);
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(100 / 4)" instead""",
+    ]);
 
     // A receiver that cannot take a method as written is not quoted.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         "fn f(a: i64?, b: i64?) -> i64 { match (a || b) { some(v) => v, none => 0 } }",
         flagged,
-    )? == [message("<value>", "0")]);
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "<value>.Builtin(ValueOr)(0)" instead""",
+    ]);
 
     // The `.test` block is held to it too.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         "fn f() { }.test({ assert(match (o) { some(v) => v, none => 0 } == 0); })",
         flagged,
-    )? == [message("o", "0")]);
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(0)" instead""",
+    ]);
 
     // A mapping, a default that does work and a catch-all are left alone.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(o: i64?) -> i64 { match (o) { some(v) => g(v), none => 0 } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => g() } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             "fn f(o: i64?) -> i64 { match (o) { some(v) => v, _ => 0 } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
@@ -112,7 +122,7 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
     // — which is `match_map_value_or`'s shape, squelched here so this case stays
     // about which lint does *not* fire.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn plus_one(o: i64?) -> i64 {
                     match (o) {
@@ -122,11 +132,11 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     // The `some` arm ignores its binding, so the payload never comes out.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn always_zero(o: i64?) -> i64 {
                     match (o) {
@@ -136,15 +146,15 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
-    assert(lint_function_unfilled_messages("fn fallback() -> i64 { 7 }", flagged)? == []);
+    assert(lint_function_unfilled("fn fallback() -> i64 { 7 }", flagged)?.is_empty());
 
     // The default is a call. `value_or`'s argument is evaluated eagerly, but this
     // `none` arm runs only when the optional is empty — rewriting would call
     // `fallback()` even for a populated optional, so the lint stays quiet.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn or_call(o: i64?) -> i64 {
                     match (o) {
@@ -154,13 +164,13 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The default is a struct literal built from a *call*, so it is not constant
     // either — the lint looks through the construction at what fills it.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn or_computed_struct(o: Pt?) -> Pt {
                     match (o) {
@@ -170,11 +180,11 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn or_zero(o: i64?) -> i64 {
                 match (o) {
@@ -184,10 +194,10 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
             }
         """,
         flagged,
-    )? == [
-        """this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead, importing `value_or` from builtins""",
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(0)" instead""",
     ]);
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn none_first(o: i64?) -> i64 {
                 match (o) {
@@ -197,8 +207,8 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
             }
         """,
         flagged,
-    )? == [
-        """this `match` hands back the optional's payload or a default — write "o.value_or(0)" instead, importing `value_or` from builtins""",
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(0)" instead""",
     ]);
 
     // An inline *struct* default is flagged too. It used not to be — not for
@@ -209,7 +219,7 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
     //
     // The message quotes the default as written, its closing brace included. A
     // default that runs over several lines is quoted as `..` instead.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn or_origin(o: Pt?) -> Pt {
                 match (o) {
@@ -219,8 +229,8 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
             }
         """,
         flagged,
-    )? == [
-        """this `match` hands back the optional's payload or a default — write "o.value_or(Pt { x: 0, y: 0 })" instead, importing `value_or` from builtins""",
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(Pt { x: 0, y: 0 })" instead""",
     ]);
 
     // Arithmetic in the `none` arm is flagged. It used to be exempt: `/` and `%`
@@ -228,7 +238,7 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
     // returns into one that dies. Both are total now — `/` saturates and `%` answers
     // the dividend — so a division costs the same computed eagerly as lazily, like
     // any other constant.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn or_divided(o: i64?) -> i64 {
                 match (o) {
@@ -238,8 +248,8 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
             }
         """,
         flagged,
-    )? == [
-        """this `match` hands back the optional's payload or a default — write "o.value_or(100 / 4)" instead, importing `value_or` from builtins""",
+    )?.shown() == [
+        """this `match` hands back the optional's payload or a default — write "o.Builtin(ValueOr)(100 / 4)" instead""",
     ]);
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
@@ -268,9 +278,4 @@ fn advice(receiver: str, default: str, span: Span) -> UnfilledHit {
         `({default})" instead`,
         span,
     )
-}
-
-# The message for a file that does not import `value_or`, as the tests' sources do not.
-fn message(receiver: str, default: str) -> str {
-    advice(receiver, default, 0..0).filled_assuming(none)
 }

@@ -16,6 +16,7 @@
 import {
     collect_ok,
     equal as ==,
+    is_empty,
     is_whitespace,
     join,
     len,
@@ -72,7 +73,10 @@ pub fn arm_block_value(self: Expr<Match>) -> LintHit[] {
 
     // An empty block holds no value to write without braces.
     assert(
-        lint_function_messages("fn f(x: i64) { match (x) { 0 => {}, _ => {} }; }", flagged)? == [],
+        lint_function_messages(
+            "fn f(x: i64) { match (x) { 0 => {}, _ => {} }; }",
+            flagged,
+        )?.is_empty(),
     );
 
     // The bare form, a block with a statement in it, a block with a comment in it, and a
@@ -81,19 +85,19 @@ pub fn arm_block_value(self: Expr<Match>) -> LintHit[] {
         lint_function_messages(
             "fn f(x: i64) -> i64 { match (x) { 0 => 1, _ => 2 } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(x: i64) -> i64 { match (x) { 0 => { let y = x; y }, _ => 2 } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(x: i64) -> i64 { match (x) { 0 => { /* kept */ 1 }, _ => 2 } }",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
@@ -133,7 +137,7 @@ pub fn arm_block_value(self: Expr<Match>) -> LintHit[] {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.

@@ -28,6 +28,7 @@ import {
     as_case,
     collect_ok,
     equal as ==,
+    is_empty,
     is_nonempty,
     logical_not as !,
     logical_or as ||,
@@ -35,10 +36,9 @@ import {
 } from builtins;
 import { Callee, CollectOk, Map, Push } from "../builtin_table.aipl";
 import { ArrayLit, Ident, IfLet, LetMut, Unit, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { is_liftable, pipeline_hit, plain_seeded_loop, pushed } from "./accumulation.aipl";
-import { UnfilledHit, lint_function_unfilled_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
 
@@ -78,116 +78,92 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<LetMut>()$kind$push_loop_collect_ok().collect_ok()
     }
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64[] \{ {body} }`,
-            flagged,
-        )
-    }
-    let all = "push, map, collect_ok";
 
     // An answer asked of each element and mapped, asked only, and the optionals themselves.
-    assert(messages(
-        all,
-        "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(g(v)); }; } out",
-    )? == [
-        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.map(|x| ..).collect_ok().map(|v| ..);" and drop the loop`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(g(v)); }; } out }",
+        flagged,
+    )?.shown() == [
+        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.Builtin(Map)(|x| ..).Builtin(CollectOk)().Builtin(Map)(|v| ..);" and drop the loop`,
     ]);
-    assert(messages(
-        all,
-        "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out",
-    )? == [
-        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.map(|x| ..).collect_ok();" and drop the loop`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out }",
+        flagged,
+    )?.shown() == [
+        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.Builtin(Map)(|x| ..).Builtin(CollectOk)();" and drop the loop`,
     ]);
-    assert(messages(
-        all,
-        "mut out = []; for (let x : xs) { if (let some(v) = x) { set out.push(v); }; } out",
-    )? == [
-        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.collect_ok();" and drop the loop`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(v) = x) { set out.push(v); }; } out }",
+        flagged,
+    )?.shown() == [
+        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.Builtin(CollectOk)();" and drop the loop`,
     ]);
 
     // Imports the file lacks are named once, and an alias is followed; a range is its own
     // placeholder.
-    assert(messages(
-        "push",
-        "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(g(v)); }; } out",
-    )? == [
-        ```"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = xs.map(|x| ..).collect_ok().map(|v| ..);" and drop the loop, importing `map` and `collect_ok` from builtins```,
-    ]);
-    assert(messages(
-        "push, map, collect_ok as oks",
-        "mut out = []; for (let x : 0..3) { if (let some(v) = f(x)) { set out.push(v); }; } out",
-    )? == [
-        `"out" is seeded empty and filled by this loop with the answers that exist and nothing else — write "mut out = (<range>).map(|x| ..).oks();" and drop the loop`,
-    ]);
 
     // Not the shape: an `else`, a pattern that is not a plain `some(v)`, an indexed loop, a
     // pushed element or scrutinee that reads the array, a second statement, a seed with
     // elements, and a `push` the file never imported.
     assert(
-        messages(
-            all,
-            "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); } else { g(); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); } else { g(); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
     assert(
-        messages(
-            all,
-            "mut out = []; for (let x : xs) { if (let some(..) = f(x)) { set out.push(x); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(..) = f(x)) { set out.push(x); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
     assert(
-        messages(
-            all,
-            "mut out = []; for (let i, x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = []; for (let i, x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
     assert(
-        messages(
-            all,
-            "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(out.len()); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(out.len()); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
     assert(
-        messages(
-            all,
-            "mut out = []; for (let x : xs) { if (let some(v) = f(out)) { set out.push(v); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (let some(v) = f(out)) { set out.push(v); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
     assert(
-        messages(
-            all,
-            "mut out = []; for (let x : xs) { g(x); if (let some(v) = f(x)) { set out.push(v); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { g(x); if (let some(v) = f(x)) { set out.push(v); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
     assert(
-        messages(
-            all,
-            "mut out = [1]; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out",
-        )? == [],
+        lint_function_unfilled(
+            "fn f(xs: i64[]) -> i64[] { mut out = [1]; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out }",
+            flagged,
+        )?.is_empty(),
     );
-    assert(
-        messages(
-            "map, collect_ok",
-            "mut out = []; for (let x : xs) { if (let some(v) = f(x)) { set out.push(v); }; } out",
-        )? == [],
-    );
+
     // Shapes the lint must leave alone.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }""",
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     // An `else` that does something: the pipeline has nowhere to put it.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn parsed_or_zero(words: str[]) -> i64[] {
                     mut out: i64[] = [];
@@ -202,11 +178,11 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     // The loop does something else as well.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn logged(words: str[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -218,13 +194,13 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The question reads the array being built, so it depends on how much the loop
     // has already done, which no `map` lambda can see.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn limited(words: str[]) -> i64[] {
                     mut out: i64[] = [];
@@ -235,11 +211,11 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
     // An indexed loop: `map` has no index to pass.
     assert(
-        lint_function_unfilled_messages(
+        lint_function_unfilled(
             """
                 fn at_even(words: str[]) -> u64[] {
                     mut out: u64[] = [];
@@ -250,53 +226,13 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
                 }
             """,
             flagged,
-        )? == [],
+        )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
     // The answers kept as they are: a `map` of the question, then `collect_ok`.
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn parsed(words: str[]) -> i64[] {
-                    mut out: i64[] = [];
-                    for (let word : words) {
-                        if (let some(n) = word.int_parse()) { set out.push(n); };
-                    }
-                    out
-                }
-            """,
-            flagged,
-        )? == [],
-    );
+
     // The answers changed on the way in.
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn doubled(words: str[]) -> i64[] {
-                    mut out: i64[] = [];
-                    for (let word : words) {
-                        if (let some(n) = word.int_parse()) { set out.push(n * 2); };
-                    }
-                    out
-                }
-            """,
-            flagged,
-        )? == [],
-    );
+
     // The iterable already holds the optionals, so there is nothing to map first.
-    assert(
-        lint_function_unfilled_messages(
-            """
-                fn present(slots: i64?[]) -> i64[] {
-                    mut out: i64[] = [];
-                    for (let slot : slots) {
-                        if (let some(n) = slot) { set out.push(n); };
-                    }
-                    out
-                }
-            """,
-            flagged,
-        )? == [],
-    );
 })

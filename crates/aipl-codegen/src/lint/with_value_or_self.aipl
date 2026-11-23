@@ -21,6 +21,7 @@
 import {
     collect_ok,
     equal as ==,
+    is_empty,
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
@@ -53,31 +54,38 @@ pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Call>()$kind$with_value_or_self().collect_ok()
     }
+
     // What the lint says of a replacement in `array`.
-    fn says(array: str) -> str {
-        `this \`value_or\` falls back to the array it is replacing in — write "{array}.try_set(..)" and drop the fallback`
-    }
 
     // A binding and a field path off one are the same place as themselves, in either call form.
     assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or(xs) }", flagged)?.shown() == [
-        says("xs"),
+        """this `Builtin(ValueOr)` falls back to the array it is replacing in — write "xs.Builtin(TrySet)(..)" and drop the fallback""",
     ]);
     assert(lint_function_unfilled(
         "fn f() { p.rows.with(0, 1).value_or(p.rows) }",
         flagged,
-    )?.shown() == [says("p.rows")]);
+    )?.shown() == [
+        """this `Builtin(ValueOr)` falls back to the array it is replacing in — write "p.rows.Builtin(TrySet)(..)" and drop the fallback""",
+    ]);
     assert(lint_function_unfilled("fn f() { value_or(with(xs, 2, 5), xs) }", flagged)?.shown() == [
-        says("xs"),
+        """this `Builtin(ValueOr)` falls back to the array it is replacing in — write "xs.Builtin(TrySet)(..)" and drop the fallback""",
     ]);
 
     // Not the shape: another array, an empty one, a different field, a computed fallback, `with`
     // on its own, and `value_or` on something else.
-    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or(ys) }", flagged)? == []);
-    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or([]) }", flagged)? == []);
-    assert(lint_function_unfilled("fn f() { p.rows.with(0, 1).value_or(p.cols) }", flagged)? == []);
-    assert(lint_function_unfilled("fn f() { xs.with(0, 9).value_or(xs[..1]) }", flagged)? == []);
-    assert(lint_function_unfilled("fn f() { xs.with(0, 9) }", flagged)? == []);
-    assert(lint_function_unfilled("fn f() { o.value_or(xs) }", flagged)? == []);
+    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or(ys) }", flagged)?.is_empty());
+    assert(lint_function_unfilled("fn f() { xs.with(0, 1).value_or([]) }", flagged)?.is_empty());
+    assert(
+        lint_function_unfilled(
+            "fn f() { p.rows.with(0, 1).value_or(p.cols) }",
+            flagged,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled("fn f() { xs.with(0, 9).value_or(xs[..1]) }", flagged)?.is_empty(),
+    );
+    assert(lint_function_unfilled("fn f() { xs.with(0, 9) }", flagged)?.is_empty());
+    assert(lint_function_unfilled("fn f() { o.value_or(xs) }", flagged)?.is_empty());
 })
 
 # Whether `self` and `other` read the same binding, or the same field path off one.

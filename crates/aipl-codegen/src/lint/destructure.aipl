@@ -68,6 +68,7 @@ import {
     contains,
     equal as ==,
     is_case,
+    is_empty,
     is_nonempty,
     is_some,
     is_some_and,
@@ -159,46 +160,59 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
     )? == [param_message("w", "Wide", ["a", "b", "c", "d"])]);
 
     // One bare mention keeps the value whole: a pattern keeps only the fields.
-    assert(lint_function_messages("fn f(p: Point) -> i64 { g(p); p.x }", destructure)? == []);
+    assert(lint_function_messages("fn f(p: Point) -> i64 { g(p); p.x }", destructure)?.is_empty());
     assert(
-        lint_function_messages("fn passed(p: Pos) -> i64 { p.line + take(p) }", destructure)? == [],
+        lint_function_messages(
+            "fn passed(p: Pos) -> i64 { p.line + take(p) }",
+            destructure,
+        )?.is_empty(),
     );
     // The name is spoken for: a field's name would shadow one in scope.
-    assert(lint_function_messages("fn f(p: Point, x: i64) -> i64 { p.x + x }", destructure)? == []);
+    assert(
+        lint_function_messages(
+            "fn f(p: Point, x: i64) -> i64 { p.x + x }",
+            destructure,
+        )?.is_empty(),
+    );
     assert(
         lint_function_messages(
             "fn shadowing(p: Pos) -> i64 { let line = 5; p.line + p.col + line }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     // A field read off two values is told apart by the names of the values.
     assert(
-        lint_function_messages("fn f(p: Point, q: Point) -> i64 { p.x + q.x }", destructure)? == [],
+        lint_function_messages(
+            "fn f(p: Point, q: Point) -> i64 { p.x + q.x }",
+            destructure,
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn between(a: Pos, b: Pos) -> i64 { a.line + b.line + a.col + b.col }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     // A tuple cannot be taken apart by a struct pattern.
-    assert(lint_function_messages("fn f(p: Point) -> i64 { p._0 }", destructure)? == []);
+    assert(lint_function_messages("fn f(p: Point) -> i64 { p._0 }", destructure)?.is_empty());
 
     // `self` is what makes a function method-callable, so a pattern there would
     // change how it is called.
-    assert(lint_function_messages("fn f(self: Point) -> i64 { self.x }", destructure)? == []);
+    assert(lint_function_messages("fn f(self: Point) -> i64 { self.x }", destructure)?.is_empty());
 
     // A keyword parameter's name *is* the call-site spelling, so destructuring it
     // would break every caller.
-    assert(lint_function_messages("fn f(p: Point = g()) -> i64 { p.x }", destructure)? == []);
+    assert(lint_function_messages("fn f(p: Point = g()) -> i64 { p.x }", destructure)?.is_empty());
 
     // `mut` is written through rather than read; a variadic is a sequence; anything
     // but a plain named type has no fields to name.
-    assert(lint_function_messages("fn f(mut p: Point) -> i64 { p.x }", destructure)? == []);
-    assert(lint_function_messages("fn f(p: Point*) -> i64 { p.x }", destructure)? == []);
-    assert(lint_function_messages("fn f(p: Point[]) -> i64 { p.x }", destructure)? == []);
+    assert(lint_function_messages("fn f(mut p: Point) -> i64 { p.x }", destructure)?.is_empty());
+    assert(lint_function_messages("fn f(p: Point*) -> i64 { p.x }", destructure)?.is_empty());
+    assert(lint_function_messages("fn f(p: Point[]) -> i64 { p.x }", destructure)?.is_empty());
     // A parameter the author already destructured is not advised about.
-    assert(lint_function_messages("fn f(Point { x, y }) -> i64 { x + y }", destructure)? == []);
+    assert(
+        lint_function_messages("fn f(Point { x, y }) -> i64 { x + y }", destructure)?.is_empty(),
+    );
 
     // A `let` that opens the body and takes the parameter apart is the same pattern
     // written one step late.
@@ -211,25 +225,25 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         lint_function_messages(
             "fn f(p: Point) -> i64 { let Point { x as a } = p; a }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(p: Point) -> i64 { let Other { x } = p; x }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(p: Point) -> i64 { mut Point { x } = p; x }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn kept(p: Pos) -> i64 { let Pos { line, col } = p; line + col + take(p) }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
 
     // ---- a `let` ----
@@ -245,18 +259,24 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
     // A pattern the author wrote is not a binding to advise about, whatever the
     // parser binds for it underneath.
     assert(
-        lint_function_messages("fn f() -> i64 { let P { a, b } = g(); a + b }", destructure)? == [],
+        lint_function_messages(
+            "fn f() -> i64 { let P { a, b } = g(); a + b }",
+            destructure,
+        )?.is_empty(),
     );
-    assert(lint_function_messages("fn f(P { a }) -> i64 { a }", destructure)? == []);
+    assert(lint_function_messages("fn f(P { a }) -> i64 { a }", destructure)?.is_empty());
     // A name the pattern binds shadows an outer one, which splits its mentions.
     assert(
         lint_function_messages(
             "fn f() -> i64 { let p = g(); let P { p } = h(); p.a }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
-        lint_function_messages("fn f() -> i64 { let p = g(); h(|p| p); p.a }", destructure)? == [],
+        lint_function_messages(
+            "fn f() -> i64 { let p = g(); h(|p| p); p.a }",
+            destructure,
+        )?.is_empty(),
     );
     // ...and a later `let` of the same name is judged on its own.
     assert(lint_function_messages(
@@ -264,28 +284,38 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         destructure,
     )? == [binding_message("p", ["a"], "<Type>")]);
     // One bare mention keeps the value whole.
-    assert(lint_function_messages("fn f() -> i64 { let p = g(); h(p); p.a }", destructure)? == []);
+    assert(
+        lint_function_messages("fn f() -> i64 { let p = g(); h(p); p.a }", destructure)?.is_empty(),
+    );
     // The name is spoken for.
     assert(
-        lint_function_messages("fn f(a: i64) -> i64 { let p = g(); p.a + a }", destructure)? == [],
+        lint_function_messages(
+            "fn f(a: i64) -> i64 { let p = g(); p.a + a }",
+            destructure,
+        )?.is_empty(),
     );
     // A field read off two values is told apart by the names of the values...
     assert(
         lint_function_messages(
             "fn f() -> i64 { let p = g(); let q = g(); p.a + q.a }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     // ...but a read inside the binding's own value runs before the pattern binds.
     assert(lint_function_messages("fn f() -> i64 { let p = h(q.a); p.a }", destructure)? == [
         binding_message("p", ["a"], "<Type>"),
     ]);
     // A tuple cannot be taken apart by a struct pattern.
-    assert(lint_function_messages("fn f() -> i64 { let p = g(); p._0 }", destructure)? == []);
+    assert(lint_function_messages("fn f() -> i64 { let p = g(); p._0 }", destructure)?.is_empty());
     // A value built on the same line is not taken apart.
-    assert(lint_function_messages("fn f() -> i64 { let p = P { a: 1 }; p.a }", destructure)? == []);
+    assert(
+        lint_function_messages(
+            "fn f() -> i64 { let p = P { a: 1 }; p.a }",
+            destructure,
+        )?.is_empty(),
+    );
     // A `mut` binding is a different question.
-    assert(lint_function_messages("fn f() -> i64 { mut p = g(); p.a }", destructure)? == []);
+    assert(lint_function_messages("fn f() -> i64 { mut p = g(); p.a }", destructure)?.is_empty());
     // The `.test` block is held to it too.
     assert(lint_function_messages(
         "fn f() { }.test({ let p = g(); assert(p.a == 1); })",
@@ -320,7 +350,7 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         lint_function_messages(
             "fn f() -> i64 { let p: Q = g(); let P { a } = p; a }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
 
     // ---- a slot of a pattern ----
@@ -339,13 +369,13 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         lint_function_messages(
             "fn f(v: V) -> i64 { let Two(xs) = v else { return 0; }; let [a, b] = xs else { return 0; }; a + b + xs.len() }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(v: V) -> i64 { let Two(xs) = v else { return 0; }; let Pair(a) = xs else { return 0; }; a }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     // A parameter's case payload that is only read by field.
     assert(lint_function_messages(
@@ -396,36 +426,41 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         lint_function_messages(
             "fn f(Fn(function)) -> i64 { g(function); function.sig }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
-    assert(lint_function_messages("fn f(Fn(function)) -> i64 { function._0 }", destructure)? == []);
-    assert(lint_function_messages("fn f(Fn(function)) -> i64 { 1 }", destructure)? == []);
+    assert(
+        lint_function_messages(
+            "fn f(Fn(function)) -> i64 { function._0 }",
+            destructure,
+        )?.is_empty(),
+    );
+    assert(lint_function_messages("fn f(Fn(function)) -> i64 { 1 }", destructure)?.is_empty());
     // The name a field would bind is spoken for, or the field is read off two values.
     assert(
         lint_function_messages(
             "fn f(Fn(function), sig: i64) -> i64 { function.sig + sig }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(Fn(function), other: P) -> i64 { function.sig + other.sig }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     // A pattern that is already nested takes the slot apart itself.
-    assert(lint_function_messages("fn f(Fn(P { sig })) -> i64 { sig }", destructure)? == []);
+    assert(lint_function_messages("fn f(Fn(P { sig })) -> i64 { sig }", destructure)?.is_empty());
     assert(
         lint_function_messages(
             "fn nested(Dot(Pos { line, col })) -> i64 { line + col }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_messages(
             "fn f(xs: V[]) -> i64 { for (let Fn(P { sig }) : xs) { g(sig); } 0 }",
             destructure,
-        )? == [],
+        )?.is_empty(),
     );
 })
 

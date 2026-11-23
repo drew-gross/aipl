@@ -1,7 +1,7 @@
 # What the two interpolation lints (`interp_to_str`, `interp_literal`) share: finding
 # the value each `{..}` of a template renders.
 
-import { collect_ok, equal as ==, first, map } from builtins;
+import { collect_ok, equal as ==, first, is_empty, map } from builtins;
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { hit, lint_function_messages } from "./lint_hit.aipl";
 
@@ -25,6 +25,6 @@ pub fn interpolated_values(self: Expr) -> Expr[] {
         lint_function_messages(
             "fn f(n: i64) -> str { n.to_str() }",
             |function| function.body.interpolated_values()$source.map(|text| hit(text, 0..0)),
-        )? == [],
+        )?.is_empty(),
     );
 })

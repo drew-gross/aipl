@@ -38,6 +38,7 @@ import {
     contains,
     equal as ==,
     is_case,
+    is_empty,
     join,
     len,
     less_than as <,
@@ -47,10 +48,9 @@ import {
 } from builtins;
 import { ToSet } from "../builtin_table.aipl";
 import { Char, Expr, SetLit, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
-import { UnfilledHit, lint_function_unfilled_messages, unfilled } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { has, to_set } from sets;
 
 # The hit for `self`, when it is a one-line unordered set of at least three character literals
@@ -79,39 +79,38 @@ pub fn char_set_literal(self: Expr<SetLit>) -> UnfilledHit? {
     fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<SetLit>()$char_set_literal().collect_ok()
     }
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_function_unfilled_messages(
-            `import \{ {imports} } from sets; fn f() -> #\{char} \{ {body} }`,
-            flagged,
-        )
-    }
-    assert(messages("to_set", "#{'a', 'b', 'c'}")? == [
-        """a char set of 3 elements spelled out — write `"abc".to_set()`""",
+
+    assert(lint_function_unfilled("fn f() -> #{char} { #{'a', 'b', 'c'} }", flagged)?.shown() == [
+        """a char set of 3 elements spelled out — write `"abc".Builtin(ToSet)()`""",
     ]);
 
     // The file's spelling of `to_set`, or the import to add.
-    assert(messages("to_set as chars", "#{'a', 'b', 'c'}")? == [
-        """a char set of 3 elements spelled out — write `"abc".chars()`""",
-    ]);
-    assert(messages("union", "#{'a', 'b', 'c'}")? == [
-        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from sets""",
-    ]);
 
     // The escapes a string takes.
-    assert(messages("to_set", """#{'"', '\\', '\n', 'x'}""")? == [
-        """a char set of 4 elements spelled out — write `"\"\\\nx".to_set()`""",
+    assert(lint_function_unfilled(
+        """fn f() -> #{char} { #{'"', '\\', '\n', 'x'} }""",
+        flagged,
+    )?.shown() == [
+        """a char set of 4 elements spelled out — write `"\"\\\nx".Builtin(ToSet)()`""",
     ]);
 
     // Two elements are a tie, an ordered set is another thing, a character with no spelling and
     // a literal broken over lines are left alone.
-    assert(messages("to_set", "#{'a', 'b'}")? == []);
-    assert(messages("to_set", "#<{'a', 'b', 'c'}")? == []);
-    assert(messages("to_set", "#{'a',\n 'b',\n 'c'}")? == []);
+    assert(lint_function_unfilled("fn f() -> #{char} { #{'a', 'b'} }", flagged)?.is_empty());
+    assert(lint_function_unfilled("fn f() -> #{char} { #<{'a', 'b', 'c'} }", flagged)?.is_empty());
+    assert(
+        lint_function_unfilled(
+            "fn f() -> #{char} { #{'a',
+ 'b',
+ 'c'} }",
+            flagged,
+        )?.is_empty(),
+    );
 
     // Shapes the lint must leave alone.
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_function_unfilled_messages(
+    assert(lint_function_unfilled(
         """
             fn subject() !prints {
                 // Three is the threshold: below it the two spellings are a tie.
@@ -126,10 +125,10 @@ pub fn char_set_literal(self: Expr<SetLit>) -> UnfilledHit? {
             }
         """,
         flagged,
-    )? == [
-        """a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from sets""",
-        """a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from sets""",
-        """a char set of 5 elements spelled out — write `"\"\\'\n\t".to_set()`, importing `to_set` from sets""",
+    )?.shown() == [
+        """a char set of 3 elements spelled out — write `"abc".Builtin(ToSet)()`""",
+        """a char set of 10 elements spelled out — write `"0123456789".Builtin(ToSet)()`""",
+        """a char set of 5 elements spelled out — write `"\"\\'\n\t".Builtin(ToSet)()`""",
     ]);
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.

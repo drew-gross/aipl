@@ -21,7 +21,7 @@
 # receiver and the `len` argument must be the same expression, so aliases or computed receivers
 # that merely happen to be equal at runtime are not flagged.
 
-import { collect_ok, equal as ==, logical_and as &&, value_or } from builtins;
+import { collect_ok, equal as ==, is_empty, logical_and as &&, value_or } from builtins;
 import { Slice, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
@@ -95,12 +95,17 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> LintHit? {
 
     // Nothing is redundant: a start worth keeping, an end that is not the length, another
     // receiver's length, an elided start with an end short of the length, or an open end.
-    assert(lint_function_messages("fn f(s: str) -> str { s[1..] }", flagged)? == []);
-    assert(lint_function_messages("fn f(s: str) -> str { s[1..2] }", flagged)? == []);
-    assert(lint_function_messages("fn f(s: str) -> str { s[..2] }", flagged)? == []);
-    assert(lint_function_messages("fn f(s: str) -> str { s[3..] }", flagged)? == []);
-    assert(lint_function_messages("fn f(s: str) -> str { s[3..5] }", flagged)? == []);
-    assert(lint_function_messages("fn f(s: str, t: str) -> str { s[3..t.len()] }", flagged)? == []);
+    assert(lint_function_messages("fn f(s: str) -> str { s[1..] }", flagged)?.is_empty());
+    assert(lint_function_messages("fn f(s: str) -> str { s[1..2] }", flagged)?.is_empty());
+    assert(lint_function_messages("fn f(s: str) -> str { s[..2] }", flagged)?.is_empty());
+    assert(lint_function_messages("fn f(s: str) -> str { s[3..] }", flagged)?.is_empty());
+    assert(lint_function_messages("fn f(s: str) -> str { s[3..5] }", flagged)?.is_empty());
+    assert(
+        lint_function_messages(
+            "fn f(s: str, t: str) -> str { s[3..t.len()] }",
+            flagged,
+        )?.is_empty(),
+    );
 })
 
 # What is said of a slice of `receiver` that covers all of it.
