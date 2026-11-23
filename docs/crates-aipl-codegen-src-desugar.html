@@ -92,126 +92,14 @@
 
 
 
-        <section class="item" id="item-NoLetPatternExpr">
-          <h3>
-            <a class="anchor" href="#item-NoLetPatternExpr">NoLetPatternExpr</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoLetPatternExpr = Expr without LetPattern throughout</code></pre>
-
-          <div class="doc"><p>The tree every pass after this one is handed: an expression with none of the surface forms <code>desugared</code> lowers anywhere in it. The refinements are stacked through names, since a <code>without</code> clause takes one exclusion.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoForPatternExpr">
-          <h3>
-            <a class="anchor" href="#item-NoForPatternExpr">NoForPatternExpr</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoForPatternExpr = NoLetPatternExpr without ForPattern throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoProviderShimExpr">
-          <h3>
-            <a class="anchor" href="#item-NoProviderShimExpr">NoProviderShimExpr</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoProviderShimExpr = NoForPatternExpr without ProviderShim throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoFieldProjectionExpr">
-          <h3>
-            <a class="anchor" href="#item-NoFieldProjectionExpr">NoFieldProjectionExpr</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoFieldProjectionExpr = NoProviderShimExpr without FieldProjection throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-CoreExpr">
           <h3>
             <a class="anchor" href="#item-CoreExpr">CoreExpr</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant CoreExpr = NoFieldProjectionExpr without MethodProjection throughout</code></pre>
+          <pre class="signature"><code>variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoLetPatternKind">
-          <h3>
-            <a class="anchor" href="#item-NoLetPatternKind">NoLetPatternKind</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoLetPatternKind = ExprKind without LetPattern throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoForPatternKind">
-          <h3>
-            <a class="anchor" href="#item-NoForPatternKind">NoForPatternKind</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoForPatternKind = NoLetPatternKind without ForPattern throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoProviderShimKind">
-          <h3>
-            <a class="anchor" href="#item-NoProviderShimKind">NoProviderShimKind</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoProviderShimKind = NoForPatternKind without ProviderShim throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoFieldProjectionKind">
-          <h3>
-            <a class="anchor" href="#item-NoFieldProjectionKind">NoFieldProjectionKind</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoFieldProjectionKind = NoProviderShimKind without FieldProjection throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>The tree every pass after this one is handed: an expression with none of the surface forms <code>desugared</code> lowers anywhere in it.</p></div>
 
 
         </section>
@@ -223,63 +111,7 @@
             <a class="anchor" href="#item-CoreKind">CoreKind</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant CoreKind = NoFieldProjectionKind without MethodProjection throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoLetPatternArm">
-          <h3>
-            <a class="anchor" href="#item-NoLetPatternArm">NoLetPatternArm</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoLetPatternArm = MatchArm without LetPattern throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoForPatternArm">
-          <h3>
-            <a class="anchor" href="#item-NoForPatternArm">NoForPatternArm</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoForPatternArm = NoLetPatternArm without ForPattern throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoProviderShimArm">
-          <h3>
-            <a class="anchor" href="#item-NoProviderShimArm">NoProviderShimArm</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoProviderShimArm = NoForPatternArm without ProviderShim throughout</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-NoFieldProjectionArm">
-          <h3>
-            <a class="anchor" href="#item-NoFieldProjectionArm">NoFieldProjectionArm</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant NoFieldProjectionArm = NoProviderShimArm without FieldProjection throughout</code></pre>
+          <pre class="signature"><code>variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -293,7 +125,7 @@
             <a class="anchor" href="#item-CoreMatchArm">CoreMatchArm</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant CoreMatchArm = NoFieldProjectionArm without MethodProjection throughout</code></pre>
+          <pre class="signature"><code>variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -468,7 +300,7 @@
             <a class="anchor" href="#item-projected">projected</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn projected(self: CoreExpr, __spat$19060: Expr, step: (CoreExpr) -&#62; CoreExpr) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn projected(self: CoreExpr, __spat$18395: Expr, step: (CoreExpr) -&#62; CoreExpr) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p>What <code>receiver$step</code> means: <code>receiver.map(|e| step)</code>, where <code>step</code> is the projection written against the element <code>e</code>, which sits where the step's name is written so an error about it points at the name. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident; it carries the projection's span, so no two projections of a function name their element alike.</p></div>
 
@@ -664,7 +496,7 @@
             <a class="anchor" href="#item-bind_one_param">bind_one_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_one_param(__spat$30822: Param, body: CoreExpr) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn bind_one_param(__spat$30157: Param, body: CoreExpr) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p>A destructured parameter's bindings in front of <code>body</code>: the case's payload, or the struct's fields, read off the parameter itself. Folded from the right by the caller so they come out in source order.</p></div>
 

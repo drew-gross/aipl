@@ -60,6 +60,8 @@ import {
     contains,
     count,
     count_while,
+    drop_first,
+    drop_n,
     equal as ==,
     extend,
     filter,
@@ -716,8 +718,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Named("type_params"),
         Lit("="),
         Named("ty_core"),
-        Lit("without"),
-        Named("exclusion"),
+        Many(Then([Lit("without"), Named("exclusion")]), min=1),
     ]);
     let variant_case: Rule<AiplTok> = OneOf([
         Then([
@@ -791,13 +792,14 @@ fn types() -> Production<AiplTok, Ast>[] {
         nested_in=parens(),
     );
 
-    // A type is a head — one of the forms below — optionally refined by a
-    // trailing `without X`. The clause binds looser than every suffix, so
+    // A type is a head — one of the forms below — refined by any number of
+    // trailing `without X` clauses, each leaving out one more thing: `V without A
+    // without B throughout`. The clauses bind looser than every suffix, so
     // `T[] without []` refines the array and a refined optional is written
     // `(T[] without [])?`; a one-element paren list is that grouping.
     let ty: Rule<AiplTok> = Then([
         Named("ty_head"),
-        Maybe(Then([Lit("without"), Named("exclusion")])),
+        Many(Then([Lit("without"), Named("exclusion")])),
     ]);
 
     // What a `without` clause excludes: the empty array, or the name of a case,
@@ -4264,18 +4266,20 @@ fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 }
 
 # `refinement_decl` — the name, the type parameters, the refined head and what
-# it leaves out. The name is the second token, as in `variant_decl`; the type
-# is rebuilt as the `Without` the clause spells, which is the whole of what the
+# each clause leaves out. The name is the second token, as in `variant_decl`; the type
+# is rebuilt as the `Without` the clauses spell, which is the whole of what the
 # declaration stands for.
 fn lower_refinement_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let head = as_ty(kid(kids, 1, sp)?, sp)?;
-    let x = as_exclusion(kid(kids, 2, sp)?, sp)?;
+    mut target = as_ty(kid(kids, 1, sp)?, sp)?;
+    for (let x : kids.drop_n(2)) {
+        set target = TyWithout(target, as_exclusion(x, sp)?);
+    }
     ok(ARefinement(RefinementDecl {
         name: span_str(src, node.second_tok(sp)),
         doc: none,
         type_vars: as_type_params(kid(kids, 0, sp)?, sp)?,
-        target: TyWithout(head, x),
+        target,
     }))
 }
 
@@ -6683,16 +6687,18 @@ fn named_ty(name: str) -> Ty {
     }
 }
 
-# `ty` — a head, refined by the `without` clause when one followed it. The
-# clause's child count is what says whether it did: the head alone, or the head
-# and what it excludes.
+# `ty` — a head, refined by each `without` clause that followed it, the first
+# clause innermost: the kids are the head and then what each clause excludes.
 fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    match (kids) {
-        [head, x] => ok(ATy(TyWithout(as_ty(head, sp)?, as_exclusion(x, sp)?))),
-        [head] => ok(ATy(as_ty(head, sp)?)),
-        _ => err(ParseError { message: "a type matched no alternative", span: sp }),
+    let some(head) = kids.first() else {
+        return err(ParseError { message: "a type matched no alternative", span: sp });
+    };
+    mut refined = as_ty(head, sp)?;
+    for (let x : kids.drop_first()) {
+        set refined = TyWithout(refined, as_exclusion(x, sp)?);
     }
+    ok(ATy(refined))
 }
 
 # `exclusion` — what a `without` clause leaves out: `[]`, a case by name, or a case

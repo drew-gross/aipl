@@ -662,10 +662,12 @@ fn import_source_precedes(a: str, b: str) -> bool {
 # followed by `!E` — any of which may then be refined by a trailing
 # `without ..` clause.
 fn ty(self: W) -> WDoc!FmtError {
-    let head = self.ty_head()?;
-    if (head.w.peek_text() != "without") { return ok(head); };
-    let x = head.w.bump().w.exclusion()?;
-    ok(WDoc { w: x.w, doc: Concat([head.doc, Text(" without "), x.doc]) })
+    mut refined = self.ty_head()?;
+    while (refined.w.peek_text() == "without") {
+        let x = refined.w.bump().w.exclusion()?;
+        set refined = WDoc { w: x.w, doc: Concat([refined.doc, Text(" without "), x.doc]) };
+    }
+    ok(refined)
 }
 
 # A type before any `without` clause — see `ty`.

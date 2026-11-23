@@ -500,37 +500,12 @@ fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -> Lifte
 }
 
 # The tree every pass after this one is handed: an expression with none of the surface forms
-# `desugared` lowers anywhere in it. The refinements are stacked through names, since a
-# `without` clause takes one exclusion.
-variant NoLetPatternExpr = Expr without LetPattern throughout
+# `desugared` lowers anywhere in it.
+variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout
 
-variant NoForPatternExpr = NoLetPatternExpr without ForPattern throughout
+variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout
 
-variant NoProviderShimExpr = NoForPatternExpr without ProviderShim throughout
-
-variant NoFieldProjectionExpr = NoProviderShimExpr without FieldProjection throughout
-
-variant CoreExpr = NoFieldProjectionExpr without MethodProjection throughout
-
-variant NoLetPatternKind = ExprKind without LetPattern throughout
-
-variant NoForPatternKind = NoLetPatternKind without ForPattern throughout
-
-variant NoProviderShimKind = NoForPatternKind without ProviderShim throughout
-
-variant NoFieldProjectionKind = NoProviderShimKind without FieldProjection throughout
-
-variant CoreKind = NoFieldProjectionKind without MethodProjection throughout
-
-variant NoLetPatternArm = MatchArm without LetPattern throughout
-
-variant NoForPatternArm = NoLetPatternArm without ForPattern throughout
-
-variant NoProviderShimArm = NoForPatternArm without ProviderShim throughout
-
-variant NoFieldProjectionArm = NoProviderShimArm without FieldProjection throughout
-
-variant CoreMatchArm = NoFieldProjectionArm without MethodProjection throughout
+variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout
 
 # What `receiver$step` means: `receiver.map(|e| step)`, where `step` is the projection written
 # against the element `e`, which sits where the step's name is written so an error about it points

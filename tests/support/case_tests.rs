@@ -949,6 +949,7 @@ case_tests! {
     cases_variants_without_case_imported = "cases/variants/without_case_imported",
     cases_variants_without_narrowing = "cases/variants/without_narrowing",
     cases_variants_without_parameters = "cases/variants/without_parameters",
+    cases_variants_without_stacked = "cases/variants/without_stacked",
     cases_variants_without_throughout = "cases/variants/without_throughout",
     cases_variants_without_throughout_forms = "cases/variants/without_throughout_forms",
     cases_variants_without_throughout_wrapped = "cases/variants/without_throughout_wrapped",

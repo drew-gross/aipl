@@ -1,0 +1,15 @@
+# Every `without` clause leaves out one more thing, so a type can exclude several cases.
+
+import { equal as == } from builtins;
+
+variant Shape = Dot | Blank | Circle(i64) | Group(Shape[])
+
+fn weight(self: Shape without Dot without Blank) -> i64 {
+    match (self) {
+        Circle(n) => n,
+        Group(..) => 0,
+    }
+}.test({
+    assert(weight(Circle(4)) == 4);
+    assert(weight(Group([Dot, Blank])) == 0);
+})
