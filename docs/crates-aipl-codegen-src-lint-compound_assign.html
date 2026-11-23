@@ -22,14 +22,28 @@
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-Compound">
+          <h3>
+            <a class="anchor" href="#item-Compound">Compound</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Compound</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-compound_assign">
           <h3>
             <a class="anchor" href="#item-compound_assign">compound_assign</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn compound_assign(self: Assign, stepped: str[]) -&#62; Advice?</code></pre>
+          <pre class="signature"><code>pub fn compound_assign(self: Assign, stepped: Callee[]) -&#62; Advice?</code></pre>
 
-          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to itself combined with something. <code>stepped</code> are the operators whose <code>± 1</code> the step lint has advice for.</p></div>
+          <div class="doc"><p>The hit for <code>self</code>, when it is a <code>set</code> of a place to itself combined with something. <code>stepped</code> are the operators, by the builtin they are, whose <code>± 1</code> the step lint has advice for.</p></div>
 
 
         </section>
@@ -48,9 +62,9 @@
             <a class="anchor" href="#item-compound_of">compound_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn compound_of(self: str) -&#62; str?</code></pre>
+          <pre class="signature"><code>fn compound_of(self: Callee) -&#62; Compound?</code></pre>
 
-          <div class="doc"><p>The compound spelling the plain operator <code>self</code> is advised to become.</p></div>
+          <div class="doc"><p>The compound spelling the operator builtin <code>self</code> is advised to become, and whether it reads in either operand order.</p></div>
 
 
         </section>

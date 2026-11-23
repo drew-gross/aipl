@@ -277,7 +277,7 @@ pub fn resolved_with_builtins(self: Expr, names: str[]) -> ResolvedExpr {
 })
 
 # What each import from a builtins library brings, by the name the file calls it.
-fn imported_callees(self: Item[]) -> #{str: Callee} {
+pub fn imported_callees(self: Item[]) -> #{str: Callee} {
     let table = builtin_table();
     [
         ..self.collect_arms::<Import>()$imported_pairs(table).join(),

@@ -117,6 +117,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  gather info about operators together, clean up e.g. Compound on compound_assign
   unary negate should be named operator and support import_as and be less special cased
   remove parameter.ty.is_some() check from use_field_projection. It's there in case the user specifies a type and the linter doesn't want to erase it, but our type system should be strong enough to handle that.
   Ident should maybe be a variant rather than having an optional Callee

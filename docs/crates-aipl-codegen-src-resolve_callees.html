@@ -120,6 +120,20 @@
 
 
 
+        <section class="item" id="item-imported_callees">
+          <h3>
+            <a class="anchor" href="#item-imported_callees">imported_callees</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn imported_callees(self: Item[]) -&#62; #{str: Callee}</code></pre>
+
+          <div class="doc"><p>What each import from a builtins library brings, by the name the file calls it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-ResolvedFunction">
           <h3>
             <a class="anchor" href="#item-ResolvedFunction">ResolvedFunction</a>
@@ -275,20 +289,6 @@
           <pre class="signature"><code>fn expressions(self: Item) -&#62; Expr[]</code></pre>
 
           <div class="doc"><p>Every expression a declaration holds at its top: a function's body and parameter defaults, a struct field's default, a variant case slot's default, a constant's value.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-imported_callees">
-          <h3>
-            <a class="anchor" href="#item-imported_callees">imported_callees</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn imported_callees(self: Item[]) -&#62; #{str: Callee}</code></pre>
-
-          <div class="doc"><p>What each import from a builtins library brings, by the name the file calls it.</p></div>
 
 
         </section>

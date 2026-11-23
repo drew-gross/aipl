@@ -105,6 +105,14 @@ pub fn use_field_projection(function: Function) -> LintHit[] { function.projecti
         )?.is_empty(),
     );
 
+    // A form the parser lowered to a call is no step: `p[1, 2]` reads a grid cell.
+    assert(
+        lint_function_messages(
+            "fn f(xs: i64[,][]) -> i64 { xs.map(|g| g[1, 2]) }",
+            use_field_projection,
+        )?.is_empty(),
+    );
+
     // A name that is no method of this file (`g` is nothing declared here), and a lambda that is not
     // a `map`'s argument.
     assert(
@@ -178,13 +186,11 @@ fn chain(self: Expr, parameter: str) -> str[]? {
     let target = arguments.first()?;
     let rest = arguments.drop_first();
 
-    // An operator use is a call named for its spelling. A call named `__builtin_..` is what the
-    // parser made of a form (`p[i, j]` is `__builtin_grid_get`), not a function a `$` step could
-    // name. A `$` the author wrote inside the lambda is a projection node, not a call, so it is
-    // not a step of this chain either.
-    if (name.starts_with(
-        "__builtin_",
-    ) || name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(
+    // An operator use is a call named for its spelling. A call the parser made of a form
+    // (`p[i, j]` is `__builtin_grid_get`) is no method, so its callee is not one a `$` step could
+    // name; and a `$` the author wrote inside the lambda is a projection node, not a call, so it
+    // is not a step of this chain either.
+    if (name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(
         [parameter],
         none,
     )) || !(method_style || callee.is_method_callable())) {

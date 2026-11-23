@@ -19,15 +19,18 @@ import {
     collect_ok,
     equal as ==,
     filter,
+    get,
     is_empty,
     is_some_and,
     logical_and as &&,
     logical_not as !,
     map,
 } from builtins;
+import { Callee } from "../builtin_table.aipl";
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
+import { imported_callees } from "../resolve_callees.aipl";
 import {
     Advice,
     Named,
@@ -55,11 +58,18 @@ pub fn step_of(self: str) -> Step? {
     }
 }
 
-# The plain operators whose `± 1` this lint has advice for in a file with these `items`.
-pub fn stepped_operators(self: Item[]) -> str[] {
-    ["+", "-"].filter(
-        |operator| operator.step_of().is_some_and(|step| self.can_flavor(step.spelling, operator)),
-    )
+# The builtins the file's `+` and `-` are whose `± 1` this lint has advice for in a file with these
+# `items`.
+pub fn stepped_operators(self: Item[]) -> Callee[] {
+    let operators = self.imported_callees();
+    ["+", "-"]
+        .filter(
+            |operator| operator
+                .step_of()
+                .is_some_and(|step| self.can_flavor(step.spelling, operator)),
+        )
+        .map(|operator| operators.get(operator))
+        .collect_ok()
 }
 
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.

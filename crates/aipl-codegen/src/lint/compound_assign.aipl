@@ -27,11 +27,20 @@ import {
     is_empty,
     logical_and as &&,
     logical_not as !,
-    logical_or as ||,
     map,
 } from builtins;
+import {
+    Callee,
+    SaturatingAdd,
+    SaturatingDivide,
+    SaturatingSub,
+    WrappingAdd,
+    WrappingMul,
+    WrappingSub,
+} from "../builtin_table.aipl";
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
+import { is_operator_name } from "../is_operator_name.aipl";
 import { Function, Item } from "../item.aipl";
 import {
     Advice,
@@ -47,36 +56,40 @@ import { is_same_place } from "./places.aipl";
 import { Flavored } from "./spelling.aipl";
 import { stepped_operators } from "./step_by_one.aipl";
 
-# The compound spelling the plain operator `self` is advised to become.
-fn compound_of(self: str) -> str? {
+# The compound spelling the operator builtin `self` is advised to become, and whether it reads in
+# either operand order.
+fn compound_of(self: Callee) -> Compound? {
     match (self) {
-        "+" => some("+="),
-        "-" => some("-="),
-        "*" => some("*="),
-        "/" => some("/="),
+        WrappingAdd | SaturatingAdd => some(Compound { spelling: "+=", commutative: true }),
+        WrappingSub | SaturatingSub => some(Compound { spelling: "-=", commutative: false }),
+        WrappingMul => some(Compound { spelling: "*=", commutative: true }),
+        SaturatingDivide => some(Compound { spelling: "/=", commutative: false }),
         _ => none,
     }
 }
 
+struct Compound { spelling: str, commutative: bool }
+
 # The hit for `self`, when it is a `set` of a place to itself combined with something. `stepped` are
-# the operators whose `± 1` the step lint has advice for.
-pub fn compound_assign(self: Assign(target, value, _), stepped: str[]) -> Advice? {
+# the operators, by the builtin they are, whose `± 1` the step lint has advice for.
+pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Advice? {
     if (!target.spans_its_text()) { return none; };
-    // An operator use is a call named for the spelling written.
-    let Call(written, [left, right], _, _) = value.kind else { return none; };
-    let spelling = written.compound_of()?;
+    // An operator use is a call named for the spelling written, which the advice is flavored like.
+    let Call(written, [left, right], _, callee) = value.kind else { return none; };
+    if (!written.is_operator_name()) { return none; };
+    let Compound { spelling, commutative } = callee.compound_of()?;
 
     // The receiver on the left works for every operator; on the right only where the operation is
     // commutative, since `k - x` and `k / x` are not accumulations of `x` at all.
     let operand = if (left.is_same_place(target)) {
         right
-    } else if (right.is_same_place(target) && (written == "+" || written == "*")) {
+    } else if (right.is_same_place(target) && commutative) {
         left
     } else {
         return none;
     };
     // `set x = x ± 1;` is the step lint's when that lint can fire here.
-    if (operand.kind == Num(1) && stepped.contains(written)) { return none; };
+    if (operand.kind == Num(1) && stepped.contains(callee)) { return none; };
     let name = target.source;
     some(Advice {
         named: [
