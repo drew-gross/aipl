@@ -48,7 +48,13 @@ pub fn with_source_text(self: WrittenProgram, text: str) -> WrittenProgram {
     let function = Function {
         name: SpanStr { text: "f", span: 3..4 },
         visibility: Private,
-        sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+        sig: Signature {
+            type_vars: [],
+            params: [],
+            effects: [],
+            return_ty: none,
+            is_method: false,
+        },
         body: call,
         doc: none,
     };

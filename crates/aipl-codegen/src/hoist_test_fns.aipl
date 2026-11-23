@@ -89,7 +89,7 @@ fn function_items(self: Function, Attributes { test_body, test_fns, benchmark })
 fn benchmark_function(self: Function, span: Span) -> Function {
     name: SpanStr { text: benchmark_fn_name(self.name.text), span },
     visibility: BenchmarkFn,
-    sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+    sig: Signature { type_vars: [], params: [], effects: [], return_ty: none, is_method: false },
     body: at(Unit, span),
     doc: none,
 }
@@ -130,7 +130,7 @@ fn with_test_function(self: Function, test_body: Expr?) -> Function[] {
     let test = Function {
         name: SpanStr { ..self.name, text: test_fn_name(self.name.text) },
         visibility,
-        sig: Signature { type_vars: [], params: [], effects, return_ty: none },
+        sig: Signature { type_vars: [], params: [], effects, return_ty: none, is_method: false },
         body: block,
         doc: none,
     };

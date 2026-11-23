@@ -117,7 +117,6 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  is_method flag on Signature (then clean up destructure, use_field_projection, and Rust side: aipl-syntax (p.name == "self") and aipl-mono/pin.rs (f.sig.params[0].name != "self"))
   merge Let and LetMut in ExprKind (with a "mutable" flag)
   operator_named_forms is info about builtins, it should be included in the info about builtins (also delete operator_spellings)
   leverage refinement types in resolve_callees so that an expr with unresolved calls and an expr with resolved calls are different types

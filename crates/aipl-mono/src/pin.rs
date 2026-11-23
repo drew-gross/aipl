@@ -1323,7 +1323,7 @@ fn check_method_declaration(f: &Function) -> Res<()> {
         return fail("only the first parameter may be \"mut\"");
     }
     if f.sig.is_mutating() {
-        if f.sig.params[0].name != "self" {
+        if !f.sig.is_method() {
             return fail("a \"mut\" receiver must be named \"self\"");
         }
         if f.sig.return_ty.is_some() {

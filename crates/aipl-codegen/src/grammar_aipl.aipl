@@ -297,6 +297,7 @@ import {
     WrittenProgram,
     ZeroOrMore,
     show_program,
+    synthesized_name,
 } from "./item.aipl";
 import {
     AiplTok,
@@ -4122,7 +4123,13 @@ fn lower_test_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         Function {
             name: SpanStr { text: unattached_test_name(0), span: at },
             visibility: Private,
-            sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+            sig: Signature {
+                type_vars: [],
+                params: [],
+                effects: [],
+                return_ty: none,
+                is_method: false,
+            },
             body: at(Unit, sp),
             shorthand_body: false,
             doc: none,
@@ -4146,7 +4153,13 @@ fn lower_benchmark_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         Function {
             name: SpanStr { text: unattached_benchmark_name(0), span: at },
             visibility: Private,
-            sig: Signature { type_vars: [], params: [], effects: [], return_ty: none },
+            sig: Signature {
+                type_vars: [],
+                params: [],
+                effects: [],
+                return_ty: none,
+                is_method: false,
+            },
             body: at(Unit, sp),
             shorthand_body: false,
             doc: none,
@@ -4368,7 +4381,13 @@ fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             } else {
                 Private
             },
-            sig: Signature { type_vars, params, effects, return_ty },
+            sig: Signature {
+                type_vars,
+                params,
+                effects,
+                return_ty,
+                is_method: params.first().is_some_and(|p| p.synthesized_name() == "self"),
+            },
             body: resolved,
             shorthand_body: body.is_case::<PConstruct>(),
             // Documentation comes from the `# ..` lines in front of the

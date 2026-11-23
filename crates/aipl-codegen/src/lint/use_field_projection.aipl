@@ -53,7 +53,6 @@ import {
     Ident,
     Lambda,
     descendants_of_kind,
-    name_at,
     synthesized_name,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -172,13 +171,7 @@ fn methods_in_view(self: Item[]) -> str[] {
 
 # The name of the function `self`, when it takes a `self`.
 fn method_name(self: LoweredFn(Function { sig, name })) -> str? {
-    if (sig.params
-        .first()
-        .is_some_and(|parameter| parameter.binding.name_at(parameter.name_span) == "self")) {
-        some(name.text)
-    } else {
-        none
-    }
+    if (sig.is_method) { some(name.text) } else { none }
 }
 
 # `self` as the projection for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.

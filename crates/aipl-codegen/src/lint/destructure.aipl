@@ -67,6 +67,7 @@ import {
     as_case,
     contains,
     equal as ==,
+    extend,
     is_case,
     is_empty,
     is_nonempty,
@@ -99,7 +100,7 @@ import {
     descendants_of_kind,
     field_reads,
 } from "../expr.aipl";
-import { Function, One, Param, pattern_reads } from "../item.aipl";
+import { Function, One, Param, Signature, pattern_reads } from "../item.aipl";
 import { Array, ArrayNested, Ctor, Nested, is_binder_name, show_pat } from "../pat.aipl";
 import { Named, Ty } from "../ty.aipl";
 import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
@@ -114,7 +115,7 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
     // same way.
     let reads = [..sig.params$pattern_reads().join(), ..body.field_reads()];
     [
-        ..sig.params$param_hits(body, reads).join(),
+        ..sig.param_hits(body, reads),
         ..body
             .descendants_of_kind::<Let>()$kind
             .map(|Let(name, annotation, value, inner)| {
@@ -485,15 +486,23 @@ fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: 
     some(Fields(self.sole_fields(name, reads, value)?))
 }
 
-# The hit for one parameter, or its pattern's slots.
-fn param_hits(self: Param, body: Expr, reads: Read[]) -> LintHit[] {
+# The hits for each of `self`'s parameters.
+fn param_hits(self: Signature, body: Expr, reads: Read[]) -> LintHit[] {
+    mut found: LintHit[] = [];
+    for (let i, param : self.params) {
+        set found.extend(param.hits(body, reads, self.is_method && i == 0));
+    }
+    found
+}
+
+# The hit for one parameter, or its pattern's slots. The receiver of a method keeps its name, which
+# is what makes the function callable as `recv.f(..)`.
+fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> LintHit[] {
     // The body's span starts at the `{` that opens it, which is a single line that
     // survives the formatter — and the closest line to the signature that a
     // parameter can be blamed on, `Param` carrying no span of its own.
     let Name(name) = self.binding else { return self.binding.slot_hits(body, reads, body.span); };
-    if (name == "self" || self.mutable || self.arity != One || self.default.is_some()) {
-        return [];
-    };
+    if (is_receiver || self.mutable || self.arity != One || self.default.is_some()) { return []; };
     let some(Named(struct_name)) = self.ty.as_case::<Named>() else { return []; };
 
     // There is no right-hand side to discount here the way a `let` has one: a

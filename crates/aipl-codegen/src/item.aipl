@@ -168,7 +168,14 @@ pub fn arity_marker(self: Arity) -> str {
     assert(OneOrMore.arity_marker() == "+");
 })
 
-struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
+struct Signature {
+    type_vars: TypeParam[],
+    params: Param[],
+    effects: str[],
+    return_ty: Ty?,
+    // Whether the first parameter is named `self`, which is what makes `recv.f(..)` a call of it.
+    is_method: bool,
+}
 
 # How a function is reached. `Public` is written `pub` and may be imported; `EntryPoint` is
 # reached by whatever runs the file, as `main` is, without being importable; `Test` and

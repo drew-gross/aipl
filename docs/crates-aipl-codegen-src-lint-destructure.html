@@ -30,7 +30,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-destructure">destructure</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure(__spat$4956: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure(__spat$4979: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each parameter, <code>let</code> and pattern slot in the program whose name is only ever taken apart.</p></div>
 
@@ -126,9 +126,23 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-param_hits">param_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn param_hits(self: Param, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn param_hits(self: Signature, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>The hit for one parameter, or its pattern's slots.</p></div>
+          <div class="doc"><p>The hits for each of <code>self</code>'s parameters.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hits">
+          <h3>
+            <a class="anchor" href="#item-hits">hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The hit for one parameter, or its pattern's slots. The receiver of a method keeps its name, which is what makes the function callable as <code>recv.f(..)</code>.</p></div>
 
 
         </section>
