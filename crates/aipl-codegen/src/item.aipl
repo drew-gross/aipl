@@ -438,7 +438,7 @@ pub fn names_in(self: Expr) -> #{str} {
 # The names `e` itself mentions, not those of its sub-expressions.
 pub fn own_names(self: Expr) -> #{str} {
     match (self.kind) {
-        Ident(name) | ExprKind.Construct(name, _) | Call(name, _, _, _) => #{name},
+        Ident(name, _) | ExprKind.Construct(name, _) | Call(name, _, _, _) => #{name},
         // Unary `-` is the one operator with no named builtin behind it, so it
         // stays a node; every other operator use is a `Call` on its spelling.
         Neg(..) => #{"-"},

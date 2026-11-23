@@ -143,7 +143,7 @@ pub fn sole_fields(self: Expr, name: str, reads: Read[], value: Expr?) -> str[]?
 # Whether `self` is the bare name `name`.
 pub fn is_name(self: Expr, name: str) -> bool {
     match (self.kind) {
-        Ident(n) => n == name,
+        Ident(n, _) => n == name,
         _ => false,
     }
 }
@@ -169,7 +169,7 @@ pub fn mentions_any(self: Expr, names: str[], skip: str?) -> bool {
     self
         .descendants()
         .any(|node| match (node.kind) {
-            Ident(n) => some(n) != skip && names.contains(n),
+            Ident(n, _) => some(n) != skip && names.contains(n),
             _ => false,
         })
 }.test({

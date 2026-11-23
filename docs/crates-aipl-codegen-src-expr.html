@@ -83,7 +83,7 @@
             <a class="anchor" href="#item-name_at">name_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5562: Span) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5569: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
 
@@ -236,7 +236,9 @@
 
             </li>
 
-            <li id="item-Ident"><code>Ident(str)</code>
+            <li id="item-Ident"><code>Ident(name: str, callee: Callee = Unresolved)</code>
+
+              <div class="doc"><p><code>callee</code> is what the name is to when it is used as a function value (<code>xs.map(f)</code>): the parser writes <code>Unresolved</code>, and <code>resolve_callees.aipl</code> decides it like a call's.</p></div>
 
 
             </li>
@@ -567,6 +569,20 @@
           <pre class="signature"><code>pub fn ident(name: str) -&#62; Expr</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_ident">
+          <h3>
+            <a class="anchor" href="#item-is_ident">is_ident</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_ident(self: ExprKind, name: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> is the name <code>name</code> used as a value, whatever it is resolved to.</p></div>
 
 
         </section>

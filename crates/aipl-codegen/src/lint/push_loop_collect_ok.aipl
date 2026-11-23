@@ -35,7 +35,7 @@ import {
     not_equal as !=,
 } from builtins;
 import { Callee, CollectOk, Map, Push } from "../builtin_table.aipl";
-import { ArrayLit, Ident, IfLet, LetMut, Unit, descendants_of_kind } from "../expr.aipl";
+import { ArrayLit, IfLet, LetMut, Unit, descendants_of_kind, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_liftable, pipeline_hit, plain_seeded_loop, pushed } from "./accumulation.aipl";
 import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
@@ -58,12 +58,12 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
 
     // Asking nothing of the element — the iterable already holds the optionals — leaves no
     // first `map` to write, and pushing the bound name itself needs no second one.
-    let asks: (Callee, str)? = if (scrutinee.kind != Ident(looped.variable)) {
+    let asks: (Callee, str)? = if (!scrutinee.kind.is_ident(looped.variable)) {
         some((Map, `(|{looped.variable}| ..)`))
     } else {
         none
     };
-    let maps: (Callee, str)? = if (element.kind != Ident(bound)) {
+    let maps: (Callee, str)? = if (!element.kind.is_ident(bound)) {
         some((Map, `(|{bound}| ..)`))
     } else {
         none

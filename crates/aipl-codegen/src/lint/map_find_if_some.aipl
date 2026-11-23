@@ -9,48 +9,24 @@
 #
 # The predicate has to *be* `is_some` — the name; a lambda forwarding to it is `identity_lambda`'s
 # to turn into the name — since that is what makes the chain a `find_map` rather than a search over mapped values
-# (`map_find_if`'s shape, which the fusion pass takes care of). `map`, `find_if` and
-# `is_some` are the precondition, since the shape is theirs, and a file that has not
-# imported one of them is not writing it; `find_map` only decides whether the advice names
-# an import too.
+# (`map_find_if`'s shape, which the fusion pass takes care of).
 #
 # The hit points at the whole chain.
 
-import {
-    as_case,
-    collect_ok,
-    equal as ==,
-    is_empty,
-    len,
-    logical_not as !,
-    map,
-    not_equal as !=,
-} from builtins;
-import { FindIf, FindMap, IsSome, Map, builtin_table } from "../builtin_table.aipl";
+import { collect_ok, equal as ==, is_empty, len, map, not_equal as != } from builtins;
+import { FindIf, FindMap, IsSome, Map } from "../builtin_table.aipl";
 import { Call, Expr, Ident, descendants_of_kind } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
-import {
-    Advice,
-    Named,
-    UnfilledHit,
-    hit_at,
-    lint_in_unfilled,
-    lint_in_unfilled_messages,
-} from "./lint_hit.aipl";
-import { Builtin, bound_to, is_builtin_named } from "./spelling.aipl";
+import { Function } from "../item.aipl";
+import { Advice, Named, UnfilledHit, hit_at, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { Builtin } from "./spelling.aipl";
 
-# The advice for the call `self`, when it is a `map(..).find_if(is_some)` chain in a file with these `items`.
-pub fn map_find_if_some(self: Call(_, arguments, _, callee), items: Item[]) -> Advice? {
+# The advice for the call `self`, when it is a `map(..).find_if(is_some)` chain.
+pub fn map_find_if_some(self: Call(_, arguments, _, callee)) -> Advice? {
     if (callee != FindIf) { return none; };
     let [mapped, predicate] = arguments else { return none; };
     let Call(_, inner_arguments, _, Map) = mapped.kind else { return none; };
-    let Ident(predicate_name) = predicate.kind.as_case::<Ident>()?;
+    let Ident(_, IsSome) = predicate.kind else { return none; };
     if (inner_arguments.len() != 2) { return none; };
-    // The name has to be the file's import of `is_some`, not another function that shares it.
-    if (!Builtin(IsSome).is_builtin_named(items.bound_to(predicate_name)?, builtin_table())) {
-        return none;
-    };
     some(Advice {
         named: [
             Named { text: `"`, builtin: Builtin(Map) },
@@ -65,82 +41,56 @@ pub fn map_find_if_some(self: Call(_, arguments, _, callee), items: Item[]) -> A
     })
 }.test({
     // The hits for each function's calls.
-    fn flagged(Function { body }, items: Item[]) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> UnfilledHit[] {
         body
             .descendants_of_kind::<Call>()
-            .map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some(items)) })
+            .map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some()) })
             .collect_ok()
     }
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
-            `import \{ {imports} } from builtins; fn f(xs: i64[]) -> i64?? \{ {body} }`,
-            flagged,
-        )
-    }
-    let all = "map, find_if, is_some, find_map";
 
     // The name itself; a lambda that forwards to it is `identity_lambda`'s to simplify first.
-    assert(messages(all, "xs.map(g).find_if(is_some)")? == [
-        `"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once`,
+    assert(lint_function_unfilled(
+        "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(is_some) }",
+        flagged,
+    )?.shown() == [
+        `"Builtin(Map)" then "Builtin(FindIf)(Builtin(IsSome))" is the first element with an answer, wrapped twice — write "Builtin(FindMap)(..)" over the mapping function, which hands the answer back once`,
     ]);
 
-    // An import the file lacks is named, and an alias is followed.
-    assert(messages("map, find_if, is_some", "xs.map(g).find_if(is_some)")? == [
-        ```"map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once, importing `find_map` from builtins```,
-    ]);
-
-    // Not the shape: another predicate, a lambda that does more, and a file that has not
-    // imported what the shape is made of.
+    // Not the shape: another predicate, a lambda that does more, a different first step, and a
+    // local that is called `is_some`.
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(|r| r.is_some() && c) }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(other) }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(xs: i64[]) -> i64?? { xs.filter(g).find_if(is_some) }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
-            "fn f(xs: i64[]) -> i64?? { xs.map(g).find_if(is_some) }",
-            flagged,
-        )?.is_empty(),
-    );
-    // Shapes the lint must leave alone.
-    assert(
-        lint_in_unfilled(
-            "fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }",
+        lint_function_unfilled(
+            "fn f(xs: i64[], is_some: (i64?) -> bool) -> i64?? { xs.map(g).find_if(is_some) }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn first_big(xs: i64[]) -> i64? { xs.map(|x| x * 10).find_if(|y| y == 20) }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn first_some(os: i64?[]) -> i64?? { os.find_if(is_some) }",
-            flagged,
-        )?.is_empty(),
-    );
-
-    // Shapes the lint flags, and what it says of them.
-
-    assert(
-        lint_in_unfilled(
-            "fn first_nonzero(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(is_some) }",
             flagged,
         )?.is_empty(),
     );

@@ -41,7 +41,7 @@ import {
     not_equal as !=,
 } from builtins;
 import { Push, Zip, ZipWith } from "../builtin_table.aipl";
-import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit } from "../expr.aipl";
+import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor } from "../pat.aipl";
 import {
@@ -171,8 +171,8 @@ fn zip_hit(self: SeededLoop) -> UnfilledHit? {
     // `other[position]`, with `other` a name that is neither the array being built nor one
     // of the loop's own bindings.
     let Index(array, at) = scrutinee.kind.as_case::<Index>()?;
-    let Ident(other) = array.kind.as_case::<Ident>()?;
-    if (at.kind != Ident(position) || [self.name, self.variable, position].contains(other)) {
+    let Ident(other, _) = array.kind.as_case::<Ident>()?;
+    if (!at.kind.is_ident(position) || [self.name, self.variable, position].contains(other)) {
         return none;
     };
 
@@ -189,5 +189,5 @@ fn zip_hit(self: SeededLoop) -> UnfilledHit? {
 # Whether `self` is the tuple of the names `first` and `second`, in that order.
 fn is_pair_of(self: Expr, first: str, second: str) -> bool {
     let TupleLit([left, right]) = self.kind else { return false; };
-    left.kind == Ident(first) && right.kind == Ident(second)
+    left.kind.is_ident(first) && right.kind.is_ident(second)
 }

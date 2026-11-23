@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-use_field_projection">use_field_projection</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn use_field_projection(function: Function, items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn use_field_projection(function: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>map</code> in the program whose function is a <code>$</code> projection.</p></div>
 
@@ -55,7 +55,7 @@
             <a class="anchor" href="#item-projections">projections</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn projections(self: Function, items: Item[]) -&#62; Projection[]</code></pre>
+          <pre class="signature"><code>pub fn projections(self: Function) -&#62; Projection[]</code></pre>
 
           <div class="doc"><p>The [<code>Projection</code>] of each <code>map</code> in <code>self</code>.</p></div>
 
@@ -71,40 +71,12 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-methods_in_view">
-          <h3>
-            <a class="anchor" href="#item-methods_in_view">methods_in_view</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn methods_in_view(self: Item[]) -&#62; str[]</code></pre>
-
-          <div class="doc"><p>The names a bare function value can use as a <code>$</code> step: a function of this file whose first parameter is named <code>self</code>, which is what method-call syntax is defined by, and a lowercase builtin the file imports. A function value carries no callee, so this is read from the file's items; a call is judged by its own callee. A function from another file is not here — its parameters are not in view when a file is linted.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-method_name">
-          <h3>
-            <a class="anchor" href="#item-method_name">method_name</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn method_name(self: LoweredFn) -&#62; str?</code></pre>
-
-          <div class="doc"><p>The name of the function <code>self</code>, when it takes a <code>self</code>.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-projection">
           <h3>
             <a class="anchor" href="#item-projection">projection</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn projection(self: Expr&#60;Call&#62;, methods: str[]) -&#62; Projection?</code></pre>
+          <pre class="signature"><code>fn projection(self: Expr&#60;Call&#62;) -&#62; Projection?</code></pre>
 
           <div class="doc"><p><code>self</code> as the projection for <code>recv.map(arg)</code>, if <code>arg</code> is a function name or a lambda <code>$</code> can say.</p></div>
 

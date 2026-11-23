@@ -101,8 +101,8 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.hits(push_array_literal),
         ..functions.unfilled_hits(return_loop_find_if).filled(items),
         ..functions.unfilled_hits(return_loop_any_all).filled(items),
-        ..functions.hits(|function| identity_lambda(function, items)),
-        ..functions.hits(|function| use_field_projection(function, items)),
+        ..functions.hits(identity_lambda),
+        ..functions.hits(use_field_projection),
         ..functions.unfilled_hits(push_loop_zip_with).filled(items),
         ..functions.unfilled_hits(return_loop_find_index).filled(items),
         ..functions.hits(interp_to_str),
@@ -114,7 +114,7 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..functions.hits(assign_lints),
         ..functions.unfilled_hits(|function| assign_advice(function, items)).filled(items),
         ..functions.hits(call_lints),
-        ..functions.unfilled_hits(|function| call_advice(function, items)).filled(items),
+        ..functions.unfilled_hits(call_advice).filled(items),
     ]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()) == []);
@@ -147,11 +147,11 @@ fn call_lints(Function { body }) -> LintHit[] {
 }
 
 # The lints over the calls of `function` that advise a builtin.
-fn call_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
+fn call_advice(Function { body }) -> UnfilledHit[] {
     let calls = body.descendants_of_kind::<Call>();
     [
         ..calls$kind$map_constant_repeat(),
-        ..calls.map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some(items)) }),
+        ..calls.map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some()) }),
         ..calls$kind$zip_with_pair_zip(),
         ..calls$kind$with_value_or_self(),
         ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),

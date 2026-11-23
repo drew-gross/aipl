@@ -25,10 +25,10 @@ import { Zip, ZipWith } from "../builtin_table.aipl";
 import {
     Call,
     Expr,
-    Ident,
     Lambda,
     TupleLit,
     descendants_of_kind,
+    is_ident,
     synthesized_name,
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
@@ -108,5 +108,5 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
 fn only_pairs(self: Expr) -> bool {
     let Lambda([first, second], body) = self.kind else { return false; };
     let TupleLit([left, right]) = body.kind else { return false; };
-    left.kind == Ident(first.synthesized_name()) && right.kind == Ident(second.synthesized_name())
+    left.kind.is_ident(first.synthesized_name()) && right.kind.is_ident(second.synthesized_name())
 }

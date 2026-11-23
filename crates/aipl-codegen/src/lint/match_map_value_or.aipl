@@ -51,7 +51,7 @@ pub fn match_map_value_or(self: Match) -> UnfilledHit? {
     // The identity arm is `value_or`'s shape, `none => false` is `is_some_and`'s and a
     // unit `none` arm is a statement `match`. A `some` arm that never reads its binding
     // maps nothing: that is an `is_some` question, and no `map` improves on it.
-    let identity = if (let Ident(payload) = some_body.kind) { payload == binder } else { false };
+    let identity = if (let Ident(payload, _) = some_body.kind) { payload == binder } else { false };
     if (identity || none_body.kind == Bool(false) || none_body.kind == Unit) { return none; };
     if (!some_body.mentions_any([binder], none)) { return none; };
     let receiver = scrutinee.receiver_text();

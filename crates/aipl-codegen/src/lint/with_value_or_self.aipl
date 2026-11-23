@@ -90,8 +90,8 @@ pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
 
 # Whether `self` and `other` read the same binding, or the same field path off one.
 fn same_place(self: Expr, other: Expr) -> bool {
-    if (let Ident(name) = self.kind) {
-        return if (let Ident(other_name) = other.kind) { name == other_name } else { false };
+    if (let Ident(name, _) = self.kind) {
+        return if (let Ident(other_name, _) = other.kind) { name == other_name } else { false };
     };
     let Field(base, field) = self.kind else { return false; };
     if (let Field(other_base, other_field) = other.kind) {

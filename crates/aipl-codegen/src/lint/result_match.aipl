@@ -9,12 +9,13 @@ import {
     first,
     is_some_and,
     len,
+    logical_not as !,
     map,
     not_equal as !=,
     value_or,
 } from builtins;
 import { Callee, Ok } from "../builtin_table.aipl";
-import { Call, Expr, Ident, Match, descendants_of_kind } from "../expr.aipl";
+import { Call, Expr, Match, descendants_of_kind, is_ident } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { hit, lint_function_messages } from "./lint_hit.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
@@ -67,7 +68,7 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
 # Whether `self` is `constructor(binder)`: the arm hands its own binding straight back to
 # the constructor it came from.
 pub fn passes_through(self: Expr, constructor: Callee, binder: str) -> bool {
-    self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind == Ident(binder))
+    self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind.is_ident(binder))
 }.test({
     assert(ok_arm_flags("ok(v)")? == "true false");
     assert(ok_arm_flags("ok(v + 1)")? == "false true");
@@ -82,7 +83,7 @@ pub fn passes_through(self: Expr, constructor: Callee, binder: str) -> bool {
 # Whether `self` is `constructor(..)` of something other than `binder`: the arm builds
 # a new value for the side it came from.
 pub fn rebuilds(self: Expr, constructor: Callee, binder: str) -> bool {
-    self.wraps_with(constructor).is_some_and(|wrapped| wrapped.kind != Ident(binder))
+    self.wraps_with(constructor).is_some_and(|wrapped| !wrapped.kind.is_ident(binder))
 }
 
 # The one argument of `self`, when it is a call to `constructor`.

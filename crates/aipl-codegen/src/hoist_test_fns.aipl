@@ -149,7 +149,7 @@ fn renamed(self: str, renames: #{str: str}) -> str { renames.get(self).value_or(
 # renamed.
 fn rename_uses(self: Expr, renames: #{str: str}) -> Expr {
     let kind = match (self.kind) {
-        Ident(name) => Ident(name.renamed(renames)),
+        Ident(name, callee) => Ident(name.renamed(renames), callee=callee),
         Call(name, args, method_style, _) => Call(
             name.renamed(renames),
             args,

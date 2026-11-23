@@ -24,24 +24,20 @@ import {
     all,
     any,
     as_case,
-    collect_arms,
     collect_ok,
     contains,
     drop_first,
     equal as ==,
-    filter,
     first,
     greater_than as >,
     is_digit,
     is_empty,
     is_some,
-    is_some_and,
     join,
     len,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
-    map,
     starts_with,
 } from builtins;
 import { Map, is_method_callable } from "../builtin_table.aipl";
@@ -55,37 +51,34 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
-import { Function, Item, LoweredFn } from "../item.aipl";
+import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, hit, lint_in_messages, quote } from "./lint_hit.aipl";
-import { imported_locals } from "./spelling.aipl";
+import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
 
 # A hit for each `map` in the program whose function is a `$` projection.
-pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
-    function.projections(items)$hit
-}.test({
+pub fn use_field_projection(function: Function) -> LintHit[] { function.projections()$hit }.test({
     // A member read, a method call with arguments, a chain, a builtin and a function name.
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.name) }",
         use_field_projection,
     )? == [`"map" with a lambda that only uses a member of its argument — write "xs$name"`]);
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.f(1, 2)) }",
         use_field_projection,
     )? == [`"map" with a lambda that only uses a member of its argument — write "xs$f(...)"`]);
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.a.f().c) }",
         use_field_projection,
     )? == [`"map" with a lambda that only uses a member of its argument — write "xs$a$f()$c"`]);
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(|n| to_str(n)) }",
         use_field_projection,
     )? == [`"map" with a lambda that only uses a member of its argument — write "ys$to_str()"`]);
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(shout) }",
         use_field_projection,
     )? == [`"map" over the function "shout" — write "ys$shout()"`]);
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { g().map(|p| p.name) }",
         use_field_projection,
     )? == [`"map" with a lambda that only uses a member of its argument — write "<items>$name"`]);
@@ -93,13 +86,13 @@ pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
     // Not a step `$` can make: an annotated parameter, the parameter used twice, an operator,
     // a function from elsewhere, and a `map` the file never imported.
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p: P| p.name) }",
             use_field_projection,
         )?.is_empty(),
     );
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.f(p)) }",
             use_field_projection,
         )?.is_empty(),
@@ -107,7 +100,7 @@ pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
 
     // A `$` inside the lambda maps its own receiver, so it is not a step of the outer chain.
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.name$shout().len()) }",
             use_field_projection,
         )?.is_empty(),
@@ -116,19 +109,19 @@ pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
     // A name that is no method of this file (`g` is nothing declared here), and a lambda that is not
     // a `map`'s argument.
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(g) }",
             use_field_projection,
         )?.is_empty(),
     );
     assert(
-        lint_in_messages(
+        lint_function_messages(
             """struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.filter(|p| p.name == "a") }""",
             use_field_projection,
         )?.is_empty(),
     );
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|n| n + 1) }",
             use_field_projection,
         )?.is_empty(),
@@ -140,38 +133,16 @@ pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
 struct Projection { hit: LintHit, lambda: Span? }
 
 # The [`Projection`] of each `map` in `self`.
-pub fn projections(self: Function, items: Item[]) -> Projection[] {
-    let methods = items.methods_in_view();
-    self.body
-        .descendants_of_kind::<Call>()
-        .map(|call: Expr<Call>| { call.projection(methods) })
-        .collect_ok()
-}
-
-# The names a bare function value can use as a `$` step: a function of this file whose first
-# parameter is named `self`, which is what method-call syntax is defined by, and a lowercase builtin
-# the file imports. A function value carries no callee, so this is read from the file's items; a
-# call is judged by its own callee. A function from another file is not here — its parameters are not
-# in view when a file is linted.
-fn methods_in_view(self: Item[]) -> str[] {
-    let own = self.collect_arms::<LoweredFn>()$method_name().collect_ok();
-    let imported = self
-        .imported_locals()
-        .filter(|name| name[0].is_some_and(|c| "abcdefghijklmnopqrstuvwxyz_".contains(c)));
-    [..own, ..imported]
-}
-
-# The name of the function `self`, when it takes a `self`.
-fn method_name(self: LoweredFn(Function { sig, name })) -> str? {
-    if (sig.is_method) { some(name.text) } else { none }
+pub fn projections(self: Function) -> Projection[] {
+    self.body.descendants_of_kind::<Call>()$projection().collect_ok()
 }
 
 # `self` as the projection for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
-fn projection(self: Expr<Call>, methods: str[]) -> Projection? {
+fn projection(self: Expr<Call>) -> Projection? {
     let Call(_, [receiver, argument], _, Map) = self.kind else { return none; };
     let items = receiver.quote("<items>");
-    if (let Ident(function) = argument.kind) {
-        if (!methods.contains(function)) { return none; };
+    if (let Ident(function, callee) = argument.kind) {
+        if (!callee.is_method_callable()) { return none; };
         return some(Projection {
             hit: hit(
                 `"map" over the function "{function}" — write "{items}${function}()"`,
@@ -197,7 +168,9 @@ fn projection(self: Expr<Call>, methods: str[]) -> Projection? {
 # reads and calls and nothing else; `none` otherwise. A call has to be one `$` can make —
 # its callee's `is_method_callable` — or already be written as a method call.
 fn chain(self: Expr, parameter: str) -> str[]? {
-    if (let Ident(name) = self.kind) { return if (name == parameter) { some([]) } else { none }; };
+    if (let Ident(name, _) = self.kind) {
+        return if (name == parameter) { some([]) } else { none };
+    };
     if (let Field(inner, name) = self.kind) {
         let steps = inner.chain(parameter)?;
         return some([..steps, `${name.slot_shown()}`]);

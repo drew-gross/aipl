@@ -26,57 +26,62 @@ import {
 import {
     Call,
     Expr,
-    Ident,
     Lambda,
     LambdaParam,
     descendants_of_kind,
+    is_ident,
     synthesized_name,
 } from "../expr.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
-import { Function, Item } from "../item.aipl";
-import { LintHit, hit, lint_in_messages } from "./lint_hit.aipl";
+import { Function } from "../item.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 import { projections } from "./use_field_projection.aipl";
 
 # A hit for each lambda in the program that only forwards its arguments.
-pub fn identity_lambda(function: Function, items: Item[]) -> LintHit[] {
+pub fn identity_lambda(function: Function) -> LintHit[] {
     // The lambdas the projection advice already covers are not advised on again.
-    let advised = function.projections(items)$lambda.collect_ok();
+    let advised = function.projections()$lambda.collect_ok();
     function.body
         .descendants_of_kind::<Lambda>()
         .map(|lambda: Expr<Lambda>| { lambda.forwarded(advised) })
         .collect_ok()
 }.test({
     // A lambda that only forwards its arguments is the function itself, anywhere.
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.filter(|p| g(p)) }",
         identity_lambda,
     )? == [`lambda only forwards its argument(s) to "g" — pass "g" directly`]);
-    assert(lint_in_messages(
+    assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { h(|a, b| g(a, b)) }",
         identity_lambda,
     )? == [`lambda only forwards its argument(s) to "g" — pass "g" directly`]);
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { h(|a, b| g(b, a)) }",
             identity_lambda,
         )?.is_empty(),
     );
 
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { h(|a| a(a)) }",
             identity_lambda,
         )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_in_messages("fn is_big(x: i64) -> bool { x > 100 }", identity_lambda)?.is_empty());
-    assert(lint_in_messages(
+    assert(
+        lint_function_messages(
+            "fn is_big(x: i64) -> bool { x > 100 }",
+            identity_lambda,
+        )?.is_empty(),
+    );
+    assert(lint_function_messages(
         "fn big(xs: i64[]) -> i64[] { xs.filter(|x| is_big(x)) }",
         identity_lambda,
     )? == [`lambda only forwards its argument(s) to "is_big" — pass "is_big" directly`]);
     assert(
-        lint_in_messages(
+        lint_function_messages(
             "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { h(|a, b| a + b) }",
             identity_lambda,
         )?.is_empty(),
@@ -106,7 +111,7 @@ fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
     let forwards = zip_with(
         arguments,
         parameters,
-        |argument: Expr, parameter: LambdaParam| argument.kind == Ident(
+        |argument: Expr, parameter: LambdaParam| argument.kind.is_ident(
             parameter.synthesized_name(),
         ),
     );

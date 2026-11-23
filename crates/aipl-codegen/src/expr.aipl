@@ -22,7 +22,7 @@ import {
     value_or,
     zip_with,
 } from builtins;
-import { Callee, Unresolved } from "./builtin_table.aipl";
+import { Callee, Local, Unresolved } from "./builtin_table.aipl";
 import { Ctor, Pat, Wildcard, pat_bindings, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
 import {
@@ -236,7 +236,9 @@ variant ExprKind =
     | Bool(bool)
     | Str(str)
     | Char(char)
-    | Ident(str)
+    # `callee` is what the name is to when it is used as a function value (`xs.map(f)`): the parser
+    # writes `Unresolved`, and `resolve_callees.aipl` decides it like a call's.
+    | Ident(name: str, callee: Callee = Unresolved)
     # `callee` is what the name is to: the parser writes `Unresolved`, and `resolve_callees.aipl`
     # decides from the file's imports and locals for the lints. It is last so an artifact built
     # before it decodes as it always did.
@@ -352,7 +354,7 @@ pub fn show_expr(self: Expr) -> str {
         Bool(b) => if (b) { "true" } else { "false" },
         Str(s) => `Str({s})`,
         Char(c) => `Char({c})`,
-        Ident(n) => n,
+        Ident(n, _) => n,
         Call(name, args, method_style, _) => show_call(name, args, method_style),
         Neg(e) => `Neg({e.show_expr()})`,
         If(c, t, f) => `If({c.show_expr()}, {t.show_expr()}, {f.show_expr()})`,
@@ -484,6 +486,19 @@ pub fn num(v: i64) -> Expr { expr(Num(v)) }
 
 pub fn ident(name: str) -> Expr { expr(Ident(name)) }
 
+# Whether `self` is the name `name` used as a value, whatever it is resolved to.
+pub fn is_ident(self: ExprKind, name: str) -> bool {
+    match (self) {
+        Ident(found, _) => found == name,
+        _ => false,
+    }
+}.test({
+    assert(Ident("x").is_ident("x"));
+    assert(Ident("x", callee=Local("x")).is_ident("x"));
+    assert(!Ident("x").is_ident("y"));
+    assert(!Num(1).is_ident("x"));
+})
+
 # One match arm as `pattern => body`.
 pub fn show_arm(self: MatchArm) -> str { `{self.pattern.show_pat()} => {self.body.show_expr()}` }
 
@@ -588,7 +603,7 @@ pub fn mapped<X: cases>(
         Bool(b) => Bool(b),
         Str(s) => Str(s),
         Char(c) => Char(c),
-        Ident(name) => Ident(name),
+        Ident(name, callee) => Ident(name, callee=callee),
         None => None,
         Unit => Unit,
         Call(name, args, method_style, callee) => Call(name, args.map(f), method_style, callee),
@@ -886,7 +901,7 @@ pub fn descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr[] {
 # The field read `self` is, when it reads one off a plain name.
 pub fn read(self: Expr) -> Read? {
     let Field(base, field) = self.kind.as_case::<Field>()?;
-    let Ident(name) = base.kind.as_case::<Ident>()?;
+    let Ident(name, _) = base.kind.as_case::<Ident>()?;
     some(Read { field, base: name })
 }.test({
     assert(expr(Field(ident("p"), "x")).read() == some(Read { field: "x", base: "p" }));

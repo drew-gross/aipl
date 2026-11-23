@@ -21,7 +21,7 @@ import {
     starts_with,
     value_or,
 } from builtins;
-import { Construct, Expr, FieldInit, Ident } from "../expr.aipl";
+import { Construct, Expr, FieldInit, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Generic, Named, Ty } from "../ty.aipl";
 import { LintHit, hit, lint_function_once_hits } from "./lint_hit.aipl";
@@ -104,7 +104,7 @@ fn literal_name(self: Ty?) -> str? {
 # trailing comma is load-bearing and the message spells it out.
 fn lone_shorthand(self: FieldInit[]) -> str? {
     let [FieldInit { name, value }] = self else { return none; };
-    if (value.kind == Ident(name)) { return some(name); };
+    if (value.kind.is_ident(name)) { return some(name); };
     none
 }
 

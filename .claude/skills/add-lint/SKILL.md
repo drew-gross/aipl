@@ -55,8 +55,8 @@ free one (`builtin_any`); an operator whose flavor does not match is not advised
 Advice that names the builtin a function *is* (`any` inside `fn any`) is dropped, since it
 would have the function call itself.
 A lint finds a call by its `callee` tag (`Call(_, args, _, Map)`), never by the name the file
-wrote, and does not call `bound_to` to decide what to *advise*; `bound_to` is for a function
-value (`Ident`), which carries no tag. An operator form in the flavor of
+wrote; a function value is tagged the same way (`Ident(_, IsSome)`), and an `Ident` is compared
+with `kind.is_ident(name)`, not `== Ident(name)`, since its tag differs. An operator form in the flavor of
 one the file uses is `Flavored("++", "+")` (see `step_by_one`). Register the
 lint in `lint.aipl` in its unfilled form.
 

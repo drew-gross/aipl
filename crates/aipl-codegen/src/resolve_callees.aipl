@@ -416,7 +416,7 @@ fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -> Res
         Bool(b) => Bool(b),
         Str(s) => Str(s),
         Char(c) => Char(c),
-        Ident(name) => Ident(name),
+        Ident(name, _) => Ident(name, callee=callee_of(name, imported, locals)),
         None => None,
         Unit => Unit,
         Call(name, args, method_style, _) => Call(

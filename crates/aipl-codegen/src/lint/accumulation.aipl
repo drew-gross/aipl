@@ -43,12 +43,12 @@ import {
     Construct,
     Expr,
     For,
-    Ident,
     If,
     LetMut,
     Seq,
     Unit,
     descendants_of_kind,
+    is_ident,
     show_expr,
 } from "../expr.aipl";
 import { ParseError } from "../grammar.aipl";
@@ -255,7 +255,7 @@ struct Pushed { element: Expr, rest: Expr }
 pub fn pushed(self: Expr, acc: str, adder: Callee) -> Pushed? {
     let Assign(target, value, rest) = self.kind.as_case::<Assign>()?;
     let Call(_, [receiver, element], _, callee) = value.kind else { return none; };
-    if (target.kind != Ident(acc) || callee != adder || receiver.kind != Ident(acc)) {
+    if (!target.kind.is_ident(acc) || callee != adder || !receiver.kind.is_ident(acc)) {
         return none;
     };
     some(Pushed { element, rest })
@@ -304,7 +304,7 @@ pub fn is_range(self: Accumulation) -> bool {
 
 # Whether the loop adds something derived from its element, rather than the element
 # itself, which a pipeline just leaves out.
-pub fn maps(self: Accumulation) -> bool { self.added.kind != Ident(self.seeded.variable) }
+pub fn maps(self: Accumulation) -> bool { !self.added.kind.is_ident(self.seeded.variable) }
 
 # Whether a pipeline over the loop's iterable can be advised. A range is not an
 # array and only `map` takes one, so a guard has no `filter` to become, and an element

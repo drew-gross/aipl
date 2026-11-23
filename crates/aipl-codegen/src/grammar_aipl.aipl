@@ -2318,7 +2318,7 @@ fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let value = kid_expr(kids, 0, sp)?;
     match (node.own_texts(src)) {
         [op, ..] => match (value.kind) {
-            Ident(f) => ok(AShimBind(op, f)),
+            Ident(f, _) => ok(AShimBind(op, f)),
             Lambda(..) => ok(AShimClosure(op, value)),
             _ => err(ParseError {
                 message: `"{op}" is bound to a function's name or to a closure \`|args| body\``,

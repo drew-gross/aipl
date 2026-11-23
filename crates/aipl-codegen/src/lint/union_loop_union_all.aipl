@@ -67,7 +67,7 @@ import {
     wrapping_add as +,
 } from builtins;
 import { Callee, Map, ToSet, Union, UnionAll } from "../builtin_table.aipl";
-import { Assign, Call, Expr, Ident, SetLit } from "../expr.aipl";
+import { Assign, Call, Expr, SetLit, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Set, Unordered, type_text } from "../ty.aipl";
 import { SeededLoop, is_liftable, pipeline_hit, seeded_loops } from "./accumulation.aipl";
@@ -465,15 +465,15 @@ fn unioned(self: SeededLoop) -> UnfilledHit? {
         _ => false,
     });
     let Assign(target, value, _) = self.body.lone_statement()?.kind.as_case::<Assign>()?;
-    if (target.kind != Ident(self.name)) { return none; };
+    if (!target.kind.is_ident(self.name)) { return none; };
 
     // The expression unioned into the accumulator by `value`, when `value` is a union of
     // the accumulator with exactly one other thing: `out.union(out)` is `out`, and a
     // union of two other things is not a fold onto this binding at all.
     let Call(_, [first, second], _, Union) = value.kind else { return none; };
-    let operand = if (first.kind == Ident(self.name) && second.kind != Ident(self.name)) {
+    let operand = if (first.kind.is_ident(self.name) && !second.kind.is_ident(self.name)) {
         second
-    } else if (second.kind == Ident(self.name) && first.kind != Ident(self.name)) {
+    } else if (second.kind.is_ident(self.name) && !first.kind.is_ident(self.name)) {
         first
     } else {
         return none;
@@ -492,7 +492,7 @@ fn unioned(self: SeededLoop) -> UnfilledHit? {
 
     // Unioning the loop variable itself is the identity map, which the pipeline just
     // leaves out.
-    let maps: (Callee, str)? = if (mapped.kind != Ident(self.variable)) {
+    let maps: (Callee, str)? = if (!mapped.kind.is_ident(self.variable)) {
         some((Map, `(|{self.variable}| ..)`))
     } else {
         none

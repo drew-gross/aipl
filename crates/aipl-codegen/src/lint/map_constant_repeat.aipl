@@ -129,7 +129,7 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> UnfilledHit? 
 fn is_constant(self: Expr, parameter: str) -> bool {
     match (self.kind) {
         Num(..) | Bool(..) | Str(..) | Char(..) | None | Unit => true,
-        Ident(name) => name != parameter,
+        Ident(name, _) => name != parameter,
         Neg(inner) => inner.is_constant(parameter),
         Construct(_, inits) => inits.all(|init| init.value.is_constant(parameter)),
         ArrayLit(elements) | TupleLit(elements) => elements.all(|e| e.is_constant(parameter)),

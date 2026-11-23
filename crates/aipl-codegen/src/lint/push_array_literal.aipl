@@ -33,13 +33,13 @@ import {
     equal as ==,
     is_empty,
     join,
+    logical_not as !,
     logical_or as ||,
-    not_equal as !=,
     push,
     to_str,
 } from builtins;
 import { Callee, Push } from "../builtin_table.aipl";
-import { ArrayLit, Expr, Ident, LetMut, Spread, descendants_of_kind } from "../expr.aipl";
+import { ArrayLit, Expr, LetMut, Spread, descendants_of_kind, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Pushed, pushed } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
@@ -224,7 +224,7 @@ fn literal(self: LetMut(name, annotation, seed, body)) -> LintHit? {
 
     // What follows the pushes must be the binding and nothing else: any other statement
     // could read or rebind `out`, and the literal would have nowhere to put it.
-    if (elements.is_empty() || rest.kind != Ident(name)) { return none; };
+    if (elements.is_empty() || !rest.kind.is_ident(name)) { return none; };
     if (elements.any(|element| element.mentions_any([name], none))) { return none; };
 
     // What the seed contributes to the front of the literal. A seed that is *already* a

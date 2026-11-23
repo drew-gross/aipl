@@ -7,7 +7,7 @@ import { Expr, Field, Ident, Neg, expr, ident } from "../expr.aipl";
 # The name a place is rooted in: `p` for `p` and for `p.a.b`, and `none` for anything that is not a place.
 pub fn root_name(self: Expr) -> str? {
     match (self.kind) {
-        Ident(name) => some(name),
+        Ident(name, _) => some(name),
         Field(receiver, _) => receiver.root_name(),
         _ => none,
     }
@@ -21,7 +21,7 @@ pub fn root_name(self: Expr) -> str? {
 # compared without the positions its nodes carry.
 pub fn is_same_place(self: Expr, other: Expr) -> bool {
     match ((self.kind, other.kind)) {
-        (Ident(a), Ident(b)) => a == b,
+        (Ident(a, _), Ident(b, _)) => a == b,
         (Field(receiver, a), Field(other_receiver, b)) => a == b && receiver.is_same_place(
             other_receiver,
         ),

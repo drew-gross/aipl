@@ -117,6 +117,8 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  field projetion and identity lambda lints shouldn't have .contains('$'), those shouldn't exist at this stage
+  Ident should maybe be a variant rather than having an optional Callee
   merge Let and LetMut in ExprKind (with a "mutable" flag)
   operator_named_forms is info about builtins, it should be included in the info about builtins (also delete operator_spellings)
   leverage refinement types in resolve_callees so that an expr with unresolved calls and an expr with resolved calls are different types
@@ -451,6 +453,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  add a "matches" function that replaces is_ident and similar
   functions with keyword arguments:
     should be able to pass these anywhere the keyword arguments are't used (and they get implicitly defaulted)
     should be able to have keyword arguments in the type somehow, so you can pass them where the keyword arguments are accounted for in the API
