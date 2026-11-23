@@ -31,10 +31,12 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
+    value_or,
 } from builtins;
 import { Callee, Equal, IsEmpty, IsNonempty, Len, LogicalNot } from "../builtin_table.aipl";
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
+import { operand_text } from "./expr_text.aipl";
 import {
     Advice,
     UnfilledHit,
@@ -42,7 +44,6 @@ import {
     hit_at,
     lint_function_unfilled,
     shown,
-    spans_its_text,
 } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
@@ -54,11 +55,16 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
     } else {
         args.length_equal_zero(callee)?
     };
-    some(if (receiver.spans_its_text()) {
-        advice(IsEmpty, `emptiness asked the long way — use "{receiver.source}.`, `()"`)
-    } else {
-        advice(IsEmpty, `emptiness asked the long way — use "`, `" on the receiver`)
-    })
+    some(
+        receiver
+            .operand_text()
+            .map(|text| advice(IsEmpty, `emptiness asked the long way — use "{text}.`, `()"`))
+            .value_or(advice(
+                IsEmpty,
+                `emptiness asked the long way — use "`,
+                `" on the receiver`,
+            )),
+    )
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> UnfilledHit[] {
@@ -77,9 +83,13 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
         flagged,
     )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
 
-    // A receiver that is not a name or a field path is a placeholder, and a missing import is named.
+    // A call as the receiver is written out, a form with no text is a placeholder, and a missing import is named.
     assert(lint_function_unfilled(
         "fn f(x: i64[]) -> bool { f(x).len() == 0 && x.is_empty() }",
+        flagged,
+    )?.shown() == [`emptiness asked the long way — use "f(x).Builtin(IsEmpty)()"`]);
+    assert(lint_function_unfilled(
+        "fn f(a: i64[], b: i64[], c: bool) -> bool { (if (c) { a } else { b }).len() == 0 && a.is_empty() }",
         flagged,
     )?.shown() == [`emptiness asked the long way — use "Builtin(IsEmpty)" on the receiver`]);
 

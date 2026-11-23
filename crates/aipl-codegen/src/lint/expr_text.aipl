@@ -1,0 +1,212 @@
+# The source text of an expression, written from its tree: what a lint's advice quotes when it
+# says "write `xs.is_empty()`" about code it read as `len(xs) == 0`.
+#
+# It renders the forms a receiver or an interpolated value is made of — names, literals, field
+# paths, calls, operators, indexing, slices, array and tuple literals — and says `none` for the
+# rest (a lambda, a `match`, a block), which advice then describes instead of quoting. What it
+# writes parses back to the tree it was written from: an operand that is itself an operator use
+# is parenthesized, so `(a + b).len()` is not `a + b.len()`.
+#
+# The span of a node is not used: a call's span stops before its closing paren, so the source
+# text of one is no spelling of it.
+
+import {
+    as_case,
+    contains,
+    drop_first,
+    equal as ==,
+    first,
+    is_empty,
+    join,
+    len,
+    logical_and as &&,
+    logical_or as ||,
+    map,
+    push,
+    starts_with,
+    value_or,
+} from builtins;
+import {
+    ArrayLit,
+    Bool,
+    Call,
+    Char,
+    Expr,
+    Field,
+    FloatLit,
+    Ident,
+    Index,
+    KwArg,
+    Neg,
+    None,
+    Num,
+    Slice,
+    Spread,
+    Str,
+    Try,
+    TupleLit,
+    Unit,
+} from "../expr.aipl";
+import { ParseFailure } from "../grammar_aipl.aipl";
+import { hit, lint_function_messages } from "./lint_hit.aipl";
+import { slot_shown } from "./places.aipl";
+
+# The operators written between two operands.
+fn is_infix(self: str) -> bool {
+    ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "||"].contains(self)
+}
+
+# The text that writes `self`, or `none` when it is a form this does not write.
+pub fn expr_text(self: Expr) -> str? {
+    match (self.kind) {
+        Num(n) => some(`{n}`),
+        FloatLit(text) => some(text),
+        Bool(b) => some(`{b}`),
+        Str(text) => some(text.quoted('"')),
+        Char(c) => some(`{c}`.quoted('\'')),
+        Ident(name, _) => some(name),
+        None => some("none"),
+        Unit => some("()"),
+        Call(..) => self.call_text(),
+        _ => self.compound_text(),
+    }
+}.test({
+    // The text written for the expression `src`, if any, read as the argument of a call.
+    fn text(src: str) -> str[]!ParseFailure {
+        lint_function_messages(
+            `fn f() \{ g({src}) }`,
+            |function| {
+                let Call(_, [argument], _, _) = function.body.kind else { return []; };
+                argument.expr_text().map(|written| [hit(written, 0..0)]).value_or([])
+            },
+        )
+    }
+    // Names, literals and field paths, a tuple slot by its number.
+    assert(text("xs")? == ["xs"]);
+    assert(text("5")? == ["5"]);
+    assert(text("true")? == ["true"]);
+    assert(text("p.a.b")? == ["p.a.b"]);
+    assert(text("t.0")? == ["t.0"]);
+    assert(text("none")? == ["none"]);
+
+    // Strings and chars are written with the escapes their text needs.
+    assert(text(`"a b"`)? == [`"a b"`]);
+    assert(text(`"a\\nb"`)? == [`"a\\nb"`]);
+    assert(text("'x'")? == ["'x'"]);
+    assert(text("""'\''""")? == ["""'\''"""]);
+    assert(text(`"q\\"q"`)? == [`"q\\"q"`]);
+
+    // Calls, in the spelling they were written, with keyword arguments.
+    assert(text("f(x, 1)")? == ["f(x, 1)"]);
+    assert(text("f(x).g(1)")? == ["f(x).g(1)"]);
+    assert(text(`xs.join(sep=", ")`)? == [`xs.join(sep=", ")`]);
+
+    // Operators between operands, parenthesized wherever the tree would regroup otherwise.
+    assert(text("a + b")? == ["a + b"]);
+    assert(text("(a + b).len()")? == ["(a + b).len()"]);
+    assert(text("a * (b + c)")? == ["a * (b + c)"]);
+    assert(text("-x")? == ["-x"]);
+    assert(text("!x")? == ["!x"]);
+    assert(text("(-x).f()")? == ["(-x).f()"]);
+
+    // Indexing, slicing, literals and `?`.
+    assert(text("xs[i]")? == ["xs[i]"]);
+    assert(text("xs[1..]")? == ["xs[1..]"]);
+    assert(text("xs[..n]")? == ["xs[..n]"]);
+    assert(text("xs[1..n]")? == ["xs[1..n]"]);
+    assert(text("[1, ..a]")? == ["[1, ..a]"]);
+    assert(text("(a, b)")? == ["(a, b)"]);
+    assert(text("f()?")? == ["f()?"]);
+
+    // What it does not write.
+    assert(text("|x| x")?.is_empty());
+    assert(text("if (c) { a } else { b }")?.is_empty());
+    assert(text("f(|x| x)")?.is_empty());
+})
+
+# `self` as an operand of a postfix form or an operator: its text, in parentheses where it is
+# itself an operator use or a negation, since those bind looser than what is applied to it.
+pub fn operand_text(self: Expr) -> str? {
+    let text = self.expr_text()?;
+    let loose = match (self.kind) {
+        Neg(..) => true,
+        Call(name, args, _, _) => name.is_infix() && args.len() == 2 || name == "!" && args.len() == 1,
+        _ => false,
+    };
+    some(if (loose) { `({text})` } else { text })
+}
+
+# The text of each of `self`, or `none` when one of them has none.
+fn texts(self: Expr[]) -> str[]? {
+    mut out: str[] = [];
+    for (let e : self) {
+        set out.push(e.expr_text()?);
+    }
+    some(out)
+}
+
+# The text of a slice bound, which is nothing where the bound is left out.
+fn bound_text(self: Expr?) -> str? {
+    if (let some(bound) = self) { bound.expr_text() } else { some("") }
+}
+
+# The forms made of one or more sub-expressions around a fixed piece of syntax.
+fn compound_text(self: Expr) -> str? {
+    match (self.kind) {
+        Field(receiver, name) => some(`{receiver.operand_text()?}.{name.slot_shown()}`),
+        Index(receiver, index) => some(`{receiver.operand_text()?}[{index.expr_text()?}]`),
+        Slice(receiver, start, end) => {
+            let lower = start.bound_text()?;
+            let upper = end.bound_text()?;
+            some(`{receiver.operand_text()?}[{lower}..{upper}]`)
+        },
+        Try(inner) => some(`{inner.operand_text()?}?`),
+        Neg(inner) => some(`-{inner.operand_text()?}`),
+        Spread(inner) => some(`..{inner.expr_text()?}`),
+        ArrayLit(elements) => some(`[{elements.texts()?.join(sep=", ")}]`),
+        // A one-element tuple has no spelling of its own.
+        TupleLit(elements) => if (elements.len() == 1) {
+            none
+        } else {
+            some(`({elements.texts()?.join(sep=", ")})`)
+        },
+        KwArg(name, value, forwarded) => some(
+            `{name}{if (forwarded) { "?=" } else { "=" }}{value.expr_text()?}`,
+        ),
+        _ => none,
+    }
+}
+
+# A call, written the way it is: infix for an operator, `recv.f(..)` for a method call, `f(..)`
+# otherwise. A call the parser made of another form (`__builtin_..`) has no spelling to write.
+fn call_text(self: Expr) -> str? {
+    let Call(name, args, method_style, _) = self.kind.as_case::<Call>()?;
+    if (name.starts_with("__")) { return none; };
+    if (name.is_infix() && args.len() == 2) {
+        return some(`{args[0]?.operand_text()?} {name} {args[1]?.operand_text()?}`);
+    };
+    if (name == "!" && args.len() == 1) { return some(`!{args[0]?.operand_text()?}`); };
+    if (method_style) {
+        let receiver = args.first()?.operand_text()?;
+        return some(`{receiver}.{name}({args.drop_first().texts()?.join(sep=", ")})`);
+    };
+    some(`{name}({args.texts()?.join(sep=", ")})`)
+}
+
+# `self` between `quote` marks, with the escapes its characters need.
+fn quoted(self: str, quote: char) -> str {
+    mut out = `{quote}`;
+    for (let c : self) {
+        let piece = if (c == quote || c == '\\') {
+            `\\{c}`
+        } else if (c == '\n') {
+            """\n"""
+        } else if (c == '\t') {
+            """\t"""
+        } else {
+            `{c}`
+        };
+        set out = `{out}{piece}`;
+    }
+    `{out}{quote}`
+}

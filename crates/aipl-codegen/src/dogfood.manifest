@@ -18,10 +18,10 @@
 ; entry find_files 82 str str -> str[]!Error
 ; entry companion_files 80 str -> __m27__Companion[]!str
 ; entry parse_spec 91 str -> __m28__Spec!str
-; entry parse_and_partial_load 90 str -> __m111__PartialLoad!__m29__ParseFailure
+; entry parse_and_partial_load 90 str -> __m112__PartialLoad!__m29__ParseFailure
 ; entry fn_role 84 str -> __m46__FnRole
 ; entry test_fn_name 83 str -> str
-; entry format_source 85 str u64 -> str!__m114__FmtError
+; entry format_source 85 str u64 -> str!__m115__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__BuiltinEntry 200 arm@0:__m19__Callee callee@40:str definition@64:__m19__BuiltinDefinition exports@120:str[] library@144:str public_name@168:str?
@@ -33,7 +33,7 @@
 ; struct __m28__Spec 232 source@0:str extra_files@24:__m28__Entry[] expect_files@48:__m28__Entry[] stdout@72:str? stderr@104:str? exit_code@136:i64? report@152:str? cli@184:str[] checks@208:__m28__Check[]
 ; struct __m28__Entry 48 path@0:str contents@24:str
 ; struct __m28__Check 48 projection@0:str body@24:str
-; struct __m111__PartialLoad 104 program@0:__m38__SuperProgram lints@56:__m52__LintHit[] type_uses@80:__builtin_Span[]
+; struct __m112__PartialLoad 104 program@0:__m38__SuperProgram lints@56:__m52__LintHit[] type_uses@80:__builtin_Span[]
 ; struct __m38__SuperProgram 56 items@0:__m38__SuperItem[] doc@24:str?
 ; variant __m38__SuperItem 296 WrittenFn(8:__m38__Function,200:__m38__Attributes) LoweredFn(8:__m38__Function) Struct(8:__m38__StructDecl) Variant(8:__m38__VariantDecl) Refinement(8:__m38__RefinementDecl) Import(8:__m38__ImportDecl) Const(8:__m38__ConstDecl)
 ; struct __m38__Function 192 name@0:__m21__SpanStr visibility@40:__m38__Visibility sig@48:__m38__Signature body@144:__m33__Expr$__m33__ExprKind shorthand_body@152:bool doc@160:str?
@@ -77,7 +77,7 @@
 ; struct __m29__ParseFailure 24 errors@0:__m41__ParseError[]
 ; struct __m41__ParseError 40 message@0:str span@24:__builtin_Span
 ; variant __m46__FnRole 32 Plain TestBody TestHelper(8:str) Benchmark(8:str)
-; struct __m114__FmtError 40 message@0:str span@24:__builtin_Span
+; struct __m115__FmtError 40 message@0:str span@24:__builtin_Span
 ; import 0 aipl_arr_drop_opt_str
 ; import 1 aipl_arr_drop_str
 ; import 2 aipl_arr_drop_warr
@@ -658,4 +658,4 @@
 ; data 499 __tostr_lit_101 66616c7365
 
 ; __m19__builtin_table
-; source-fingerprint 3368590010738919519
+; source-fingerprint 6000074603781332682

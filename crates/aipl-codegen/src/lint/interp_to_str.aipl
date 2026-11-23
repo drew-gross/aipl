@@ -11,23 +11,22 @@
 #
 # The hit points at the `to_str` call.
 
-import { collect_ok, equal as ==, is_empty } from builtins;
+import { collect_ok, equal as ==, is_empty, map, value_or } from builtins;
 import { ToStr } from "../builtin_table.aipl";
 import { Call, Expr, Interpolation, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, hit, lint_function_messages, spans_its_text } from "./lint_hit.aipl";
+import { expr_text } from "./expr_text.aipl";
+import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 
 # The hit for the interpolation `self`, when its whole value is a `to_str` call.
 pub fn interp_to_str(self: Interpolation(Expr { kind, span })) -> LintHit? {
     let Call(to_str, [argument], _, ToStr) = kind else { return none; };
 
-    // The argument is spliced into the advice only where its span is its text:
-    // a call's span stops before its closing paren.
-    let advice = if (argument.spans_its_text()) {
-        `write "\{{argument.source}}"`
-    } else {
-        "interpolate the value itself"
-    };
+    // The argument is written into the advice where it has a text to write.
+    let advice = argument
+        .expr_text()
+        .map(|text| `write "\{{text}}"`)
+        .value_or("interpolate the value itself");
     some(hit(message(to_str, advice), span))
 }.test({
     // The hits for each function's interpolations.
@@ -47,13 +46,19 @@ pub fn interp_to_str(self: Interpolation(Expr { kind, span })) -> LintHit? {
         flagged,
     )? == [message("show", "write \"{n}\"")]);
 
-    // A field path is quoted whole; anything else is not.
+    // A field path and a call are written out whole.
     assert(lint_function_messages(
         "import { to_str } from builtins; fn f(p: P) -> str { `{to_str(p.x)}` }",
         flagged,
     )? == [message("to_str", "write \"{p.x}\"")]);
     assert(lint_function_messages(
         "import { to_str } from builtins; fn f(n: i64) -> str { `{to_str(g(n))}` }",
+        flagged,
+    )? == [message("to_str", "write \"{g(n)}\"")]);
+
+    // A value with no text to write is described.
+    assert(lint_function_messages(
+        "import { to_str } from builtins; fn f(c: bool) -> str { `{to_str(if (c) { 1 } else { 2 })}` }",
         flagged,
     )? == [message("to_str", "interpolate the value itself")]);
 

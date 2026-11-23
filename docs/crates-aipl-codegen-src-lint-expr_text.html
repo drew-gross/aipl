@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lint/expr_text.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lint/expr_text.aipl</code></h1>
+
+      <div class="module-doc"><p>The source text of an expression, written from its tree: what a lint's advice quotes when it says &quot;write <code>xs.is_empty()</code>&quot; about code it read as <code>len(xs) == 0</code>.</p><p>It renders the forms a receiver or an interpolated value is made of — names, literals, field paths, calls, operators, indexing, slices, array and tuple literals — and says <code>none</code> for the rest (a lambda, a <code>match</code>, a block), which advice then describes instead of quoting. What it writes parses back to the tree it was written from: an operand that is itself an operator use is parenthesized, so <code>(a + b).len()</code> is not <code>a + b.len()</code>.</p><p>The span of a node is not used: a call's span stops before its closing paren, so the source text of one is no spelling of it.</p></div>
+
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-expr_text">
+          <h3>
+            <a class="anchor" href="#item-expr_text">expr_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn expr_text(self: Expr) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The text that writes <code>self</code>, or <code>none</code> when it is a form this does not write.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-operand_text">
+          <h3>
+            <a class="anchor" href="#item-operand_text">operand_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn operand_text(self: Expr) -&#62; str?</code></pre>
+
+          <div class="doc"><p><code>self</code> as an operand of a postfix form or an operator: its text, in parentheses where it is itself an operator use or a negation, since those bind looser than what is applied to it.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-is_infix">
+          <h3>
+            <a class="anchor" href="#item-is_infix">is_infix</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_infix(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>The operators written between two operands.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-texts">
+          <h3>
+            <a class="anchor" href="#item-texts">texts</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn texts(self: Expr[]) -&#62; str[]?</code></pre>
+
+          <div class="doc"><p>The text of each of <code>self</code>, or <code>none</code> when one of them has none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bound_text">
+          <h3>
+            <a class="anchor" href="#item-bound_text">bound_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bound_text(self: Expr?) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The text of a slice bound, which is nothing where the bound is left out.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-compound_text">
+          <h3>
+            <a class="anchor" href="#item-compound_text">compound_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn compound_text(self: Expr) -&#62; str?</code></pre>
+
+          <div class="doc"><p>The forms made of one or more sub-expressions around a fixed piece of syntax.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-call_text">
+          <h3>
+            <a class="anchor" href="#item-call_text">call_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn call_text(self: Expr) -&#62; str?</code></pre>
+
+          <div class="doc"><p>A call, written the way it is: infix for an operator, <code>recv.f(..)</code> for a method call, <code>f(..)</code> otherwise. A call the parser made of another form (<code>__builtin_..</code>) has no spelling to write.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-quoted">
+          <h3>
+            <a class="anchor" href="#item-quoted">quoted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn quoted(self: str, quote: char) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> between <code>quote</code> marks, with the escapes its characters need.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

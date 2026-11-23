@@ -999,6 +999,7 @@ case_tests! {
     crates_aipl_codegen_src_lint_constant_default = "crates/aipl-codegen/src/lint/constant_default",
     crates_aipl_codegen_src_lint_destructure = "crates/aipl-codegen/src/lint/destructure",
     crates_aipl_codegen_src_lint_duplicate_import_source = "crates/aipl-codegen/src/lint/duplicate_import_source",
+    crates_aipl_codegen_src_lint_expr_text = "crates/aipl-codegen/src/lint/expr_text",
     crates_aipl_codegen_src_lint_extend_loop_map_join = "crates/aipl-codegen/src/lint/extend_loop_map_join",
     crates_aipl_codegen_src_lint_field_init_shorthand = "crates/aipl-codegen/src/lint/field_init_shorthand",
     crates_aipl_codegen_src_lint_field_uses = "crates/aipl-codegen/src/lint/field_uses",

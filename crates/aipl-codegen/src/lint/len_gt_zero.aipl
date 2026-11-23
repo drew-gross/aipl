@@ -27,6 +27,7 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
+    value_or,
 } from builtins;
 import {
     Callee,
@@ -39,6 +40,7 @@ import {
 } from "../builtin_table.aipl";
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
+import { operand_text } from "./expr_text.aipl";
 import {
     Advice,
     UnfilledHit,
@@ -46,7 +48,6 @@ import {
     hit_at,
     lint_function_unfilled,
     shown,
-    spans_its_text,
 } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
@@ -59,11 +60,12 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> Advice? {
             return none;
         },
     };
-    some(if (receiver.spans_its_text()) {
-        advice(IsNonempty, `{what} — use "{receiver.source}.`, `()"`)
-    } else {
-        advice(IsNonempty, `{what} — use "`, `" on the receiver`)
-    })
+    some(
+        receiver
+            .operand_text()
+            .map(|text| advice(IsNonempty, `{what} — use "{text}.`, `()"`))
+            .value_or(advice(IsNonempty, `{what} — use "`, `" on the receiver`)),
+    )
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> UnfilledHit[] {
@@ -78,13 +80,23 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> Advice? {
         flagged,
     )?.shown() == [`a length compared against 0 — use "x.Builtin(IsNonempty)()"`]);
 
-    // A receiver that is not spelled by its text is a placeholder, and a missing import is named.
+    // A call as the receiver is written out, and a missing import is named.
     assert(lint_function_unfilled(
         "fn f(x: i64[]) -> bool { len(x) > 0 && x.is_nonempty() }",
         flagged,
     )?.shown() == [`a length compared against 0 — use "x.Builtin(IsNonempty)()"`]);
     assert(lint_function_unfilled(
         "fn f(x: i64[]) -> bool { f(x).len() > 0 && x.is_nonempty() }",
+        flagged,
+    )?.shown() == [`a length compared against 0 — use "f(x).Builtin(IsNonempty)()"`]);
+
+    // An operator use is parenthesized to stay the receiver, and a form with no text is a placeholder.
+    assert(lint_function_unfilled(
+        "fn f(a: i64[], b: i64[]) -> bool { (a + b).len() > 0 && a.is_nonempty() }",
+        flagged,
+    )?.shown() == [`a length compared against 0 — use "(a + b).Builtin(IsNonempty)()"`]);
+    assert(lint_function_unfilled(
+        "fn f(a: i64[], b: i64[], c: bool) -> bool { (if (c) { a } else { b }).len() > 0 && a.is_nonempty() }",
         flagged,
     )?.shown() == [`a length compared against 0 — use "Builtin(IsNonempty)" on the receiver`]);
 
