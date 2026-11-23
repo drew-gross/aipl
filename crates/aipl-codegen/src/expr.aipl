@@ -313,6 +313,10 @@ variant ExprKind =
     # projection's `name_span` is the step's name.
     | FieldProjection(receiver: Expr, name: str)
     | MethodProjection(receiver: Expr, name: str, args: Expr[])
+    # The `{e}` of a template, as written, so the lints see an interpolation rather than the
+    # `__template_interp` call (`to_str` under another name) it means; `desugar.aipl` lowers it
+    # to that call and nothing downstream of it ever sees the node.
+    | Interpolation(Expr)
 
 # What a `let`, a `for` or a parameter binds a value to, as written. A plain name
 # is the simplest binding; the rest take the value apart. A tuple's slots are its
@@ -401,6 +405,7 @@ pub fn show_expr(self: Expr) -> str {
         },
         LetPattern(binding, value, body) => `LetPattern({binding.show_binding()}, {value.show_expr()}, {body.show_expr()})`,
         ProviderShim(provider, args, body) => `ProviderShim({provider}, [{show_exprs(args)}], {body.show_expr()})`,
+        Interpolation(value) => `Interpolation({value.show_expr()})`,
         FieldProjection(receiver, name) => `{receiver.show_expr()}${name}`,
         MethodProjection(receiver, name, args) => `{receiver.show_expr()}${name}({show_exprs(args)})`,
         ForPattern(binding, iterable, body, index) => match (index) {
@@ -678,6 +683,7 @@ pub fn mapped<X: cases>(
         TypeArgs(x, types) => TypeArgs(f(x), types),
         LetPattern(pattern, value, body) => LetPattern(pattern, f(value), f(body)),
         ProviderShim(provider, args, body) => ProviderShim(provider, args.map(f), f(body)),
+        Interpolation(value) => Interpolation(f(value)),
         FieldProjection(receiver, name) => FieldProjection(f(receiver), name),
         MethodProjection(receiver, name, args) => MethodProjection(f(receiver), name, args.map(f)),
         ForPattern(pattern, iterable, body, index) => ForPattern(
@@ -790,6 +796,7 @@ pub fn subexprs(self: Expr) -> Expr[] {
         Neg(x)
         | Field(x, _)
         | FieldProjection(x, _)
+        | Interpolation(x)
         | Try(x)
         | Return(x)
         | KwArg(_, x, _)

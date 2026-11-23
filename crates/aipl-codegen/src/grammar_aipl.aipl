@@ -198,6 +198,7 @@ import {
     If,
     IfLet,
     Index,
+    Interpolation,
     KwArg,
     Lambda,
     LambdaParam,
@@ -1498,8 +1499,8 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 //   - **A range is a construct.** `a..b` builds the builtin `Span`. No name is
 //     written, so no import is needed — which is why the desugar has to happen
 //     here rather than in the loader.
-//   - **A template is a concat chain.** Each interpolation goes through
-//     `__template_interp` and the pieces through `__aipl_concat`, folded from
+//   - **A template is a concat chain.** Each interpolation is an `Interpolation` node
+//     and the pieces go through `__aipl_concat`, folded from
 //     the tail backwards so the tree matches the one the right-recursive
 //     `template_rest` produces.
 //
@@ -2078,12 +2079,10 @@ fn interpolation_piece(segment: str, e: Expr, sp: Span) -> Expr {
     concat_call(at(Str(segment), sp), interp_call(e))
 }
 
-# `__template_interp` is `to_str` under another name — a `str` passes through
-# unchanged, a `char` widens to its one-character `str`, anything else renders
-# by its type — kept distinct so a lowered template is recognizable as one.
+# The `{e}` of a template, as written. `desugar.aipl` lowers it to `__template_interp`.
 fn interp_call(e: Expr) -> Expr {
     let span = e.span;
-    at(Call("__template_interp", [e], false, Unresolved), span)
+    at(Interpolation(e), span)
 }
 
 fn concat_call(a: Expr, b: Expr) -> Expr {
@@ -4898,8 +4897,8 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("#>{1, ..a, ..b}") == "Set([1, ..a, ..b], Desc)");
     assert(expr_dump("#{1: 2, ..a}").starts_with("error: a `..` spread is only allowed in a set"));
 
-    // A template is a concat chain over `__template_interp` of each
-    // interpolation, folded from the tail backwards.
+    // A template is a concat chain over `__template_interp` of each interpolation (the
+    // `Interpolation` node, once desugared), folded from the tail backwards.
     assert(
         expr_dump(
             "`a{x}b`",

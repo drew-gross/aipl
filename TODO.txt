@@ -575,6 +575,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map
   tag/resolve Idents the same way as calls, so that we can do the same kind of destructuring in lints

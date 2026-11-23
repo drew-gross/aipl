@@ -1980,7 +1980,6 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/push_loop_zip_with.aipl",
     "./lint/push_loop_pipeline.aipl",
     "./lint/extend_loop_map_join.aipl",
-    "./lint/interpolation.aipl",
     "./lint/interp_literal.aipl",
     "./lint/interp_to_str.aipl",
     "./lint/places.aipl",

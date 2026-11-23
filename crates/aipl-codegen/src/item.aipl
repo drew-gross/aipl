@@ -469,6 +469,7 @@ pub fn own_names(self: Expr) -> #{str} {
         | If(..)
         | Field(..)
         | FieldProjection(..)
+        | Interpolation(..)
         | Assign(..)
         | For(..)
         | While(..)

@@ -50,6 +50,7 @@ import {
     ForPattern,
     Ident,
     IfLet,
+    Interpolation,
     Lambda,
     LambdaParam,
     Let,
@@ -176,6 +177,10 @@ pub fn desugared(self: Expr) -> CoreExpr {
             body.desugared(),
             self.span,
         ),
+        Interpolation(value) => {
+            let rendered = value.desugared();
+            core_at(Call("__template_interp", [rendered], false, Unresolved), rendered.span)
+        },
         FieldProjection(receiver, name) => receiver
             .desugared()
             .projected(self, |element: CoreExpr| core_at(Field(element, name), self.span)),
@@ -194,6 +199,9 @@ pub fn desugared(self: Expr) -> CoreExpr {
         _ => core_with_kind(self, mapped(kind, desugared)).with_binders_lowered(),
     }
 }.test({
+    // An interpolation is the `__template_interp` call.
+    assert(expr(Interpolation(ident("x"))).desugared().show_expr() == "__template_interp(x)");
+
     // A projection is a `map` over a lambda whose element is named for where the projection is.
     assert(
         expr(FieldProjection(ident("p"), "x"))
@@ -501,11 +509,11 @@ fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -> Lifte
 
 # The tree every pass after this one is handed: an expression with none of the surface forms
 # `desugared` lowers anywhere in it.
-variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout
+variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout
 
-variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout
+variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout
 
-variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout
+variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout
 
 # What `receiver$step` means: `receiver.map(|e| step)`, where `step` is the projection written
 # against the element `e`, which sits where the step's name is written so an error about it points

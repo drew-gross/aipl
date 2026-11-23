@@ -18,55 +18,46 @@ import {
     is_empty,
     logical_and as &&,
     logical_not as !,
-    map,
     starts_with,
 } from builtins;
-import { Char, Str } from "../expr.aipl";
+import { Char, Expr, Interpolation, Str, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { interpolated_values } from "./interpolation.aipl";
 import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
 
-# A hit for each string or char literal interpolated into a template.
-pub fn interp_literal(Function { body }) -> LintHit[] {
-    body
-        .interpolated_values()
-        .map(|value| {
-            // The tree does not record which form a string literal was written in; its
-            // first characters do.
-            let raw = value.source.starts_with(`"""`);
-            let what = if (value.kind.is_case::<Char>()) {
-                "char"
-            } else if (value.kind.is_case::<Str>() && !raw) {
-                "string"
-            } else {
-                return none;
-            };
-            some(hit(message(what), value.span))
-        })
-        .collect_ok()
+# The hit for the interpolation `self`, when its whole value is a string or char literal.
+pub fn interp_literal(self: Interpolation(Expr { source, kind, span })) -> LintHit? {
+    // The tree does not record which form a string literal was written in; its
+    // first characters do.
+    let raw = source.starts_with(`"""`);
+    let what = if (kind.is_case::<Char>()) {
+        "char"
+    } else if (kind.is_case::<Str>() && !raw) {
+        "string"
+    } else {
+        return none;
+    };
+    some(hit(message(what), span))
 }.test({
-    assert(lint_function_messages("fn f() -> str { `a: {'a'}` }", interp_literal)? == [
-        message("char"),
-    ]);
-    assert(lint_function_messages("""fn f() -> str { `a: {"aa"}` }""", interp_literal)? == [
+    // The hits for each function's interpolations.
+    fn flagged(Function { body }) -> LintHit[] {
+        body.descendants_of_kind::<Interpolation>()$kind$interp_literal().collect_ok()
+    }
+
+    assert(lint_function_messages("fn f() -> str { `a: {'a'}` }", flagged)? == [message("char")]);
+    assert(lint_function_messages("""fn f() -> str { `a: {"aa"}` }""", flagged)? == [
         message("string"),
     ]);
 
     // A literal that is only part of the interpolation computes something, a
     // `"""` literal is raw text a template cannot say, and a name is not a literal.
-    assert(
-        lint_function_messages(
-            """fn f(s: str) -> str { `{"a" == s}` }""",
-            interp_literal,
-        )?.is_empty(),
-    );
+    assert(lint_function_messages("""fn f(s: str) -> str { `{"a" == s}` }""", flagged)?.is_empty());
     assert(
         lint_function_messages(
             "fn f() -> str { `{\"\"\"back\\slash\"\"\"}` }",
-            interp_literal,
+            flagged,
         )?.is_empty(),
     );
-    assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", interp_literal)?.is_empty());
+    assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", flagged)?.is_empty());
     // Shapes the lint must leave alone.
 })
 

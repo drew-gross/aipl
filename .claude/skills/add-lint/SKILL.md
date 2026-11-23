@@ -28,7 +28,7 @@ DRY is critical here. Before writing a helper, search for it:
   `lint_in_unfilled_messages` for a lint that takes `items`).
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl` (reading a bound), `lint/option_match.aipl`,
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
-  shape and its pipeline advice), `lint/interpolation.aipl` — shared shape recognizers.
+  shape and its pipeline advice). Template interpolations are `Interpolation` nodes (`interp_lints` in `lint.aipl`).
 - The builtins and `crates/aipl-codegen/src/*.aipl` (expr walkers, `source`
   quoting, spans). `body.descendants_of_kind::<Slice>()` is every `Slice` under `body` as an
   `Expr<Slice>` (its `kind` typed as that case alone, its span and source beside it).

@@ -1006,7 +1006,6 @@ case_tests! {
     crates_aipl_codegen_src_lint_identity_lambda = "crates/aipl-codegen/src/lint/identity_lambda",
     crates_aipl_codegen_src_lint_interp_literal = "crates/aipl-codegen/src/lint/interp_literal",
     crates_aipl_codegen_src_lint_interp_to_str = "crates/aipl-codegen/src/lint/interp_to_str",
-    crates_aipl_codegen_src_lint_interpolation = "crates/aipl-codegen/src/lint/interpolation",
     crates_aipl_codegen_src_lint_is_empty_longhand = "crates/aipl-codegen/src/lint/is_empty_longhand",
     crates_aipl_codegen_src_lint_len_gt_zero = "crates/aipl-codegen/src/lint/len_gt_zero",
     crates_aipl_codegen_src_lint_let_else_as_case = "crates/aipl-codegen/src/lint/let_else_as_case",

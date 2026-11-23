@@ -63,6 +63,7 @@ import {
     If,
     IfLet,
     Index,
+    Interpolation,
     KwArg,
     Lambda,
     Let,
@@ -502,6 +503,7 @@ fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -> Res
             value.resolved(imported, locals),
             body.resolved(imported, [..locals, ..binding.binders()]),
         ),
+        Interpolation(value) => Interpolation(value.resolved(imported, locals)),
         FieldProjection(receiver, name) => FieldProjection(
             receiver.resolved(imported, locals),
             name,
