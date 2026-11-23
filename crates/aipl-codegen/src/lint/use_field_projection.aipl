@@ -11,8 +11,7 @@
 # appear nowhere else (`|x| x.f(x)` needs the name), it has to be unannotated, since `$` has
 # no place to write a type, and every call in the chain has to be one `$` can make — a
 # function of this file whose first parameter is named `self`, which is what method-call
-# syntax is defined by, a lowercase builtin the file imports, or a call already written as a
-# method. A function from another file is not known here — its parameters are not in view
+# syntax is defined by, a builtin, or a call already written as a method. A function from another file is not known here — its parameters are not in view
 # when a file is linted — so it is never advised. An operator is never a step: `|x| x + 1`
 # does something with `x`.
 #
@@ -45,7 +44,7 @@ import {
     map,
     starts_with,
 } from builtins;
-import { Map } from "../builtin_table.aipl";
+import { Map, is_method_callable } from "../builtin_table.aipl";
 import {
     Call,
     Expr,
@@ -55,7 +54,6 @@ import {
     descendants_of_kind,
     synthesized_name,
 } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Function, Item, LoweredFn } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
@@ -66,14 +64,6 @@ import { imported_locals } from "./spelling.aipl";
 pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
     function.projections(items)$hit
 }.test({
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn messages(imports: str, body: str) -> str[]!ParseFailure {
-        lint_in_messages(
-            `import \{ {imports} } from builtins; struct P \{ name: str } fn shout(self: str) -> str \{ self } fn f(xs: P[], ys: str[]) -> i64 \{ {body} }`,
-            use_field_projection,
-        )
-    }
-
     // A member read, a method call with arguments, a chain, a builtin and a function name.
     assert(lint_in_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.name) }",
@@ -87,9 +77,10 @@ pub fn use_field_projection(function: Function, items: Item[]) -> LintHit[] {
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.a.f().c) }",
         use_field_projection,
     )? == [`"map" with a lambda that only uses a member of its argument — write "xs$a$f()$c"`]);
-    assert(messages("map, to_str", "ys.map(|n| to_str(n))")? == [
-        `"map" with a lambda that only uses a member of its argument — write "ys$to_str()"`,
-    ]);
+    assert(lint_in_messages(
+        "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(|n| to_str(n)) }",
+        use_field_projection,
+    )? == [`"map" with a lambda that only uses a member of its argument — write "ys$to_str()"`]);
     assert(lint_in_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { ys.map(shout) }",
         use_field_projection,
@@ -157,10 +148,11 @@ pub fn projections(self: Function, items: Item[]) -> Projection[] {
         .collect_ok()
 }
 
-# The names a call can use as a `$` step: a function of this file whose first parameter is
-# named `self`, which is what method-call syntax is defined by, and a lowercase builtin the
-# file imports. A function from another file is not here — its parameters are not in view
-# when a file is linted.
+# The names a bare function value can use as a `$` step: a function of this file whose first
+# parameter is named `self`, which is what method-call syntax is defined by, and a lowercase builtin
+# the file imports. A function value carries no callee, so this is read from the file's items; a
+# call is judged by its own callee. A function from another file is not here — its parameters are not
+# in view when a file is linted.
 fn methods_in_view(self: Item[]) -> str[] {
     let own = self.collect_arms::<LoweredFn>()$method_name().collect_ok();
     let imported = self
@@ -190,7 +182,7 @@ fn projection(self: Expr<Call>, methods: str[]) -> Projection? {
     };
     let Lambda([parameter], body) = argument.kind else { return none; };
     if (parameter.ty.is_some() || parameter.synthesized_name().contains('$')) { return none; };
-    let steps = body.chain(parameter.synthesized_name(), methods)?;
+    let steps = body.chain(parameter.synthesized_name())?;
     if (steps.is_empty()) { return none; };
     some(Projection {
         hit: hit(
@@ -202,15 +194,15 @@ fn projection(self: Expr<Call>, methods: str[]) -> Projection? {
 }
 
 # The `$` steps `self` is made of, outermost last, when it is `parameter` taken through member
-# reads and calls and nothing else; `none` otherwise. A call has to be one `$` can make — see
-# `methods_in_view` — or already be written as a method call.
-fn chain(self: Expr, parameter: str, methods: str[]) -> str[]? {
+# reads and calls and nothing else; `none` otherwise. A call has to be one `$` can make —
+# its callee's `is_method_callable` — or already be written as a method call.
+fn chain(self: Expr, parameter: str) -> str[]? {
     if (let Ident(name) = self.kind) { return if (name == parameter) { some([]) } else { none }; };
     if (let Field(inner, name) = self.kind) {
-        let steps = inner.chain(parameter, methods)?;
+        let steps = inner.chain(parameter)?;
         return some([..steps, `${name.slot_shown()}`]);
     };
-    let Call(name, arguments, method_style, _) = self.kind.as_case::<Call>()?;
+    let Call(name, arguments, method_style, callee) = self.kind.as_case::<Call>()?;
     let target = arguments.first()?;
     let rest = arguments.drop_first();
 
@@ -223,10 +215,10 @@ fn chain(self: Expr, parameter: str, methods: str[]) -> str[]? {
     ) || name.is_operator_name() || name == parameter || rest.any(|argument| argument.mentions_any(
         [parameter],
         none,
-    )) || !(method_style || methods.contains(name))) {
+    )) || !(method_style || callee.is_method_callable())) {
         return none;
     };
-    let steps = target.chain(parameter, methods)?;
+    let steps = target.chain(parameter)?;
     some([..steps, `${name}({if (rest.is_empty()) { "" } else { "..." }})`])
 }
 

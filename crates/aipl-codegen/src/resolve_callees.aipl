@@ -159,19 +159,27 @@ pub fn resolve_callees(self: Program) -> ResolvedProgram {
         "import { len } from builtins; fn f(len: (i64[]) -> u64, x: i64[]) -> u64 { len(x) }",
     )? == [Local("len")]);
     assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [
-        User("len"),
+        User("len", false),
     ]);
     assert(called("""import { len } from "./a.aipl"; fn f(x: i64[]) -> u64 { len(x) }""")? == [
-        User("len"),
+        User("len", false),
+    ]);
+
+    // A function of the file's own that takes `self` first says so; one that does not, does not.
+    assert(called("fn shout(self: str) -> str { self } fn f(s: str) -> str { shout(s) }")? == [
+        User("shout", true),
+    ]);
+    assert(called("fn shout(s: str) -> str { s } fn f(s: str) -> str { shout(s) }")? == [
+        User("shout", false),
     ]);
 
     // The names the language reserves.
     assert(called("fn f(x: i64) -> i64? { some(x) }")? == [Some]);
-    assert(called("fn f(x: i64) { assert(x == 1); }")? == [Assert, User("==")]);
+    assert(called("fn f(x: i64) { assert(x == 1); }")? == [Assert, User("==", false)]);
 
     // Defaults are resolved too: nothing in the program is left unresolved.
-    assert(called("fn f(x: u64 = len([1])) -> u64 { x }")? == [User("len")]);
-    assert(called("struct P { x: u64 = len([1]) }")? == [User("len")]);
+    assert(called("fn f(x: u64 = len([1])) -> u64 { x }")? == [User("len", false)]);
+    assert(called("struct P { x: u64 = len([1]) }")? == [User("len", false)]);
 })
 
 # The name of the function `self` declares.
@@ -224,6 +232,7 @@ pub fn resolve_with_every_builtin(self: Program) -> ResolvedProgram {
         ..named,
         ..operators,
         ..self.items.collect_arms::<Import>()$imported_pairs(table).join(),
+        ..self.items.own_method_pairs(),
     ].to_dict();
     SuperProgram { items: self.items$resolved_item(imported), doc: self.doc }
 }.test({
@@ -239,7 +248,7 @@ pub fn resolve_with_every_builtin(self: Program) -> ResolvedProgram {
     assert(called("fn f(a: i64, b: i64) -> bool { a == b }")? == [Equal]);
     // The file's own function of the same name is no builtin, and an alias still works.
     assert(called("fn len(x: i64[]) -> u64 { 0 } fn f(x: i64[]) -> u64 { len(x) }")? == [
-        User("len"),
+        User("len", false),
     ]);
     assert(called("import { len as length } from builtins; fn f(x: i64[]) { length(x) }")? == [
         Len,
@@ -261,13 +270,26 @@ pub fn resolved_with_builtins(self: Expr, names: str[]) -> ResolvedExpr {
     let Call(_, _, _, callee) = block.resolved_with_builtins(["len"]).kind.as_case::<Call>()?;
     assert(callee == Len);
     let Call(_, _, _, other) = block.resolved_with_builtins([]).kind.as_case::<Call>()?;
-    assert(other == User("len"));
+    assert(other == User("len", false));
 })
 
 # What each import from a builtins library brings, by the name the file calls it.
 fn imported_callees(self: Item[]) -> #{str: Callee} {
     let table = builtin_table();
-    self.collect_arms::<Import>()$imported_pairs(table).join().to_dict()
+    [
+        ..self.collect_arms::<Import>()$imported_pairs(table).join(),
+        ..self.own_method_pairs(),
+    ].to_dict()
+}
+
+# The file's own functions that take `self` first, as `(name, callee)`: a call to one can be written
+# `recv.f(..)`.
+fn own_method_pairs(self: Item[]) -> (str, Callee)[] {
+    self.collect_arms::<LoweredFn>()$method_pair().collect_ok()
+}
+
+fn method_pair(self: LoweredFn(Function { sig, name })) -> (str, Callee)? {
+    if (sig.is_method) { some((name.text, User(name.text, true))) } else { none }
 }
 
 # The builtins `self` imports, as `(local name, callee)`.
@@ -348,7 +370,7 @@ variant ResolvedCallee = Callee without Unresolved
 fn settled(self: Callee, name: str) -> ResolvedCallee {
     let callee = self;
     match (callee) {
-        Unresolved => User(name),
+        Unresolved => User(name, false),
         _ => callee,
     }
 }
@@ -368,7 +390,7 @@ fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -> ResolvedCall
     } else if (name == "assert") {
         Assert
     } else {
-        User(name)
+        User(name, false)
     }
 }
 

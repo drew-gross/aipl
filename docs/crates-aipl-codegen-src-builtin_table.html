@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Callee</code></pre>
 
-          <div class="doc"><p>What a call is to. The importable builtins have a case each, named as the Rust <code>Callee</code> arm is; <code>Some</code>, <code>Ok</code>, <code>Err</code> and <code>Assert</code> are the names the language reserves; a call to a name the file does not import from a builtins library is <code>User</code>, or <code>Local</code> where a local holding a function hides the name. <code>Unresolved</code> is what the parser writes, before <code>resolve_callees</code> decides.</p></div>
+          <div class="doc"><p>What a call is to. The importable builtins have a case each, named as the Rust <code>Callee</code> arm is; <code>Some</code>, <code>Ok</code>, <code>Err</code> and <code>Assert</code> are the names the language reserves; a call to a name the file does not import from a builtins library is <code>User</code> (<code>is_method</code> says whether the file's own function it names takes <code>self</code> first, so <code>recv.f(..)</code> can call it), or <code>Local</code> where a local holding a function hides the name. <code>Unresolved</code> is what the parser writes, before <code>resolve_callees</code> decides.</p></div>
 
 
           <ul class="cases">
@@ -1029,7 +1029,7 @@
 
             </li>
 
-            <li id="item-User"><code>User(name: str)</code>
+            <li id="item-User"><code>User(name: str, is_method: bool)</code>
 
 
             </li>
@@ -1045,6 +1045,20 @@
             </li>
 
           </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-is_method_callable">
+          <h3>
+            <a class="anchor" href="#item-is_method_callable">is_method_callable</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_method_callable(self: Callee) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a call to <code>self</code> can be written with the first argument as its receiver: a function of the file's own that takes <code>self</code> first, or a builtin. A local that holds a function, a reserved name and an unresolved call cannot.</p></div>
+
 
         </section>
 

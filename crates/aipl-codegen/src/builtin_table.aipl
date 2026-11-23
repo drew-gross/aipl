@@ -16,13 +16,15 @@ import {
     find_if,
     len,
     logical_and as &&,
+    logical_not as !,
     starts_with,
     value_or,
 } from builtins;
 
 # What a call is to. The importable builtins have a case each, named as the Rust `Callee` arm is;
 # `Some`, `Ok`, `Err` and `Assert` are the names the language reserves; a call to a name the file
-# does not import from a builtins library is `User`, or `Local` where a local holding a function
+# does not import from a builtins library is `User` (`is_method` says whether the file's own
+# function it names takes `self` first, so `recv.f(..)` can call it), or `Local` where a local holding a function
 # hides the name. `Unresolved` is what the parser writes, before `resolve_callees` decides.
 variant Callee =
     | Print
@@ -224,9 +226,26 @@ variant Callee =
     | Ok
     | Err
     | Assert
-    | User(name: str)
+    | User(name: str, is_method: bool)
     | Local(name: str)
     | Unresolved
+
+# Whether a call to `self` can be written with the first argument as its receiver: a function of
+# the file's own that takes `self` first, or a builtin. A local that holds a function, a reserved
+# name and an unresolved call cannot.
+pub fn is_method_callable(self: Callee) -> bool {
+    match (self) {
+        User(_, is_method) => is_method,
+        Local(..) | Some | Ok | Err | Assert | Unresolved => false,
+        _ => true,
+    }
+}.test({
+    assert(Len.is_method_callable());
+    assert(User("f", true).is_method_callable());
+    assert(!User("f", false).is_method_callable());
+    assert(!Local("f").is_method_callable());
+    assert(!Some.is_method_callable());
+})
 
 variant BuiltinDefinition = Written(file: str) | Declared | Described(signature: str, doc: str)
 
