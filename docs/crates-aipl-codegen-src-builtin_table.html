@@ -1009,6 +1009,58 @@
 
             </li>
 
+            <li id="item-WrappingIncrement"><code>WrappingIncrement</code>
+
+              <div class="doc"><p>The operator builtins that share another's Rust callee (<code>wrapping_increment</code> is a <code>wrapping_add</code> of one), so the table the Rust side reads has no row for them and a call to one is a call of the shared callee there. A lint tells them apart, which is what <code>lint_table</code> is for.</p></div>
+
+
+            </li>
+
+            <li id="item-SaturatingIncrement"><code>SaturatingIncrement</code>
+
+
+            </li>
+
+            <li id="item-WrappingDecrement"><code>WrappingDecrement</code>
+
+
+            </li>
+
+            <li id="item-SaturatingDecrement"><code>SaturatingDecrement</code>
+
+
+            </li>
+
+            <li id="item-WrappingAddAssign"><code>WrappingAddAssign</code>
+
+
+            </li>
+
+            <li id="item-SaturatingAddAssign"><code>SaturatingAddAssign</code>
+
+
+            </li>
+
+            <li id="item-WrappingSubAssign"><code>WrappingSubAssign</code>
+
+
+            </li>
+
+            <li id="item-SaturatingSubAssign"><code>SaturatingSubAssign</code>
+
+
+            </li>
+
+            <li id="item-WrappingMulAssign"><code>WrappingMulAssign</code>
+
+
+            </li>
+
+            <li id="item-SaturatingDivideAssign"><code>SaturatingDivideAssign</code>
+
+
+            </li>
+
             <li id="item-Some"><code>Some</code>
 
 
@@ -1133,6 +1185,20 @@
           <pre class="signature"><code>pub fn builtin_imported(self: BuiltinEntry[], library: str, name: str) -&#62; BuiltinEntry?</code></pre>
 
           <div class="doc"><p>The builtin that <code>import { name } from library;</code> brings in, if there is one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_table">
+          <h3>
+            <a class="anchor" href="#item-lint_table">lint_table</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_table() -&#62; BuiltinEntry[]</code></pre>
+
+          <div class="doc"><p>The table the lints read: the importable builtins, and the operator builtins that Rust resolves to another's callee. Each is a builtin the file imports under its operator (<code>wrapping_increment as ++</code>), so a lint can say which one a call is, and what to advise, without the written name.</p></div>
 
 
         </section>

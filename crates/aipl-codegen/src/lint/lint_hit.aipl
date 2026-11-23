@@ -36,8 +36,8 @@ import {
     Map,
     Union,
     Unresolved,
-    builtin_table,
     import_name,
+    lint_table,
 } from "../builtin_table.aipl";
 import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
@@ -48,15 +48,7 @@ import {
     resolve_callees,
     resolve_with_every_builtin,
 } from "../resolve_callees.aipl";
-import {
-    Builtin,
-    Flavored,
-    Need,
-    Request,
-    Spelling,
-    is_builtin_named,
-    spelled,
-} from "./spelling.aipl";
+import { Builtin, Need, Request, Spelling, is_builtin_named, spelled } from "./spelling.aipl";
 
 struct LintHit { message: str, span: Span }
 
@@ -192,7 +184,7 @@ pub fn filled_with(self: UnfilledHit, spell: (Need) -> Spelling?) -> LintHit? {
 # (`none`: it imports none, and the advice names the import). For a lint's own test of the message
 # it gives.
 pub fn filled_assuming(self: UnfilledHit, spelled: str?) -> str {
-    let table = builtin_table();
+    let table = lint_table();
     self
         .filled_with(|need| match (need) {
             Builtin(callee) => table
@@ -207,7 +199,6 @@ pub fn filled_assuming(self: UnfilledHit, spelled: str?) -> str {
                         }),
                     },
                 }),
-            Flavored(..) => none,
         })$message
         .value_or("")
 }.test({
@@ -222,7 +213,7 @@ pub fn filled_assuming(self: UnfilledHit, spelled: str?) -> str {
 # `self` filled in for the file whose items are `items`.
 pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
     if (self.is_empty()) { return []; };
-    let table = builtin_table();
+    let table = lint_table();
     self$filled_with(|need| need.spelled(items, table)).collect_ok()
 }.test({
     let items = aipl_parse_surface_file(
@@ -378,7 +369,7 @@ pub fn unfilled_hits(self: Function[], lint: (Function) -> UnfilledHit[]) -> Unf
 # the longhand that `any` replaces, and advising it to call `any` would have it call itself.
 fn outside_its_definition(self: Function, hits: UnfilledHit[]) -> UnfilledHit[] {
     if (hits.is_empty()) { return []; };
-    let table = builtin_table();
+    let table = lint_table();
     hits.filter(|hit| !hit.named.any(|part| part.builtin.is_builtin_named(self.name.text, table)))
 }
 

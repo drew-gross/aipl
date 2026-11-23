@@ -40,8 +40,8 @@ import {
     Union,
     User,
     builtin_imported,
-    builtin_table,
     import_name,
+    lint_table,
 } from "./builtin_table.aipl";
 import {
     ArrayLit,
@@ -218,7 +218,7 @@ fn expressions(self: Item) -> Expr[] {
 # file's own hides a builtin of the same name. A lint's own tests read the calls this way, so they
 # say what the lint does with a shape and nothing about what the file imports.
 pub fn resolve_with_every_builtin(self: Program) -> ResolvedProgram {
-    let table = builtin_table();
+    let table = lint_table();
     let own = self.items.collect_arms::<LoweredFn>()$declared_name();
     let named = table
         .map(|entry| (entry.import_name(), entry.arm))
@@ -261,7 +261,7 @@ pub fn resolve_with_every_builtin(self: Program) -> ResolvedProgram {
 # `self` resolved as in a file that imports each of `names` from builtins under its own name and
 # has nothing else in scope: what a test of a helper over a bare block needs.
 pub fn resolved_with_builtins(self: Expr, names: str[]) -> ResolvedExpr {
-    let table = builtin_table();
+    let table = lint_table();
     let imported = names
         .map(|name| ImportName { name, alias: none, span: 0..0 })
         $imported_pair("builtins", table)
@@ -278,7 +278,7 @@ pub fn resolved_with_builtins(self: Expr, names: str[]) -> ResolvedExpr {
 
 # What each import from a builtins library brings, by the name the file calls it.
 pub fn imported_callees(self: Item[]) -> #{str: Callee} {
-    let table = builtin_table();
+    let table = lint_table();
     [
         ..self.collect_arms::<Import>()$imported_pairs(table).join(),
         ..self.own_method_pairs(),

@@ -222,6 +222,19 @@ variant Callee =
     | LogicalAnd
     | LogicalOr
     | LogicalNot
+    # The operator builtins that share another's Rust callee (`wrapping_increment` is a `wrapping_add`
+    # of one), so the table the Rust side reads has no row for them and a call to one is a call of
+    # the shared callee there. A lint tells them apart, which is what `lint_table` is for.
+    | WrappingIncrement
+    | SaturatingIncrement
+    | WrappingDecrement
+    | SaturatingDecrement
+    | WrappingAddAssign
+    | SaturatingAddAssign
+    | WrappingSubAssign
+    | SaturatingSubAssign
+    | WrappingMulAssign
+    | SaturatingDivideAssign
     | Some
     | Ok
     | Err
@@ -281,6 +294,75 @@ pub fn builtin_imported(self: BuiltinEntry[], library: str, name: str) -> Builti
     assert(table.builtin_imported("json", "parse")$arm == some(ParseJson));
     assert(table.builtin_imported("sets", "len") == none);
     assert(table.builtin_imported("builtins", "__builtin_len") == none);
+})
+
+# The table the lints read: the importable builtins, and the operator builtins that Rust resolves
+# to another's callee. Each is a builtin the file imports under its operator (`wrapping_increment
+# as ++`), so a lint can say which one a call is, and what to advise, without the written name.
+pub fn lint_table() -> BuiltinEntry[] {
+    [
+        ..builtin_table(),
+        BuiltinEntry {
+            arm: WrappingIncrement,
+            callee: "__builtin_wrapping_increment",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: SaturatingIncrement,
+            callee: "__builtin_saturating_increment",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: WrappingDecrement,
+            callee: "__builtin_wrapping_decrement",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: SaturatingDecrement,
+            callee: "__builtin_saturating_decrement",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: WrappingAddAssign,
+            callee: "__builtin_wrapping_add_assign",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: SaturatingAddAssign,
+            callee: "__builtin_saturating_add_assign",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: WrappingSubAssign,
+            callee: "__builtin_wrapping_sub_assign",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: SaturatingSubAssign,
+            callee: "__builtin_saturating_sub_assign",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: WrappingMulAssign,
+            callee: "__builtin_wrapping_mul_assign",
+            definition: Declared,
+        },
+        BuiltinEntry {
+            arm: SaturatingDivideAssign,
+            callee: "__builtin_saturating_divide_assign",
+            definition: Declared,
+        },
+    ]
+}.test({
+    let table = lint_table();
+    assert(table$arm.distinct() == table$arm);
+    assert(
+        table
+            .find_if(|entry| entry.arm == WrappingIncrement)?
+            .import_name() == "wrapping_increment",
+    );
+    // They follow the table the Rust side reads.
+    assert(table[builtin_table().len()]?.arm == WrappingIncrement);
 })
 
 # The whole table.

@@ -5,14 +5,14 @@
 # spells it. [`spelled`] decides, from the file's imports: the name the file already has one under,
 # or the preferred spelling (the operator for an operator builtin, else the builtin's own name)
 # with the import that makes it available. A spelling the file cannot take — the name is bound to
-# something else, or an operator's flavor does not match the file's — is no spelling at all, and the
+# something else, or an operator is bound to another flavor — is no spelling at all, and the
 # advice that needed it is dropped, since a rewrite the file cannot write is no advice.
 #
 # Operators that come in more than one flavor (`wrapping_add` and `saturating_add`) are bound by
-# import, and nothing fixes which flavor a file chose for `+`. A lint that advises another spelling
-# of the same arithmetic — `set x = x + 1;` as `set x++;`, or as `set x += 1;` — is only right when
-# the spelling it advises has the flavor the file's operator has, and it is the import that names
-# it. That is decided here (`paired`), so each such lint asks the same question the same way.
+# import, and nothing fixes which flavor a file chose for `+`. Each flavor is a builtin of its own
+# with its own tag, so a lint that advises another spelling of the same arithmetic — `set x = x + 1;`
+# as `set x++;` — names the builtin of the flavor of the call it read (`WrappingAdd` advises
+# `WrappingIncrement`), and the file either has that operator or can take it.
 
 import {
     collect_arms,
@@ -21,14 +21,11 @@ import {
     filter,
     find_if,
     first,
-    is_some,
     is_some_and,
     join,
-    len,
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
-    split,
     value_or,
 } from builtins;
 import {
@@ -37,9 +34,10 @@ import {
     Insert,
     IsCase,
     Len,
+    SaturatingIncrement,
     WrappingAdd,
-    builtin_table,
     import_name,
+    lint_table,
 } from "../builtin_table.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
@@ -47,10 +45,8 @@ import { is_operator_name } from "../is_operator_name.aipl";
 import { Function, Import, ImportDecl, Item, LoweredFn, local } from "../item.aipl";
 import { operator_named_forms, operator_spellings } from "../operator_named_forms.aipl";
 
-# What a lint's advice needs the file to have: a builtin, by its tag, or an operator in the flavor
-# of one the file already uses (`Flavored("++", "+")` is the increment that goes with the file's
-# `+`; no builtin has a tag for it, since which one it is depends on the file).
-variant Need = Builtin(callee: Callee) | Flavored(operator: str, like: str)
+# What a lint's advice needs the file to have: a builtin, by its tag.
+variant Need = Builtin(callee: Callee)
 
 # An import that makes a [`Spelling`] available: the item to import from `library`, as the import
 # list writes it (`wrapping_increment as ++`).
@@ -65,12 +61,10 @@ pub fn is_builtin_named(self: Need, name: str, table: BuiltinEntry[]) -> bool {
         Builtin(callee) => table
             .find_if(|entry| entry.arm == callee)
             .is_some_and(|entry| entry.import_name() == name),
-        Flavored(..) => false,
     }
 }.test({
-    assert(Builtin(Len).is_builtin_named("len", builtin_table()));
-    assert(!Builtin(Len).is_builtin_named("any", builtin_table()));
-    assert(!Flavored("++", "+").is_builtin_named("++", builtin_table()));
+    assert(Builtin(Len).is_builtin_named("len", lint_table()));
+    assert(!Builtin(Len).is_builtin_named("any", lint_table()));
 })
 
 # The spelling of `self` in a file with these `items`, or `none` when the file cannot take any.
@@ -78,14 +72,10 @@ pub fn is_builtin_named(self: Need, name: str, table: BuiltinEntry[]) -> bool {
 pub fn spelled(self: Need, items: Item[], table: BuiltinEntry[]) -> Spelling? {
     match (self) {
         Builtin(callee) => items.spelled_builtin(table.find_if(|entry| entry.arm == callee)?),
-        Flavored(operator, like) => items.spelled_flavored(operator, like),
     }
 }.test({
     fn spelling(src: str, need: Need) -> Spelling?!ParseFailure {
-        ok(need.spelled(
-            aipl_parse_surface_file(src)?.program.hoist_test_fns().items,
-            builtin_table(),
-        ))
+        ok(need.spelled(aipl_parse_surface_file(src)?.program.hoist_test_fns().items, lint_table()))
     }
     fn missing(library: str, item: str) -> Request? { some(Request { library, item }) }
 
@@ -142,19 +132,26 @@ pub fn spelled(self: Need, items: Item[], table: BuiltinEntry[]) -> Spelling? {
         spelling("import { saturating_add as + } from builtins;", Builtin(WrappingAdd))? == none,
     );
 
-    // The flavor of the operator the file uses picks the builtin an operator form stands for.
+    // The flavored forms are builtins of their own, imported by name under the operator.
     assert(spelling(
         "import { saturating_add as + } from builtins;",
-        Flavored("++", "+"),
+        Builtin(SaturatingIncrement),
     )? == some(Spelling {
         text: "++",
         request: missing("builtins", "saturating_increment as ++"),
     }));
     assert(spelling(
         "import { saturating_add as +, saturating_increment as ++ } from builtins;",
-        Flavored("++", "+"),
+        Builtin(SaturatingIncrement),
     )? == some(Spelling { text: "++", request: none }));
-    assert(spelling("fn f() { }", Flavored("++", "+"))? == none);
+
+    // The operator is bound to the other flavor.
+    assert(
+        spelling(
+            "import { wrapping_increment as ++ } from builtins;",
+            Builtin(SaturatingIncrement),
+        )? == none,
+    );
 })
 
 # The spelling of the builtin `entry` in a file with these `items`.
@@ -196,24 +193,6 @@ fn free_name(self: Item[], candidate: str) -> str {
     } else {
         candidate
     }
-}
-
-# Whether the operator `operator` can be written in the flavor of the operator `like`, which the
-# file has to use.
-pub fn can_flavor(self: Item[], operator: str, like: str) -> bool {
-    self.spelled_flavored(operator, like).is_some()
-}
-
-# The spelling of the operator `operator` in the flavor of the operator `like`, which the file has
-# to use.
-fn spelled_flavored(self: Item[], operator: str, like: str) -> Spelling? {
-    let Pairing { builtin, imported } = self.paired(like, operator)?;
-    let request = if (imported) {
-        none
-    } else {
-        some(Request { library: "builtins", item: `{builtin} as {operator}` })
-    };
-    some(Spelling { text: operator, request })
 }
 
 # The operator that the builtin `self` provides, when it provides one: `+` for `wrapping_add`.
@@ -265,100 +244,3 @@ fn locals_from(self: Import(ImportDecl { names, source }), library: str, name: s
         Path(..) => [],
     }
 }
-
-# The builtin a file's `items` import under the local name `local`, as builtins
-# exports it (`wrapping_add` for `import { wrapping_add as + } from builtins;`), or `none`
-# when that name is not bound by an import from builtins — unbound, or one of the file's own.
-pub fn bound_to(self: Item[], local: str) -> str? {
-    self.collect_arms::<Import>()$builtin_bound_to(local).join().first()
-}.test({
-    let items = aipl_parse_surface_file(
-        """import { wrapping_add as +, len } from builtins; import { less_than as < } from "./a.aipl";""",
-    )?.program.hoist_test_fns().items;
-    assert(items.bound_to("+") == some("wrapping_add"));
-    assert(items.bound_to("len") == some("len"));
-    assert(items.bound_to("<") == none);
-    assert(items.bound_to("map") == none);
-})
-
-# The name an import from builtins exports under the local name `local`.
-fn builtin_bound_to(self: Import(ImportDecl { names, source }), local: str) -> str[] {
-    match (source) {
-        Builtins | Library(..) => names.filter(|n| n.local() == local)$name,
-        Path(..) => [],
-    }
-}
-
-# The builtin that provides the operator `target` with the flavor of the operator `written`, as
-# this file binds it, and whether the file has imported it already.
-struct Pairing { builtin: str, imported: bool }
-
-# The flavor of the operator builtin `self`: `wrapping` for `wrapping_add_assign`.
-fn flavor(self: str) -> str { self.split("_").first().value_or("") }.test({
-    assert("wrapping_add_assign".flavor() == "wrapping");
-    assert("saturating_decrement".flavor() == "saturating");
-    assert("".flavor() == "");
-})
-
-# How `items` can be advised to write `target` where they write `written`, or `none` when there is
-# nothing that provably means the same.
-#
-# The written operator has to be the file's own and a builtin: a user function of that name has no
-# flavor to pair with. Where `target` has only one flavor there is nothing to choose and it is that
-# one; where it has several, the one sharing the written operator's flavor is the one that means the
-# same. A `target` the file already imports counts only if it is that builtin — one bound to the
-# other flavor, or to a function of the file's own, would not mean what the advice says.
-pub fn paired(self: Item[], written: str, target: str) -> Pairing? {
-    let written_name = self.bound_to(written)?;
-    if (!written.operator_named_forms().contains(written_name)) { return none; };
-    let forms = target.operator_named_forms();
-    let builtin = if (forms.len() == 1) {
-        forms.first()?
-    } else {
-        forms.find_if(|form| form.flavor() == written_name.flavor())?
-    };
-    match (self.bound_to(target)) {
-        none => some(Pairing { builtin, imported: false }),
-        some(bound) => if (bound == builtin) {
-            some(Pairing { builtin, imported: true })
-        } else {
-            none
-        },
-    }
-}.test({
-    fn pairing(src: str, written: str, target: str) -> Pairing?!ParseFailure {
-        ok(aipl_parse_surface_file(src)?.program.hoist_test_fns().items.paired(written, target))
-    }
-    // The flavor of the file's `+` picks the step, and the import is named until it is made.
-    assert(pairing("import { wrapping_add as + } from builtins;", "+", "++")? == some(Pairing {
-        builtin: "wrapping_increment",
-        imported: false,
-    }));
-    assert(pairing("import { saturating_add as + } from builtins;", "+", "++")? == some(Pairing {
-        builtin: "saturating_increment",
-        imported: false,
-    }));
-    assert(pairing(
-        "import { saturating_add as +, saturating_increment as ++ } from builtins;",
-        "+",
-        "++",
-    )? == some(Pairing { builtin: "saturating_increment", imported: true }));
-
-    // An operator with one flavor has nothing to choose.
-    assert(pairing("import { wrapping_mul as * } from builtins;", "*", "*=")? == some(Pairing {
-        builtin: "wrapping_mul_assign",
-        imported: false,
-    }));
-
-    // The other flavor already bound to the target, a function of the file's own, or no import at all.
-    assert(
-        pairing(
-            "import { saturating_add as +, wrapping_increment as ++ } from builtins;",
-            "+",
-            "++",
-        )? == none,
-    );
-    assert(pairing("import { wrapping_add as ++ } from builtins;", "+", "++")? == none);
-    assert(pairing("""import { plus as + } from "./a.aipl";""", "+", "++")? == none);
-    assert(pairing("fn f() { }", "+", "++")? == none);
-})

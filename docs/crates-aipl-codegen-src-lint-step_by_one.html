@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/step_by_one.aipl</code></h1>
 
-      <div class="module-doc"><p>The <code>step_by_one</code> lint: a step of one written the long way — <code>set x = x + 1;</code>, <code>set x += 1;</code>, and their <code>-</code> mirrors — where <code>set x++;</code> / <code>set x--;</code> is the form for it.</p><p>Every spelling that adds or subtracts exactly one is the same statement, so they are one lint rather than four: the plain operator with either operand order for <code>+</code> (<code>x + 1</code> and <code>1 + x</code> both add one) but only the left for <code>-</code> (<code>set x = 1 - x;</code> is not a decrement), and the compound forms, whose receiver is always on the left.</p><p>The target may be a name or a field path off one (<code>set p.n = p.n + 1;</code> is <code>set p.n++;</code>): every <code>set</code> form takes either, and a path's text spells it, so the advice can quote it as written.</p><p>A written operator has a step form only where it provably means the same here — see <code>paired</code> — and the advice names the import to add when the file lacks it. Neither step operator has a bare form, so following the advice without the import would only trade this error for the operator gate's.</p><p>The hit points at the <code>set</code> statement.</p></div>
+      <div class="module-doc"><p>The <code>step_by_one</code> lint: a step of one written the long way — <code>set x = x + 1;</code>, <code>set x += 1;</code>, and their <code>-</code> mirrors — where <code>set x++;</code> / <code>set x--;</code> is the form for it.</p><p>Every spelling that adds or subtracts exactly one is the same statement, so they are one lint rather than four: the plain operator with either operand order for <code>+</code> (<code>x + 1</code> and <code>1 + x</code> both add one) but only the left for <code>-</code> (<code>set x = 1 - x;</code> is not a decrement), and the compound forms, whose receiver is always on the left.</p><p>The target may be a name or a field path off one (<code>set p.n = p.n + 1;</code> is <code>set p.n++;</code>): every <code>set</code> form takes either, and a path's text spells it, so the advice can quote it as written.</p><p>An operator has a step form of its own flavor (<code>wrapping_add</code> has <code>wrapping_increment</code>), and the advice names the import to add when the file lacks it. Neither step operator has a bare form, so following the advice without the import would only trade this error for the operator gate's.</p><p>The hit points at the <code>set</code> statement.</p></div>
 
 
 
@@ -29,7 +29,7 @@
           </h3>
           <pre class="signature"><code>struct Step</code></pre>
 
-          <div class="doc"><p>The step spelling that replaces a written operator, and whether the operation reads in either operand order.</p></div>
+          <div class="doc"><p>The step builtin that replaces an operator builtin, whether it adds, and whether the operation reads in either operand order.</p></div>
 
 
         </section>
@@ -41,9 +41,9 @@
             <a class="anchor" href="#item-step_of">step_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn step_of(self: str) -&#62; Step?</code></pre>
+          <pre class="signature"><code>pub fn step_of(self: Callee) -&#62; Step?</code></pre>
 
-          <div class="doc"><p>The step the written operator <code>self</code> becomes, if it adds or subtracts.</p></div>
+          <div class="doc"><p>The step the operator builtin <code>self</code> becomes, if it adds or subtracts.</p></div>
 
 
         </section>
@@ -57,7 +57,7 @@
           </h3>
           <pre class="signature"><code>pub fn stepped_operators(self: Item[]) -&#62; Callee[]</code></pre>
 
-          <div class="doc"><p>The builtins the file's <code>+</code> and <code>-</code> are whose <code>± 1</code> this lint has advice for in a file with these <code>items</code>.</p></div>
+          <div class="doc"><p>The plain operator builtins whose <code>± 1</code> this lint has advice for in a file with these <code>items</code>: the file can take the step form.</p></div>
 
 
         </section>

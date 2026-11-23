@@ -13,9 +13,8 @@
 # rewrite of the same line. Where it has none (no step flavor matches this file's operator), `±= 1` is the
 # only advice left and this lint gives it.
 #
-# Only the operators whose compound spelling provably means the same thing are advised — see `paired`:
-# the compound spelling has to be the flavor of the file's operator, and one the file already binds to
-# something else is not offered. The advice names the import to add when the file lacks it, since no
+# The compound form advised is the one of the operator's own flavor (`wrapping_add` has
+# `wrapping_add_assign`), and one the file already binds to something else is not offered. The advice names the import to add when the file lacks it, since no
 # compound operator has a bare form.
 #
 # The hit points at the `set` statement.
@@ -32,15 +31,20 @@ import {
 import {
     Callee,
     SaturatingAdd,
+    SaturatingAddAssign,
     SaturatingDivide,
+    SaturatingDivideAssign,
     SaturatingSub,
+    SaturatingSubAssign,
     WrappingAdd,
+    WrappingAddAssign,
     WrappingMul,
+    WrappingMulAssign,
     WrappingSub,
+    WrappingSubAssign,
 } from "../builtin_table.aipl";
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { is_operator_name } from "../is_operator_name.aipl";
 import { Function, Item } from "../item.aipl";
 import {
     Advice,
@@ -53,31 +57,32 @@ import {
     spans_its_text,
 } from "./lint_hit.aipl";
 import { is_same_place } from "./places.aipl";
-import { Flavored } from "./spelling.aipl";
+import { Builtin } from "./spelling.aipl";
 import { stepped_operators } from "./step_by_one.aipl";
 
-# The compound spelling the operator builtin `self` is advised to become, and whether it reads in
+# The compound builtin the operator builtin `self` is advised to become, and whether it reads in
 # either operand order.
 fn compound_of(self: Callee) -> Compound? {
     match (self) {
-        WrappingAdd | SaturatingAdd => some(Compound { spelling: "+=", commutative: true }),
-        WrappingSub | SaturatingSub => some(Compound { spelling: "-=", commutative: false }),
-        WrappingMul => some(Compound { spelling: "*=", commutative: true }),
-        SaturatingDivide => some(Compound { spelling: "/=", commutative: false }),
+        WrappingAdd => some(Compound { builtin: WrappingAddAssign, commutative: true }),
+        SaturatingAdd => some(Compound { builtin: SaturatingAddAssign, commutative: true }),
+        WrappingSub => some(Compound { builtin: WrappingSubAssign, commutative: false }),
+        SaturatingSub => some(Compound { builtin: SaturatingSubAssign, commutative: false }),
+        WrappingMul => some(Compound { builtin: WrappingMulAssign, commutative: true }),
+        SaturatingDivide => some(Compound { builtin: SaturatingDivideAssign, commutative: false }),
         _ => none,
     }
 }
 
-struct Compound { spelling: str, commutative: bool }
+struct Compound { builtin: Callee, commutative: bool }
 
 # The hit for `self`, when it is a `set` of a place to itself combined with something. `stepped` are
 # the operators, by the builtin they are, whose `± 1` the step lint has advice for.
 pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Advice? {
     if (!target.spans_its_text()) { return none; };
-    // An operator use is a call named for the spelling written, which the advice is flavored like.
-    let Call(written, [left, right], _, callee) = value.kind else { return none; };
-    if (!written.is_operator_name()) { return none; };
-    let Compound { spelling, commutative } = callee.compound_of()?;
+    // An operator use is a call of the builtin, whatever the file calls it.
+    let Call(_, [left, right], _, callee) = value.kind else { return none; };
+    let Compound { builtin, commutative } = callee.compound_of()?;
 
     // The receiver on the left works for every operator; on the right only where the operation is
     // commutative, since `k - x` and `k / x` are not accumulations of `x` at all.
@@ -95,7 +100,7 @@ pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Adv
         named: [
             Named {
                 text: `"{name}" accumulates onto itself — use the compound form "set {name} `,
-                builtin: Flavored(spelling, written),
+                builtin: Builtin(builtin),
             },
         ],
         tail: ` ...;"`,
@@ -113,16 +118,37 @@ pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Adv
         "fn f(x: i64) -> i64 { mut n = x; set n = n + x; n }",
         flagged,
     )?.shown() == [
-        `"n" accumulates onto itself — use the compound form "set n Flavored("+=", "+") ...;"`,
+        `"n" accumulates onto itself — use the compound form "set n Builtin(WrappingAddAssign) ...;"`,
     ]);
     assert(lint_in_unfilled(
         "fn f(x: i64) -> i64 { mut n = x; set n = x * n; n }",
         flagged,
     )?.shown() == [
-        `"n" accumulates onto itself — use the compound form "set n Flavored("*=", "*") ...;"`,
+        `"n" accumulates onto itself — use the compound form "set n Builtin(WrappingMulAssign) ...;"`,
     ]);
 
-    // The import to add is named, in the flavor of the file's operator.
+    // The import to add is named, in the flavor of the operator written.
+    assert(lint_in_unfilled_messages(
+        "import { saturating_add as + } from builtins; fn f(mut n: i64, m: i64) { set n = n + m; }",
+        flagged,
+    )? == [
+        ```"n" accumulates onto itself — use the compound form "set n += ...;", importing `saturating_add_assign as +=` from builtins```,
+    ]);
+
+    // `n + 1` is the step lint's wherever it can advise; where it cannot (`++` is the other flavor)
+    // the compound form is the only advice left.
+    assert(lint_in_unfilled_messages(
+        "import { saturating_add as +, wrapping_increment as ++ } from builtins; fn f(mut n: i64) { set n = n + 1; }",
+        flagged,
+    )? == [
+        ```"n" accumulates onto itself — use the compound form "set n += ...;", importing `saturating_add_assign as +=` from builtins```,
+    ]);
+    assert(
+        lint_in_unfilled_messages(
+            "import { wrapping_add as + } from builtins; fn f(mut n: i64) { set n = n + 1; }",
+            flagged,
+        )?.is_empty(),
+    );
 
     // `k - n` is not an accumulate.
     assert(

@@ -56,9 +56,10 @@ Advice that names the builtin a function *is* (`any` inside `fn any`) is dropped
 would have the function call itself.
 A lint finds a call by its `callee` tag (`Call(_, args, _, Map)`), never by the name the file
 wrote; a function value is tagged the same way (`Ident(_, IsSome)`), and an `Ident` is compared
-with `kind.is_ident(name)`, not `== Ident(name)`, since its tag differs. An operator form in the flavor of
-one the file uses is `Flavored("++", "+")` (see `step_by_one`). Register the
-lint in `lint.aipl` in its unfilled form.
+with `kind.is_ident(name)`, not `== Ident(name)`, since its tag differs. Every flavor of an operator
+is a builtin with a tag of its own, the compound and step forms included (`WrappingAdd`,
+`WrappingAddAssign`, `WrappingIncrement`; see `step_by_one`), so advice names the flavor of the call
+it read. Register the lint in `lint.aipl` in its unfilled form.
 
 This covers **every builtin the message names, not only the one being
 introduced**: advice such as `write "x.value_or(d)"` or `"x.is_some_and(|v| ..)"`
