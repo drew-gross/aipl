@@ -4309,7 +4309,19 @@ fn lower_case_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             let implicit_some = toks.contains("?");
             let default = if (kids.len() == 2) { some(kid_expr(kids, 1, sp)?) } else { none };
             let ty = if (implicit_some) { TyOptional(written) } else { written };
-            ok(ACaseParam(CaseParam { name: some(name), ty, default, implicit_some, doc }))
+            // The name is the first token that is not one of the `# ..` doc lines.
+            let name_span = own
+                .find_index(|t| !t.starts_with('#'))
+                .map(|i| node.tokens[i].value_or(sp))
+                .value_or(sp);
+            ok(ACaseParam(CaseParam {
+                name: some(name),
+                ty,
+                default,
+                implicit_some,
+                doc,
+                name_span,
+            }))
         },
         // A bare type.
         _ => ok(ACaseParam(CaseParam {

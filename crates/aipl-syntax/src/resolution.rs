@@ -28,6 +28,14 @@ pub enum Target {
     /// declaring variant item (the template, for a generic one) and the bare
     /// case name.
     Case { variant: String, case: String },
+    /// The named payload slot `field` of case `case` of a variant, as `value.field` reads it
+    /// off a value known to be that case: the declaring variant item (the template, for a
+    /// generic one) and the bare case name.
+    CaseField {
+        variant: String,
+        case: String,
+        field: String,
+    },
     /// A local binding (`let`, `mut`, `for`), by the span of the name that
     /// introduced it in the same function.
     Local(Span),

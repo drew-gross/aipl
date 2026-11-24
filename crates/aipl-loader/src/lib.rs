@@ -1691,6 +1691,7 @@ fn rewrite_item(
                                     .map(|d| rewrite_expr(d, view, sc, &earlier)),
                                 implicit_some: slot.implicit_some,
                                 doc: slot.doc.clone(),
+                                name_span: slot.name_span.clone(),
                             });
                             earlier.extend(slot.name.clone());
                         }

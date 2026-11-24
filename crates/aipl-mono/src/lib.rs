@@ -1873,6 +1873,7 @@ pub fn monomorphize(
                             default: None,
                             implicit_some: false,
                             doc: None,
+                            name_span: Default::default(),
                         })
                         .collect(),
                 })

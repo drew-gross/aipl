@@ -902,6 +902,9 @@ pub mod ast {
         /// written inside the payload's parentheses, one slot per line. `None`
         /// when it carries none.
         pub doc: Option<String>,
+        /// Where the slot's name is written, for the language server; empty for a bare
+        /// slot and for one a pass made up.
+        pub name_span: NameSpan,
     }
 
     /// How many arguments a parameter takes at a call site — see

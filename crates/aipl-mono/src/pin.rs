@@ -2780,6 +2780,17 @@ impl Pinner<'_> {
                 // A value known to be one case of a variant is read by that case's payload
                 // names, as a struct is by its fields.
                 if let Some((case, slots, index)) = self.case_field(&x.ty, &owner, field) {
+                    // `Case@Variant`: the case's constructor, which names both.
+                    if let Some((bare, variant)) = case.split_once('@') {
+                        self.resolve(
+                            &e.name_span,
+                            Target::CaseField {
+                                variant: variant.to_string(),
+                                case: bare.to_string(),
+                                field: field.clone(),
+                            },
+                        );
+                    }
                     return self.read_case_field(x, case, slots, index, e);
                 }
                 if !self.is_struct_like(&owner, &e.span)? {

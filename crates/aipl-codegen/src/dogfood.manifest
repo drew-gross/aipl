@@ -67,7 +67,7 @@
 ; struct __m38__FieldDecl 64 name@0:__m21__SpanStr ty@40:__m32__Ty default@48:__m33__Expr$__m33__ExprKind?
 ; struct __m38__VariantDecl 120 name@0:__m21__SpanStr doc@40:str? type_vars@72:__m38__TypeParam[] cases@96:__m38__VariantCase[]
 ; struct __m38__VariantCase 96 name@0:__m21__SpanStr doc@40:str? payload@72:__m38__CaseParam[]
-; struct __m38__CaseParam 96 name@0:str? ty@32:__m32__Ty default@40:__m33__Expr$__m33__ExprKind? implicit_some@56:bool doc@64:str?
+; struct __m38__CaseParam 112 name@0:str? ty@32:__m32__Ty default@40:__m33__Expr$__m33__ExprKind? implicit_some@56:bool doc@64:str? name_span@96:__builtin_Span
 ; struct __m38__RefinementDecl 104 name@0:__m21__SpanStr doc@40:str? type_vars@72:__m38__TypeParam[] target@96:__m32__Ty
 ; struct __m38__ImportDecl 72 names@0:__m38__ImportName[] source@24:__m38__ImportSource source_span@56:__builtin_Span
 ; struct __m38__ImportName 72 name@0:str alias@24:str? span@56:__builtin_Span
@@ -659,4 +659,4 @@
 ; data 500 __tostr_lit_101 66616c7365
 
 ; __m19__builtin_table
-; source-fingerprint 11586473319837169090
+; source-fingerprint 11970293943565179413

@@ -339,6 +339,43 @@ fn the_references_of_a_field_are_that_fields_uses() {
     }
 }
 
+/// A variant whose cases have named slots, read off a value known to be one case and passed by
+/// keyword at a construction.
+const CASE_FIELD: &str =
+    "variant Shape = Circle(radius: i64, label: str = \"c\") | Square(side: i64)\n\
+                          \n\
+                          fn grow(self: Circle) -> i64 { self.radius }\n\
+                          \n\
+                          fn make() -> Shape { Circle(3, label = \"x\") }\n";
+
+/// A named slot of a case is a place to go to and to find: its declaration, the reads of it
+/// off a value of that case, and the keyword arguments that supply it.
+#[test]
+fn the_references_of_a_case_slot_are_its_reads_and_keyword_arguments() {
+    let workspace = Workspace::new("case_slot_references", &[("main.aipl", CASE_FIELD)]);
+    let mut server = opened(&workspace, "main.aipl");
+    analysed(&mut server, &workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    let at = |snippet: &str| triple(&uri, cursor_on(CASE_FIELD, snippet));
+
+    // The read of `radius`, from the use and from the declaration.
+    for from in ["radius }", "radius: i64"] {
+        assert_eq!(
+            references_at(&mut server, &uri, cursor_on(CASE_FIELD, from), true),
+            vec![at("radius: i64"), at("radius }")],
+            "from {from:?}"
+        );
+    }
+    // The keyword argument of `label`, which no read mentions.
+    for from in ["label: str", "label = "] {
+        assert_eq!(
+            references_at(&mut server, &uri, cursor_on(CASE_FIELD, from), true),
+            vec![at("label: str"), at("label = ")],
+            "from {from:?}"
+        );
+    }
+}
+
 /// A use in a file nobody has opened is still a use: the references are the
 /// project's, found by checking each workspace file that mentions the name. A
 /// file that does not compile has nothing resolved to list and is left out, and

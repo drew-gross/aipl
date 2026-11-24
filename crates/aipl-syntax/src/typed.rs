@@ -1167,6 +1167,7 @@ impl TProgram {
                                         default: p.default.as_ref().map(TExpr::erase),
                                         implicit_some: p.implicit_some,
                                         doc: p.doc.clone(),
+                                        name_span: Default::default(),
                                     })
                                     .collect(),
                             })

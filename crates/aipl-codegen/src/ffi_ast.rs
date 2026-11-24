@@ -356,6 +356,10 @@ fn case_param(v: &FfiValue) -> R<ast::CaseParam> {
         default: maybe(field(v, "default")?, expr)?,
         implicit_some: flag(field(v, "implicit_some")?)?,
         doc: maybe(field(v, "doc")?, text)?,
+        name_span: ast::NameSpan(match v_field(v, "name_span") {
+            Some(at) => span(at)?,
+            None => 0..0,
+        }),
     })
 }
 

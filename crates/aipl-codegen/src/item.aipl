@@ -217,7 +217,15 @@ struct StructDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], fields: Fi
 # One payload slot of a variant case. A positional slot has no name; the three
 # named forms differ only in whether they carry a default and whether the `?`
 # moved onto the name.
-struct CaseParam { name: str?, ty: Ty, default: Expr?, implicit_some: bool, doc: str? }
+struct CaseParam {
+    name: str?,
+    ty: Ty,
+    default: Expr?,
+    implicit_some: bool,
+    doc: str?,
+    // Where the slot's name is written; empty for a bare slot.
+    name_span: Span = 0..0,
+}
 
 struct VariantCase { name: SpanStr, doc: str?, payload: CaseParam[] }
 

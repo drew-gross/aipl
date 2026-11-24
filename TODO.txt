@@ -305,7 +305,6 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace), but also separate types for strings that can contain those
 
 lsp:
-  go-to-refs should work for variant arm fields (e.g. go to uses of name field of ExprKind's Call's name field)
   "this document does not compile" error should name he document
   warm the cache in the background on start and on edit
   docs hover should work on Error, err, ok, etc.

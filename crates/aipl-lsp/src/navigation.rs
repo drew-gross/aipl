@@ -114,6 +114,10 @@ impl Navigation {
         let mut variants: HashMap<&str, Site> = HashMap::new();
         let mut fields: HashMap<(&str, &str), Site> = HashMap::new();
         let mut cases: HashMap<(&str, &str), Site> = HashMap::new();
+        // The named payload slots of cases: by variant, case and slot, and by the constructor's
+        // name (`Case@Variant`) and slot, which is how a keyword argument names its callee.
+        let mut case_fields: HashMap<(&str, &str, &str), Site> = HashMap::new();
+        let mut constructor_params: HashMap<(String, String), Site> = HashMap::new();
         let mut declarations: Vec<Site> = Vec::new();
         let mut binders: Vec<Site> = Vec::new();
         // The items that declare type parameters, with where each starts in its
@@ -201,6 +205,21 @@ impl Navigation {
                             };
                             cases.insert((&v.name, &case.name), site.clone());
                             declarations.push(site);
+                            for slot in case.payload.iter().filter(|p| written(&p.name_span.0)) {
+                                let Some(name) = slot.name.as_deref() else {
+                                    continue;
+                                };
+                                let site = Site {
+                                    file: file.clone(),
+                                    span: slot.name_span.0.clone(),
+                                };
+                                case_fields.insert((&v.name, &case.name, name), site.clone());
+                                constructor_params.insert(
+                                    (format!("{}@{}", case.name.text, v.name), name.to_string()),
+                                    site.clone(),
+                                );
+                                declarations.push(site);
+                            }
                         }
                     }
                 }
@@ -338,8 +357,11 @@ impl Navigation {
             }
             // A keyword argument's name is the parameter it was passed for.
             for keyword in &source.keyword_uses {
-                if let Some(site) =
-                    parameters.get(&(keyword.callee.as_str(), keyword.param.as_str()))
+                if let Some(site) = parameters
+                    .get(&(keyword.callee.as_str(), keyword.param.as_str()))
+                    .or_else(|| {
+                        constructor_params.get(&(keyword.callee.clone(), keyword.param.clone()))
+                    })
                 {
                     uses.push((
                         Site {
@@ -391,6 +413,14 @@ impl Navigation {
                     .or_else(|| {
                         builtin_type(owner).map(|owner| Found::Native(format!("{owner}.{field}")))
                     }),
+                Target::CaseField {
+                    variant,
+                    case,
+                    field,
+                } => case_fields
+                    .get(&(variant.as_str(), case.as_str(), field.as_str()))
+                    .cloned()
+                    .map(Found::Declared),
                 Target::Struct(name) => structs
                     .get(name.as_str())
                     .cloned()
