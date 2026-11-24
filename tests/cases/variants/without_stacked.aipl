@@ -1,4 +1,5 @@
-# Every `without` clause leaves out one more thing, so a type can exclude several cases.
+# Every `without` clause leaves out one more thing, so a type can exclude several cases, and a
+# parenthesized list leaves out several in one clause.
 
 import { equal as == } from builtins;
 
@@ -12,4 +13,12 @@ fn weight(self: Shape without Dot without Blank) -> i64 {
 }.test({
     assert(weight(Circle(4)) == 4);
     assert(weight(Group([Dot, Blank])) == 0);
+})
+
+fn bulk(self: Shape without (Dot, Blank)) -> i64 { self.weight() }.test({
+    assert(bulk(Circle(2)) == 2);
+})
+
+fn everywhere(self: Shape without (Dot, Blank) throughout) -> i64 { self.weight() }.test({
+    assert(everywhere(Group([Circle(1)])) == 0);
 })

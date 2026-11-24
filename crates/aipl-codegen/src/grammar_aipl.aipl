@@ -115,7 +115,7 @@ import {
     DetachedDoc as ADetachedDoc,
     Entries as AEntries,
     Entry as AEntry,
-    Exclusion as AExclusion,
+    Exclusions as AExclusions,
     Expr as AExpr,
     Exprs as AExprs,
     FieldDecl as AFieldDecl,
@@ -810,6 +810,8 @@ fn types() -> Production<AiplTok, Ast>[] {
     // change to `ty`.
     let exclusion: Rule<AiplTok> = OneOf([
         Then([Lit("["), Lit("]")]),
+        // `without (A, B) throughout`: several cases at once, each as if written on its own.
+        Then([Many(Term(Name), min=1, sep=Lit(","), nested_in=parens()), Maybe(Lit("throughout"))]),
         Then([Term(Name), Maybe(Lit("throughout"))]),
     ]);
 
@@ -4265,7 +4267,9 @@ fn lower_refinement_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     mut target = as_ty(kid(kids, 1, sp)?, sp)?;
     for (let x : kids.drop_n(2)) {
-        set target = TyWithout(target, as_exclusion(x, sp)?);
+        for (let left_out : as_exclusions(x, sp)?) {
+            set target = TyWithout(target, left_out);
+        }
     }
     ok(ARefinement(RefinementDecl {
         name: span_str(src, node.second_tok(sp)),
@@ -4695,6 +4699,16 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
     // A case may be left out of everything the type holds, not only of the type.
     assert(ty_dump("V without C throughout") == "Without(V, C throughout)");
     assert(ty_dump("(V without C throughout) without D") == "Without(Without(V, C throughout), D)");
+
+    // Several cases at once: the list is the clauses it stands for, in order, and a trailing
+    // comma is allowed as in any list.
+    assert(ty_dump("V without (C, D)") == "Without(Without(V, C), D)");
+    assert(ty_dump("V without (C, D,)") == "Without(Without(V, C), D)");
+    assert(ty_dump("V without (C)") == "Without(V, C)");
+    assert(
+        ty_dump("V without (C, D) throughout") == "Without(Without(V, C throughout), D throughout)",
+    );
+    assert(ty_dump("V without A without (C, D)") == "Without(Without(Without(V, A), C), D)");
     assert(
         ty_dump("Tree<T> without Leaf throughout") == "Without(Generic(Tree, T), Leaf throughout)",
     );
@@ -6651,8 +6665,8 @@ fn as_ty(v: Ast, span: Span) -> Ty!ParseError {
     err(wrong_kind("a type", v, span))
 }
 
-fn as_exclusion(v: Ast, span: Span) -> Exclusion!ParseError {
-    if (let AExclusion(x) = v) { return ok(x); };
+fn as_exclusions(v: Ast, span: Span) -> Exclusion[]!ParseError {
+    if (let AExclusions(xs) = v) { return ok(xs); };
     err(wrong_kind("a `without` exclusion", v, span))
 }
 
@@ -6700,19 +6714,28 @@ fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     };
     mut refined = as_ty(head, sp)?;
     for (let x : kids.drop_first()) {
-        set refined = TyWithout(refined, as_exclusion(x, sp)?);
+        for (let left_out : as_exclusions(x, sp)?) {
+            set refined = TyWithout(refined, left_out);
+        }
     }
     ok(ATy(refined))
 }
 
-# `exclusion` — what a `without` clause leaves out: `[]`, a case by name, or a case
-# by name followed by `throughout`. The first token tells the array from the others,
+# `exclusion` — what a `without` clause leaves out: `[]`, a case by name, a case
+# by name followed by `throughout`, or a parenthesized list of case names, which
+# `throughout` may follow to apply to each. The first token tells the array from the others,
 # since a name is the only form that starts with one.
 fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     match (node.own_texts(src)) {
-        ["[", ..] => ok(AExclusion(EmptyArray)),
-        [name, "throughout"] => ok(AExclusion(Throughout(name))),
-        [name, ..] => ok(AExclusion(NamedCase(name))),
+        ["[", ..] => ok(AExclusions([EmptyArray])),
+        ["(", ..] => {
+            let written = node.own_texts(src);
+            let everywhere = written.last() == some("throughout");
+            let names = written.filter(|t| !["(", ")", ",", "throughout"].contains(t));
+            ok(AExclusions(names.map(|n| if (everywhere) { Throughout(n) } else { NamedCase(n) })))
+        },
+        [name, "throughout"] => ok(AExclusions([Throughout(name)])),
+        [name, ..] => ok(AExclusions([NamedCase(name)])),
         _ => err(ParseError { message: "an exclusion matched no token", span: node.span() }),
     }
 }

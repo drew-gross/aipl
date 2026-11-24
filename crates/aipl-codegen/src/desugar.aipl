@@ -527,13 +527,45 @@ fn lifted_all(self: Pat[], tag: u64, taken: u64, written: WrittenNames) -> Lifte
 
 # The tree every pass after this one is handed: an expression with none of the surface forms
 # `desugared` lowers anywhere in it.
-variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout
+variant CoreExpr = Expr without (
+    LetPattern,
+    ForPattern,
+    ProviderShim,
+    FieldProjection,
+    MethodProjection,
+    Interpolation,
+    Range,
+) throughout
 
-variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout
+variant CoreKind = ExprKind without (
+    LetPattern,
+    ForPattern,
+    ProviderShim,
+    FieldProjection,
+    MethodProjection,
+    Interpolation,
+    Range,
+) throughout
 
-variant CoreFieldInit = FieldInit without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout
+variant CoreFieldInit = FieldInit without (
+    LetPattern,
+    ForPattern,
+    ProviderShim,
+    FieldProjection,
+    MethodProjection,
+    Interpolation,
+    Range,
+) throughout
 
-variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout
+variant CoreMatchArm = MatchArm without (
+    LetPattern,
+    ForPattern,
+    ProviderShim,
+    FieldProjection,
+    MethodProjection,
+    Interpolation,
+    Range,
+) throughout
 
 # What `receiver$step` means: `receiver.map(|e| step)`, where `step` is the projection written
 # against the element `e`, which sits where the step's name is written so an error about it points

@@ -2206,22 +2206,40 @@ fn type_var_sites(file: &LoadedFile) -> Vec<Span> {
 
 /// The cases written after a `without` in `file`'s types, each with the variant
 /// the name before the `without` means. `without` is a keyword, so a type token
-/// spelled that way is always the clause, and the token after it its exclusion.
+/// spelled that way is always the clause, and what follows it is its exclusion:
+/// one token, or the names inside a parenthesized list.
 fn exclusion_sites(
     file: &LoadedFile,
     view: &HashMap<String, String>,
 ) -> Vec<aipl_syntax::ast::ImportSite> {
     let text = |span: &Span| file.source.get(span.clone());
-    file.type_uses
-        .windows(3)
-        .filter(|window| text(&window[1]) == Some("without"))
-        .filter_map(|window| {
-            Some(aipl_syntax::ast::ImportSite {
-                span: window[2].clone(),
-                target: view.get(text(&window[0])?)?.clone(),
-            })
-        })
-        .collect()
+    let spans = &file.type_uses;
+    let mut sites = Vec::new();
+    for (at, span) in spans.iter().enumerate() {
+        if at == 0 || text(span) != Some("without") {
+            continue;
+        }
+        let Some(target) = text(&spans[at - 1]).and_then(|name| view.get(name)) else {
+            continue;
+        };
+        let Some(first) = spans.get(at + 1) else {
+            continue;
+        };
+        let written: Vec<&Span> = if text(first) == Some("(") {
+            spans[at + 2..]
+                .iter()
+                .take_while(|s| text(s) != Some(")"))
+                .filter(|s| text(s).is_some_and(|t| t.starts_with(|c: char| c.is_alphabetic())))
+                .collect()
+        } else {
+            vec![first]
+        };
+        sites.extend(written.into_iter().map(|s| aipl_syntax::ast::ImportSite {
+            span: s.clone(),
+            target: target.clone(),
+        }));
+    }
+    sites
 }
 
 fn type_sites(

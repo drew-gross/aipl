@@ -405,6 +405,9 @@ variant ListStyle =
     | SpacedBraces
     | Angles
     | TyParens
+    // The case names of a `without (A, B)` clause: parentheses, and unlike a type's list it
+    // takes the trailing comma when broken.
+    | Exclusions
     | SpacedBracesNoTrailing
 
 # A style's brackets and the two layout bits, unpacked. The Rust version returns
@@ -430,6 +433,7 @@ fn shape(self: ListStyle) -> ListShape {
         },
         Angles => ListShape { open: "<", close: ">", spaced: false, trailing: false },
         TyParens => ListShape { open: "(", close: ")", spaced: false, trailing: false },
+        Exclusions => ListShape { open: "(", close: ")", spaced: false, trailing: true },
     }
 }
 
@@ -689,6 +693,7 @@ fn ty_head(self: W) -> WDoc!FmtError {
 # itself, or the name of a case of the variant the type refines, which `throughout`
 # extends to everything the type holds.
 fn exclusion(self: W) -> WDoc!FmtError {
+    if (self.peek_text() == "(") { return self.exclusion_list(); };
     if (self.peek_is(Ident)) {
         let WStr { w, text } = self.bump();
         if (w.peek_text() == "throughout") {
@@ -698,6 +703,24 @@ fn exclusion(self: W) -> WDoc!FmtError {
     };
     let closed = self.expect("[")?.w.expect("]")?.w;
     ok(WDoc { w: closed, doc: Text("[]") })
+}
+
+# `(A, B)` after a `without`, with `throughout` after it when the cases are left out of
+# everything the type holds: a list that breaks to a line per name with a trailing comma.
+fn exclusion_list(self: W) -> WDoc!FmtError {
+    mut w = self.bump().w;
+    mut names: Doc[] = [];
+    while (w.more_before(")")) {
+        let WStr { w as after, text } = w.bump();
+        set names.push(Text(text));
+        set w = if (after.peek_text() == ",") { after.bump().w } else { after };
+    }
+    let closed = w.expect(")")?.w;
+    let list = comma_list_docs(names, Exclusions);
+    if (closed.peek_text() == "throughout") {
+        return ok(WDoc { w: closed.bump().w, doc: Concat([list, Text(" throughout")]) });
+    };
+    ok(WDoc { w: closed, doc: list })
 }
 
 # `(A, B) -> R` (function type), `(A, B)` (tuple), `(A, B)[]` (tuple array), or
@@ -909,8 +932,8 @@ fn refinement_follows(self: W) -> bool {
     self.peek_text_n(1) == "without" || self.peek_text_n(1) == "<"
 }
 
-# `variant V = Base without C`: one line, since there is no list to break. The
-# refined type is laid out as any type is.
+# `variant V = Base without C`: the refined type, laid out as any type is, so a
+# `without (A, B)` list breaks when the line is too long.
 fn refinement_item(self: W, name: str, params: Doc) -> WDoc!FmtError {
     let t = self.ty()?;
     let tc = t.w.trailing_comment();
@@ -3203,6 +3226,17 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("Box < T [ ] without [ ] >")?.ty().rendered(100)? == "Box<T[] without []>");
     // A variant refines by excluding one of its cases, named.
     assert(walker_of("V   without   C")?.ty().rendered(100)? == "V without C");
+    assert(walker_of("V without ( A ,B, )")?.ty().rendered(100)? == "V without (A, B)");
+    assert(
+        walker_of("V without (A, B) throughout")?
+            .ty()
+            .rendered(100)? == "V without (A, B) throughout",
+    );
+    assert(
+        walker_of("V without (Alpha, Beta, Gamma) throughout")?
+            .ty()
+            .rendered(30)? == "V without (\n    Alpha,\n    Beta,\n    Gamma,\n) throughout\n",
+    );
     assert(walker_of("( V without C ) ?")?.ty().rendered(100)? == "(V without C)?");
     assert(walker_of("Tree < T > without Leaf")?.ty().rendered(100)? == "Tree<T> without Leaf");
 

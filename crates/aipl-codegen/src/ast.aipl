@@ -73,7 +73,7 @@ import { Exclusion as ExclusionNode, Ty as TyNode, Unit } from "./ty.aipl";
 variant Ast =
     | Ty(TyNode)
     | Tys(TyNode[])
-    | Exclusion(ExclusionNode)
+    | Exclusions(ExclusionNode[])
     | Pat(PatNode)
     | Payload(PatNode[], bool)
     # A bare `..` in a pattern position. Only the end of an array arm's elements
@@ -124,7 +124,7 @@ pub fn ast_case_name(self: Ast) -> str {
     match (self) {
         Ty(..) => "a type",
         Tys(..) => "a list of types",
-        Exclusion(..) => "a `without` exclusion",
+        Exclusions(..) => "a `without` exclusion",
         Pat(..) => "a pattern",
         Payload(..) => "a constructor payload",
         Rest(..) => "a `..`",
