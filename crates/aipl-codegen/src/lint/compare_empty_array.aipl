@@ -19,7 +19,6 @@ import {
     logical_and as &&,
     logical_not as !,
     map,
-    value_or,
 } from builtins;
 import { Equal, IsEmpty, IsNonempty, NotEqual } from "../builtin_table.aipl";
 import { ArrayLit, Call, Expr, descendants_of_kind } from "../expr.aipl";
@@ -45,16 +44,11 @@ pub fn compare_empty_array(self: Call(_, args, _, callee)) -> LintHit? {
     } else {
         return none;
     };
-    some(
-        receiver
-            .operand_text()
-            .map(|text| advice(builtin, `comparing with an empty array — use "{text}.`, `()"`))
-            .value_or(advice(
-                builtin,
-                `comparing with an empty array — use "`,
-                `" on the receiver`,
-            )),
-    )
+    some(advice(
+        builtin,
+        `comparing with an empty array — use "{receiver.operand_text()}.`,
+        `()"`,
+    ))
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> LintHit[] {
@@ -83,7 +77,9 @@ pub fn compare_empty_array(self: Call(_, args, _, callee)) -> LintHit? {
     assert(lint_function_unfilled(
         "fn f(c: bool, a: i64[], b: i64[]) -> bool { (if (c) { a } else { b }) == [] }",
         flagged,
-    )?.shown() == [`comparing with an empty array — use "Builtin(IsEmpty)" on the receiver`]);
+    )?.shown() == [
+        "comparing with an empty array — use \"(if (c) { a } else { b }).Builtin(IsEmpty)()\"",
+    ]);
 
     // Inequality is the non-empty test, with either side the literal.
     assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x != [] }", flagged)?.shown() == [

@@ -1,11 +1,11 @@
 # The source text of an expression, written from its tree: what a lint's advice quotes when it
 # says "write `xs.is_empty()`" about code it read as `len(xs) == 0`.
 #
-# It renders the forms a receiver or an interpolated value is made of — names, literals, field
-# paths, calls, operators, indexing, slices, array and tuple literals — and says `none` for the
-# rest (a lambda, a `match`, a block), which advice then describes instead of quoting. What it
-# writes parses back to the tree it was written from: an operand that is itself an operator use
-# is parenthesized, so `(a + b).len()` is not `a + b.len()`.
+# It writes every form of the language: what comes back parses to the tree it was written from.
+# An operand that is itself an operator use is parenthesized, so `(a + b).len()` is not
+# `a + b.len()`, and a block is written on one line, its statements between braces. A call the
+# parser made of another form (`__builtin_grid_get`, `__aipl_concat`) is written under the name it
+# has.
 #
 # The span of a node is not used: a call's span stops before its closing paren, so the source
 # text of one is no spelling of it.
@@ -13,41 +13,71 @@
 import {
     contains,
     drop_first,
+    ends_with,
     equal as ==,
-    first,
+    greater_than_or_equal as >=,
     is_empty,
     join,
     len,
     logical_and as &&,
+    logical_not as !,
     logical_or as ||,
-    map,
-    push,
+    not_equal as !=,
     starts_with,
-    value_or,
 } from builtins;
 import {
     ArrayLit,
+    Assign,
+    Binding,
     Bool,
+    ByPattern,
     Call,
     Char,
+    Construct,
+    DictLit,
     Expr,
     Field,
+    FieldInit,
+    FieldProjection,
     FloatLit,
+    For,
+    ForPattern,
     Ident,
+    If,
+    IfLet,
     Index,
+    Interpolation,
     KwArg,
+    Lambda,
+    LambdaParam,
+    Let,
+    LetMut,
+    LetPattern,
+    Match,
+    MatchArm,
+    MethodProjection,
     Neg,
     None,
     Num,
+    ProviderShim,
     Range,
+    Return,
+    Seq,
+    SetLit,
+    Shim,
     Slice,
     Spread,
     Str,
     Try,
     TupleLit,
+    TypeArgs,
     Unit,
+    While,
+    show_binding,
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
+import { pat_text, quoted } from "../pat.aipl";
+import { Ty, set_spelling, type_text } from "../ty.aipl";
 import { lint_function_messages, lint_message } from "./lint_hit.aipl";
 import { slot_shown } from "./places.aipl";
 
@@ -56,29 +86,75 @@ fn is_infix(self: str) -> bool {
     ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "||"].contains(self)
 }
 
-# The text that writes `self`, or `none` when it is a form this does not write.
-pub fn expr_text(self: Expr) -> str? {
+# The operators of `set target op= value;`.
+fn is_compound(self: str) -> bool { ["+=", "-=", "*=", "/="].contains(self) }
+
+# The text that writes `self`.
+pub fn expr_text(self: Expr) -> str {
     let k = self.kind;
     match (k) {
-        Num(n) => some(`{n}`),
-        FloatLit(text) => some(text),
-        Bool(b) => some(`{b}`),
-        Str(text) => some(text.quoted('"')),
-        Char(c) => some(`{c}`.quoted('\'')),
-        Ident(name, _) => some(name),
-        None => some("none"),
-        Unit => some("()"),
-        Call(..) => k.call_text(),
-        _ => self.compound_text(),
+        Num(n) => `{n}`,
+        FloatLit(text) => text,
+        Bool(b) => `{b}`,
+        Str(text) => text.quoted('"'),
+        Char(c) => `{c}`.quoted('\''),
+        Ident(name, _) => name,
+        None => "none",
+        Unit => "()",
+        Call(..) => k.call_text(""),
+        TypeArgs(inner, types) => inner.type_args_text(types),
+        Field(receiver, name) => `{receiver.operand_text()}.{name.slot_shown()}`,
+        FieldProjection(receiver, name) => `{receiver.operand_text()}${name.slot_shown()}`,
+        MethodProjection(receiver, name, args) => `{receiver.operand_text()}${name}({args.texts()})`,
+        Index(receiver, index) => `{receiver.operand_text()}[{index.expr_text()}]`,
+        Slice(receiver, start, end) => `{receiver.operand_text()}[{start.bound_text()}..{end.bound_text()}]`,
+        Try(inner) => `{inner.operand_text()}?`,
+        Neg(inner) => `-{inner.operand_text()}`,
+        Range(start, end) => `{start.operand_text()}..{end.operand_text()}`,
+        Spread(inner) => `..{inner.expr_text()}`,
+        Interpolation(inner) => `\`\{{inner.expr_text()}}\``,
+        KwArg(name, value, forwarded) => `{name}{if (forwarded) { "?=" } else { "=" }}{value.expr_text()}`,
+        ArrayLit(elements) => `[{elements.texts()}]`,
+        // A one-element tuple is not written in source; the comma is what it would take.
+        TupleLit(elements) => if (elements.len() == 1) {
+            `({elements.texts()},)`
+        } else {
+            `({elements.texts()})`
+        },
+        SetLit(elements, order) => `#{order.set_spelling()}\{{elements.texts()}\}`,
+        DictLit(entries) => if (entries.is_empty()) {
+            "#{}"
+        } else {
+            `#\{{entries$entry_text().join(sep=", ")}\}`
+        },
+        Construct(name, fields) => if (fields.is_empty()) {
+            `{name} \{}`
+        } else {
+            `{name} \{ {fields$field_init_text().join(sep=", ")} }`
+        },
+        Lambda(params, body) => `|{params$param_text().join(sep=", ")}| {body.body_text()}`,
+        If(condition, then, otherwise) => `if ({condition.expr_text()}) {then.braced()}{otherwise.else_text()}`,
+        IfLet(arm, value, otherwise) => `if (let {arm.pattern.pat_text()} = {value.expr_text()}) {arm.body.braced()}{otherwise.else_text()}`,
+        Match(scrutinee, arms) => `match ({scrutinee.expr_text()}) \{ {arms$arm_text().join(sep=", ")} }`,
+        For(name, iterable, body, index) => `for (let {index.index_text()}{name} : {iterable.expr_text()}) {body.loop_braced()}`,
+        ForPattern(binding, iterable, body, index) => `for (let {index.index_text()}{binding.binding_text()} : {iterable.expr_text()}) {body.loop_braced()}`,
+        While(condition, body) => `while ({condition.expr_text()}) {body.loop_braced()}`,
+        Shim(effect, bindings, body) => `shim {effect} \{ {bindings$bind_text().join(sep=", ")} } {body.braced()}`,
+        ProviderShim(provider, args, body) => `shim random {provider}({args.texts()}) {body.braced()}`,
+        Return(value) => match (value.kind) {
+            Unit => "return",
+            _ => `return {value.expr_text()}`,
+        },
+        Let(..) | LetMut(..) | LetPattern(..) | Assign(..) | Seq(..) => self.braced(),
     }
 }.test({
-    // The text written for the expression `src`, if any, read as the argument of a call.
+    // The text written for the expression `src`, read as the argument of a call.
     fn text(src: str) -> str[]!ParseFailure {
         lint_function_messages(
             `fn f() \{ g({src}) }`,
             |function| {
                 let Call(_, [argument], _, _) = function.body.kind else { return []; };
-                argument.expr_text().map(|written| [lint_message(written, span=0..0)]).value_or([])
+                [lint_message(argument.expr_text(), span=0..0)]
             },
         )
     }
@@ -97,10 +173,12 @@ pub fn expr_text(self: Expr) -> str? {
     assert(text("""'\''""")? == ["""'\''"""]);
     assert(text(`"q\\"q"`)? == [`"q\\"q"`]);
 
-    // Calls, in the spelling they were written, with keyword arguments.
+    // Calls, in the spelling they were written, with keyword arguments and type arguments.
     assert(text("f(x, 1)")? == ["f(x, 1)"]);
     assert(text("f(x).g(1)")? == ["f(x).g(1)"]);
     assert(text(`xs.join(sep=", ")`)? == [`xs.join(sep=", ")`]);
+    assert(text("f::<i64, str>(x)")? == ["f::<i64, str>(x)"]);
+    assert(text("xs.collect::<i64>()")? == ["xs.collect::<i64>()"]);
 
     // Operators between operands, parenthesized wherever the tree would regroup otherwise.
     assert(text("a + b")? == ["a + b"]);
@@ -117,99 +195,309 @@ pub fn expr_text(self: Expr) -> str? {
     assert(text("xs[1..n]")? == ["xs[1..n]"]);
     assert(text("[1, ..a]")? == ["[1, ..a]"]);
     assert(text("(a, b)")? == ["(a, b)"]);
+    assert(text("#{1, 2}")? == ["#{1, 2}"]);
+    assert(text("#>{1}")? == ["#>{1}"]);
+    assert(text("""#{"k": 1, "j": 2}""")? == ["""#{"k": 1, "j": 2}"""]);
+    assert(text("#{}")? == ["#{}"]);
     assert(text("f()?")? == ["f()?"]);
     assert(text("0..n")? == ["0..n"]);
     assert(text("(a + b)..n")? == ["(a + b)..n"]);
 
-    // What it does not write.
-    assert(text("|x| x")?.is_empty());
-    assert(text("if (c) { a } else { b }")?.is_empty());
-    assert(text("f(|x| x)")?.is_empty());
+    // Projections and struct literals, with the spread and the shorthand as written.
+    assert(text("xs$name")? == ["xs$name"]);
+    assert(text("xs$f(1)")? == ["xs$f(1)"]);
+    assert(text("P { x: 1, y }")? == ["P { x: 1, y }"]);
+    assert(text("P { ..p, x: 1 }")? == ["P { ..p, x: 1 }"]);
+    assert(text("P {}")? == ["P {}"]);
+
+    // Lambdas and the forms with blocks, a block on one line.
+    assert(text("|x| x")? == ["|x| x"]);
+    assert(text("|x: i64, y| x")? == ["|x: i64, y| x"]);
+    assert(text("|(a, b)| a")? == ["|(a, b)| a"]);
+    assert(text("|| 1")? == ["|| 1"]);
+    assert(text("f(|x| x)")? == ["f(|x| x)"]);
+    assert(text("if (c) { a } else { b }")? == ["if (c) { a } else { b }"]);
+    assert(text("if (c) { a } else if (d) { b } else { e }")? == [
+        "if (c) { a } else if (d) { b } else { e }",
+    ]);
+    assert(text("(if (c) { a } else { b }).f()")? == ["(if (c) { a } else { b }).f()"]);
+    assert(text("if (let some(v) = o) { v } else { 0 }")? == [
+        "if (let some(v) = o) { v } else { 0 }",
+    ]);
+    assert(text("match (x) { some(v) => v, _ => 0 }")? == ["match (x) { some(v) => v, _ => 0 }"]);
+    assert(text("""match (s) { "a" => 1, _ => 2 }""")? == ["""match (s) { "a" => 1, _ => 2 }"""]);
+    assert(text("|x| { let y = x; y }")? == ["|x| { let y = x; y }"]);
+    assert(text("|x| { mut y: i64 = x; set y++; y }")? == ["|x| { mut y: i64 = x; set y++; y }"]);
+    assert(text("|x| { set y = x; }")? == ["|x| { set y = x; }"]);
+    assert(text("|x| { set ys.push(x); }")? == ["|x| { set ys.push(x); }"]);
+    assert(text("|x| { set n += 2; }")? == ["|x| { set n += 2; }"]);
+    assert(text("|x| { for (let i, y : xs) { f(i); } }")? == [
+        "|x| { for (let i, y : xs) { f(i); } }",
+    ]);
+    assert(text("|x| { while (c) { f(x); } }")? == ["|x| { while (c) { f(x); } }"]);
+    assert(text("|x| { f(x); g(x); }")? == ["|x| { f(x); g(x); }"]);
+    assert(text("|x| { return x; }")? == ["|x| { return x; }"]);
+    assert(text("|x| { let (a, b) = x; a }")? == ["|x| { let (a, b) = x; a }"]);
+    assert(text("|x| { if (c) { f(x); } }")? == ["|x| if (c) { f(x); }"]);
+    assert(text("|x| { match (x) { some(v) => { f(v); }, _ => {} }; }")? == [
+        "|x| { match (x) { some(v) => { f(v); }, _ => {} }; }",
+    ]);
+    assert(text("|x| { shim prints { print = f } { g(x); }; }")? == [
+        "|x| { shim prints { print = f } { g(x); }; }",
+    ]);
+    // A template is the chain of concatenations the parser made of it.
+    assert(text("`a{x}b`")? == ["""__aipl_concat(__aipl_concat("a", `{x}`), "b")"""]);
+    // `let .. else` is the `if let` the parser made of it.
+    assert(text("|x| { let Circle(r) = x else { return none; }; r }")? == [
+        "|x| if (let Circle(r) = x) { r } else { return none; }",
+    ]);
 })
 
 # `self` as an operand of a postfix form or an operator: its text, in parentheses where it is
-# itself an operator use or a negation, since those bind looser than what is applied to it.
-pub fn operand_text(self: Expr) -> str? {
-    let text = self.expr_text()?;
-    let loose = match (self.kind) {
-        Neg(..) | Range(..) => true,
-        Call(name, args, _, _) => name.is_infix() && args.len() == 2 || name == "!" && args.len() == 1,
-        _ => false,
-    };
-    some(if (loose) { `({text})` } else { text })
+# itself an operator use or anything else that binds looser than what is applied to it.
+pub fn operand_text(self: Expr) -> str {
+    if (self.is_tight()) { self.expr_text() } else { `({self.expr_text()})` }
 }
 
-# The text of each of `self`, or `none` when one of them has none.
-fn texts(self: Expr[]) -> str[]? {
-    mut out: str[] = [];
-    for (let e : self) {
-        set out.push(e.expr_text()?);
+# Whether `self` can be the receiver of a postfix form, or an operand, as it is written.
+fn is_tight(self: Expr) -> bool {
+    match (self.kind) {
+        Num(n) => n >= 0,
+        FloatLit(text) => !text.starts_with("-"),
+        Call(name, args, _, _) => !(name.is_infix() && args.len() == 2 || name == "!" && args.len() == 1),
+        Bool(..)
+        | Str(..)
+        | Char(..)
+        | Ident(..)
+        | None
+        | Unit
+        | TypeArgs(..)
+        | Field(..)
+        | FieldProjection(..)
+        | MethodProjection(..)
+        | Index(..)
+        | Slice(..)
+        | Try(..)
+        | Interpolation(..)
+        | ArrayLit(..)
+        | TupleLit(..)
+        | SetLit(..)
+        | DictLit(..)
+        | Construct(..) => true,
+        Neg(..)
+        | Range(..)
+        | Spread(..)
+        | KwArg(..)
+        | Lambda(..)
+        | If(..)
+        | IfLet(..)
+        | Match(..)
+        | For(..)
+        | ForPattern(..)
+        | While(..)
+        | Shim(..)
+        | ProviderShim(..)
+        | Return(..)
+        | Let(..)
+        | LetMut(..)
+        | LetPattern(..)
+        | Assign(..)
+        | Seq(..) => false,
     }
-    some(out)
 }
+
+# The text of each of `self`, comma-separated.
+fn texts(self: Expr[]) -> str { self$expr_text().join(sep=", ") }
 
 # The text of a slice bound, which is nothing where the bound is left out.
-fn bound_text(self: Expr?) -> str? {
-    if (let some(bound) = self) { bound.expr_text() } else { some("") }
-}
-
-# The forms made of one or more sub-expressions around a fixed piece of syntax.
-fn compound_text(self: Expr) -> str? {
-    match (self.kind) {
-        Field(receiver, name) => some(`{receiver.operand_text()?}.{name.slot_shown()}`),
-        Index(receiver, index) => some(`{receiver.operand_text()?}[{index.expr_text()?}]`),
-        Slice(receiver, start, end) => {
-            let lower = start.bound_text()?;
-            let upper = end.bound_text()?;
-            some(`{receiver.operand_text()?}[{lower}..{upper}]`)
-        },
-        Try(inner) => some(`{inner.operand_text()?}?`),
-        Neg(inner) => some(`-{inner.operand_text()?}`),
-        Range(start, end) => some(`{start.operand_text()?}..{end.operand_text()?}`),
-        Spread(inner) => some(`..{inner.expr_text()?}`),
-        ArrayLit(elements) => some(`[{elements.texts()?.join(sep=", ")}]`),
-        // A one-element tuple has no spelling of its own.
-        TupleLit(elements) => if (elements.len() == 1) {
-            none
-        } else {
-            some(`({elements.texts()?.join(sep=", ")})`)
-        },
-        KwArg(name, value, forwarded) => some(
-            `{name}{if (forwarded) { "?=" } else { "=" }}{value.expr_text()?}`,
-        ),
-        _ => none,
-    }
-}
+fn bound_text(self: Expr?) -> str { if (let some(bound) = self) { bound.expr_text() } else { "" } }
 
 # A call, written the way it is: infix for an operator, `recv.f(..)` for a method call, `f(..)`
-# otherwise. A call the parser made of another form (`__builtin_..`) has no spelling to write.
-fn call_text(self: Call(name, args, method_style, _)) -> str? {
-    if (name.starts_with("__")) { return none; };
-    if (name.is_infix() && args.len() == 2) {
-        return some(`{args[0]?.operand_text()?} {name} {args[1]?.operand_text()?}`);
-    };
-    if (name == "!" && args.len() == 1) { return some(`!{args[0]?.operand_text()?}`); };
-    if (method_style) {
-        let receiver = args.first()?.operand_text()?;
-        return some(`{receiver}.{name}({args.drop_first().texts()?.join(sep=", ")})`);
-    };
-    some(`{name}({args.texts()?.join(sep=", ")})`)
+# otherwise, with `type_args` (`::<T>`, or nothing) after the name.
+fn call_text(self: Call(name, args, method_style, _), type_args: str) -> str {
+    match (args) {
+        [left, right] => if (name.is_infix()) {
+            `{left.operand_text()} {name} {right.operand_text()}`
+        } else {
+            name.plain_call_text(args, method_style, type_args)
+        },
+        [operand] => if (name == "!") {
+            `!{operand.operand_text()}`
+        } else {
+            name.plain_call_text(args, method_style, type_args)
+        },
+        _ => name.plain_call_text(args, method_style, type_args),
+    }
 }
 
-# `self` between `quote` marks, with the escapes its characters need.
-fn quoted(self: str, quote: char) -> str {
-    mut out = `{quote}`;
-    for (let c : self) {
-        let piece = if (c == quote || c == '\\') {
-            `\\{c}`
-        } else if (c == '\n') {
-            """\n"""
-        } else if (c == '\t') {
-            """\t"""
+# `name(args)`, or `receiver.name(args)` for a call written in method style.
+fn plain_call_text(self: str, args: Expr[], method_style: bool, type_args: str) -> str {
+    match (args) {
+        [receiver, ..] => if (method_style) {
+            `{receiver.operand_text()}.{self}{type_args}({args.drop_first().texts()})`
         } else {
-            `{c}`
-        };
-        set out = `{out}{piece}`;
+            `{self}{type_args}({args.texts()})`
+        },
+        _ => `{self}{type_args}({args.texts()})`,
     }
-    `{out}{quote}`
 }
+
+# The call `self` with the types written between angle brackets after its name.
+fn type_args_text(self: Expr, types: Ty[]) -> str {
+    let written = `::<{types$type_text().join(sep=", ")}>`;
+    let k = self.kind;
+    match (k) {
+        Call(..) => k.call_text(written),
+        _ => `{self.operand_text()}{written}`,
+    }
+}
+
+# `self` as the inside of a pair of braces: the statements of a block, then its value. A loop's
+# body ends in the `0` the parser gives a block with no value, which `loop_body` leaves out.
+fn block_text(self: Expr, loop_body: bool) -> str {
+    match (self.kind) {
+        Let(name, ty, value, body) => `let {name}{ty.annotation_text()} = {value.expr_text()};`.followed_by(
+            body,
+            loop_body,
+        ),
+        LetMut(name, ty, value, body) => `mut {name}{ty.annotation_text()} = {value.expr_text()};`.followed_by(
+            body,
+            loop_body,
+        ),
+        LetPattern(binding, value, body) => `let {binding.binding_text()} = {value.expr_text()};`.followed_by(
+            body,
+            loop_body,
+        ),
+        Assign(target, value, body) => target.set_text(value).followed_by(body, loop_body),
+        Seq(first, rest) => first.statement_text().followed_by(rest, loop_body),
+        Unit => "",
+        Num(0) => if (loop_body) { "" } else { "0" },
+        // Every form that holds statements is above; each of the others is written as itself.
+        _ => self.expr_text(),
+    }
+}
+
+# `self` between braces: a block, or the value of a branch.
+fn braced(self: Expr) -> str { self.braced_as(false) }
+
+# The body of a loop between braces.
+fn loop_braced(self: Expr) -> str { self.braced_as(true) }
+
+fn braced_as(self: Expr, loop_body: bool) -> str {
+    let inside = self.block_text(loop_body);
+    if (inside.is_empty()) { "{}" } else { `\{ {inside} }` }
+}
+
+# `self` where a lambda's body or a match arm's value stands: bare, unless it is a block or a loop.
+fn body_text(self: Expr) -> str {
+    match (self.kind) {
+        Let(..)
+        | LetMut(..)
+        | LetPattern(..)
+        | Assign(..)
+        | Seq(..)
+        | For(..)
+        | ForPattern(..)
+        | While(..) => self.braced(),
+        Unit => "{}",
+        _ => self.expr_text(),
+    }
+}
+
+# `self` followed by what `rest` holds, a space between when both have text.
+fn followed_by(self: str, rest: Expr, loop_body: bool) -> str {
+    let after = rest.block_text(loop_body);
+    if (self.is_empty()) { after } else if (after.is_empty()) { self } else { `{self} {after}` }
+}
+
+# `self` as a statement of a block: the text, ended with `;` unless it is a loop or already ends
+# in one.
+fn statement_text(self: Expr) -> str {
+    let text = self.block_text(false);
+    match (self.kind) {
+        For(..) | ForPattern(..) | While(..) => text,
+        _ => if (text.is_empty() || text.ends_with(";")) {
+            text
+        } else {
+            `{text};`
+        },
+    }
+}
+
+# The `set` statement that assigns `value` to `self`, in the short form it was written in when the
+# value is the target updated by an operator or a method: `set n++;`, `set n += 2;`,
+# `set xs.push(x);`.
+fn set_text(self: Expr, value: Expr) -> str {
+    let target = self.expr_text();
+    let longhand = `set {target} = {value.expr_text()};`;
+    let Call(name, args, method_style, _) = value.kind else { return longhand; };
+    match (args) {
+        [receiver, ..] => if (receiver.expr_text() != target) {
+            longhand
+        } else if (method_style) {
+            `set {value.expr_text()};`
+        } else if (name == "++" || name == "--") {
+            `set {target}{name};`
+        } else {
+            match (args) {
+                [_, rhs] => if (name.is_compound()) {
+                    `set {target} {name} {rhs.expr_text()};`
+                } else {
+                    longhand
+                },
+                _ => longhand,
+            }
+        },
+        _ => longhand,
+    }
+}
+
+# What follows an `if`'s then-branch: nothing for an `if` with no `else`, and the chain `else if`
+# for an `else` that is itself an `if`.
+fn else_text(self: Expr) -> str {
+    match (self.kind) {
+        Unit => "",
+        If(..) | IfLet(..) => ` else {self.expr_text()}`,
+        _ => ` else {self.braced()}`,
+    }
+}
+
+# A `match` arm, `pattern => value`.
+fn arm_text(self: MatchArm) -> str { `{self.pattern.pat_text()} => {self.body.body_text()}` }
+
+# The `: T` that follows a binding annotated with a type.
+fn annotation_text(self: Ty?) -> str {
+    if (let some(ty) = self) { `: {ty.type_text()}` } else { "" }
+}
+
+# What a loop's index binder adds before the element binder: `i, `.
+fn index_text(self: str?) -> str { if (let some(index) = self) { `{index}, ` } else { "" } }
+
+# What a `let`, a `for` or a parameter binds, as written.
+fn binding_text(self: Binding) -> str {
+    match (self) {
+        ByPattern(pattern) => pattern.pat_text(),
+        _ => self.show_binding(),
+    }
+}
+
+fn param_text(self: LambdaParam) -> str {
+    `{self.binding.binding_text()}{self.ty.annotation_text()}`
+}
+
+# A field of a struct literal: `name: value`, the name alone for the shorthand, and the value alone
+# for the spread (`..base`), which has no name.
+fn field_init_text(self: FieldInit) -> str {
+    if (self.name.is_empty()) {
+        self.value.expr_text()
+    } else if (self.shorthand) {
+        self.name
+    } else {
+        `{self.name}: {self.value.expr_text()}`
+    }
+}
+
+fn entry_text(self: (Expr, Expr)) -> str { `{self.0.expr_text()}: {self.1.expr_text()}` }
+
+# An operation a `shim` stands in for, and what stands in for it.
+fn bind_text(self: (str, str)) -> str { `{self.0} = {self.1}` }

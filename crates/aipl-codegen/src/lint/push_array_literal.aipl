@@ -37,7 +37,6 @@ import {
     logical_or as ||,
     push,
     to_str,
-    value_or,
 } from builtins;
 import { Callee, Push } from "../builtin_table.aipl";
 import { ArrayLit, Expr, LetMut, Spread, descendants_of_kind, is_ident } from "../expr.aipl";
@@ -193,12 +192,6 @@ pub fn push_array_literal(Function { body }) -> LintHit[] {
         )?.is_empty(),
     );
 
-    // A call-shaped seed can't be quoted back into the advice — its span stops
-    // before its parens — so the literal is shown with a placeholder in its place.
-
-    // The same goes for a computed element. The longhand `set out = out.push(..)`
-    // is the same statement written out, so it is flagged the same way.
-
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
     fn appended(xs: i64[], x: i64) -> i64[] {
         mut out = xs; #[allow]
@@ -236,7 +229,7 @@ fn literal(self: LetMut(name, annotation, seed, body)) -> LintHit? {
     let opening = if (let ArrayLit(members) = seed.kind) {
         members$element_text()
     } else {
-        [`..{seed.expr_text().value_or("<array>")}`]
+        [`..{seed.expr_text()}`]
     };
     some(lint_message(
         `"{name}" is seeded and then only appended to before being returned — write "[{[..opening, ..elements$element_text()].join(sep=", ")}]" and drop the mut`,
@@ -255,12 +248,7 @@ fn pushes(self: Expr, acc: str, adder: Callee) -> Pushes {
     Pushes { elements: [element, ..elements], rest: end }
 }
 
-# One element of the rewritten literal. A spread stays a spread, and what cannot be
-# quoted is a placeholder.
+# One element of the rewritten literal. A spread stays a spread.
 fn element_text(self: Expr) -> str {
-    if (let Spread(inner) = self.kind) {
-        `..{inner.expr_text().value_or("<array>")}`
-    } else {
-        self.expr_text().value_or("<element>")
-    }
+    if (let Spread(inner) = self.kind) { `..{inner.expr_text()}` } else { self.expr_text() }
 }

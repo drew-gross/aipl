@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">226 files, 2231 items.</p>
+      <p class="summary">226 files, 2253 items.</p>
 
       <ul class="files">
 
@@ -520,7 +520,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Expr</code> and <code>ExprKind</code> as AIPL declares them, with the structural dump the lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">13 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">12 private</a></span>
 
 
           <ul class="items">
@@ -647,6 +647,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-show_exprs"><code>show_exprs</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-show_binding"><code>show_binding</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -2302,7 +2307,7 @@
           <p class="file-summary">The source text of an expression, written from its tree: what a lint's advice quotes when it says &quot;write <code>xs.is_empty()</code>&quot; about code it read as <code>len(xs) == 0</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-expr_text.html#private">6 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-expr_text.html#private">25 private</a></span>
 
 
           <ul class="items">
@@ -3843,7 +3848,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Pattern</code> as AIPL declares it. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-pat.html#private">11 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-pat.html#private">12 private</a></span>
 
 
           <ul class="items">
@@ -3875,6 +3880,16 @@
 
             <li>
               <a href="crates-aipl-codegen-src-pat.html#item-show_pat"><code>show_pat</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-pat.html#item-pat_text"><code>pat_text</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-pat.html#item-quoted"><code>quoted</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -4286,7 +4301,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Type</code> as AIPL declares it. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-ty.html#private">2 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-ty.html#private">1 private</a></span>
 
 
           <ul class="items">
@@ -4318,6 +4333,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-ty.html#item-type_text"><code>type_text</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-ty.html#item-set_spelling"><code>set_spelling</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

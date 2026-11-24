@@ -41,7 +41,6 @@ import {
     logical_or as ||,
     push,
     to_str,
-    value_or,
 } from builtins;
 import { Insert } from "../builtin_table.aipl";
 import { Assign, SetLit, Spread, descendants_of_kind } from "../expr.aipl";
@@ -81,7 +80,7 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
     for (let i, element : added) {
         let separator = if (i == 0) { "" } else { " " };
         set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(Insert) });
-        set text = `({element.expr_text().value_or("<element>")});`;
+        set text = `({element.expr_text()});`;
     }
     some(LintHit { named, tail: `{text}"`, span: spread.span })
 }.test({

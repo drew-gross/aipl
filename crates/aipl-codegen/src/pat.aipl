@@ -12,6 +12,7 @@ import {
     join,
     logical_and as &&,
     logical_not as !,
+    logical_or as ||,
     map,
     not_equal as !=,
     zip_with,
@@ -189,6 +190,84 @@ fn show_field_binder(field: str, name: str) -> str {
 
 # The elements of a pattern list, comma-separated.
 fn show_pats(self: Pat[]) -> str { self$show_pat().join(sep=", ") }
+
+# `self` as the pattern was written, where `show_pat` is a dump: a string or char literal is
+# quoted with the escapes its text needs, so what comes back parses to the pattern it was made
+# from.
+pub fn pat_text(self: Pat) -> str {
+    match (self) {
+        Wildcard => "_",
+        Str(s) => s.quoted('"'),
+        Char(c) => `{c}`.quoted('\''),
+        Array(elems) => `[{elems$element_text().join(sep=", ")}]`,
+        ArrayRest(elems) => if (elems.is_empty()) {
+            "[..]"
+        } else {
+            `[{elems$element_text().join(sep=", ")}, ..]`
+        },
+        ArrayNested(ps) => `[{ps$pat_text().join(sep=", ")}]`,
+        Ctor(name, bindings, ignore_payload) => if (ignore_payload) {
+            `{name}(..)`
+        } else if (bindings.is_empty()) {
+            name
+        } else {
+            `{name}({bindings.join(sep=", ")})`
+        },
+        Tuple(ps) => `({ps$pat_text().join(sep=", ")})`,
+        Nested(name, args) => `{name}({args$pat_text().join(sep=", ")})`,
+        Int(n) => `{n}`,
+        Struct(name, fields, names) => `{name} \{ {zip_with(fields, names, show_field_binder).join(sep=", ")} }`,
+    }
+}.test({
+    assert(Wildcard.pat_text() == "_");
+    assert(Str(`a"b`).pat_text() == `"a\\"b"`);
+    assert(Char('x').pat_text() == "'x'");
+    assert(Ctor("Circle", ignore_payload=true).pat_text() == "Circle(..)");
+    assert(Ctor("some", bindings=["v"]).pat_text() == "some(v)");
+    assert(Struct("P", ["x", "y"], ["x", "b"]).pat_text() == "P { x, y as b }");
+    assert(Tuple([Int(1), Nested("some", [Str("s")])]).pat_text() == `(1, some("s"))`);
+    assert(
+        Array([
+            element(ElementKind.Text("a")),
+            element(ElementKind.Letter('b')),
+            element(ElementKind.Binder("x")),
+        ]).pat_text() == `["a", 'b', x]`,
+    );
+    assert(ArrayRest([]).pat_text() == "[..]");
+})
+
+# One element of a simple array pattern as it was written.
+fn element_text(self: PatElement) -> str {
+    match (self.kind) {
+        Binder(name) => name,
+        Text(s) => s.quoted('"'),
+        Letter(c) => `{c}`.quoted('\''),
+        Number(n) => `{n}`,
+    }
+}
+
+# `self` between `quote` marks, with the escapes its characters need.
+pub fn quoted(self: str, quote: char) -> str {
+    mut out = `{quote}`;
+    for (let c : self) {
+        let piece = if (c == quote || c == '\\') {
+            `\\{c}`
+        } else if (c == '\n') {
+            """\n"""
+        } else if (c == '\t') {
+            """\t"""
+        } else {
+            `{c}`
+        };
+        set out = `{out}{piece}`;
+    }
+    `{out}{quote}`
+}.test({
+    assert("a b".quoted('"') == `"a b"`);
+    assert(`q"q`.quoted('"') == `"q\\"q"`);
+    assert("a\nb".quoted('"') == `"a\\nb"`);
+    assert("it's".quoted('\'') == """'it\'s'""");
+})
 
 # The names a pattern binds, in order — `Pattern::bindings` in Rust. It is what
 # an arm's alternatives must agree on, so that a shared body means the same

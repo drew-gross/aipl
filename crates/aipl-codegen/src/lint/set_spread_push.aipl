@@ -44,7 +44,6 @@ import {
     logical_or as ||,
     push,
     to_str,
-    value_or,
 } from builtins;
 import { Extend, Push } from "../builtin_table.aipl";
 import { ArrayLit, Assign, Spread, descendants_of_kind } from "../expr.aipl";
@@ -78,8 +77,8 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
     for (let i, element : appended) {
         let separator = if (i == 0) { "" } else { " " };
         let (builtin, argument) = match (element.kind) {
-            Spread(inner) => (Extend, inner.expr_text().value_or("<array>")),
-            _ => (Push, element.expr_text().value_or("<element>")),
+            Spread(inner) => (Extend, inner.expr_text()),
+            _ => (Push, element.expr_text()),
         };
         set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(builtin) });
         set text = `({argument});`;

@@ -11,7 +11,7 @@
 #
 # The hit points at the `to_str` call.
 
-import { collect_ok, equal as ==, is_empty, map, value_or } from builtins;
+import { collect_ok, equal as ==, is_empty, map } from builtins;
 import { ToStr } from "../builtin_table.aipl";
 import { Call, Expr, Interpolation, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
@@ -22,12 +22,7 @@ import { LintHit, hit_at, lint_function_messages, lint_message } from "./lint_hi
 pub fn interp_to_str(self: Interpolation(Expr { kind })) -> LintHit? {
     let Call(to_str, [argument], _, ToStr) = kind else { return none; };
 
-    // The argument is written into the advice where it has a text to write.
-    let advice = argument
-        .expr_text()
-        .map(|text| `write "\{{text}}"`)
-        .value_or("interpolate the value itself");
-    some(lint_message(message(to_str, advice)))
+    some(lint_message(message(to_str, `write "\{{argument.expr_text()}}"`)))
 }.test({
     // The hits for each function's interpolations.
     fn flagged(Function { body }) -> LintHit[] {
@@ -63,7 +58,7 @@ pub fn interp_to_str(self: Interpolation(Expr { kind })) -> LintHit? {
     assert(lint_function_messages(
         "import { to_str } from builtins; fn f(c: bool) -> str { `{to_str(if (c) { 1 } else { 2 })}` }",
         flagged,
-    )? == [message("to_str", "interpolate the value itself")]);
+    )? == [message("to_str", "write \"{if (c) { 1 } else { 2 }}\"")]);
 
     // Not the shape: outside a template, one operand of the interpolated expression,
     // a function of the file's own, and a file that does not import the builtin.

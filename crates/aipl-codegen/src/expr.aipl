@@ -566,7 +566,7 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 # A binding as one line, for the dump: `x`, `(a, b)`, `Case(a, b)`,
 # `T { x as a, y }` (and `mut T { .. }`). A field bound under its own name prints
 # bare.
-fn show_binding(self: Binding) -> str {
+pub fn show_binding(self: Binding) -> str {
     match (self) {
         Name(name) => name,
         ByTuple(names) => `({names.join(sep=", ")})`,

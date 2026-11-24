@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/expr_text.aipl</code></h1>
 
-      <div class="module-doc"><p>The source text of an expression, written from its tree: what a lint's advice quotes when it says &quot;write <code>xs.is_empty()</code>&quot; about code it read as <code>len(xs) == 0</code>.</p><p>It renders the forms a receiver or an interpolated value is made of — names, literals, field paths, calls, operators, indexing, slices, array and tuple literals — and says <code>none</code> for the rest (a lambda, a <code>match</code>, a block), which advice then describes instead of quoting. What it writes parses back to the tree it was written from: an operand that is itself an operator use is parenthesized, so <code>(a + b).len()</code> is not <code>a + b.len()</code>.</p><p>The span of a node is not used: a call's span stops before its closing paren, so the source text of one is no spelling of it.</p></div>
+      <div class="module-doc"><p>The source text of an expression, written from its tree: what a lint's advice quotes when it says &quot;write <code>xs.is_empty()</code>&quot; about code it read as <code>len(xs) == 0</code>.</p><p>It writes every form of the language: what comes back parses to the tree it was written from. An operand that is itself an operator use is parenthesized, so <code>(a + b).len()</code> is not <code>a + b.len()</code>, and a block is written on one line, its statements between braces. A call the parser made of another form (<code>__builtin_grid_get</code>, <code>__aipl_concat</code>) is written under the name it has.</p><p>The span of a node is not used: a call's span stops before its closing paren, so the source text of one is no spelling of it.</p></div>
 
 
 
@@ -27,9 +27,9 @@
             <a class="anchor" href="#item-expr_text">expr_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn expr_text(self: Expr) -&#62; str?</code></pre>
+          <pre class="signature"><code>pub fn expr_text(self: Expr) -&#62; str</code></pre>
 
-          <div class="doc"><p>The text that writes <code>self</code>, or <code>none</code> when it is a form this does not write.</p></div>
+          <div class="doc"><p>The text that writes <code>self</code>.</p></div>
 
 
         </section>
@@ -41,9 +41,9 @@
             <a class="anchor" href="#item-operand_text">operand_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn operand_text(self: Expr) -&#62; str?</code></pre>
+          <pre class="signature"><code>pub fn operand_text(self: Expr) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> as an operand of a postfix form or an operator: its text, in parentheses where it is itself an operator use or a negation, since those bind looser than what is applied to it.</p></div>
+          <div class="doc"><p><code>self</code> as an operand of a postfix form or an operator: its text, in parentheses where it is itself an operator use or anything else that binds looser than what is applied to it.</p></div>
 
 
         </section>
@@ -71,14 +71,42 @@
 
 
 
+        <section class="item" id="item-is_compound">
+          <h3>
+            <a class="anchor" href="#item-is_compound">is_compound</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_compound(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>The operators of <code>set target op= value;</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_tight">
+          <h3>
+            <a class="anchor" href="#item-is_tight">is_tight</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_tight(self: Expr) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> can be the receiver of a postfix form, or an operand, as it is written.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-texts">
           <h3>
             <a class="anchor" href="#item-texts">texts</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn texts(self: Expr[]) -&#62; str[]?</code></pre>
+          <pre class="signature"><code>fn texts(self: Expr[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>The text of each of <code>self</code>, or <code>none</code> when one of them has none.</p></div>
+          <div class="doc"><p>The text of each of <code>self</code>, comma-separated.</p></div>
 
 
         </section>
@@ -90,23 +118,9 @@
             <a class="anchor" href="#item-bound_text">bound_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bound_text(self: Expr?) -&#62; str?</code></pre>
+          <pre class="signature"><code>fn bound_text(self: Expr?) -&#62; str</code></pre>
 
           <div class="doc"><p>The text of a slice bound, which is nothing where the bound is left out.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-compound_text">
-          <h3>
-            <a class="anchor" href="#item-compound_text">compound_text</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn compound_text(self: Expr) -&#62; str?</code></pre>
-
-          <div class="doc"><p>The forms made of one or more sub-expressions around a fixed piece of syntax.</p></div>
 
 
         </section>
@@ -118,23 +132,275 @@
             <a class="anchor" href="#item-call_text">call_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn call_text(self: Call) -&#62; str?</code></pre>
+          <pre class="signature"><code>fn call_text(self: Call, type_args: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>A call, written the way it is: infix for an operator, <code>recv.f(..)</code> for a method call, <code>f(..)</code> otherwise. A call the parser made of another form (<code>__builtin_..</code>) has no spelling to write.</p></div>
+          <div class="doc"><p>A call, written the way it is: infix for an operator, <code>recv.f(..)</code> for a method call, <code>f(..)</code> otherwise, with <code>type_args</code> (<code>::&lt;T&gt;</code>, or nothing) after the name.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-quoted">
+        <section class="item" id="item-plain_call_text">
           <h3>
-            <a class="anchor" href="#item-quoted">quoted</a>
+            <a class="anchor" href="#item-plain_call_text">plain_call_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn quoted(self: str, quote: char) -&#62; str</code></pre>
+          <pre class="signature"><code>fn plain_call_text(self: str, args: Expr[], method_style: bool, type_args: str) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> between <code>quote</code> marks, with the escapes its characters need.</p></div>
+          <div class="doc"><p><code>name(args)</code>, or <code>receiver.name(args)</code> for a call written in method style.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-type_args_text">
+          <h3>
+            <a class="anchor" href="#item-type_args_text">type_args_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn type_args_text(self: Expr, types: Ty[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The call <code>self</code> with the types written between angle brackets after its name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-block_text">
+          <h3>
+            <a class="anchor" href="#item-block_text">block_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn block_text(self: Expr, loop_body: bool) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> as the inside of a pair of braces: the statements of a block, then its value. A loop's body ends in the <code>0</code> the parser gives a block with no value, which <code>loop_body</code> leaves out.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-braced">
+          <h3>
+            <a class="anchor" href="#item-braced">braced</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn braced(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> between braces: a block, or the value of a branch.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-loop_braced">
+          <h3>
+            <a class="anchor" href="#item-loop_braced">loop_braced</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn loop_braced(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>The body of a loop between braces.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-braced_as">
+          <h3>
+            <a class="anchor" href="#item-braced_as">braced_as</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn braced_as(self: Expr, loop_body: bool) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-body_text">
+          <h3>
+            <a class="anchor" href="#item-body_text">body_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn body_text(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> where a lambda's body or a match arm's value stands: bare, unless it is a block or a loop.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-followed_by">
+          <h3>
+            <a class="anchor" href="#item-followed_by">followed_by</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn followed_by(self: str, rest: Expr, loop_body: bool) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> followed by what <code>rest</code> holds, a space between when both have text.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-statement_text">
+          <h3>
+            <a class="anchor" href="#item-statement_text">statement_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn statement_text(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> as a statement of a block: the text, ended with <code>;</code> unless it is a loop or already ends in one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-set_text">
+          <h3>
+            <a class="anchor" href="#item-set_text">set_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn set_text(self: Expr, value: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>The <code>set</code> statement that assigns <code>value</code> to <code>self</code>, in the short form it was written in when the value is the target updated by an operator or a method: <code>set n++;</code>, <code>set n += 2;</code>, <code>set xs.push(x);</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-else_text">
+          <h3>
+            <a class="anchor" href="#item-else_text">else_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn else_text(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>What follows an <code>if</code>'s then-branch: nothing for an <code>if</code> with no <code>else</code>, and the chain <code>else if</code> for an <code>else</code> that is itself an <code>if</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-arm_text">
+          <h3>
+            <a class="anchor" href="#item-arm_text">arm_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn arm_text(self: MatchArm) -&#62; str</code></pre>
+
+          <div class="doc"><p>A <code>match</code> arm, <code>pattern =&gt; value</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-annotation_text">
+          <h3>
+            <a class="anchor" href="#item-annotation_text">annotation_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn annotation_text(self: Ty?) -&#62; str</code></pre>
+
+          <div class="doc"><p>The <code>: T</code> that follows a binding annotated with a type.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-index_text">
+          <h3>
+            <a class="anchor" href="#item-index_text">index_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn index_text(self: str?) -&#62; str</code></pre>
+
+          <div class="doc"><p>What a loop's index binder adds before the element binder: <code>i, </code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binding_text">
+          <h3>
+            <a class="anchor" href="#item-binding_text">binding_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binding_text(self: Binding) -&#62; str</code></pre>
+
+          <div class="doc"><p>What a <code>let</code>, a <code>for</code> or a parameter binds, as written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-param_text">
+          <h3>
+            <a class="anchor" href="#item-param_text">param_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn param_text(self: LambdaParam) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-field_init_text">
+          <h3>
+            <a class="anchor" href="#item-field_init_text">field_init_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn field_init_text(self: FieldInit) -&#62; str</code></pre>
+
+          <div class="doc"><p>A field of a struct literal: <code>name: value</code>, the name alone for the shorthand, and the value alone for the spread (<code>..base</code>), which has no name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-entry_text">
+          <h3>
+            <a class="anchor" href="#item-entry_text">entry_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn entry_text(self: (Expr, Expr)) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-bind_text">
+          <h3>
+            <a class="anchor" href="#item-bind_text">bind_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bind_text(self: (str, str)) -&#62; str</code></pre>
+
+          <div class="doc"><p>An operation a <code>shim</code> stands in for, and what stands in for it.</p></div>
 
 
         </section>

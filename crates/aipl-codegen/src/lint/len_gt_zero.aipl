@@ -27,7 +27,6 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
-    value_or,
 } from builtins;
 import {
     Callee,
@@ -53,12 +52,7 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> LintHit? {
             return none;
         },
     };
-    some(
-        receiver
-            .operand_text()
-            .map(|text| advice(IsNonempty, `{what} — use "{text}.`, `()"`))
-            .value_or(advice(IsNonempty, `{what} — use "`, `" on the receiver`)),
-    )
+    some(advice(IsNonempty, `{what} — use "{receiver.operand_text()}.`, `()"`))
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> LintHit[] {
@@ -91,7 +85,9 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> LintHit? {
     assert(lint_function_unfilled(
         "fn f(a: i64[], b: i64[], c: bool) -> bool { (if (c) { a } else { b }).len() > 0 && a.is_nonempty() }",
         flagged,
-    )?.shown() == [`a length compared against 0 — use "Builtin(IsNonempty)" on the receiver`]);
+    )?.shown() == [
+        "a length compared against 0 — use \"(if (c) { a } else { b }).Builtin(IsNonempty)()\"",
+    ]);
 
     assert(
         lint_function_unfilled("fn f(x: i64[]) -> bool { x.is_nonempty() }", flagged)?.is_empty(),

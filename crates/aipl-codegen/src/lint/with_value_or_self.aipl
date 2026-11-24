@@ -25,7 +25,6 @@ import {
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
-    value_or,
 } from builtins;
 import { TrySet, ValueOr, With } from "../builtin_table.aipl";
 import { Call, Expr, Field, Ident, descendants_of_kind } from "../expr.aipl";
@@ -44,7 +43,7 @@ pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> LintHit? {
         named: [
             Named { text: "this `", builtin: Builtin(ValueOr) },
             Named {
-                text: `\` falls back to the array it is replacing in — write "{receiver.operand_text().value_or("<array>")}.`,
+                text: `\` falls back to the array it is replacing in — write "{receiver.operand_text()}.`,
                 builtin: Builtin(TrySet),
             },
         ],

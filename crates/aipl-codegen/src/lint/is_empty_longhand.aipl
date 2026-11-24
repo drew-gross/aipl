@@ -31,7 +31,6 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
-    value_or,
 } from builtins;
 import { Callee, Equal, IsEmpty, IsNonempty, Len, LogicalNot } from "../builtin_table.aipl";
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
@@ -48,16 +47,7 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     } else {
         args.length_equal_zero(callee)?
     };
-    some(
-        receiver
-            .operand_text()
-            .map(|text| advice(IsEmpty, `emptiness asked the long way — use "{text}.`, `()"`))
-            .value_or(advice(
-                IsEmpty,
-                `emptiness asked the long way — use "`,
-                `" on the receiver`,
-            )),
-    )
+    some(advice(IsEmpty, `emptiness asked the long way — use "{receiver.operand_text()}.`, `()"`))
 }.test({
     // The hits for each function's calls.
     fn flagged(Function { body }) -> LintHit[] {
@@ -84,7 +74,9 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     assert(lint_function_unfilled(
         "fn f(a: i64[], b: i64[], c: bool) -> bool { (if (c) { a } else { b }).len() == 0 && a.is_empty() }",
         flagged,
-    )?.shown() == [`emptiness asked the long way — use "Builtin(IsEmpty)" on the receiver`]);
+    )?.shown() == [
+        "emptiness asked the long way — use \"(if (c) { a } else { b }).Builtin(IsEmpty)()\"",
+    ]);
 
     // `!= 0`, another number, an operator that is not the builtin one, and a `len` of the
     // file's own are not this.

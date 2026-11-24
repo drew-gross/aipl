@@ -48,7 +48,7 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
     };
     let place = target.source;
     let stores = fields.map_join(
-        |field| `set {place}.{field.name} = {field.value.expr_text().value_or("..")};`,
+        |field| `set {place}.{field.name} = {field.value.expr_text()};`,
         sep=" ",
     );
     let (what, advice) = if (fields.len() == 1) {

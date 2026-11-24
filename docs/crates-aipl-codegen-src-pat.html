@@ -249,6 +249,34 @@
 
 
 
+        <section class="item" id="item-pat_text">
+          <h3>
+            <a class="anchor" href="#item-pat_text">pat_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn pat_text(self: Pat) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> as the pattern was written, where <code>show_pat</code> is a dump: a string or char literal is quoted with the escapes its text needs, so what comes back parses to the pattern it was made from.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-quoted">
+          <h3>
+            <a class="anchor" href="#item-quoted">quoted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn quoted(self: str, quote: char) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>self</code> between <code>quote</code> marks, with the escapes its characters need.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-pat_bindings">
           <h3>
             <a class="anchor" href="#item-pat_bindings">pat_bindings</a>
@@ -348,6 +376,20 @@
           <pre class="signature"><code>fn show_pats(self: Pat[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The elements of a pattern list, comma-separated.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-element_text">
+          <h3>
+            <a class="anchor" href="#item-element_text">element_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn element_text(self: PatElement) -&#62; str</code></pre>
+
+          <div class="doc"><p>One element of a simple array pattern as it was written.</p></div>
 
 
         </section>

@@ -32,7 +32,6 @@ import {
     join,
     logical_not as !,
     logical_or as ||,
-    value_or,
 } from builtins;
 import { Map, is_method_callable } from "../builtin_table.aipl";
 import {
@@ -144,7 +143,7 @@ pub fn projections(self: Function) -> Projection[] {
 # `self` as the projection for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
 fn projection(self: Expr<Call>) -> Projection? {
     let Call(_, [receiver, argument], _, Map) = self.kind else { return none; };
-    let items = receiver.operand_text().value_or("<items>");
+    let items = receiver.operand_text();
     if (let Ident(function, callee) = argument.kind) {
         if (!callee.is_method_callable()) { return none; };
         return some(Projection {

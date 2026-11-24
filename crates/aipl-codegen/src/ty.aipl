@@ -115,7 +115,7 @@ fn suffix_operand(self: Ty) -> str {
 
 # What follows the `#` of a set type to say how it is ordered: nothing for the unordered set,
 # `>` for largest first and `<` for smallest first.
-fn set_spelling(self: SetOrder) -> str {
+pub fn set_spelling(self: SetOrder) -> str {
     match (self) {
         Unordered => "",
         Desc => ">",

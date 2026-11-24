@@ -20,7 +20,6 @@ import {
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
-    value_or,
 } from builtins;
 import { Zip, ZipWith } from "../builtin_table.aipl";
 import {
@@ -46,11 +45,11 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> LintHit? {
         named: [
             Named { text: `"`, builtin: Builtin(ZipWith) },
             Named {
-                text: `" with a function that only pairs its arguments is "{receiver.operand_text().value_or("<items>")}.`,
+                text: `" with a function that only pairs its arguments is "{receiver.operand_text()}.`,
                 builtin: Builtin(Zip),
             },
         ],
-        tail: `({other.expr_text().value_or("<other>")})"`,
+        tail: `({other.expr_text()})"`,
         span: function.span,
     })
 }.test({

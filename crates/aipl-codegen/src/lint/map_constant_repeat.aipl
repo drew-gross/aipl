@@ -33,7 +33,6 @@ import {
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
-    value_or,
 } from builtins;
 import { Len, Map, Repeat } from "../builtin_table.aipl";
 import {
@@ -75,13 +74,10 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
         named: [
             Named { text: `"`, builtin: Builtin(Map) },
             Named {
-                text: `" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.expr_text().value_or("<element>")}].`,
+                text: `" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.expr_text()}].`,
                 builtin: Builtin(Repeat),
             },
-            Named {
-                text: `({receiver.operand_text().value_or("<items>")}.`,
-                builtin: Builtin(Len),
-            },
+            Named { text: `({receiver.operand_text()}.`, builtin: Builtin(Len) },
         ],
         tail: `())"`,
         span: lambda.span,
