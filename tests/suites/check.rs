@@ -1160,16 +1160,16 @@ reallocations     0
 bytes allocated   97
 peak live bytes   97
 instructions      75
-binary size       1544 bytes (code 560, data 1, metadata 983)
+binary size       1528 bytes (code 548, data 1, metadata 979)
 
 function            calls  code bytes
-__to_str_u64            1         204
+__to_str_u64            1         200
 aipl_array_dec          1    external
 aipl_array_new          1    external
 aipl_shim_get           1    external
 aipl_u64_len            2    external
 aipl_write_u64          1    external
-main                    1         356
+main                    1         348
 handoff-fill: section\tsections_report_cli.aipl\treport
 ";
     assert_eq!(stdout, format!("{findings}{NO_TESTS}"));

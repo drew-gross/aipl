@@ -49,6 +49,7 @@ mod array_ops;
 mod buffer;
 mod http_curl;
 mod http_response;
+mod object_cache;
 mod str24_host;
 
 // The 256-bit `#{char}` value. Shared verbatim with the AOT runtime, so
@@ -6707,6 +6708,9 @@ impl ObjectCompilation {
         // signature reflects that before lowering. `main_wants_args` records
         // whether the user actually reads them, which we hand to the runtime.
         let (program, main_wants_args) = with_cli_args_main(program)?;
+        // The cache is for this build alone: each function is compiled once however many
+        // programs of this process contain it.
+        let cached = object_cache::Scope::begin();
         let (funcs, _structs, ir) = compile_program(
             &mut module,
             &program,
@@ -6717,6 +6721,7 @@ impl ObjectCompilation {
             ARTIFACT_CONST_BASE,
         )?;
         emit_main_wants_args_flag(&mut module, main_wants_args)?;
+        drop(cached);
 
         Ok(Self { module, funcs, ir })
     }
@@ -8697,8 +8702,7 @@ fn define_fn<M: Module>(
         instrument_call_count(module, &mut ctx.func, body_id, call_fn)?;
     }
 
-    module
-        .define_function(body_id, ctx)
+    object_cache::define_function(module, body_id, ctx)
         .map_err(|e| Error::msg(format!("define {}: {e:?}", func.name)))?;
     module.clear_context(ctx);
     // A participant's exported symbol is still C-convention: give it the
@@ -8773,8 +8777,7 @@ fn define_tail_trampoline<M: Module>(
         let call_fn = declared_import(module, "aipl_count_call")?;
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define {} trampoline: {e:?}", func.name)))?;
     module.clear_context(ctx);
     Ok(())
@@ -11689,8 +11692,7 @@ fn define_rec_drop_fn<M: Module>(
         let call_fn = builtins.id(module, "aipl_count_call");
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define rec drop fn: {e}")))?;
     module.clear_context(ctx);
     Ok(())
@@ -13228,8 +13230,7 @@ fn define_pair_rc_fn<M: Module>(
         let call_fn = builtins.id(module, "aipl_count_call");
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define pair rc fn: {e}")))?;
     module.clear_context(ctx);
     Ok(())
@@ -13301,8 +13302,7 @@ fn define_elem_rc_fn<M: Module>(
         let call_fn = builtins.id(module, "aipl_count_call");
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define elem rc fn: {e}")))?;
     module.clear_context(ctx);
     Ok(())
@@ -15148,8 +15148,7 @@ fn define_test_fail_fn<M: Module>(
         let call_fn = builtins.id(module, "aipl_count_call");
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define test-fail helper: {e:?}")))?;
     ctx.clear();
     Ok(())
@@ -15231,8 +15230,7 @@ fn define_eq_fn<M: Module>(
         let call_fn = builtins.id(module, "aipl_count_call");
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define eq helper: {e:?}")))?;
     ctx.clear();
     Ok(())
@@ -15362,8 +15360,7 @@ fn define_tostr_fn<M: Module>(
             let call_fn = builtins.id(module, "aipl_count_call");
             instrument_call_count(module, &mut ctx.func, id, call_fn)?;
         }
-        module
-            .define_function(id, ctx)
+        object_cache::define_function(module, id, ctx)
             .map_err(|e| Error::msg(format!("define to_str helper: {e:?}")))?;
         module.clear_context(ctx);
     }
@@ -21168,8 +21165,7 @@ fn define_constant_teardown_fn<M: Module>(
         let call_fn = builtins.id(module, "aipl_count_call");
         instrument_call_count(module, &mut ctx.func, id, call_fn)?;
     }
-    module
-        .define_function(id, ctx)
+    object_cache::define_function(module, id, ctx)
         .map_err(|e| Error::msg(format!("define constant teardown fn: {e}")))?;
     module.clear_context(ctx);
     Ok(())

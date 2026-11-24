@@ -71,6 +71,7 @@ check:
   a file that runs tests and also measures `main` is built more than once (Phase 4 note)
 
 handoff / check speed (corpus now runs as `aipl check --baseline --shard` processes; handoff 675s -> 444s):
+  the compile cache (object_cache.rs) covers object builds only; the JIT build (Compilation::jit, ~37% of a check's CPU) still compiles every function, because JITModule::define_function also records code_ranges that define_function_bytes skips: cache it by recording the range ourselves (needs the blob's ptr/size back from the module)
   shards are uneven (171-293s in one run): hand out the heavy files (crates/, ~7s each; lint files ~17s) first, or from a shared queue, instead of round-robin by sorted position
   the 200 compiler-source files under crates/ are ~90% of the corpus cost; the other 874 cases are ~0.13s each
   optimizer: pre-mono passes ~15% of a lint file's check (`inline_single_use_pinned` alone ~5%: it recomputes use counts and binders every round, as the post-mono pass did before `SingleUseTally`)

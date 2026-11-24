@@ -27,6 +27,9 @@ stacker = { workspace = true }
 # Used to install the dogfooded `reindent_block` into the formatter's hook (the
 # formatter's raw-block re-layout, dogfooded via the FFI); `install_parser_hooks`.
 cranelift = { workspace = true }
+# Compiled functions are kept between builds in one process (`object_cache`), which
+# Cranelift offers behind `incremental-cache`.
+cranelift-codegen = { workspace = true, features = ["incremental-cache"] }
 cranelift-jit = { workspace = true }
 cranelift-module = { workspace = true }
 cranelift-native = { workspace = true }
@@ -51,4 +54,4 @@ aipl-artifact = { workspace = true }
 # Cross-target ISA lookup, for `abi_spike.rs`: the regression tests for the Cranelift
 # lowerings the 24-byte value ABI rests on (a three-word signature, an out pointer,
 # and that x86-64 refuses a three-word return), which a Cranelift upgrade could change.
-cranelift-codegen = { version = "0.134.2", features = ["all-arch"] }
+cranelift-codegen = { version = "0.138.0", features = ["all-arch"] }

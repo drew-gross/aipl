@@ -80,15 +80,15 @@ reallocations     7
 bytes allocated   1926
 peak live bytes   3958
 instructions      12238
-binary size       6928 bytes (code 3940, data 418, metadata 2570)
+binary size       6896 bytes (code 3908, data 418, metadata 2570)
 
 function                                                                     calls  code bytes
-__builtin_find_if$i64$lam$__test$__test_block_1$lambda1                          1         212
-__builtin_find_if$i64$lam$is_big                                                 1         212
-__builtin_map_find_if$i64$i64$lam$stepped$__test$__test_block_1$lambda2          1         220
-__builtin_map_find_if$i64$i64$lam$stepped$is_big                                 1         220
-__test$__test_block_1                                                            1        2592
-__to_str_i64$opt                                                                 4         376
+__builtin_find_if$i64$lam$__test$__test_block_1$lambda1                          1         208
+__builtin_find_if$i64$lam$is_big                                                 1         208
+__builtin_map_find_if$i64$i64$lam$stepped$__test$__test_block_1$lambda2          1         216
+__builtin_map_find_if$i64$i64$lam$stepped$is_big                                 1         216
+__test$__test_block_1                                                            1        2584
+__to_str_i64$opt                                                                 4         372
 aipl_array_dec                                                                   2    external
 aipl_array_with_cap                                                              1    external
 aipl_assert                                                                      3    external
@@ -98,4 +98,4 @@ aipl_test_end                                                                   
 aipl_test_summary                                                                1    external
 aipl_write_bytes                                                                 7    external
 aipl_write_i64                                                                   3    external
-main                                                                             1         108
+main                                                                             1         104

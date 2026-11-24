@@ -58,12 +58,12 @@ reallocations     0
 bytes allocated   1761
 peak live bytes   1761
 instructions      33331
-binary size       7544 bytes (code 5160, data 198, metadata 2186)
+binary size       7512 bytes (code 5128, data 198, metadata 2186)
 
 function                   calls  code bytes
-__builtin_repeat$Cell          2         524
-__test$__test_block_1          1        3244
-__to_str_bool                  4         224
+__builtin_repeat$Cell          2         516
+__test$__test_block_1          1        3240
+__to_str_bool                  4         220
 aipl_array_dec                 5    external
 aipl_array_new                 2    external
 aipl_assert                    1    external
@@ -71,6 +71,6 @@ aipl_test_begin                1    external
 aipl_test_end                  1    external
 aipl_test_summary              1    external
 aipl_write_bytes               4    external
-main                           1         108
-marked$own0                  101         336
-toggled$own0                 101         724
+main                           1         104
+marked$own0                  101         328
+toggled$own0                 101         720

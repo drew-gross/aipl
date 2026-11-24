@@ -75,15 +75,15 @@ reallocations     3
 bytes allocated   2802
 peak live bytes   2842
 instructions      9837
-binary size       28384 bytes (code 18880, data 1987, metadata 7517)
+binary size       28280 bytes (code 18776, data 1987, metadata 7517)
 
 function                   calls  code bytes
-__arr_drop_First               2         240
-__arr_retain_First             0         148
-__test$__test_block_1          1       11096
-__to_str_First                 3        1464
-__to_str_Named                 6        1100
-__to_str_u64                   2         204
+__arr_drop_First               2         228
+__arr_retain_First             0         144
+__test$__test_block_1          1       11092
+__to_str_First                 3        1440
+__to_str_Named                 6        1084
+__to_str_u64                   2         200
 aipl_array_dec                29    external
 aipl_array_new                 5    external
 aipl_array_with_cap            8    external
@@ -96,7 +96,7 @@ aipl_u64_len                   4    external
 aipl_write_bytes             105    external
 aipl_write_i64                 5    external
 aipl_write_u64                 2    external
-fold                           2        2808
-main                           1         108
-rename                         2         800
-rename$own0                    4         912
+fold                           2        2780
+main                           1         104
+rename                         2         796
+rename$own0                    4         908
