@@ -49,6 +49,11 @@
 #   its pattern is the named form `self: Span { start, end }`, not the
 #   `Span { start, end }` this lint's advice spells.
 # - **A parameter already destructured**, whose pattern the author wrote.
+#
+# **A parameter of a case's type** (`self: Call`) has fields to take apart only through the
+# case's own pattern, and the advice is the same either way it is spelled: `let Call(name,
+# args) = self;` opening the body, with `self` used nowhere else, is `self: Call(name, args)`
+# in the signature. That holds for the receiver too, the named form being the one it takes.
 # - **A keyword parameter.** Its name *is* the call-site spelling (`f(sep = ", ")`),
 #   so destructuring it would break every caller.
 # - **`mut` and variadic parameters.** A `mut` receiver is written through rather
@@ -87,6 +92,7 @@ import {
     Alias,
     Binding,
     ByCase,
+    ByPattern,
     ByStruct,
     ByTuple,
     Construct,
@@ -102,7 +108,7 @@ import {
     field_reads,
 } from "../expr.aipl";
 import { Function, One, Param, Signature, pattern_reads } from "../item.aipl";
-import { Array, ArrayNested, Ctor, Nested, is_binder_name, show_pat } from "../pat.aipl";
+import { Array, ArrayNested, Ctor, Nested, Pat, is_binder_name, show_pat } from "../pat.aipl";
 import { Named, Ty } from "../ty.aipl";
 import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
 import { LintHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
@@ -139,6 +145,40 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
             .join(),
     ]
 }.test({
+    // ---- a parameter of a case's type, opened by a `let` of the case ----
+    assert(lint_function_messages(
+        "fn f(p: Pair) -> i64 { let Pair(a, b) = p; a + b }",
+        destructure,
+    )? == [
+        ```parameter "p" is only taken apart by a destructuring `let` — destructure it in the signature instead: "Pair(a, b)" in place of "p: Pair"```,
+    ]);
+    // The receiver keeps its name, which the pattern follows.
+    assert(lint_function_messages(
+        "fn f(self: Pair) -> i64 { let Pair(a, _) = self; a }",
+        destructure,
+    )? == [
+        ```parameter "self" is only taken apart by a destructuring `let` — destructure it in the signature instead: "self: Pair(a, _)" in place of "self: Pair"```,
+    ]);
+    // Not the shape: the value is used again, it is another case, or the parameter is `mut`.
+    assert(
+        lint_function_messages(
+            "fn f(p: Pair) -> i64 { let Pair(a, b) = p; g(p) + a }",
+            destructure,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_messages(
+            "fn f(p: Pair) -> i64 { let Other(a, b) = p; a + b }",
+            destructure,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_messages(
+            "fn f(mut p: Pair) -> i64 { let Pair(a, b) = p; a + b }",
+            destructure,
+        )?.is_empty(),
+    );
+
     // ---- a parameter ----
     // Only fields are read: take the parameter apart in the signature.
     assert(lint_function_messages("fn f(p: Point) -> i64 { p.x + p.y }", destructure)? == [
@@ -503,6 +543,7 @@ fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> LintHit[] 
     // survives the formatter — and the closest line to the signature that a
     // parameter can be blamed on, `Param` carrying no span of its own.
     let Name(name) = self.binding else { return self.binding.slot_hits(body, reads, body.span); };
+    if (let some(hit) = self.case_opening_hit(name, body, is_receiver)) { return [hit]; };
     if (is_receiver || self.mutable || self.arity != One || self.default.is_some()) { return []; };
     let some(Named(struct_name)) = self.ty.as_case::<Named>() else { return []; };
 
@@ -515,6 +556,43 @@ fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> LintHit[] 
         Opening(span, _, _) => [
             lint_message(advice(Parameter(struct_name), name, taken), span=span),
         ],
+    }
+}
+
+# The hit for the parameter `self`, named `name`, whose type is a case and whose one use is the
+# `let Case(..) = name;` that opens the body: the pattern moves into the signature, as it was
+# written. A receiver keeps the name in front of it.
+fn case_opening_hit(self: Param, name: str, body: Expr, is_receiver: bool) -> LintHit? {
+    if (self.mutable || self.arity != One || self.default.is_some()) { return none; };
+    let Named(case_name) = self.ty.as_case::<Named>()?;
+    let LetPattern(pattern, value, _) = body.kind.as_case::<LetPattern>()?;
+    // A pattern with a `_` or a nested pattern in it is a `ByPattern`; one of plain names a `ByCase`.
+    let (named, rewritten) = match (pattern) {
+        ByCase(named, names) => (named, `{named}({names.join(sep=", ")})`),
+        ByPattern(inner) => (inner.pattern_case()?, inner.show_pat()),
+        _ => {
+            return none;
+        },
+    };
+    if (named != case_name || !value.is_name(name)) { return none; };
+    let Uses { mentions, field_reads, shadowed } = body.uses_of(name);
+    if (shadowed || field_reads != 0 || mentions != 1) { return none; };
+    let (new, old) = if (is_receiver) {
+        (`{name}: {rewritten}`, `{name}: {case_name}`)
+    } else {
+        (rewritten, `{name}: {case_name}`)
+    };
+    some(lint_message(
+        `parameter "{name}" is only taken apart by a destructuring \`let\` — destructure it in the signature instead: "{new}" in place of "{old}"`,
+        span=value.span,
+    ))
+}
+
+# The case a pattern is of, when it is one.
+fn pattern_case(self: Pat) -> str? {
+    match (self) {
+        Ctor(name, _, _) | Nested(name, _) => some(name),
+        _ => none,
     }
 }
 

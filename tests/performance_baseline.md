@@ -63,11 +63,11 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/compare_empty_array | 32850 | 5459647 | 918014 | 30455330 | 8020120 |
 | crates/aipl-codegen/src/lint/compound_assign | 28852 | 6005675 | 916658 | 20522341 | 8102664 |
 | crates/aipl-codegen/src/lint/constant_default | 26516 | 5473596 | 910484 | 25831862 | 7952760 |
-| crates/aipl-codegen/src/lint/destructure | 91181 | 15429002 | 949161 | 122743388 | 8128544 |
+| crates/aipl-codegen/src/lint/destructure | 97224 | 16471246 | 951497 | 132534828 | 8160512 |
 | crates/aipl-codegen/src/lint/duplicate_import_source | 20968 | 3320168 | 842632 | 8231313 | 7951488 |
 | crates/aipl-codegen/src/lint/expr_text | 38168 | 8466710 | 930801 | 48882954 | 8047052 |
 | crates/aipl-codegen/src/lint/extend_loop_map_join | 39114 | 5796596 | 925926 | 33953259 | 8048436 |
-| crates/aipl-codegen/src/lint/field_init_shorthand | 28492 | 5434182 | 872584 | 16857173 | 9857156 |
+| crates/aipl-codegen/src/lint/field_init_shorthand | 28492 | 5434182 | 872584 | 16858747 | 9874680 |
 | crates/aipl-codegen/src/lint/field_uses | 91863 | 22778378 | 636384 | 37171469 | 7900908 |
 | crates/aipl-codegen/src/lint/fn_body_type_stutter | 28561 | 4838857 | 876352 | 24338144 | 8063980 |
 | crates/aipl-codegen/src/lint/identity_lambda | 32930 | 4823748 | 920800 | 27158893 | 8149152 |
@@ -76,7 +76,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/is_empty_longhand | 32246 | 5140161 | 919979 | 27187769 | 8017188 |
 | crates/aipl-codegen/src/lint/len_gt_zero | 37320 | 6119999 | 921673 | 37317326 | 8024700 |
 | crates/aipl-codegen/src/lint/let_else_as_case | 43158 | 6848774 | 923747 | 44401664 | 7998304 |
-| crates/aipl-codegen/src/lint/lint | 19663 | 3207168 | 833416 | 6355582 | 9836908 |
+| crates/aipl-codegen/src/lint/lint | 19663 | 3207168 | 833416 | 6355582 | 9855396 |
 | crates/aipl-codegen/src/lint/lint_hit | 23880 | 4900683 | 873039 | 15828510 | 8475592 |
 | crates/aipl-codegen/src/lint/loop_shape | 80443 | 19144968 | 652688 | 37133538 | 7889416 |
 | crates/aipl-codegen/src/lint/map_constant_repeat | 26407 | 4566264 | 916918 | 20622922 | 8022648 |
@@ -101,7 +101,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/return_loop_any_all | 51518 | 7737046 | 930955 | 53307073 | 8135400 |
 | crates/aipl-codegen/src/lint/return_loop_find_if | 43231 | 6439331 | 922853 | 38193471 | 8083356 |
 | crates/aipl-codegen/src/lint/return_loop_find_index | 57602 | 8504538 | 928939 | 60830876 | 8012948 |
-| crates/aipl-codegen/src/lint/set_spread_field | 40167 | 7003864 | 890623 | 24271768 | 9860220 |
+| crates/aipl-codegen/src/lint/set_spread_field | 40167 | 7003864 | 890623 | 24273506 | 9877744 |
 | crates/aipl-codegen/src/lint/set_spread_insert | 57362 | 7784583 | 928960 | 61845583 | 8044084 |
 | crates/aipl-codegen/src/lint/set_spread_push | 43189 | 6492380 | 936039 | 40754330 | 8043924 |
 | crates/aipl-codegen/src/lint/slice_bounds | 26 | 3128 | 2272 | 2973 | 77892 |
@@ -113,13 +113,13 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/lint/unused_functions | 29384 | 4694684 | 896432 | 18032151 | 8013268 |
 | crates/aipl-codegen/src/lint/unused_imports | 29408 | 4447511 | 863952 | 18095474 | 8017352 |
 | crates/aipl-codegen/src/lint/use_field_projection | 47905 | 6788098 | 922192 | 49649613 | 8145556 |
-| crates/aipl-codegen/src/lint/value_or_compare | 33598 | 6884621 | 880941 | 23404863 | 9864380 |
+| crates/aipl-codegen/src/lint/value_or_compare | 33598 | 6884621 | 880941 | 23406323 | 9881904 |
 | crates/aipl-codegen/src/lint/with_value_or_self | 25926 | 4436032 | 914928 | 19188315 | 8068212 |
 | crates/aipl-codegen/src/lint/zip_with_pair_zip | 26633 | 4301719 | 916424 | 18521142 | 8013336 |
 | crates/aipl-codegen/src/normalize_output | 16 | 880 | 143 | 2538 | 2520 |
 | crates/aipl-codegen/src/operator_named_forms | 17 | 1744 | 1232 | 5768 | 14956 |
 | crates/aipl-codegen/src/parse | 8731 | 927722 | 146351 | 5245930 | 768584 |
-| crates/aipl-codegen/src/parse_and_partial_load | 34088 | 8312265 | 945703 | 22917271 | 10154816 |
+| crates/aipl-codegen/src/parse_and_partial_load | 34088 | 8312265 | 945703 | 22918229 | 10173256 |
 | crates/aipl-codegen/src/parse_spec | 310 | 14728 | 6175 | 169315 | 152588 |
 | crates/aipl-codegen/src/parse_test_section_header | 0 | 0 | 0 | 1784 | 5244 |
 | crates/aipl-codegen/src/parsed | 38 | 3545 | 3081 | 3271 | 77164 |
