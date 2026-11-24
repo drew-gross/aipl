@@ -1,0 +1,22 @@
+# An optional spreads like an array of zero or one elements: `[..a, ..b]` holds what `a` has, if it
+# has anything, then `b`'s elements.
+
+import { equal as ==, map, wrapping_add as + } from builtins;
+
+fn around(before: i64?, middle: i64[], after: i64?) -> i64[] { [..before, ..middle, ..after] }.test({
+    assert(around(some(1), [2, 3], some(4)) == [1, 2, 3, 4]);
+    assert(around(none, [2, 3], some(4)) == [2, 3, 4]);
+    assert(around(some(1), [], none) == [1]);
+    assert(around(none, [], none) == []);
+})
+
+fn alone(a: str?) -> str[] { [..a] }.test({
+    assert(alone(some("x")) == ["x"]);
+    assert(alone(none) == []);
+})
+
+// Plain elements either side, and an optional that is a call rather than a name.
+fn framed(a: i64?, n: i64) -> i64[] { [0, ..a, n, ..a.map(|x| x + 1)] }.test({
+    assert(framed(some(5), 9) == [0, 5, 9, 6]);
+    assert(framed(none, 9) == [0, 9]);
+})

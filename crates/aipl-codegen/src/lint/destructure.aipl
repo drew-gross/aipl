@@ -65,6 +65,7 @@
 import {
     Span,
     as_case,
+    collect_ok,
     contains,
     equal as ==,
     extend,
@@ -119,9 +120,9 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
         ..body
             .descendants_of_kind::<Let>()$kind
             .map(|Let(name, annotation, value, inner)| {
-                binding_hits(name, annotation, value, inner, reads)
+                binding_hit(name, annotation, value, inner, reads)
             })
-            .join(),
+            .collect_ok(),
         ..body
             .descendants_of_kind::<LetPattern>()$kind
             .map(|LetPattern(pattern, value, rest)| pattern.slot_hits(rest, reads, value.span))
@@ -518,23 +519,23 @@ fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> LintHit[] 
 }
 
 # The hit for `let name = value; inner`, at its value.
-fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -> LintHit[] {
+fn binding_hit(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -> LintHit? {
     // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
     // written by the author, who cannot put an `#[allow]` on it. The destructuring
     // forms are not among them: this reads the program before they are lowered.
-    if (name.contains("$")) { return []; };
+    if (name.contains("$")) { return none; };
 
     // Taking apart a value built on the same line is not an improvement: the pattern
     // restates the type name that literal just wrote and re-lists the fields it just
     // set.
-    if (value.kind.is_case::<Construct>()) { return []; };
+    if (value.kind.is_case::<Construct>()) { return none; };
     // The struct is named only where the source already names it — an annotation.
     let written = match (annotation) {
         some(Named(struct_name)) => some(struct_name),
         _ => none,
     };
-    let some(taken) = inner.taken_apart(name, reads, some(value), written) else { return []; };
-    [lint_message(advice(Bound(written), name, taken), span=value.span)]
+    let taken = inner.taken_apart(name, reads, some(value), written)?;
+    some(lint_message(advice(Bound(written), name, taken), span=value.span))
 }
 
 # The hits for the slots of `pattern`, the names it binds over `scope`, at `at`.

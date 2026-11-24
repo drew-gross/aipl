@@ -4912,6 +4912,114 @@ impl Pinner<'_> {
         Ok(())
     }
 
+    /// The call that `e` (a use of a spread operand: its length, the seed of the literal, or a
+    /// piece appended to it) stands for once the operand's type is known, or `None` when the call
+    /// is not one of those or the operand is an array and needs no change. An optional operand
+    /// reads as the array of what it holds: `[v]` for `some(v)`, `[]` for `none`, and a length of
+    /// one or zero.
+    fn spread_operand(&mut self, e: &Expr, callee: &Callee, args: &[Expr]) -> Res<Option<Expr>> {
+        use aipl_syntax::ast::{MatchArm, WrittenNames};
+        // The in-place form appends to the literal's own accumulator, a name no program can write.
+        let appends = matches!(callee, Callee::Extend | Callee::ExtendMap)
+            && matches!(args.first().map(|a| &a.kind), Some(ExprKind::Ident(n)) if n.starts_with("__spread$"));
+        let slot = match callee {
+            Callee::SpreadLen | Callee::ArrReserve => 0,
+            Callee::ArrConcat => 1,
+            Callee::Extend | Callee::ExtendMap if appends => 1,
+            _ => return Ok(None),
+        };
+        let Some(operand) = args.get(slot) else {
+            return Ok(None);
+        };
+        let typed = self.expr(operand)?;
+        let optional = matches!(self.table.shallow(&typed.ty), It::Opt(_));
+        let span = operand.span.clone();
+        let node = |kind| Expr::new(kind, span.clone());
+        if *callee == Callee::SpreadLen {
+            if !optional {
+                return Ok(Some(Expr::new(
+                    ExprKind::Call(Callee::Len, args.to_vec(), true),
+                    e.span.clone(),
+                )));
+            }
+            // What an optional holds counts as one, and nothing as zero: `u64`s, as every other
+            // length summed beside it is.
+            let count = |n: i64| {
+                let name = format!("__spread_count${}_{n}", span.start);
+                node(ExprKind::Let(
+                    name.clone(),
+                    Some(Type::Primitive(Primitive::U64)),
+                    Box::new(node(ExprKind::Num(n))),
+                    Box::new(node(ExprKind::Ident(name))),
+                ))
+            };
+            let present = MatchArm {
+                pattern: Pattern::Ctor {
+                    name: "some".to_string(),
+                    bindings: Vec::new(),
+                    ignore_payload: true,
+                },
+                body: count(1),
+                span: span.clone(),
+                written: WrittenNames::default(),
+            };
+            return Ok(Some(node(ExprKind::IfLet(
+                Box::new(present),
+                Box::new(operand.clone()),
+                Box::new(count(0)),
+            ))));
+        }
+        // What an optional holds, as an array: `[v]` for `some(v)`, `[]` for `none`.
+        let held = format!("__spread_held${}", span.start);
+        let as_array = |value: Expr| {
+            let arm = MatchArm {
+                pattern: Pattern::Ctor {
+                    name: "some".to_string(),
+                    bindings: vec![held.clone()],
+                    ignore_payload: false,
+                },
+                body: node(ExprKind::ArrayLit(vec![node(ExprKind::Ident(
+                    held.clone(),
+                ))])),
+                span: span.clone(),
+                written: WrittenNames::default(),
+            };
+            node(ExprKind::IfLet(
+                Box::new(arm),
+                Box::new(value),
+                Box::new(node(ExprKind::ArrayLit(Vec::new()))),
+            ))
+        };
+        if !optional {
+            return Ok(None);
+        }
+        // `extend_map(acc, optional, f)` appends what `optional.map(f)` holds.
+        if *callee == Callee::ExtendMap {
+            let [accumulator, receiver, function] = args else {
+                return Ok(None);
+            };
+            let mapped = Expr::new(
+                ExprKind::Call(Callee::Map, vec![receiver.clone(), function.clone()], true),
+                e.span.clone(),
+            );
+            return Ok(Some(Expr::new(
+                ExprKind::Call(
+                    Callee::Extend,
+                    vec![accumulator.clone(), as_array(mapped)],
+                    true,
+                ),
+                e.span.clone(),
+            )));
+        }
+        let mut rewritten = args.to_vec();
+        rewritten[slot] = as_array(operand.clone());
+        let method_style = matches!(callee, Callee::Extend);
+        Ok(Some(Expr::new(
+            ExprKind::Call(callee.clone(), rewritten, method_style),
+            e.span.clone(),
+        )))
+    }
+
     fn call(
         &mut self,
         e: &Expr,
@@ -4935,6 +5043,11 @@ impl Pinner<'_> {
             )
         };
         let call = |args: Vec<TExpr<It>>, ret: It, p: &Self| call_with(Vec::new(), args, ret, p);
+        // The loader's array-literal spread names its operand wherever it uses it, before any type
+        // is known. An operand that is an optional is read as the zero or one elements it holds.
+        if let Some(rewritten) = self.spread_operand(e, callee, args)? {
+            return self.expr(&rewritten);
+        }
         // A local that holds a function is called by its name.
         if let Some(Binding { ty, binder, .. }) = self.env.get(name).cloned() {
             if let Some(binder) = binder {

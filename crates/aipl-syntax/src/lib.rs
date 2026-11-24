@@ -3718,6 +3718,7 @@ fn __trace(self: str) {}
 fn __aipl_arr_reserve<T: any>(self: T[], extra: u64) -> T[] { self }
 fn __aipl_arr_append<T: any>(self: T[], x: T) -> T[] { self }
 fn __aipl_arr_concat<T: any>(self: T[], other: T[]) -> T[] { self }
+fn __aipl_spread_len<T: any>(self: T[]) -> u64 { 0 }
 // Internal: emitted by the compiler for template-literal concatenation.
 fn __aipl_concat(a: str, b: str) -> str { "" }
 // Internal: what a `shim random <provider>(..) { .. }` lowers to. The provider

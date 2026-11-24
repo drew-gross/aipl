@@ -396,7 +396,6 @@ syntax:
   spread optionals into arrays to make tabulate's widths computation simpler
   arr$[i] syntax for getting all items at specified index
   make HOFs able to treat their predicates as self methods.
-  .. should maybe work on optionals too? Or anything that can be $'ed?
   .... in an array or set literal should double-unwrap-spread
   support if (let [a, ..] = xs) syntax
   unary minus doesn't have a named operator
@@ -458,6 +457,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  make it so that lint_function_unfilled &co can accept lint: (Function) -> LintHit*, then we don't have to do opt-to-array conversions when calling it
   add a "matches" function that replaces is_ident and similar
   functions with keyword arguments:
     should be able to pass these anywhere the keyword arguments are't used (and they get implicitly defaulted)
@@ -572,6 +572,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  fn_body_type_stutter should not be looking at __builtin_ because it should see the code before it is transformed to reference __builtin_
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map

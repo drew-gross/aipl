@@ -377,6 +377,9 @@ pub enum Callee {
     ArrReserve,
     ArrAppend,
     ArrConcat,
+    /// The length a spread operand adds (the loader): `len` of an array, and the 0 or 1 an
+    /// optional adds. The checker rewrites it into one of those, so nothing past it sees it.
+    SpreadLen,
     /// An empty array reserved to a given capacity — `map`'s output (mono).
     WithCapacity,
     /// The moved-in array parameter as a writable block, for the in-place
@@ -667,6 +670,7 @@ impl Callee {
         Callee::ArrReserve,
         Callee::ArrAppend,
         Callee::ArrConcat,
+        Callee::SpreadLen,
         Callee::WithCapacity,
         Callee::ArrWritable,
         Callee::Move,
@@ -910,6 +914,7 @@ impl Callee {
             Callee::ArrReserve => "__aipl_arr_reserve",
             Callee::ArrAppend => "__aipl_arr_append",
             Callee::ArrConcat => "__aipl_arr_concat",
+            Callee::SpreadLen => "__aipl_spread_len",
             Callee::WithCapacity => "__builtin_with_capacity",
             Callee::ArrWritable => "__arr_writable",
             Callee::Move => "__move",

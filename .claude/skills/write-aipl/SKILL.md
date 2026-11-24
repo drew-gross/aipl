@@ -33,7 +33,7 @@ variant Shape = Circle(r: i64) | Square(i64) | Empty
 ## Expressions
 ```
 let x = 1;  mut y = 0;  set y = y + 1;  set y++;  set xs.push(x);   // `mut` binding required to set
-[1, 2]  [..a, x]  0..n  xs[1..3]  xs[i] (→ T?)  #{1, 2}  #{k: v}  (a, b)  P { x: 1 }  P { ..p, x: 2 }
+[1, 2]  [..a, x] (a spread takes an array, or an optional as zero or one elements)  0..n  xs[1..3]  xs[i] (→ T?)  #{1, 2}  #{k: v}  (a, b)  P { x: 1 }  P { ..p, x: 2 }
 some(x) none ok(x) err(e)   f()?  (postfix: propagate none/err)   f(sep=", ")   |x| x + 1
 `text {expr} \{literal brace}`   """raw multi-line, dedented"""   'c'   "s"
 if (c) { a } else { b }      if (let some(v) = o) { .. }

@@ -543,7 +543,7 @@ fn is_spread(fi: &FieldInit) -> bool {
 fn cheap_len(e: &Expr) -> Option<Expr> {
     let len = |x: &Expr| {
         Expr::new(
-            ExprKind::Call(Callee::Len, vec![x.clone()], true),
+            ExprKind::Call(Callee::SpreadLen, vec![x.clone()], true),
             e.span.clone(),
         )
     };
@@ -890,7 +890,7 @@ impl Expander {
             // the binding being a bare name and so cheap by construction.
             let len = cheap_len(inner).unwrap_or_else(|| {
                 Expr::new(
-                    ExprKind::Call(Callee::Len, vec![(**inner).clone()], true),
+                    ExprKind::Call(Callee::SpreadLen, vec![(**inner).clone()], true),
                     elem.span.clone(),
                 )
             });
