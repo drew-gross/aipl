@@ -6,23 +6,18 @@ import {
     any,
     collect_arms,
     collect_ok,
-    contains,
     distinct,
-    ends_with,
     equal as ==,
     filter,
     find_if,
-    greater_than_or_equal as >=,
     is_empty,
     is_err_and,
     is_nonempty,
     join,
     len,
-    logical_and as &&,
     logical_not as !,
     map,
     not_equal as !=,
-    starts_with,
     value_or,
     zip_with,
 } from builtins;
@@ -39,7 +34,7 @@ import {
     import_name,
     lint_table,
 } from "../builtin_table.aipl";
-import { Bool, Call, Char, Expr, Field, Ident, Num, Str, expr, ident, num } from "../expr.aipl";
+import { Call, Expr, Field, Ident, expr, ident } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { Function, Item, LoweredFn, Program } from "../item.aipl";
@@ -282,39 +277,6 @@ pub fn spans_its_text(self: Expr) -> bool {
     assert(expr(Field(ident("p"), "x")).spans_its_text());
     assert(!expr(Call("f", [ident("x")], false, Unresolved)).spans_its_text());
     assert(!expr(Field(expr(Call("f", [], false, Unresolved)), "x")).spans_its_text());
-})
-
-# What advice quotes for the expression `self`: its source where that spells it exactly
-# — a name, a field path off one, or a literal written on one line — and `placeholder`
-# for the rest. A literal is *checked* against the source rather than assumed, because
-# the parser also synthesizes literals that carry no text of their own.
-pub fn quote(self: Expr, placeholder: str) -> str {
-    let text = self.source;
-    let spells_it = match (self.kind) {
-        Num(n) => text == `{n}`,
-        Bool(b) => text == `{b}`,
-        Char(..) => text.len() >= 3 && text.starts_with("'") && text.ends_with("'"),
-        Str(..) => text.len() >= 2 && text.starts_with(`"`) && text.ends_with(
-            `"`,
-        ) && !text.contains("\n"),
-        _ => self.spans_its_text(),
-    };
-    if (spells_it) { text } else { placeholder }
-}.test({
-    assert(Expr { ..ident("xs"), source: "xs" }.quote("<array>") == "xs");
-    assert(Expr { ..num(5), source: "5" }.quote("<element>") == "5");
-    assert(Expr { ..expr(Bool(true)), source: "true" }.quote("<element>") == "true");
-    assert(Expr { ..expr(Str("a b")), source: `"a b"` }.quote("<element>") == `"a b"`);
-    assert(Expr { ..expr(Char('c')), source: "'c'" }.quote("<element>") == "'c'");
-
-    // A literal with no text of its own, a call and a multi-line string are not quoted.
-    assert(num(5).quote("<element>") == "<element>");
-    assert(
-        Expr { ..expr(Call("f", [], false, Unresolved)), source: "f(" }.quote(
-            "<element>",
-        ) == "<element>",
-    );
-    assert(Expr { ..expr(Str("a\nb")), source: `"a\nb"` }.quote("<element>") == "<element>");
 })
 
 # Lints come in two kinds. A *program* lint is a function of the whole `Program`

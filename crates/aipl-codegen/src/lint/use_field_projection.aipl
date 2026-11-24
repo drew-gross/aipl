@@ -32,6 +32,7 @@ import {
     join,
     logical_not as !,
     logical_or as ||,
+    value_or,
 } from builtins;
 import { Map, is_method_callable } from "../builtin_table.aipl";
 import {
@@ -45,8 +46,9 @@ import {
 } from "../expr.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Function } from "../item.aipl";
+import { operand_text } from "./expr_text.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, lint_function_messages, lint_message, quote } from "./lint_hit.aipl";
+import { LintHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
 import { slot_shown } from "./places.aipl";
 
 # A hit for each `map` in the program whose function is a `$` projection.
@@ -75,7 +77,7 @@ pub fn use_field_projection(function: Function) -> LintHit[] { function.projecti
     assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { g().map(|p| p.name) }",
         use_field_projection,
-    )? == [`"map" with a lambda that only uses a member of its argument — write "<items>$name"`]);
+    )? == [`"map" with a lambda that only uses a member of its argument — write "g()$name"`]);
 
     // Not a step `$` can make: an annotated parameter, the parameter used twice, an operator,
     // a function from elsewhere, and a `map` the file never imported.
@@ -142,7 +144,7 @@ pub fn projections(self: Function) -> Projection[] {
 # `self` as the projection for `recv.map(arg)`, if `arg` is a function name or a lambda `$` can say.
 fn projection(self: Expr<Call>) -> Projection? {
     let Call(_, [receiver, argument], _, Map) = self.kind else { return none; };
-    let items = receiver.quote("<items>");
+    let items = receiver.operand_text().value_or("<items>");
     if (let Ident(function, callee) = argument.kind) {
         if (!callee.is_method_callable()) { return none; };
         return some(Projection {

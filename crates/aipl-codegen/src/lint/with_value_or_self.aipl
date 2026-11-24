@@ -25,11 +25,13 @@ import {
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
+    value_or,
 } from builtins;
 import { TrySet, ValueOr, With } from "../builtin_table.aipl";
 import { Call, Expr, Field, Ident, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { operand_text } from "./expr_text.aipl";
+import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `with(..)` the call falls back from to the array it replaces in.
@@ -42,7 +44,7 @@ pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> LintHit? {
         named: [
             Named { text: "this `", builtin: Builtin(ValueOr) },
             Named {
-                text: `\` falls back to the array it is replacing in — write "{receiver.quote("<array>")}.`,
+                text: `\` falls back to the array it is replacing in — write "{receiver.operand_text().value_or("<array>")}.`,
                 builtin: Builtin(TrySet),
             },
         ],

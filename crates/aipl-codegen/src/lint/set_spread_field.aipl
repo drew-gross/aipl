@@ -28,9 +28,10 @@ import {
     value_or,
 } from builtins;
 import { Assign, Construct, Spread } from "../expr.aipl";
+import { expr_text } from "./expr_text.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { lint_str } from "./lint.aipl";
-import { LintHit, lint_message, quote } from "./lint_hit.aipl";
+import { LintHit, lint_message } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 
 # The hit for the `set` `self`, when it sets a place to a literal that starts from the same place
@@ -47,7 +48,7 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
     };
     let place = target.source;
     let stores = fields.map_join(
-        |field| `set {place}.{field.name} = {field.value.quote("..")};`,
+        |field| `set {place}.{field.name} = {field.value.expr_text().value_or("..")};`,
         sep=" ",
     );
     let (what, advice) = if (fields.len() == 1) {
@@ -71,7 +72,7 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
 
     // Several fields are one store each, quoted where they can be and a placeholder where not.
     assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: 1, y: g(2) }; q }")? == [
-        `this "set" rebuilds "q" from itself only to replace some fields — assign each field directly: "set q.x = 1; set q.y = ..;"`,
+        `this "set" rebuilds "q" from itself only to replace some fields — assign each field directly: "set q.x = 1; set q.y = g(2);"`,
     ]);
 
     // A swap reads the target, so it cannot be split; a different base or no replacement is no
@@ -91,7 +92,7 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
         }
     """)? == [
         `this "set" rebuilds "self" from itself only to replace "x" — assign the field directly: "set self.x = 1;"`,
-        `this "set" rebuilds "self.inner" from itself only to replace "n" — assign the field directly: "set self.inner.n = ..;"`,
+        `this "set" rebuilds "self.inner" from itself only to replace "n" — assign the field directly: "set self.inner.n = self.inner.n + 1;"`,
         `this "set" rebuilds "self" from itself only to replace some fields — assign each field directly: "set self.x = 5; set self.y = 6;"`,
     ]);
 

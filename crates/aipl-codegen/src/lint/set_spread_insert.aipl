@@ -41,13 +41,15 @@ import {
     logical_or as ||,
     push,
     to_str,
+    value_or,
 } from builtins;
 import { Insert } from "../builtin_table.aipl";
 import { Assign, SetLit, Spread, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
+import { expr_text } from "./expr_text.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 import { Builtin } from "./spelling.aipl";
 import { insert } from sets;
@@ -79,7 +81,7 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
     for (let i, element : added) {
         let separator = if (i == 0) { "" } else { " " };
         set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(Insert) });
-        set text = `({element.quote("<element>")});`;
+        set text = `({element.expr_text().value_or("<element>")});`;
     }
     some(LintHit { named, tail: `{text}"`, span: spread.span })
 }.test({
@@ -108,7 +110,7 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
         "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, g(x)}; out }",
         flagged,
     )?.shown() == [
-        `this "set" rebuilds "out" from itself only to add to it — add in place: "set out.Builtin(Insert)(<element>);"`,
+        `this "set" rebuilds "out" from itself only to add to it — add in place: "set out.Builtin(Insert)(g(x));"`,
     ]);
 
     // The target may be a field path.

@@ -33,6 +33,7 @@ import {
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
+    value_or,
 } from builtins;
 import { Len, Map, Repeat } from "../builtin_table.aipl";
 import {
@@ -57,7 +58,8 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { expr_text, operand_text } from "./expr_text.aipl";
+import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for the call `self`, when it is a `map` over a function that ignores its argument.
@@ -73,10 +75,13 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
         named: [
             Named { text: `"`, builtin: Builtin(Map) },
             Named {
-                text: `" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.quote("<element>")}].`,
+                text: `" with a function that ignores its argument builds the same value once per element — for a sequence, write "[{constant.expr_text().value_or("<element>")}].`,
                 builtin: Builtin(Repeat),
             },
-            Named { text: `({receiver.quote("<items>")}.`, builtin: Builtin(Len) },
+            Named {
+                text: `({receiver.operand_text().value_or("<items>")}.`,
+                builtin: Builtin(Len),
+            },
         ],
         tail: `())"`,
         span: lambda.span,
@@ -100,12 +105,12 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
         `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[""].Builtin(Repeat)(xs.Builtin(Len)())"`,
     ]);
     assert(lint_function_unfilled("fn f() { xs.map(|x| [c, 1]) }", flagged)?.shown() == [
-        `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[<element>].Builtin(Repeat)(xs.Builtin(Len)())"`,
+        `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[[c, 1]].Builtin(Repeat)(xs.Builtin(Len)())"`,
     ]);
 
-    // An iterable that cannot be quoted is a placeholder.
+    // An iterable that is a call is written out.
     assert(lint_function_unfilled("fn f() { g().map(|x| 0) }", flagged)?.shown() == [
-        `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].Builtin(Repeat)(<items>.Builtin(Len)())"`,
+        `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].Builtin(Repeat)(g().Builtin(Len)())"`,
     ]);
 
     // The hit points at the function.

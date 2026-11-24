@@ -20,6 +20,7 @@ import {
     logical_and as &&,
     logical_not as !,
     not_equal as !=,
+    value_or,
 } from builtins;
 import { Zip, ZipWith } from "../builtin_table.aipl";
 import {
@@ -32,7 +33,8 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { expr_text, operand_text } from "./expr_text.aipl";
+import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `zip_with` whose function only pairs its two arguments.
@@ -44,11 +46,11 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> LintHit? {
         named: [
             Named { text: `"`, builtin: Builtin(ZipWith) },
             Named {
-                text: `" with a function that only pairs its arguments is "{receiver.quote("<items>")}.`,
+                text: `" with a function that only pairs its arguments is "{receiver.operand_text().value_or("<items>")}.`,
                 builtin: Builtin(Zip),
             },
         ],
-        tail: `({other.quote("<other>")})"`,
+        tail: `({other.expr_text().value_or("<other>")})"`,
         span: function.span,
     })
 }.test({
@@ -78,7 +80,7 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> LintHit? {
         "fn f() { g().zip_with(h(), |a, b| { (a, b) }) }",
         flagged,
     )?.shown() == [
-        `"Builtin(ZipWith)" with a function that only pairs its arguments is "<items>.Builtin(Zip)(<other>)"`,
+        `"Builtin(ZipWith)" with a function that only pairs its arguments is "g().Builtin(Zip)(h())"`,
     ]);
 
     // Not the shape: the pair swapped (a different array), a body that computes something, a
