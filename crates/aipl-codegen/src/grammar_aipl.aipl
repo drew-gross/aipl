@@ -288,6 +288,7 @@ import {
     Public,
     Refinement as ItemRefinement,
     RefinementDecl,
+    ReturnsMany,
     Signature,
     Struct as ItemStruct,
     StructDecl,
@@ -3899,13 +3900,20 @@ fn named_param(
     has_default: bool = false,
     marker: str = "",
 ) -> Ast!ParseError {
+    let written = as_ty(kid(kids, 0, sp)?, sp)?;
+
+    // A `*` after a function type is on its result, `(A) -> T*`: the body sees the function
+    // returning `T[]`, and a call may hand it one returning `T`, `T?` or `T[]`.
     let arity = match (marker) {
-        "*" => ZeroOrMore,
+        "*" => if (let TyFn(..) = written) { ReturnsMany } else { ZeroOrMore },
         "+" => OneOrMore,
         _ => One,
     };
-    let written = as_ty(kid(kids, 0, sp)?, sp)?;
     let ty = match (arity) {
+        ReturnsMany => match (written) {
+            TyFn(parameters, result) => TyFn(parameters, TyArray(result)),
+            _ => written,
+        },
         ZeroOrMore => variadic_seq_ty(written),
         OneOrMore => nonempty_seq_ty(written),
         One => if (implicit_some) { TyOptional(written) } else { written },
@@ -5597,6 +5605,11 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         ) == "fn f(mut xs: Array(i64), z: Array(i64)*, k?: Optional(u64) = none) = ()",
     );
     assert(program_dump("fn f(c: char*) { }") == "fn f(c: str*) = ()");
+
+    // A `*` after a function type is on its result: the body sees the function returning the
+    // sequence, and the parameter is not a variadic of functions.
+    assert(program_dump("fn f(g: (i64) -> i64*) { }") == "fn f(g: Fn([i64], Array(i64))*) = ()");
+    assert(program_dump("fn f(g: ((i64) -> i64)*) { }") == "fn f(g: Fn([i64], Array(i64))*) = ()");
     // `T+` is the non-empty sequence: the body may take its first element.
     assert(
         program_dump(

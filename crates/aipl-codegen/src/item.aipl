@@ -153,13 +153,13 @@ pub fn pattern_reads(self: Param) -> Read[] {
 # How many arguments a parameter takes at a call site: one, or — for a
 # variadic — zero or more (`T*`) or one or more (`T+`). Mirrors
 # `aipl_syntax::ast::Arity`.
-variant Arity = One | ZeroOrMore | OneOrMore
+variant Arity = One | ZeroOrMore | OneOrMore | ReturnsMany
 
 # The marker written after a parameter's type: nothing, `*` or `+`.
 pub fn arity_marker(self: Arity) -> str {
     match (self) {
         One => "",
-        ZeroOrMore => "*",
+        ZeroOrMore | ReturnsMany => "*",
         OneOrMore => "+",
     }
 }.test({

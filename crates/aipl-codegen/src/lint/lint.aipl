@@ -84,7 +84,7 @@ pub fn lint(program: ResolvedProgram) -> FilledHit[] {
         ..duplicate_import_source(program),
         ..functions.unfilled_hits(destructure),
         ..functions.unfilled_hits(unused_binding),
-        ..functions.unfilled_hits(|function| [..fn_body_type_stutter(function)]),
+        ..functions.unfilled_hits(fn_body_type_stutter),
         ..functions.unfilled_hits(match_lints),
         ..functions.unfilled_hits(match_case_try_as_case),
         ..functions.unfilled_hits(let_else_as_case),

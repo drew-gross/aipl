@@ -5767,7 +5767,11 @@ impl Pinner<'_> {
                 if slots[i].is_some() || is_closure != (pass == 1) {
                     continue;
                 }
-                let mut typed = self.arg(arg, &ptys[i])?;
+                let mut typed = if sig.params[i].arity == aipl_syntax::ast::Arity::ReturnsMany {
+                    self.returns_many_arg(arg, &ptys[i])?
+                } else {
+                    self.arg(arg, &ptys[i])?
+                };
                 // A span given to `cartesian_product` is the array of its positions.
                 let as_positions = *callee == Callee::CartesianProduct
                     && matches!(self.table.shallow(&typed.ty), It::Named(ref n) if n == aipl_syntax::SPAN_TYPE);
@@ -5956,6 +5960,153 @@ impl Pinner<'_> {
             ret,
             e,
         ))
+    }
+
+    /// An argument to a `(A) -> T*` parameter, whose type `expected` is the function as the body
+    /// sees it, `(A) -> T[]`. A function that returns `T[]` is taken as it stands; one that
+    /// returns `T?` or `T` is wrapped in a function that returns the array of what it returned
+    /// (`[]` for `none`), so the body only ever calls one that returns the sequence.
+    fn returns_many_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
+        use aipl_syntax::ast::{LambdaParam, MatchArm, Pattern};
+        let (It::Fn(params, sequence), span) = (self.table.shallow(expected), arg.span.clone())
+        else {
+            return self.arg(arg, expected);
+        };
+        let It::Arr(elem) = self.table.shallow(&sequence) else {
+            return self.arg(arg, expected);
+        };
+        // The function as written, its result left for it to say.
+        let result = self.fresh();
+        let loose = It::Fn(params.clone(), Box::new(result.clone()));
+        let probe = self.arg(arg, &loose)?;
+        self.coerce_expr(&probe, &loose, &span, "an argument")?;
+        let wrong = |p: &mut Self, given: &It| -> Res<TExpr<It>> {
+            reject(
+                format!(
+                    "an argument to a parameter that takes a function returning {} (or one \
+                     element, or an optional one), got one returning {}",
+                    p.table.show(&sequence),
+                    p.table.show(given),
+                ),
+                &span,
+            )
+        };
+        let written = self.table.shallow(&result);
+        let optional = match &written {
+            It::Opt(x) => {
+                if self.agree(x, &elem).is_err() {
+                    return wrong(self, &written);
+                }
+                true
+            }
+            It::Arr(_) => {
+                if self.agree(&written, &sequence).is_err() {
+                    return wrong(self, &written);
+                }
+                return Ok(probe);
+            }
+            _ => {
+                if self.agree(&written, &elem).is_err() {
+                    return wrong(self, &written);
+                }
+                false
+            }
+        };
+        let at = |kind| Expr::new(kind, span.clone());
+        // What an element or an optional element is as the sequence.
+        let wrap = |value: Expr| {
+            if optional {
+                let arm = |pattern, body| MatchArm {
+                    pattern,
+                    body,
+                    span: span.clone(),
+                    written: Default::default(),
+                };
+                at(ExprKind::Match(
+                    Box::new(value),
+                    vec![
+                        arm(
+                            Pattern::Ctor {
+                                name: "some".to_string(),
+                                bindings: vec!["$many_item".to_string()],
+                                ignore_payload: false,
+                            },
+                            at(ExprKind::ArrayLit(vec![at(ExprKind::Ident(
+                                "$many_item".to_string(),
+                            ))])),
+                        ),
+                        arm(
+                            Pattern::Ctor {
+                                name: "none".to_string(),
+                                bindings: Vec::new(),
+                                ignore_payload: false,
+                            },
+                            at(ExprKind::ArrayLit(Vec::new())),
+                        ),
+                    ],
+                ))
+            } else {
+                at(ExprKind::ArrayLit(vec![value]))
+            }
+        };
+        let wrapper = match &arg.kind {
+            // The lambda, its result and each `return` of its own wrapped.
+            ExprKind::Lambda(lambda_params, body) => {
+                fn wrap_returns(e: &mut Expr, wrap: &dyn Fn(Expr) -> Expr) {
+                    if matches!(e.kind, ExprKind::Lambda(..)) {
+                        return;
+                    }
+                    for child in e.children_mut() {
+                        wrap_returns(child, wrap);
+                    }
+                    if let ExprKind::Return(value) = &mut e.kind {
+                        let inner = std::mem::replace(
+                            &mut **value,
+                            Expr::new(ExprKind::Unit, e.span.clone()),
+                        );
+                        **value = wrap(inner);
+                    }
+                }
+                let mut body = (**body).clone();
+                wrap_returns(&mut body, &wrap);
+                at(ExprKind::Lambda(
+                    lambda_params.clone(),
+                    Box::new(wrap(body)),
+                ))
+            }
+            // `|p0, p1| wrap(f(p0, p1))`.
+            ExprKind::Ident(function) if !self.env.contains_key(function) => {
+                let names: Vec<String> = (0..params.len()).map(|k| format!("$many{k}")).collect();
+                let call = at(ExprKind::Call(
+                    Callee::User(function.clone()),
+                    names
+                        .iter()
+                        .map(|n| at(ExprKind::Ident(n.clone())))
+                        .collect(),
+                    false,
+                ));
+                at(ExprKind::Lambda(
+                    names
+                        .into_iter()
+                        .map(|name| LambdaParam {
+                            name,
+                            ty: None,
+                            span: span.clone(),
+                        })
+                        .collect(),
+                    Box::new(wrap(call)),
+                ))
+            }
+            _ => {
+                return reject(
+                    "a function that returns one element or an optional one, where a function \
+                     returning a sequence is also taken, has to be a lambda or the name of a \
+                     function",
+                    &span,
+                )
+            }
+        };
+        self.arg(&wrapper, expected)
     }
 
     /// An argument, typed with the parameter type it lands in as its context. A lambda needs the

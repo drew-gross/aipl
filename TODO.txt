@@ -315,6 +315,7 @@ lsp:
   go-to-def should work on files that don't typecheck
 
 bugs:
+  (A) -> T* and ((A) -> T)* meaning the same thing is crazy, thats not how brackets should work
   import wrapping_add as ++ should work
   improve error message for unshimmed effects in tests
   set tracker = params; from inside a shim closure should work
@@ -459,7 +460,6 @@ matrices:
   support more than 2 dimensions
 
 types:
-  make it so that lint_function_unfilled &co can accept lint: (Function) -> LintHit*, then we don't have to do opt-to-array conversions when calling it
   add a "matches" function that replaces is_ident and similar
   functions with keyword arguments:
     should be able to pass these anywhere the keyword arguments are't used (and they get implicitly defaulted)

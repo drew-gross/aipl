@@ -917,19 +917,24 @@ pub mod ast {
         ZeroOrMore,
         /// `T+`: one or more elements.
         OneOrMore,
+        /// `(A) -> T*`: a function parameter whose result may be written as the sequence the
+        /// body sees (`T[]`), one element, or an optional one. The stored `ty` is the function
+        /// as the body sees it, `(A) -> T[]`; a call adapts a function that returns `T` or
+        /// `T?` to it.
+        ReturnsMany,
     }
 
     impl Arity {
         /// Whether the parameter takes a sequence of arguments at all.
         pub fn is_variadic(self) -> bool {
-            !matches!(self, Arity::One)
+            matches!(self, Arity::ZeroOrMore | Arity::OneOrMore)
         }
 
         /// The marker written after the type: nothing, `*` or `+`.
         pub fn marker(self) -> &'static str {
             match self {
                 Arity::One => "",
-                Arity::ZeroOrMore => "*",
+                Arity::ZeroOrMore | Arity::ReturnsMany => "*",
                 Arity::OneOrMore => "+",
             }
         }

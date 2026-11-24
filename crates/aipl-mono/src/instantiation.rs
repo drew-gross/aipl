@@ -136,7 +136,7 @@ pub fn derive_type_args(
         binder.bind(ret, result);
     }
     for (i, param) in sig.params.iter().enumerate() {
-        if param.arity != Arity::One {
+        if param.arity.is_variadic() {
             for arg in args.iter().skip(i) {
                 binder.bind(&param.ty, arg);
             }

@@ -274,6 +274,7 @@ fn arity(v: &FfiValue) -> R<ast::Arity> {
         "One" => ast::Arity::One,
         "ZeroOrMore" => ast::Arity::ZeroOrMore,
         "OneOrMore" => ast::Arity::OneOrMore,
+        "ReturnsMany" => ast::Arity::ReturnsMany,
         other => return Err(unknown("Arity", other)),
     })
 }

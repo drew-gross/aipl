@@ -41,7 +41,7 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
 }.test({
     let found = lint_function_unfilled(
         "fn f(x: i64) -> P { P { x: x + 1, y: 0 } }",
-        |function| [..fn_body_type_stutter(function)],
+        fn_body_type_stutter,
     )?;
     assert(found.shown() == [message("f", "P", none)]);
     assert(found$span == [20..40]);
@@ -49,64 +49,47 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
     // A lone shorthand field spells out the trailing comma.
     assert(lint_function_unfilled(
         "fn f(x: i64) -> P { P { x } }",
-        |function| [..fn_body_type_stutter(function)],
+        fn_body_type_stutter,
     )?.shown() == [message("f", "P", some("x"))]);
     assert(lint_function_unfilled(
         "fn f(x: i64) -> P { P { x: x + 1 } }",
-        |function| [..fn_body_type_stutter(function)],
+        fn_body_type_stutter,
     )?.shown() == [message("f", "P", none)]);
 
     // A generic return is built under its base name.
     assert(lint_function_unfilled(
         "fn f(x: i64) -> Pair<i64> { Pair { a: x, b: x } }",
-        |function| [..fn_body_type_stutter(function)],
+        fn_body_type_stutter,
     )?.shown() == [message("f", "Pair", none)]);
 
     // The shorthand body, a literal of another type, a statement before the literal,
     // an empty literal and a field named like the type are all left alone.
     assert(
-        lint_function_unfilled(
-            "fn f(x: i64) -> P { x, y: 0 }",
-            |function| [..fn_body_type_stutter(function)],
-        )?.is_empty(),
+        lint_function_unfilled("fn f(x: i64) -> P { x, y: 0 }", fn_body_type_stutter)?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
-            "fn f(x: i64) -> P { Q { x } }",
-            |function| [..fn_body_type_stutter(function)],
-        )?.is_empty(),
+        lint_function_unfilled("fn f(x: i64) -> P { Q { x } }", fn_body_type_stutter)?.is_empty(),
     );
     assert(
         lint_function_unfilled(
             "fn f(x: i64) -> P { let y = x; P { x, y } }",
-            |function| [..fn_body_type_stutter(function)],
+            fn_body_type_stutter,
         )?.is_empty(),
     );
+    assert(lint_function_unfilled("fn f() -> P { P {} }", fn_body_type_stutter)?.is_empty());
     assert(
-        lint_function_unfilled(
-            "fn f() -> P { P {} }",
-            |function| [..fn_body_type_stutter(function)],
-        )?.is_empty(),
-    );
-    assert(
-        lint_function_unfilled(
-            "fn f(P: i64) -> Q { P, y: 0 }",
-            |function| [..fn_body_type_stutter(function)],
-        )?.is_empty(),
+        lint_function_unfilled("fn f(P: i64) -> Q { P, y: 0 }", fn_body_type_stutter)?.is_empty(),
     );
 
     // A destructured parameter is not a statement.
     assert(lint_function_unfilled(
         "fn f(P { x }) -> P { P { x: x + 1 } }",
-        |function| [..fn_body_type_stutter(function)],
+        fn_body_type_stutter,
     )?.shown() == [message("f", "P", none)]);
 
     // A range is a synthesized literal.
     assert(
-        lint_function_unfilled(
-            "fn f(a: i64) -> Span { a..a }",
-            |function| [..fn_body_type_stutter(function)],
-        )?.is_empty(),
+        lint_function_unfilled("fn f(a: i64) -> Span { a..a }", fn_body_type_stutter)?.is_empty(),
     );
     // Shapes the lint must leave alone.
 })
