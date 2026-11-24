@@ -18,10 +18,7 @@
 import {
     collect_ok,
     equal as ==,
-    filter,
     is_empty,
-    is_some,
-    is_some_and,
     logical_and as &&,
     logical_not as !,
     map,
@@ -40,21 +37,20 @@ import {
     WrappingIncrement,
     WrappingSub,
     WrappingSubAssign,
-    lint_table,
 } from "../builtin_table.aipl";
 import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { Function, Item } from "../item.aipl";
+import { Function } from "../item.aipl";
 import {
     LintHit,
     Named,
     hit_at,
-    lint_in_unfilled,
-    lint_in_unfilled_messages,
+    lint_function_unfilled,
+    lint_function_unfilled_messages,
     shown,
 } from "./lint_hit.aipl";
 import { is_same_place, place_text } from "./places.aipl";
-import { Builtin, spelled } from "./spelling.aipl";
+import { Builtin } from "./spelling.aipl";
 
 # The step builtin that replaces an operator builtin, whether it adds, and whether the operation
 # reads in either operand order.
@@ -89,16 +85,6 @@ pub fn step_of(self: Callee) -> Step? {
     }
 }
 
-# The plain operator builtins whose `± 1` this lint has advice for in a file with these `items`:
-# the file can take the step form.
-pub fn stepped_operators(self: Item[]) -> Callee[] {
-    [WrappingAdd, SaturatingAdd, WrappingSub, SaturatingSub].filter(
-        |callee| callee
-            .step_of()
-            .is_some_and(|step| Builtin(step.builtin).spelled(self, lint_table()).is_some()),
-    )
-}
-
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.
 pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
     let name = target.place_text()?;
@@ -128,32 +114,32 @@ pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
     })
 }.test({
     // The hits for each function's `set`s.
-    fn flagged(Function { body }, items: Item[]) -> LintHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body
             .descendants_of_kind::<Assign>()
             .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) })
             .collect_ok()
     }
     fn on_field(body: str) -> str[]!ParseFailure {
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             `import \{ wrapping_add as + } from builtins; fn f(mut c: Counter, m: i64) \{ {body} }`,
             flagged,
         )
     }
 
-    assert(lint_in_unfilled(
+    assert(lint_function_unfilled(
         "fn f(x: i64) -> i64 { mut n = x; set n = n + 1; n }",
         flagged,
     )?.shown() == [
         `adding 1 to "n" — use the increment form "set nBuiltin(WrappingIncrement);"`,
     ]);
-    assert(lint_in_unfilled(
+    assert(lint_function_unfilled(
         "fn f(x: i64) -> i64 { mut n = x; set n = 1 + n; n }",
         flagged,
     )?.shown() == [
         `adding 1 to "n" — use the increment form "set nBuiltin(WrappingIncrement);"`,
     ]);
-    assert(lint_in_unfilled(
+    assert(lint_function_unfilled(
         "fn f(x: i64) -> i64 { mut n = x; set n = n - 1; n }",
         flagged,
     )?.shown() == [
@@ -162,14 +148,14 @@ pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
 
     // The import to add is named, in the flavor of the operator written; where the file binds `++` to
     // the other flavor there is no step to advise.
-    assert(lint_in_unfilled_messages(
+    assert(lint_function_unfilled_messages(
         "import { saturating_add as + } from builtins; fn f(mut n: i64) { set n = n + 1; }",
         flagged,
     )? == [
         """adding 1 to "n" — use the increment form "set n++;", importing `saturating_increment as ++` from builtins""",
     ]);
     assert(
-        lint_in_unfilled_messages(
+        lint_function_unfilled_messages(
             "import { saturating_add as +, wrapping_increment as ++ } from builtins; fn f(mut n: i64) { set n = n + 1; }",
             flagged,
         )?.is_empty(),
@@ -178,13 +164,13 @@ pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
     // `1 - n` is not a decrement; another amount is not a step; a flavor that does not match, or an
     // operator the file defines itself, is quiet.
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(x: i64) -> i64 { mut n = x; set n = 1 - n; n }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(x: i64) -> i64 { mut n = x; set n = n + 2; n }",
             flagged,
         )?.is_empty(),
@@ -198,13 +184,13 @@ pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
 
     // Only the same place on both sides is a step: another binding, or a field fed from one, is not.
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(x: i64) -> i64 { mut n = x; set n = x + 1; n }",
             flagged,
         )?.is_empty(),
     );
     assert(
-        lint_in_unfilled(
+        lint_function_unfilled(
             "fn f(x: i64) -> i64 { mut n = x; set n = x - 1; n }",
             flagged,
         )?.is_empty(),
@@ -215,13 +201,13 @@ pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
     assert(on_field("set c.n = m + 1;")?.is_empty());
 
     // An operator bound to one of the file's own functions is not the builtin, whatever it is called.
-    assert(lint_in_unfilled(
+    assert(lint_function_unfilled(
         "fn f(x: i64) -> i64 { mut n = x; set n += 1; n }",
         flagged,
     )?.shown() == [
         `adding 1 to "n" — use the increment form "set nBuiltin(WrappingIncrement);"`,
     ]);
-    assert(lint_in_unfilled(
+    assert(lint_function_unfilled(
         "fn f(x: i64) -> i64 { mut n = x; set n -= 1; n }",
         flagged,
     )?.shown() == [

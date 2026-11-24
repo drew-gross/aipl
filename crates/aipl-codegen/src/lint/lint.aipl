@@ -4,7 +4,16 @@
 # covers and says how to keep the rest. A lint is added by giving it its own file and
 # a line in `lint`; the hits come back in the order the lints are listed.
 
-import { collect_ok, is_empty, join, map } from builtins;
+import {
+    any,
+    collect_ok,
+    equal as ==,
+    filter,
+    is_empty,
+    join,
+    logical_not as !,
+    map,
+} from builtins;
 import {
     Assign,
     Call,
@@ -19,7 +28,7 @@ import {
 } from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
-import { Function, Item, SuperProgram } from "../item.aipl";
+import { Function, SuperProgram } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
@@ -60,7 +69,7 @@ import { return_loop_find_index } from "./return_loop_find_index.aipl";
 import { set_spread_field } from "./set_spread_field.aipl";
 import { set_spread_insert } from "./set_spread_insert.aipl";
 import { set_spread_push } from "./set_spread_push.aipl";
-import { step_by_one, stepped_operators } from "./step_by_one.aipl";
+import { step_by_one } from "./step_by_one.aipl";
 import { union_loop_union_all } from "./union_loop_union_all.aipl";
 import { unused_binding } from "./unused_binding.aipl";
 import { unused_functions } from "./unused_functions.aipl";
@@ -78,7 +87,7 @@ import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 pub fn lint(program: ResolvedProgram) -> FilledHit[] {
     let items = program.items;
     let functions = program.functions();
-    [
+    let others = [
         ..unused_imports(program),
         ..unused_functions(program),
         ..duplicate_import_source(program),
@@ -104,10 +113,19 @@ pub fn lint(program: ResolvedProgram) -> FilledHit[] {
         ..functions.unfilled_hits(match_hits),
         ..functions.unfilled_hits(construct_lints),
         ..functions.unfilled_hits(assign_lints),
-        ..functions.unfilled_hits(|function| assign_advice(function, items)),
+        ..functions.unfilled_hits(assign_advice),
         ..functions.unfilled_hits(call_lints),
         ..functions.unfilled_hits(call_advice),
-    ].filled(items)
+    ].filled(items);
+
+    // `set x = x + 1;` is `set x++;` where the file can take the step form, and `set x += 1;` where it cannot:
+    // the compound lint's hit for a `set` the step lint has advice for is the worse of the two.
+    let steps = functions.unfilled_hits(step_hits).filled(items);
+    let compounds = functions
+        .unfilled_hits(compound_hits)
+        .filled(items)
+        .filter(|hit| !steps.any(|step| step.span == hit.span));
+    [..others, ..steps, ..compounds]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()).is_empty());
 })
@@ -194,18 +212,26 @@ fn assign_lints(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
 }
 
-# The lints over the assignments of `function` that advise a builtin or an operator.
-fn assign_advice(Function { body }, items: Item[]) -> LintHit[] {
+# The lints over the assignments of `function` that advise a builtin.
+fn assign_advice(Function { body }) -> LintHit[] {
     let assigns = body.descendants_of_kind::<Assign>();
-    let stepped = items.stepped_operators();
-    [
-        ..assigns$kind$set_spread_insert(),
-        ..assigns$kind$set_spread_push(),
-        ..assigns.map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) }),
-        ..assigns.map(|assign: Expr<Assign>| {
-            assign.hit_at(assign.kind.compound_assign(stepped))
-        }),
-    ].collect_ok()
+    [..assigns$kind$set_spread_insert(), ..assigns$kind$set_spread_push()].collect_ok()
+}
+
+# The step lint's hits for the assignments of `function`.
+fn step_hits(Function { body }) -> LintHit[] {
+    body
+        .descendants_of_kind::<Assign>()
+        .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) })
+        .collect_ok()
+}
+
+# The compound lint's hits for the assignments of `function`.
+fn compound_hits(Function { body }) -> LintHit[] {
+    body
+        .descendants_of_kind::<Assign>()
+        .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.compound_assign()) })
+        .collect_ok()
 }
 
 # The messages every lint reports for the program `src` parses to, which is how a lint's own tests
@@ -214,4 +240,26 @@ pub fn lint_str(src: str) -> str[]!ParseFailure {
     ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees())$message)
 }.test({
     assert(lint_str("fn main() { }")?.is_empty());
+
+    // `set n = n + 1;` has two pieces of advice, and the step form is the better where the file can
+    // take it: the compound lint's hit for the same `set` is dropped.
+    assert(lint_str(
+        "import { wrapping_add as + } from builtins; fn f(mut n: i64) { set n = n + 1; }",
+    )? == [
+        """adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins""",
+    ]);
+
+    // Where it cannot (`++` is the other flavor) the compound form is the only advice left, and
+    // it is not left out for a step lint that has nothing to say.
+    assert(lint_str(
+        "import { saturating_add as +, wrapping_increment as ++ } from builtins; fn f(mut n: i64) { set n = n + 1; set n++; }",
+    )? == [
+        ```"n" accumulates onto itself — use the compound form "set n += ...;", importing `saturating_add_assign as +=` from builtins```,
+    ]);
+    // An operand other than one is not a step at all.
+    assert(lint_str(
+        "import { wrapping_add as + } from builtins; fn f(mut n: i64, m: i64) { set n = n + m; }",
+    )? == [
+        ```"n" accumulates onto itself — use the compound form "set n += ...;", importing `wrapping_add_assign as +=` from builtins```,
+    ]);
 })

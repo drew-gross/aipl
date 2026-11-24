@@ -540,6 +540,7 @@ grammar:
   can `semicolon` 2nd arm be a plain refuse as long it's only used in last position in a OneOf? Maybe an Expect() can be an implicit Refuse for situations like this?
 
 utilities:
+  make an .only() method with type T[] -> T? to replace let [val] = vec else { return none; };
   is_none_or to replace x.value_or(0) == 0
   better function for making an "index" (list of T to dict of T's ID to T)
   join() should get leading_sep and trailing_sep and then tabulate's rule() can get simpler

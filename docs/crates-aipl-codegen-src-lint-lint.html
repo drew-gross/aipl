@@ -62,7 +62,7 @@
             <a class="anchor" href="#item-match_hits">match_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_hits(__spat$5930: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn match_hits(__spat$6437: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the <code>match</code>es of <code>function</code> that are not about what they say.</p></div>
 
@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-set_lints">set_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn set_lints(__spat$6132: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn set_lints(__spat$6639: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the set literals of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -90,7 +90,7 @@
             <a class="anchor" href="#item-interp_lints">interp_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn interp_lints(__spat$6356: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn interp_lints(__spat$6863: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the template interpolations of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-slice_lints">slice_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn slice_lints(__spat$6829: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn slice_lints(__spat$7336: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the slices of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -118,7 +118,7 @@
             <a class="anchor" href="#item-construct_lints">construct_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn construct_lints(__spat$7057: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn construct_lints(__spat$7564: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the struct literals of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -132,7 +132,7 @@
             <a class="anchor" href="#item-call_lints">call_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn call_lints(__spat$7300: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn call_lints(__spat$7807: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the calls of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -146,7 +146,7 @@
             <a class="anchor" href="#item-call_advice">call_advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn call_advice(__spat$7492: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn call_advice(__spat$7999: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the calls of <code>function</code> that advise a builtin.</p></div>
 
@@ -174,7 +174,7 @@
             <a class="anchor" href="#item-let_mut_lints">let_mut_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn let_mut_lints(__spat$8960: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn let_mut_lints(__spat$9467: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the <code>mut</code> bindings of <code>function</code>, which are found once for all of them: each is about an array or set seeded and then filled by the loop that follows.</p></div>
 
@@ -188,7 +188,7 @@
             <a class="anchor" href="#item-assign_lints">assign_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn assign_lints(__spat$9238: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn assign_lints(__spat$9745: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the assignments of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -202,9 +202,37 @@
             <a class="anchor" href="#item-assign_advice">assign_advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn assign_advice(__spat$9455: Function, items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn assign_advice(__spat$9947: Function) -&#62; LintHit[]</code></pre>
 
-          <div class="doc"><p>The lints over the assignments of <code>function</code> that advise a builtin or an operator.</p></div>
+          <div class="doc"><p>The lints over the assignments of <code>function</code> that advise a builtin.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-step_hits">
+          <h3>
+            <a class="anchor" href="#item-step_hits">step_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn step_hits(__spat$10199: Function) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The step lint's hits for the assignments of <code>function</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-compound_hits">
+          <h3>
+            <a class="anchor" href="#item-compound_hits">compound_hits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn compound_hits(__spat$10469: Function) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>The compound lint's hits for the assignments of <code>function</code>.</p></div>
 
 
         </section>
