@@ -26,12 +26,12 @@ import { AsCase } from "../builtin_table.aipl";
 import { IfLet, None, Return, Seq, Unit } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, statement_head, tail_matches } from "./case_match.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 
 # A hit for each `let .. else { return none; }` that ends the function and takes a
 # variant value apart.
-pub fn let_else_as_case(Function { body }) -> UnfilledHit[] {
+pub fn let_else_as_case(Function { body }) -> LintHit[] {
     body
         .tail_matches()
         .map(|tail| {

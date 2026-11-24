@@ -56,7 +56,7 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
                 .descendants_of_kind::<Match>()$kind
                 $option_match()
                 .collect_ok()
-                .map(|m| lint_message(`{m.binder} {m.scrutinee.receiver_text()}`, 0..0)),
+                .map(|m| lint_message(`{m.binder} {m.scrutinee.receiver_text()}`, span=0..0)),
         )
     }
     assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")? == ["v o"]);

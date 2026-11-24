@@ -52,12 +52,12 @@ import {
     pushed,
 } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop pairing two arrays by
 # position.
-pub fn push_loop_zip_with(Function { body }) -> UnfilledHit[] {
+pub fn push_loop_zip_with(Function { body }) -> LintHit[] {
     body.indexed_seeded_loops()$zip_hit().collect_ok()
 }.test({
     // The loop the lint is about, pushing `pushed` for each pair.
@@ -158,7 +158,7 @@ pub fn push_loop_zip_with(Function { body }) -> UnfilledHit[] {
 })
 
 # `self` as the advice for the loop it is, when it is a loop pairing two arrays by position.
-fn zip_hit(self: SeededLoop) -> UnfilledHit? {
+fn zip_hit(self: SeededLoop) -> LintHit? {
     let some(position) = self.index else { return none; };
     let ArrayLit(elements) = self.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };

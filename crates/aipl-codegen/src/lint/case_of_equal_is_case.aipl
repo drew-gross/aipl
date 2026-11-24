@@ -13,8 +13,7 @@ import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function } from "../item.aipl";
 import {
-    Advice,
-    UnfilledHit,
+    LintHit,
     advice,
     at,
     filled_assuming,
@@ -22,7 +21,7 @@ import {
 } from "./lint_hit.aipl";
 
 # The advice for the call `self`, when it is `==` with a `case_of()` on exactly one side.
-pub fn case_of_equal_is_case(self: Call(_, operands, _, callee)) -> Advice? {
+pub fn case_of_equal_is_case(self: Call(_, operands, _, callee)) -> LintHit? {
     if (callee != Equal) { return none; };
     let case_reads = operands.count_if(|operand| match (operand.kind) {
         Call(_, arguments, _, CaseOf) => arguments.len() == 1,
@@ -31,11 +30,11 @@ pub fn case_of_equal_is_case(self: Call(_, operands, _, callee)) -> Advice? {
     if (case_reads != 1) { return none; };
     some(comparison_advice())
 }.test({
-    fn at_call(self: Expr<Call>) -> UnfilledHit? {
+    fn at_call(self: Expr<Call>) -> LintHit? {
         let found = case_of_equal_is_case(self.kind)?;
         some(found.at(self.span))
     }
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Call>()$at_call().collect_ok()
     }
     // The file imports what the lint reads: a call is to a builtin by what the imports make of it.
@@ -84,7 +83,7 @@ pub fn case_of_equal_is_case(self: Call(_, operands, _, callee)) -> Advice? {
 
 # What is said of a comparison that only asks which case a value is, with the name of
 # `is_case` left for the caller to fill in.
-fn comparison_advice() -> Advice {
+fn comparison_advice() -> LintHit {
     advice(
         IsCase,
         `this compares a value's case — write "<value>.`,

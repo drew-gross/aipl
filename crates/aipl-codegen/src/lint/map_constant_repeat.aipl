@@ -56,11 +56,11 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for the call `self`, when it is a `map` over a function that ignores its argument.
-pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
+pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
     if (callee != Map) { return none; };
 
     let [receiver, lambda] = arguments else { return none; };
@@ -68,7 +68,7 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> UnfilledHit? 
     if (receiver.is_range() || !constant.is_constant(parameter.synthesized_name())) {
         return none;
     };
-    some(UnfilledHit {
+    some(LintHit {
         named: [
             Named { text: `"`, builtin: Builtin(Map) },
             Named {
@@ -82,7 +82,7 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> UnfilledHit? 
     })
 }.test({
     // The hits for each function's calls.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Call>()$kind$map_constant_repeat().collect_ok()
     }
 

@@ -25,7 +25,7 @@ import { collect_ok, equal as ==, is_empty, logical_and as &&, value_or } from b
 import { Slice, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
-    UnfilledHit,
+    LintHit,
     lint_function_messages,
     lint_function_unfilled,
     lint_message,
@@ -33,7 +33,7 @@ import {
 import { is_len_of, is_zero } from "./slice_bounds.aipl";
 
 # The hit for the slice `self`, when one of its bounds says what leaving it out would.
-pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> UnfilledHit? {
+pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> LintHit? {
     // An absent end already runs to the length; a present one has to say so.
     let reaches_end = end$is_len_of(receiver).value_or(true);
     let starts_at_edge = start$is_zero().value_or(true);
@@ -42,33 +42,33 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> UnfilledHit? 
         // (`receiver[..]` is not a form, so one of the two is there).
         return some(lint_message(
             whole(receiver.source),
-            start.value_or(end.value_or(receiver)).span,
+            span=start.value_or(end.value_or(receiver)).span,
         ));
     };
     let some(lower) = start else { return none; };
     let some(bound) = end else { return none; };
     if (bound.is_len_of(receiver)) {
-        some(lint_message(to_len(receiver.source, lower.source), bound.span))
+        some(lint_message(to_len(receiver.source, lower.source), span=bound.span))
     } else if (lower.is_zero()) {
-        some(lint_message(from_zero(receiver.source, bound.source), lower.span))
+        some(lint_message(from_zero(receiver.source, bound.source), span=lower.span))
     } else {
         none
     }
 }.test({
     // The hits for each function's slices.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Slice>()$kind$redundant_slice_bound().collect_ok()
     }
 
     // The whole receiver, in its three spellings, each pointing at a bound.
     assert(lint_function_unfilled("fn f(s: str) -> str { s[0..] }", flagged)? == [
-        lint_message(whole("s"), 24..25),
+        lint_message(whole("s"), span=24..25),
     ]);
     assert(lint_function_unfilled("fn f(s: str) -> str { s[..s.len()] }", flagged)? == [
-        lint_message(whole("s"), 26..33),
+        lint_message(whole("s"), span=26..33),
     ]);
     assert(lint_function_unfilled("fn f(s: str) -> str { s[0..s.len()] }", flagged)? == [
-        lint_message(whole("s"), 24..25),
+        lint_message(whole("s"), span=24..25),
     ]);
 
     // The receiver is quoted as written, a call's arguments and all.
@@ -83,7 +83,7 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> UnfilledHit? 
 
     // An end that is the receiver's length, with a start worth keeping.
     assert(lint_function_unfilled("fn f(s: str) -> str { s[3..s.len()] }", flagged)? == [
-        lint_message(to_len("s", "3"), 27..34),
+        lint_message(to_len("s", "3"), span=27..34),
     ]);
 
     // A bound that is itself a computation is quoted whole.
@@ -93,7 +93,7 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> UnfilledHit? 
 
     // A written zero start, with an end short of the length.
     assert(lint_function_unfilled("fn f(s: str) -> str { s[0..2] }", flagged)? == [
-        lint_message(from_zero("s", "2"), 24..25),
+        lint_message(from_zero("s", "2"), span=24..25),
     ]);
 
     // A call-shaped end is quoted whole, parentheses included.

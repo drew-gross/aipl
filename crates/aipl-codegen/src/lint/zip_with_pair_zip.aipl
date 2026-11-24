@@ -32,15 +32,15 @@ import {
     synthesized_name,
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `zip_with` whose function only pairs its two arguments.
-pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
+pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> LintHit? {
     if (callee != ZipWith) { return none; };
     let [receiver, other, function] = arguments else { return none; };
     if (!function.only_pairs()) { return none; };
-    some(UnfilledHit {
+    some(LintHit {
         named: [
             Named { text: `"`, builtin: Builtin(ZipWith) },
             Named {
@@ -53,7 +53,7 @@ pub fn zip_with_pair_zip(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     })
 }.test({
     // The hits for each function's calls.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Call>()$kind$zip_with_pair_zip().collect_ok()
     }
 

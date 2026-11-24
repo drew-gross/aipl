@@ -53,7 +53,7 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
                 .descendants_of_kind::<Match>()$kind
                 $result_match()
                 .collect_ok()
-                .map(|m| lint_message(`{m.ok_binder} {m.err_binder}`, 0..0)),
+                .map(|m| lint_message(`{m.ok_binder} {m.err_binder}`, span=0..0)),
         )
     }
     assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, err(e) => 0 } }")? == ["v e"]);
@@ -103,7 +103,7 @@ fn ok_arm_flags(body: str) -> str!ParseFailure {
             .collect_ok()
             .map(|m| lint_message(
                 `{m.ok_body.passes_through(Ok, m.ok_binder)} {m.ok_body.rebuilds(Ok, m.ok_binder)}`,
-                0..0,
+                span=0..0,
             )),
     )?;
     ok(flags.first().value_or(""))

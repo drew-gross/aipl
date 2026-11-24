@@ -28,7 +28,7 @@
             <a class="anchor" href="#item-match_map_value_or">match_map_value_or</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_map_value_or(self: Match) -&#62; UnfilledHit?</code></pre>
+          <pre class="signature"><code>pub fn match_map_value_or(self: Match) -&#62; LintHit?</code></pre>
 
           <div class="doc"><p>The hit for the <code>match</code> <code>self</code>, when it maps an optional's payload and falls back to a default.</p></div>
 
@@ -49,7 +49,7 @@
             <a class="anchor" href="#item-kept_none">kept_none</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn kept_none(receiver: str, binder: str, span: Span) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>fn kept_none(receiver: str, binder: str, span: Span) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>What is said of a <code>match</code> that maps the payload and keeps <code>none</code>, pointing at <code>span</code>.</p></div>
 
@@ -63,7 +63,7 @@
             <a class="anchor" href="#item-with_default">with_default</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn with_default(receiver: str, binder: str, default: str, span: Span) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>fn with_default(receiver: str, binder: str, default: str, span: Span) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>What is said of a <code>match</code> that maps the payload or falls back to <code>default</code>, pointing at <code>span</code>.</p></div>
 

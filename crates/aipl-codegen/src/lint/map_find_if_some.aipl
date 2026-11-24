@@ -17,17 +17,17 @@ import { collect_ok, equal as ==, is_empty, len, map, not_equal as != } from bui
 import { FindIf, FindMap, IsSome, Map } from "../builtin_table.aipl";
 import { Call, Expr, Ident, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { Advice, Named, UnfilledHit, hit_at, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { LintHit, Named, hit_at, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The advice for the call `self`, when it is a `map(..).find_if(is_some)` chain.
-pub fn map_find_if_some(self: Call(_, arguments, _, callee)) -> Advice? {
+pub fn map_find_if_some(self: Call(_, arguments, _, callee)) -> LintHit? {
     if (callee != FindIf) { return none; };
     let [mapped, predicate] = arguments else { return none; };
     let Call(_, inner_arguments, _, Map) = mapped.kind else { return none; };
     let Ident(_, IsSome) = predicate.kind else { return none; };
     if (inner_arguments.len() != 2) { return none; };
-    some(Advice {
+    some(LintHit {
         named: [
             Named { text: `"`, builtin: Builtin(Map) },
             Named { text: `" then "`, builtin: Builtin(FindIf) },
@@ -41,7 +41,7 @@ pub fn map_find_if_some(self: Call(_, arguments, _, callee)) -> Advice? {
     })
 }.test({
     // The hits for each function's calls.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body
             .descendants_of_kind::<Call>()
             .map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some()) })

@@ -38,13 +38,13 @@ import { Callee, CollectOk, Map, Push } from "../builtin_table.aipl";
 import { ArrayLit, IfLet, LetMut, Unit, descendants_of_kind, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_liftable, pipeline_hit, plain_seeded_loop, pushed } from "./accumulation.aipl";
-import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
 
 # The hit for the array the binding `self` seeds, when it seeds it empty and a loop pushes the
 # answers that exist onto it.
-pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
+pub fn push_loop_collect_ok(self: LetMut) -> LintHit? {
     let looped = self.plain_seeded_loop()?;
     let ArrayLit(elements) = looped.seed.kind.as_case::<ArrayLit>()?;
     if (elements.is_nonempty()) { return none; };
@@ -75,7 +75,7 @@ pub fn push_loop_collect_ok(self: LetMut) -> UnfilledHit? {
     ))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<LetMut>()$kind$push_loop_collect_ok().collect_ok()
     }
 

@@ -572,7 +572,6 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  lets make the span argument to lint_message optional, and if not provided, the outer linter assumes it applies to the whole node that is being linted. Also lets renamed UnfilledHit to LintHit, since it's now the primary way to report lint errors (and thus deserves to own the primary name)
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map

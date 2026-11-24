@@ -43,7 +43,7 @@ pub fn is_constant_default(self: Expr) -> bool {
         let hits = lint_function_messages(
             `fn f() \{ {src} }`,
             |function| if (function.body.is_constant_default()) {
-                [lint_message("yes", 0..0)]
+                [lint_message("yes", span=0..0)]
             } else {
                 []
             },

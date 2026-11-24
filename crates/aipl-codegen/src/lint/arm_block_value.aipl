@@ -44,19 +44,19 @@ import {
 } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import {
-    UnfilledHit,
+    LintHit,
     lint_function_messages,
     lint_function_unfilled,
     lint_message,
 } from "./lint_hit.aipl";
 
 # The hits for the arms of the match `self` whose block holds nothing but its value.
-pub fn arm_block_value(self: Expr<Match>) -> UnfilledHit[] {
+pub fn arm_block_value(self: Expr<Match>) -> LintHit[] {
     let Match(_, arms) = self.kind;
     arms$block_hit(self).collect_ok()
 }.test({
     // The hits for each function's matches.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Match>()$arm_block_value().join()
     }
     assert(lint_function_messages(
@@ -173,7 +173,7 @@ pub fn arm_block_value(self: Expr<Match>) -> UnfilledHit[] {
 
 # The hit for `self`, an arm of the match `within`, when its body is written as a block that
 # holds nothing but the value.
-fn block_hit(self: MatchArm, within: Expr) -> UnfilledHit? {
+fn block_hit(self: MatchArm, within: Expr) -> LintHit? {
     // An alternation `A | B => body` is one arm per pattern here, sharing the body; only the
     // last pattern is followed by the `=>`, so the shared block is reported once.
     let source = within.source;
@@ -196,7 +196,7 @@ fn block_hit(self: MatchArm, within: Expr) -> UnfilledHit? {
     };
     let close = source.blank_end(self.body.span.end - base);
     if (!source[close..].starts_with("}")) { return none; };
-    some(lint_message(message(), base + close..base + close + 1))
+    some(lint_message(message(), span=base + close..base + close + 1))
 }
 
 # The index in `self` of the first character at or after `start` that is not blank.

@@ -46,9 +46,8 @@ import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
 import {
-    Advice,
+    LintHit,
     Named,
-    UnfilledHit,
     hit_at,
     lint_in_unfilled,
     lint_in_unfilled_messages,
@@ -101,7 +100,7 @@ pub fn stepped_operators(self: Item[]) -> Callee[] {
 }
 
 # The hit for `self`, when it is a `set` of a place to itself plus or minus one.
-pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
+pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
     let name = target.place_text()?;
 
     // An operator use is a call of the builtin, whatever the file calls it: `+` and `+=` want
@@ -121,7 +120,7 @@ pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
     } else {
         (`subtracting 1 from "{name}"`, "decrement")
     };
-    some(Advice {
+    some(LintHit {
         named: [
             Named { text: `{what} — use the {form} form "set {name}`, builtin: Builtin(builtin) },
         ],
@@ -129,7 +128,7 @@ pub fn step_by_one(self: Assign(target, value, _)) -> Advice? {
     })
 }.test({
     // The hits for each function's `set`s.
-    fn flagged(Function { body }, items: Item[]) -> UnfilledHit[] {
+    fn flagged(Function { body }, items: Item[]) -> LintHit[] {
         body
             .descendants_of_kind::<Assign>()
             .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) })

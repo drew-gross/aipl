@@ -71,12 +71,12 @@ import { Assign, Call, Expr, SetLit, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Set, Unordered, type_text } from "../ty.aipl";
 import { SeededLoop, is_liftable, pipeline_hit, seeded_loops } from "./accumulation.aipl";
-import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { lone_statement } from "./loop_shape.aipl";
 import { to_set, union, union_all } from sets;
 
 # A hit for each set the program seeds empty and grows with a loop of `union`s.
-pub fn union_loop_union_all(Function { body }) -> UnfilledHit[] {
+pub fn union_loop_union_all(Function { body }) -> LintHit[] {
     body.seeded_loops()$unioned().collect_ok()
 }.test({
     // A set at a time, mapped or as it is, in either operand order.
@@ -457,7 +457,7 @@ pub fn union_loop_union_all(Function { body }) -> UnfilledHit[] {
 })
 
 # `self` as the hit for a set grown by unioning into it, when it is one.
-fn unioned(self: SeededLoop) -> UnfilledHit? {
+fn unioned(self: SeededLoop) -> LintHit? {
     let SetLit(elements, order) = self.seed.kind.as_case::<SetLit>()?;
     if (elements.is_nonempty() || order != Unordered) { return none; };
     let ordered = self.annotation.is_some_and(|annotation| match (annotation) {

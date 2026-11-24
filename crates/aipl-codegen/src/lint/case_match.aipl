@@ -154,7 +154,7 @@ fn tails(src: str) -> str[]!ParseFailure {
             .tail_matches()
             .map(|e| lint_message(
                 if (e.kind.is_case::<Match>()) { "Match" } else { "IfLet" },
-                0..0,
+                span=0..0,
             )),
     )
 }

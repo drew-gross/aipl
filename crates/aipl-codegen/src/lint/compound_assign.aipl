@@ -39,9 +39,8 @@ import { Assign, Call, Expr, Num, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Function, Item } from "../item.aipl";
 import {
-    Advice,
+    LintHit,
     Named,
-    UnfilledHit,
     hit_at,
     lint_in_unfilled,
     lint_in_unfilled_messages,
@@ -69,7 +68,7 @@ struct Compound { builtin: Callee, commutative: bool }
 
 # The hit for `self`, when it is a `set` of a place to itself combined with something. `stepped` are
 # the operators, by the builtin they are, whose `± 1` the step lint has advice for.
-pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Advice? {
+pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> LintHit? {
     let name = target.place_text()?;
     // An operator use is a call of the builtin, whatever the file calls it.
     let Call(_, [left, right], _, callee) = value.kind else { return none; };
@@ -86,7 +85,7 @@ pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Adv
     };
     // `set x = x ± 1;` is the step lint's when that lint can fire here.
     if (operand.kind == Num(1) && stepped.contains(callee)) { return none; };
-    some(Advice {
+    some(LintHit {
         named: [
             Named {
                 text: `"{name}" accumulates onto itself — use the compound form "set {name} `,
@@ -97,7 +96,7 @@ pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Adv
     })
 }.test({
     // The hits for each function's `set`s.
-    fn flagged(Function { body }, items: Item[]) -> UnfilledHit[] {
+    fn flagged(Function { body }, items: Item[]) -> LintHit[] {
         let stepped = items.stepped_operators();
         body
             .descendants_of_kind::<Assign>()

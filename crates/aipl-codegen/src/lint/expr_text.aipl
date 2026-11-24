@@ -77,7 +77,7 @@ pub fn expr_text(self: Expr) -> str? {
             `fn f() \{ g({src}) }`,
             |function| {
                 let Call(_, [argument], _, _) = function.body.kind else { return []; };
-                argument.expr_text().map(|written| [lint_message(written, 0..0)]).value_or([])
+                argument.expr_text().map(|written| [lint_message(written, span=0..0)]).value_or([])
             },
         )
     }

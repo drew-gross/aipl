@@ -35,10 +35,10 @@ import { IsCase } from "../builtin_table.aipl";
 import { Bool, Match, MatchArm, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor, is_binder_name } from "../pat.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 
 # The hit for the `match` `self`, when it only asks which case a value is.
-pub fn match_bool_is_case(self: Match(_, arms)) -> UnfilledHit? {
+pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
     if (!arms.all(|arm| arm.body.kind.is_case::<Bool>())) { return none; };
     let [MatchArm { pattern, span }] = arms.filter(|arm| arm.body.kind == Bool(true)) else {
         return none;
@@ -47,7 +47,7 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> UnfilledHit? {
     if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) { return none; };
     some(advice(case, span))
 }.test({
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Match>()$kind$match_bool_is_case().collect_ok()
     }
     // One case is `true`, the rest `false`.
@@ -235,7 +235,7 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> UnfilledHit? {
 
 # What is said of a match that only asks whether a value is `case`, with the name
 # of `is_case` left for the caller to fill in.
-fn advice(case: str, span: Span) -> UnfilledHit {
+fn advice(case: str, span: Span) -> LintHit {
     unfilled(
         IsCase,
         `this match only asks whether the value is {case} — write "<value>.`,

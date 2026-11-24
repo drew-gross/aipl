@@ -36,7 +36,7 @@ import { interp_to_str } from "./interp_to_str.aipl";
 import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
-import { LintHit, UnfilledHit, filled, functions, hit_at, unfilled_hits } from "./lint_hit.aipl";
+import { FilledHit, LintHit, filled, functions, hit_at, unfilled_hits } from "./lint_hit.aipl";
 import { map_constant_repeat } from "./map_constant_repeat.aipl";
 import { map_find_if_some } from "./map_find_if_some.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
@@ -74,7 +74,7 @@ import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 # A lint is either a function of the whole program or of one function. The program's functions
 # are listed once, and each function lint is run over them: every body that is code. One that
 # also needs the file's imports takes the program's `items` beside the function.
-pub fn lint(program: ResolvedProgram) -> LintHit[] {
+pub fn lint(program: ResolvedProgram) -> FilledHit[] {
     let items = program.items;
     let functions = program.functions();
     [
@@ -112,39 +112,46 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
 })
 
 # The lints over the `match`es of `function` that are not about what they say.
-fn match_hits(Function { body }) -> UnfilledHit[] {
+fn match_hits(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<Match>()$arm_block_value().join()
 }
 
 # The lints over the set literals of `function`, which are found once for all of them.
-fn set_lints(Function { body }) -> UnfilledHit[] {
+fn set_lints(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<SetLit>()$char_set_literal().collect_ok()
 }
 
 # The lints over the template interpolations of `function`, which are found once for all of them.
-fn interp_lints(Function { body }) -> UnfilledHit[] {
-    let interpolations = body.descendants_of_kind::<Interpolation>()$kind;
-    [..interpolations$interp_to_str(), ..interpolations$interp_literal()].collect_ok()
+fn interp_lints(Function { body }) -> LintHit[] {
+    let interpolations = body.descendants_of_kind::<Interpolation>();
+    [
+        ..interpolations.map(|node: Expr<Interpolation>| {
+            node.hit_at(node.kind.interp_to_str())
+        }),
+        ..interpolations.map(|node: Expr<Interpolation>| {
+            node.hit_at(node.kind.interp_literal())
+        }),
+    ].collect_ok()
 }
 
 # The lints over the slices of `function`, which are found once for all of them.
-fn slice_lints(Function { body }) -> UnfilledHit[] {
+fn slice_lints(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<Slice>()$kind$redundant_slice_bound().collect_ok()
 }
 
 # The lints over the struct literals of `function`, which are found once for all of them.
-fn construct_lints(Function { body }) -> UnfilledHit[] {
+fn construct_lints(Function { body }) -> LintHit[] {
     let constructs = body.descendants_of_kind::<Construct>();
     constructs$kind$field_init_shorthand().join()
 }
 
 # The lints over the calls of `function`, which are found once for all of them.
-fn call_lints(Function { body }) -> UnfilledHit[] {
+fn call_lints(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<Call>()$kind$value_or_compare().collect_ok()
 }
 
 # The lints over the calls of `function` that advise a builtin.
-fn call_advice(Function { body }) -> UnfilledHit[] {
+fn call_advice(Function { body }) -> LintHit[] {
     let calls = body.descendants_of_kind::<Call>();
     [
         ..calls$kind$map_constant_repeat(),
@@ -159,7 +166,7 @@ fn call_advice(Function { body }) -> UnfilledHit[] {
 
 # The lints over the `match`es of `function`, which are found once for all of them. One that is about
 # the function it is in takes it as well.
-fn match_lints(function: Function) -> UnfilledHit[] {
+fn match_lints(function: Function) -> LintHit[] {
     let matches = function.body.descendants_of_kind::<Match>()$kind;
     [
         ..matches$match_bool_is_case(),
@@ -175,18 +182,18 @@ fn match_lints(function: Function) -> UnfilledHit[] {
 
 # The lints over the `mut` bindings of `function`, which are found once for all of them: each is
 # about an array or set seeded and then filled by the loop that follows.
-fn let_mut_lints(Function { body }) -> UnfilledHit[] {
+fn let_mut_lints(Function { body }) -> LintHit[] {
     let seeds = body.descendants_of_kind::<LetMut>()$kind;
     [..seeds$push_loop_pipeline(), ..seeds$push_loop_collect_ok()].collect_ok()
 }
 
 # The lints over the assignments of `function`, which are found once for all of them.
-fn assign_lints(Function { body }) -> UnfilledHit[] {
+fn assign_lints(Function { body }) -> LintHit[] {
     body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
 }
 
 # The lints over the assignments of `function` that advise a builtin or an operator.
-fn assign_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
+fn assign_advice(Function { body }, items: Item[]) -> LintHit[] {
     let assigns = body.descendants_of_kind::<Assign>();
     let stepped = items.stepped_operators();
     [

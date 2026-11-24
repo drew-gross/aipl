@@ -47,13 +47,13 @@ import { Assign, SetLit, Spread, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Unordered } from "../ty.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 import { Builtin } from "./spelling.aipl";
 import { insert } from sets;
 
 # The hit for the `set` `self`, when it sets a place to a set literal that starts by spreading it.
-pub fn set_spread_insert(self: Assign(target, value, _)) -> UnfilledHit? {
+pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
     let SetLit(elements, order) = value.kind.as_case::<SetLit>()?;
     // `insert` writes back an unordered set, so an ordered literal is left as it is.
     if (!order.is_case::<Unordered>()) { return none; };
@@ -81,10 +81,10 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> UnfilledHit? {
         set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(Insert) });
         set text = `({element.quote("<element>")});`;
     }
-    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
+    some(LintHit { named, tail: `{text}"`, span: spread.span })
 }.test({
     // The hits for each function's `set`s.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Assign>()$kind$set_spread_insert().collect_ok()
     }
 

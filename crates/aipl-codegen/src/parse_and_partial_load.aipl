@@ -32,14 +32,14 @@ import {
 import { hoist_test_fns } from "./hoist_test_fns.aipl";
 import { Item, LoweredFn, Program, show_program } from "./item.aipl";
 import { lint } from "./lint/lint.aipl";
-import { LintHit } from "./lint/lint_hit.aipl";
+import { FilledHit } from "./lint/lint_hit.aipl";
 import { squelch } from "./lint/squelch.aipl";
 import { promote_type_vars } from "./promote_type_vars.aipl";
 import { resolve_callees } from "./resolve_callees.aipl";
 
 # A file as far as the loader has been ported: the program, and the lint errors it
 # has: the hits no `#[allow]` squelches, and the markers that squelch nothing.
-struct PartialLoad { program: Program, lints: LintHit[], type_uses: Span[] = [] }
+struct PartialLoad { program: Program, lints: FilledHit[], type_uses: Span[] = [] }
 
 # `aipl_parse_surface_file`, then the steps of loading that happen per file and need
 # nothing from any other.

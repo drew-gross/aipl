@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-lint">lint</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint(program: ResolvedProgram) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn lint(program: ResolvedProgram) -&#62; FilledHit[]</code></pre>
 
           <div class="doc"><p>Every hit the ported lints find in <code>program</code>.</p><p>A lint is either a function of the whole program or of one function. The program's functions are listed once, and each function lint is run over them: every body that is code. One that also needs the file's imports takes the program's <code>items</code> beside the function.</p></div>
 
@@ -62,7 +62,7 @@
             <a class="anchor" href="#item-match_hits">match_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_hits(__spat$5862: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn match_hits(__spat$5862: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the <code>match</code>es of <code>function</code> that are not about what they say.</p></div>
 
@@ -76,7 +76,7 @@
             <a class="anchor" href="#item-set_lints">set_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn set_lints(__spat$6068: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn set_lints(__spat$6064: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the set literals of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -90,7 +90,7 @@
             <a class="anchor" href="#item-interp_lints">interp_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn interp_lints(__spat$6296: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn interp_lints(__spat$6288: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the template interpolations of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-slice_lints">slice_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn slice_lints(__spat$6595: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn slice_lints(__spat$6761: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the slices of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -118,7 +118,7 @@
             <a class="anchor" href="#item-construct_lints">construct_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn construct_lints(__spat$6827: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn construct_lints(__spat$6989: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the struct literals of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -132,7 +132,7 @@
             <a class="anchor" href="#item-call_lints">call_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn call_lints(__spat$7074: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn call_lints(__spat$7232: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the calls of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -146,7 +146,7 @@
             <a class="anchor" href="#item-call_advice">call_advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn call_advice(__spat$7270: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn call_advice(__spat$7424: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the calls of <code>function</code> that advise a builtin.</p></div>
 
@@ -160,7 +160,7 @@
             <a class="anchor" href="#item-match_lints">match_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_lints(function: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn match_lints(function: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the <code>match</code>es of <code>function</code>, which are found once for all of them. One that is about the function it is in takes it as well.</p></div>
 
@@ -174,7 +174,7 @@
             <a class="anchor" href="#item-let_mut_lints">let_mut_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn let_mut_lints(__spat$8657: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn let_mut_lints(__spat$8803: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the <code>mut</code> bindings of <code>function</code>, which are found once for all of them: each is about an array or set seeded and then filled by the loop that follows.</p></div>
 
@@ -188,7 +188,7 @@
             <a class="anchor" href="#item-assign_lints">assign_lints</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn assign_lints(__spat$8939: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn assign_lints(__spat$9081: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the assignments of <code>function</code>, which are found once for all of them.</p></div>
 
@@ -202,7 +202,7 @@
             <a class="anchor" href="#item-assign_advice">assign_advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn assign_advice(__spat$9160: Function, items: Item[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn assign_advice(__spat$9298: Function, items: Item[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The lints over the assignments of <code>function</code> that advise a builtin or an operator.</p></div>
 

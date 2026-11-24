@@ -5,16 +5,16 @@
 
 import { collect_arms, equal as ==, push } from builtins;
 import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
-import { UnfilledHit, lint_hits, lint_message, shown } from "./lint_hit.aipl";
+import { LintHit, lint_hits, lint_message, shown } from "./lint_hit.aipl";
 import { has, insert } from sets;
 
 # A hit for each import of a source an earlier import already took names from,
 # in the order the imports are written.
-pub fn duplicate_import_source(Program { items }) -> UnfilledHit[] {
+pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     mut seen: #{ImportSource} = #{};
-    mut hits: UnfilledHit[] = [];
+    mut hits: LintHit[] = [];
     for (let Import(ImportDecl { source, source_span }) : items.collect_arms::<Import>()) {
-        if (seen.has(source)) { set hits.push(lint_message(source.message(), source_span)); };
+        if (seen.has(source)) { set hits.push(lint_message(source.message(), span=source_span)); };
         set seen.insert(source);
     }
     hits

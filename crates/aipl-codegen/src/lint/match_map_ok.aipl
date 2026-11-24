@@ -33,13 +33,13 @@ import {
 import { Err, MapOk, Ok } from "../builtin_table.aipl";
 import { Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 import { ResultMatch, passes_through, rebuilds, result_match } from "./result_match.aipl";
 
 # A hit for each `match` in the function that rebuilds a result's value side and passes
 # its error through.
-pub fn match_map_ok(self: Match) -> UnfilledHit? {
+pub fn match_map_ok(self: Match) -> LintHit? {
     let ResultMatch { scrutinee, ok_binder, ok_body, err_binder, err_body } = self.result_match()?;
     if (!err_body.passes_through(Err, err_binder) || !ok_body.rebuilds(Ok, ok_binder)) {
         return none;
@@ -51,7 +51,7 @@ pub fn match_map_ok(self: Match) -> UnfilledHit? {
         err_body.span,
     ))
 }.test({
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Match>()$kind$match_map_ok().collect_ok()
     }
     // The value side is rebuilt, in either arm order; the hit is the pass-through arm.

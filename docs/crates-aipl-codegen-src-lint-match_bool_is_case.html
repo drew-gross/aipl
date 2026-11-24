@@ -31,7 +31,7 @@
             <a class="anchor" href="#item-match_bool_is_case">match_bool_is_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn match_bool_is_case(self: Match) -&#62; UnfilledHit?</code></pre>
+          <pre class="signature"><code>pub fn match_bool_is_case(self: Match) -&#62; LintHit?</code></pre>
 
           <div class="doc"><p>The hit for the <code>match</code> <code>self</code>, when it only asks which case a value is.</p></div>
 
@@ -52,7 +52,7 @@
             <a class="anchor" href="#item-advice">advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn advice(case: str, span: Span) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>fn advice(case: str, span: Span) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>What is said of a match that only asks whether a value is <code>case</code>, with the name of <code>is_case</code> left for the caller to fill in.</p></div>
 

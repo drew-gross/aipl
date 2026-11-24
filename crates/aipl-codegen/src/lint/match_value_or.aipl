@@ -36,17 +36,17 @@ import { ValueOr } from "../builtin_table.aipl";
 import { Ident, Match, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { is_constant_default } from "./constant_default.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { OptionMatch, default_text, option_match, receiver_text } from "./option_match.aipl";
 
 # The hit for the `match` `self`, when it only unwraps an optional or defaults.
-pub fn match_value_or(self: Match) -> UnfilledHit? {
+pub fn match_value_or(self: Match) -> LintHit? {
     let OptionMatch { scrutinee, binder, some_body, none_body } = self.option_match()?;
     let Ident(payload, _) = some_body.kind.as_case::<Ident>()?;
     if (payload != binder || !none_body.is_constant_default()) { return none; };
     some(advice(scrutinee.receiver_text(), none_body.default_text(), some_body.span))
 }.test({
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Match>()$kind$match_value_or().collect_ok()
     }
     // The identity arm is what is pointed at, in either arm order.
@@ -271,7 +271,7 @@ pub fn match_value_or(self: Match) -> UnfilledHit? {
 
 # What is said of a `match` that unwraps the optional `receiver` or gives `default`,
 # pointing at `span`.
-fn advice(receiver: str, default: str, span: Span) -> UnfilledHit {
+fn advice(receiver: str, default: str, span: Span) -> LintHit {
     unfilled(
         ValueOr,
         `this \`match\` hands back the optional's payload or a default — write "{receiver}.`,

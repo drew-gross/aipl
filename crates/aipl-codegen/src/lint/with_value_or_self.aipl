@@ -29,16 +29,16 @@ import {
 import { TrySet, ValueOr, With } from "../builtin_table.aipl";
 import { Call, Expr, Field, Ident, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for `self`, when it is a `with(..)` the call falls back from to the array it replaces in.
-pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
+pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> LintHit? {
     if (callee != ValueOr) { return none; };
     let [replaced, fallback] = arguments else { return none; };
     let Call(_, [receiver, _, _], _, With) = replaced.kind else { return none; };
     if (!receiver.same_place(fallback)) { return none; };
-    some(UnfilledHit {
+    some(LintHit {
         named: [
             Named { text: "this `", builtin: Builtin(ValueOr) },
             Named {
@@ -51,7 +51,7 @@ pub fn with_value_or_self(self: Call(_, arguments, _, callee)) -> UnfilledHit? {
     })
 }.test({
     // The hits for each function's calls.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Call>()$kind$with_value_or_self().collect_ok()
     }
 

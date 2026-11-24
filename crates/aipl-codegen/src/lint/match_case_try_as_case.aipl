@@ -24,12 +24,12 @@ import { AsCase, Some } from "../builtin_table.aipl";
 import { Call, Match, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { case_pattern, is_give_up, statement_head, tail_matches } from "./case_match.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 
 # A hit for each `match` that ends the function and gives up with `none` unless a value
 # is one case.
-pub fn match_case_try_as_case(Function { body }) -> UnfilledHit[] {
+pub fn match_case_try_as_case(Function { body }) -> LintHit[] {
     body
         .tail_matches()
         .map(|tail| {

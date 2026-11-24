@@ -42,13 +42,13 @@ import {
 import { FindIndex, Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
 import { passes_through } from "./result_match.aipl";
 
 # A hit for each indexed loop in the function that returns the position of the first
 # element passing a test.
-pub fn return_loop_find_index(Function { body }) -> UnfilledHit[] {
+pub fn return_loop_find_index(Function { body }) -> LintHit[] {
     body
         .search_loops()
         .map(|found| {

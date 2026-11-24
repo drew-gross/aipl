@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-identity_lambda">identity_lambda</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn identity_lambda(function: Function) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn identity_lambda(function: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each lambda in the program that only forwards its arguments.</p></div>
 
@@ -48,7 +48,7 @@
             <a class="anchor" href="#item-forwarded">forwarded</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn forwarded(self: Expr&#60;Lambda&#62;, advised: Span[]) -&#62; UnfilledHit?</code></pre>
+          <pre class="signature"><code>fn forwarded(self: Expr&#60;Lambda&#62;, advised: Span[]) -&#62; LintHit?</code></pre>
 
           <div class="doc"><p>A hit for <code>self</code> when it is a lambda that only forwards its argument(s) to one call, outside a <code>map</code> that <code>use_field_projection</code> handles (<code>advised</code> is the lambdas it covered). An operator is left alone deliberately: the language does accept <code>+</code> as a value, but <code>xs.fold(0, +)</code> is a different reading from <code>|acc, x| acc + x</code> rather than an obviously better one, and this lint's job is the case where the lambda adds <em>nothing</em> — <code>|x| to_str(x)</code> against <code>to_str</code>.</p></div>
 

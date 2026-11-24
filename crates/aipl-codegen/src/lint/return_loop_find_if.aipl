@@ -44,7 +44,7 @@ import {
 import { FindIf, Some } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import {
-    UnfilledHit,
+    LintHit,
     lint_function_unfilled,
     lint_function_unfilled_messages,
     shown,
@@ -54,7 +54,7 @@ import { answers_none, is_lambda_safe, iterable_text, search_loops } from "./loo
 import { passes_through } from "./result_match.aipl";
 
 # A hit for each loop in the function that returns the first element passing a test.
-pub fn return_loop_find_if(Function { body }) -> UnfilledHit[] {
+pub fn return_loop_find_if(Function { body }) -> LintHit[] {
     body
         .search_loops()
         .map(|found| {

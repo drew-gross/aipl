@@ -49,12 +49,12 @@ import { Extend, Push } from "../builtin_table.aipl";
 import { ArrayLit, Assign, Spread, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { Named, UnfilledHit, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
+import { LintHit, Named, lint_function_unfilled, quote, shown } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for the `set` `self`, when it sets a place to an array literal that starts by spreading it.
-pub fn set_spread_push(self: Assign(target, value, _)) -> UnfilledHit? {
+pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
     let ArrayLit(elements) = value.kind.as_case::<ArrayLit>()?;
     let root = target.root_name()?;
     let spread = elements.first()?;
@@ -82,10 +82,10 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> UnfilledHit? {
         set named.push(Named { text: `{text}{separator}set {place}.`, builtin: Builtin(builtin) });
         set text = `({argument});`;
     }
-    some(UnfilledHit { named, tail: `{text}"`, span: spread.span })
+    some(LintHit { named, tail: `{text}"`, span: spread.span })
 }.test({
     // The hits for each function's `set`s.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Assign>()$kind$set_spread_push().collect_ok()
     }
 

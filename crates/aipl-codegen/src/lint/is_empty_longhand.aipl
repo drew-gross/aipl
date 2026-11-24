@@ -37,19 +37,12 @@ import { Callee, Equal, IsEmpty, IsNonempty, Len, LogicalNot } from "../builtin_
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { operand_text } from "./expr_text.aipl";
-import {
-    Advice,
-    UnfilledHit,
-    advice,
-    hit_at,
-    lint_function_unfilled,
-    shown,
-} from "./lint_hit.aipl";
+import { LintHit, advice, hit_at, lint_function_unfilled, shown } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
 # The advice for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
 # equality.
-pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
+pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     let receiver = if (args.len() == 1) {
         args.negated_nonempty(callee)?
     } else {
@@ -67,7 +60,7 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> Advice? {
     )
 }.test({
     // The hits for each function's calls.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body
             .descendants_of_kind::<Call>()
             .map(|call: Expr<Call>| { call.hit_at(call.kind.is_empty_longhand()) })

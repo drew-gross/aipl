@@ -11,8 +11,9 @@ registered in `lint/lint.aipl`, listed in `DOGFOOD_SOURCE_FILES`
 function, the `.test` and `.benchmark` blocks included) and before desugaring (so
 the source forms are still there), returning hits. Most lints are a function of one
 `Function`, run over the program's functions (`lint()` lists them once) by `unfilled_hits`; every lint
-returns `UnfilledHit`s, and a hit that names no builtin is `lint_message(message, span)`, which is
-an `UnfilledHit` with nothing named, so `lint()` fills them all in at the end; one that needs
+returns `LintHit`s, and a hit that names no builtin is `lint_message(message)` (or
+`lint_message(message, span=..)`), which is a `LintHit` with nothing named; a hit with no span of its
+own points at the node the lint was run over (`hit_at`), or at the function's name, so `lint()` fills them all in at the end; one that needs
 the file's imports (to find a call by the name it was written under) takes the program's `items`
 beside the function, as `push_loop_pipeline` does. A lint of the whole program
 (`unused_imports`) takes the `Program`. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
@@ -24,7 +25,7 @@ CLAUDE.md and in the add-builtin skill's step 4.
 
 DRY is critical here. Before writing a helper, search for it:
 
-- `lint/lint_hit.aipl` — `lint_message`, `UnfilledHit`, `functions`,
+- `lint/lint_hit.aipl` — `lint_message`, `LintHit`, `functions`,
   `unfilled_hits`, the `lint_*` test drivers (`lint_function_messages` and `lint_function_unfilled`;
   `lint_in_unfilled` and `lint_in_unfilled_messages` for a lint that takes `items`).
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl` (reading a bound), `lint/option_match.aipl`,
@@ -40,13 +41,13 @@ new shared one) and have both lints import it** — do not copy it, and do not
 leave it private to one lint. When you extract, make it `pub`, keep its `.test`
 blocks with it, and add any new file to `DOGFOOD_SOURCE_FILES`.
 
-## 2. Naming a builtin in advice: use `UnfilledHit`
+## 2. Naming a builtin in advice: use `LintHit`
 
 A "don't reimplement `foo()`" lint tells the author to call a function. The
 lint cannot know how the linted file spells it (alias, or not imported at all),
 and it must not try: it says **which** builtin by its tag (`Len`, `IsCase`, a
 `Callee` from `builtin_table.aipl`), never how it is written. Return
-`UnfilledHit[]` — `unfilled(IsCase, before, after, span)`; a message that names
+`LintHit[]` — `unfilled(IsCase, before, after, span)`; a message that names
 several builtins is a `Named { text, builtin: Builtin(Tag) }` per builtin — and
 let the caller hydrate it with `filled` / `unfilled_hits`. `spelling.aipl` then
 writes each builtin the way the file can take it (the name it already imports it
@@ -90,7 +91,7 @@ string and checks the messages, so the flagged shape, the near-miss and the mess
 code that produces them and run in-process with the file's other tests. A lint over one kind of expression (a function of one node, run by a helper in `lint.aipl`) is tested with `lint_str(src)` from `lint.aipl`, which runs every lint and returns the messages, so its snippets must be ones no other lint objects to. The three kinds:
 
 - **Flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [message(..)])`, what the lint says of the shape.
-  For a lint that returns `UnfilledHit`s, the driver is `lint_function_unfilled(src, lint)`, which
+  For a lint that returns `LintHit`s, the driver is `lint_function_unfilled(src, lint)`, which
   resolves every builtin as if imported and returns the hits as the lint made them; `.shown()`
   writes each builtin as its own name with no import named. A lint's tests are about the shape it
   finds, never about the file's imports (aliasing and the import hint are the framework's, tested in

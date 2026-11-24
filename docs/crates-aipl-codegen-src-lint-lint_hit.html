@@ -22,12 +22,12 @@
         <h2 id="public">Public</h2>
 
 
-        <section class="item" id="item-LintHit">
+        <section class="item" id="item-FilledHit">
           <h3>
-            <a class="anchor" href="#item-LintHit">LintHit</a>
+            <a class="anchor" href="#item-FilledHit">FilledHit</a>
             <span class="kind kind-struct">struct</span>
           </h3>
-          <pre class="signature"><code>struct LintHit</code></pre>
+          <pre class="signature"><code>struct FilledHit</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -41,7 +41,7 @@
             <a class="anchor" href="#item-hit">hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn hit(message: str, span: Span) -&#62; LintHit</code></pre>
+          <pre class="signature"><code>pub fn hit(message: str, span: Span) -&#62; FilledHit</code></pre>
 
           <div class="doc"><p>A hit at <code>span</code>.</p></div>
 
@@ -50,28 +50,14 @@
 
 
 
-        <section class="item" id="item-UnfilledHit">
+        <section class="item" id="item-LintHit">
           <h3>
-            <a class="anchor" href="#item-UnfilledHit">UnfilledHit</a>
+            <a class="anchor" href="#item-LintHit">LintHit</a>
             <span class="kind kind-struct">struct</span>
           </h3>
-          <pre class="signature"><code>struct UnfilledHit</code></pre>
+          <pre class="signature"><code>struct LintHit</code></pre>
 
-          <div class="doc"><p>A hit whose message names builtins the way the file that was linted spells them. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in parts — each stretch of text followed by the builtin its rewrite uses, then a closing stretch — and the framework writes each in the way the file can take (see <code>spelling.aipl</code>), adding the import the file lacks.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-Advice">
-          <h3>
-            <a class="anchor" href="#item-Advice">Advice</a>
-            <span class="kind kind-struct">struct</span>
-          </h3>
-          <pre class="signature"><code>struct Advice</code></pre>
-
-          <div class="doc"><p>An [<code>UnfilledHit</code>] with nowhere to point yet: what a lint over one node says of it, the node being the caller's to name. [<code>advised</code>] puts each at the node it is for.</p></div>
+          <div class="doc"><p>A hit whose message names builtins the way the file that was linted spells them. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in parts — each stretch of text followed by the builtin its rewrite uses, then a closing stretch — and the framework writes each in the way the file can take (see <code>spelling.aipl</code>), adding the import the file lacks.</p><p>The <code>span</code> is where the hit points. A lint that says nothing about it leaves it empty (an empty span is no location), and the framework that ran the lint over a node points the hit at the whole node ([<code>hit_at</code>]), or over a function at the function's name ([<code>unfilled_hits</code>]).</p></div>
 
 
         </section>
@@ -97,7 +83,7 @@
             <a class="anchor" href="#item-unfilled">unfilled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unfilled(builtin: Callee, before: str, after: str, span: Span) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>pub fn unfilled(builtin: Callee, before: str, after: str, span: Span) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>An unfilled hit at <code>span</code> for a message <code>before</code> + the builtin's spelling + <code>after</code>.</p></div>
 
@@ -111,9 +97,9 @@
             <a class="anchor" href="#item-lint_message">lint_message</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_message(message: str, span: Span) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>pub fn lint_message(message: str, span: Span = 0..0) -&#62; LintHit</code></pre>
 
-          <div class="doc"><p>A hit at <code>span</code> that names no builtin: the whole of its message is the <code>tail</code>, so filling it in changes nothing.</p></div>
+          <div class="doc"><p>A hit that names no builtin: the whole of its message is the <code>tail</code>, so filling it in changes nothing. It points at <code>span</code>, or where the lint was run when there is none.</p></div>
 
 
         </section>
@@ -125,7 +111,7 @@
             <a class="anchor" href="#item-advice">advice</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn advice(builtin: Callee, before: str, after: str) -&#62; Advice</code></pre>
+          <pre class="signature"><code>pub fn advice(builtin: Callee, before: str, after: str) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>An advice for a message <code>before</code> + the builtin's spelling + <code>after</code>.</p></div>
 
@@ -139,9 +125,9 @@
             <a class="anchor" href="#item-hit_at">hit_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn hit_at(self: Expr, advice: Advice?) -&#62; UnfilledHit?</code></pre>
+          <pre class="signature"><code>pub fn hit_at(self: Expr, hit: LintHit?) -&#62; LintHit?</code></pre>
 
-          <div class="doc"><p><code>advice</code>, when there is one, as the hit at the node <code>self</code>: a lint of one node says what is wrong with it, and the node's own span is where that is pointed.</p></div>
+          <div class="doc"><p><code>hit</code>, when there is one, as a hit at the node <code>self</code>: a lint of one node says what is wrong with it, and unless it points somewhere in particular the node's own span is where that is pointed.</p></div>
 
 
         </section>
@@ -153,9 +139,9 @@
             <a class="anchor" href="#item-at">at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn at(self: Advice, span: Span) -&#62; UnfilledHit</code></pre>
+          <pre class="signature"><code>pub fn at(self: LintHit, span: Span) -&#62; LintHit</code></pre>
 
-          <div class="doc"><p>The hit that <code>self</code> is when it is about the node whose span is <code>span</code>.</p></div>
+          <div class="doc"><p>The hit that <code>self</code> is when it is about what spans <code>span</code>: where it points already, or there.</p></div>
 
 
         </section>
@@ -167,7 +153,7 @@
             <a class="anchor" href="#item-filled_with">filled_with</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn filled_with(self: UnfilledHit, spell: (Need) -&#62; Spelling?) -&#62; LintHit?</code></pre>
+          <pre class="signature"><code>pub fn filled_with(self: LintHit, spell: (Need) -&#62; Spelling?) -&#62; FilledHit?</code></pre>
 
           <div class="doc"><p><code>self</code> as the hit it is for a file that writes each thing it names as <code>spell</code> says, or <code>none</code> when some of them cannot be written: the advice is dropped.</p></div>
 
@@ -181,7 +167,7 @@
             <a class="anchor" href="#item-filled_assuming">filled_assuming</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn filled_assuming(self: UnfilledHit, spelled: str?) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn filled_assuming(self: LintHit, spelled: str?) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> with each thing it names written as <code>spelled</code>, the spelling a file that imports them has (<code>none</code>: it imports none, and the advice names the import). For a lint's own test of the message it gives.</p></div>
 
@@ -195,7 +181,7 @@
             <a class="anchor" href="#item-filled">filled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn filled(self: UnfilledHit[], items: Item[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn filled(self: LintHit[], items: Item[]) -&#62; FilledHit[]</code></pre>
 
           <div class="doc"><p><code>self</code> filled in for the file whose items are <code>items</code>.</p></div>
 
@@ -209,7 +195,7 @@
             <a class="anchor" href="#item-lint_hits">lint_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (ResolvedProgram) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (ResolvedProgram) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What the program lint <code>lint</code> says of the program <code>src</code> parses to, as it says it. The one way the program lints' <code>.test</code> blocks run a lint over source text: pass the lint function itself.</p></div>
 
@@ -223,7 +209,7 @@
             <a class="anchor" href="#item-lint_messages">lint_messages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (ResolvedProgram) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (ResolvedProgram) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_hits</code>], keeping only the messages.</p></div>
 
@@ -279,7 +265,7 @@
             <a class="anchor" href="#item-unfilled_hits">unfilled_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unfilled_hits(self: Function[], lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn unfilled_hits(self: Function[], lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>What the function lint <code>lint</code> reports for each of <code>self</code>, the hits [<code>filled</code>] fills in.</p></div>
 
@@ -293,7 +279,7 @@
             <a class="anchor" href="#item-lint_function_unfilled_hits">lint_function_unfilled_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_function_unfilled_hits(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_function_unfilled_hits(src: str, lint: (Function) -&#62; LintHit[]) -&#62; FilledHit[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
 
@@ -307,7 +293,7 @@
             <a class="anchor" href="#item-lint_function_unfilled_messages">lint_function_unfilled_messages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_function_unfilled_messages(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_function_unfilled_messages(src: str, lint: (Function) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_function_unfilled_hits</code>], keeping only the messages.</p></div>
 
@@ -321,9 +307,9 @@
             <a class="anchor" href="#item-lint_function_unfilled">lint_function_unfilled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_function_unfilled(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_function_unfilled(src: str, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
-          <div class="doc"><p>What the function lint <code>lint</code> says of the program <code>src</code> parses to, as it says it: the [<code>UnfilledHit</code>]s, before any file's imports decide how they are written. Every builtin counts as imported, so a lint's own tests are about the shape it finds and nothing about imports.</p></div>
+          <div class="doc"><p>What the function lint <code>lint</code> says of the program <code>src</code> parses to, as it says it: the [<code>LintHit</code>]s, before any file's imports decide how they are written. Every builtin counts as imported, so a lint's own tests are about the shape it finds and nothing about imports.</p></div>
 
 
         </section>
@@ -335,7 +321,7 @@
             <a class="anchor" href="#item-lint_function_messages">lint_function_messages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_function_messages(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_function_messages(src: str, lint: (Function) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_function_unfilled</code>], shown as messages.</p></div>
 
@@ -349,7 +335,7 @@
             <a class="anchor" href="#item-shown">shown</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn shown(self: UnfilledHit[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn shown(self: LintHit[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p><code>self</code> as messages: each stretch of text followed by the builtin it names as <code>to_str</code> shows it, then the closing stretch. Not what a file's author is shown, which is <code>filled</code>'s, but enough for a lint's tests to say what advice it gives.</p></div>
 
@@ -363,9 +349,9 @@
             <a class="anchor" href="#item-lint_in_unfilled">lint_in_unfilled</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_in_unfilled(src: str, lint: (Function, Item[]) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_in_unfilled(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
-          <div class="doc"><p>What the lint <code>lint</code>, which also reads the file's items, says of the program <code>src</code> parses to: the [<code>UnfilledHit</code>]s as [<code>lint_function_unfilled</code>] gives them.</p></div>
+          <div class="doc"><p>What the lint <code>lint</code>, which also reads the file's items, says of the program <code>src</code> parses to: the [<code>LintHit</code>]s as [<code>lint_function_unfilled</code>] gives them.</p></div>
 
 
         </section>
@@ -377,7 +363,7 @@
             <a class="anchor" href="#item-lint_in_unfilled_hits">lint_in_unfilled_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_in_unfilled_hits(src: str, lint: (Function, Item[]) -&#62; UnfilledHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_in_unfilled_hits(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; FilledHit[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What the lint <code>lint</code>, which also reads the file's items, reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
 
@@ -391,7 +377,7 @@
             <a class="anchor" href="#item-lint_in_unfilled_messages">lint_in_unfilled_messages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_in_unfilled_messages(src: str, lint: (Function, Item[]) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_in_unfilled_messages(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_in_unfilled_hits</code>], keeping only the messages.</p></div>
 
@@ -426,7 +412,7 @@
             <a class="anchor" href="#item-outside_its_definition">outside_its_definition</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn outside_its_definition(self: Function, hits: UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>fn outside_its_definition(self: Function, hits: LintHit[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p><code>hits</code> less those that advise the builtin <code>self</code> is itself: a function written to be <code>any</code> holds the longhand that <code>any</code> replaces, and advising it to call <code>any</code> would have it call itself.</p></div>
 

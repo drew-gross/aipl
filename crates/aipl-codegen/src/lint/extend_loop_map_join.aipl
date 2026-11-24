@@ -23,10 +23,10 @@ import { equal as ==, extend, filter, is_empty, join, map, to_str } from builtin
 import { Extend, Join } from "../builtin_table.aipl";
 import { Function } from "../item.aipl";
 import { accumulations, element_stages, filled_hit, is_advisable } from "./accumulation.aipl";
-import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 
 # A hit for each array the program seeds empty and fills with a loop of `extend`s.
-pub fn extend_loop_map_join(Function { body }) -> UnfilledHit[] {
+pub fn extend_loop_map_join(Function { body }) -> LintHit[] {
     body
         .accumulations(Extend)
         .filter(is_advisable)

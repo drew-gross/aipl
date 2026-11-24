@@ -9,12 +9,12 @@
 
 import { Span, any, equal as ==, filter, len, logical_not as !, map } from builtins;
 import { lines } from "../lines.aipl";
-import { LintHit, hit } from "./lint_hit.aipl";
+import { FilledHit, hit } from "./lint_hit.aipl";
 
 # The hits of `hits` that no marker in `allows` squelches, each saying how to keep it,
 # followed by an error for every marker that squelched nothing. `src` is the text the
 # spans index into. A marker is not itself squelchable: what it would squelch is itself.
-pub fn squelch(src: str, allows: Span[], hits: LintHit[]) -> LintHit[] {
+pub fn squelch(src: str, allows: Span[], hits: FilledHit[]) -> FilledHit[] {
     let marker_lines = allows.map(|marker| src.line_of(marker.start));
     let hit_lines = hits.map(|h| src.line_of(h.span.start));
 
@@ -51,13 +51,13 @@ pub fn squelch(src: str, allows: Span[], hits: LintHit[]) -> LintHit[] {
 })
 
 # `self` with how to keep what it flagged.
-fn advised(self: LintHit) -> LintHit {
+fn advised(self: FilledHit) -> FilledHit {
     ..self,
     message: `{self.message} (or append #[allow] to this line to keep it)`,
 }
 
 # The error for a marker that squelched nothing.
-fn unmatched_marker(self: Span) -> LintHit {
+fn unmatched_marker(self: Span) -> FilledHit {
     hit("this `#[allow]` squelches nothing — remove it", self)
 }
 

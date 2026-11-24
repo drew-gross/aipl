@@ -104,11 +104,11 @@ import { Function, One, Param, Signature, pattern_reads } from "../item.aipl";
 import { Array, ArrayNested, Ctor, Nested, is_binder_name, show_pat } from "../pat.aipl";
 import { Named, Ty } from "../ty.aipl";
 import { Uses, is_name, sole_fields, uses_of } from "./field_uses.aipl";
-import { UnfilledHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
+import { LintHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
 
 # A hit for each parameter, `let` and pattern slot in the program whose name is only
 # ever taken apart.
-pub fn destructure(Function { sig, body }) -> UnfilledHit[] {
+pub fn destructure(Function { sig, body }) -> LintHit[] {
     // Every read is those of the whole body, so that a field read off two bases
     // anywhere in it counts against each name it belongs to; the destructured
     // parameters take their fields apart at the top of it, and their reads count the
@@ -487,8 +487,8 @@ fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: 
 }
 
 # The hits for each of `self`'s parameters.
-fn param_hits(self: Signature, body: Expr, reads: Read[]) -> UnfilledHit[] {
-    mut found: UnfilledHit[] = [];
+fn param_hits(self: Signature, body: Expr, reads: Read[]) -> LintHit[] {
+    mut found: LintHit[] = [];
     for (let i, param : self.params) {
         set found.extend(param.hits(body, reads, self.is_method && i == 0));
     }
@@ -497,7 +497,7 @@ fn param_hits(self: Signature, body: Expr, reads: Read[]) -> UnfilledHit[] {
 
 # The hit for one parameter, or its pattern's slots. The receiver of a method keeps its name, which
 # is what makes the function callable as `recv.f(..)`.
-fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> UnfilledHit[] {
+fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> LintHit[] {
     // The body's span starts at the `{` that opens it, which is a single line that
     // survives the formatter — and the closest line to the signature that a
     // parameter can be blamed on, `Param` carrying no span of its own.
@@ -510,19 +510,15 @@ fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -> UnfilledHi
     // the pattern's names would have to live alongside.
     let some(taken) = body.taken_apart(name, reads, none, some(struct_name)) else { return []; };
     match (taken) {
-        Fields(..) => [lint_message(advice(Parameter(struct_name), name, taken), body.span)],
-        Opening(span, _, _) => [lint_message(advice(Parameter(struct_name), name, taken), span)],
+        Fields(..) => [lint_message(advice(Parameter(struct_name), name, taken), span=body.span)],
+        Opening(span, _, _) => [
+            lint_message(advice(Parameter(struct_name), name, taken), span=span),
+        ],
     }
 }
 
 # The hit for `let name = value; inner`, at its value.
-fn binding_hits(
-    name: str,
-    annotation: Ty?,
-    value: Expr,
-    inner: Expr,
-    reads: Read[],
-) -> UnfilledHit[] {
+fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -> LintHit[] {
     // A name the parser made (`__iset1$6`, the `seed$provider` of a shim) was never
     // written by the author, who cannot put an `#[allow]` on it. The destructuring
     // forms are not among them: this reads the program before they are lowered.
@@ -538,11 +534,11 @@ fn binding_hits(
         _ => none,
     };
     let some(taken) = inner.taken_apart(name, reads, some(value), written) else { return []; };
-    [lint_message(advice(Bound(written), name, taken), value.span)]
+    [lint_message(advice(Bound(written), name, taken), span=value.span)]
 }
 
 # The hits for the slots of `pattern`, the names it binds over `scope`, at `at`.
-fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> UnfilledHit[] {
+fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
     match (self) {
         ByCase(case_name, names) => names.slots_taken_apart(some(case_name), scope, reads, at),
         ByTuple(names) => names.slots_taken_apart(none, scope, reads, at),
@@ -554,7 +550,7 @@ fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> UnfilledHit
 # The hits for the slots of the case pattern a `let .. else` or `if let` arm matches, whose
 # one use is the array pattern that opens the arm's body: `let Two(xs) = v else { .. };
 # let [a, b] = xs else { .. };` is `let Two([a, b]) = v else { .. };`.
-fn array_slot_hits(self: MatchArm) -> UnfilledHit[] {
+fn array_slot_hits(self: MatchArm) -> LintHit[] {
     // A slot that is a bare binder name, among the shown slots of the case pattern.
     let (case_name, slots) = match (self.pattern) {
         Ctor(case_name, bindings, _) => (case_name, bindings),
@@ -563,13 +559,13 @@ fn array_slot_hits(self: MatchArm) -> UnfilledHit[] {
             return [];
         },
     };
-    mut found: UnfilledHit[] = [];
+    mut found: LintHit[] = [];
     for (let name : slots) {
         if (name != "_" && !name.contains("$") && name.is_binder_name()) {
             if (let some((span, array)) = self.body.opening_array(name)) {
                 set found.push(lint_message(
                     slot_opening_message(name, slot_pattern(some(case_name), slots, name, array)),
-                    span,
+                    span=span,
                 ));
             };
         };
@@ -596,14 +592,14 @@ fn slots_taken_apart(
     scope: Expr,
     reads: Read[],
     at: Span,
-) -> UnfilledHit[] {
-    mut found: UnfilledHit[] = [];
+) -> LintHit[] {
+    mut found: LintHit[] = [];
     for (let name : self) {
         // The parser's own temporaries are not the author's to rewrite, and `_` binds
         // nothing.
         if (name != "_" && !name.contains("$")) {
             if (let some(taken) = scope.taken_apart(name, reads, none, none)) {
-                set found.push(lint_message(advice(Slot(case_name, self), name, taken), at));
+                set found.push(lint_message(advice(Slot(case_name, self), name, taken), span=at));
             };
         };
     }

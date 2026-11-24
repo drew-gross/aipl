@@ -56,7 +56,7 @@ import { lower_aipl_block_surface } from "../grammar_aipl.aipl";
 import { resolved_with_builtins } from "../resolve_callees.aipl";
 import { Ty } from "../ty.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { Named, UnfilledHit } from "./lint_hit.aipl";
+import { LintHit, Named } from "./lint_hit.aipl";
 import { is_lambda_safe, iterable_text, lone_statement } from "./loop_shape.aipl";
 import { Builtin } from "./spelling.aipl";
 
@@ -325,7 +325,7 @@ pub fn element_stages(self: Accumulation) -> (Callee, str)[] {
 
 # The hit for an array filled by one loop that is the pipeline of `stages` over its
 # iterable: each stage a builtin and the arguments it is written with.
-pub fn filled_hit(self: Accumulation, stages: (Callee, str)[]) -> UnfilledHit {
+pub fn filled_hit(self: Accumulation, stages: (Callee, str)[]) -> LintHit {
     self.seeded.pipeline_hit("filled by this loop and nothing else", "", stages)
 }
 
@@ -342,13 +342,13 @@ pub fn pipeline_hit(
     what: str,
     annotation: str,
     stages: (Callee, str)[],
-) -> UnfilledHit {
+) -> LintHit {
     let lead = `"{self.name}" is seeded empty and {what} — `;
     let receiver = self.iterable.iterable_text();
 
     // No stage at all: the loop copies the iterable one element at a time.
     if (stages.is_empty()) {
-        return UnfilledHit {
+        return LintHit {
             named: [],
             tail: `{lead}it is "{receiver}" already — assign that and drop the loop`,
             span: self.seed.span,
@@ -356,7 +356,7 @@ pub fn pipeline_hit(
     };
     let opening = `{lead}write "mut {self.name}{annotation} = {receiver}.`;
     let separators = stages.drop_last()$1.map(|arguments| `{arguments}.`);
-    UnfilledHit {
+    LintHit {
         named: zip_with(
             [opening, ..separators],
             stages,

@@ -23,12 +23,10 @@ import {
 import { Construct, Expr, FieldInit, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Generic, Named, Ty } from "../ty.aipl";
-import { UnfilledHit, lint_function_unfilled, lint_message, shown } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, lint_message, shown } from "./lint_hit.aipl";
 
 # The hits for a function whose body is a literal of its return type: one, or none.
-pub fn fn_body_type_stutter(
-    Function { name as function, shorthand_body, sig, body },
-) -> UnfilledHit[] {
+pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, body }) -> LintHit[] {
     if (shorthand_body) { return []; };
 
     // The name the return type offers the literal: a generic return contributes its
@@ -42,7 +40,7 @@ pub fn fn_body_type_stutter(
     // spelled, so it has no shorter form. `{}` has no shorthand either (it would
     // read as an empty block).
     if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) { return []; };
-    [lint_message(message(function.text, name, inits.lone_shorthand()), span)]
+    [lint_message(message(function.text, name, inits.lone_shorthand()), span=span)]
 }.test({
     let found = lint_function_unfilled(
         "fn f(x: i64) -> P { P { x: x + 1, y: 0 } }",

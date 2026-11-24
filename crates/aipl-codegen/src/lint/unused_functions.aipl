@@ -34,14 +34,14 @@ import {
     function_names,
     item_names,
 } from "../item.aipl";
-import { UnfilledHit, functions, lint_hits, lint_message, lint_messages } from "./lint_hit.aipl";
+import { LintHit, functions, lint_hits, lint_message, lint_messages } from "./lint_hit.aipl";
 import { has, union_all } from sets;
 
 # A function's name and every name its signature and body mention.
 struct Mentions { owner: str, names: #{str} }
 
 # A hit for each private function nothing else mentions, at its name.
-pub fn unused_functions(program: Program) -> UnfilledHit[] {
+pub fn unused_functions(program: Program) -> LintHit[] {
     let declarations = program.functions();
     if (!declarations.any(|function| function.visibility != Private)) { return []; };
     let elsewhere = program.items$non_function_names().union_all();
@@ -50,7 +50,7 @@ pub fn unused_functions(program: Program) -> UnfilledHit[] {
         .filter(|function| function.visibility == Private)
         .filter(|function| !elsewhere.has(function.name.text))
         .filter(|function| !mentions.any(|m| m.is_mention_of(function.name.text)))
-        .map(|function| lint_message(unused_message(function.name.text), function.name.span))
+        .map(|function| lint_message(unused_message(function.name.text), span=function.name.span))
 }.test({
     // A private function nothing mentions is reported, at its name.
     assert(lint_messages("fn helper() { } pub fn f() { }", unused_functions)? == [

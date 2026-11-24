@@ -53,12 +53,12 @@ import {
 import { All, Any, LogicalNot } from "../builtin_table.aipl";
 import { Bool, Call, Return, Seq } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { is_lambda_safe, iterable_text, search_loops } from "./loop_shape.aipl";
 
 # A hit for each loop in the program that reports whether some or every element passes a
 # test.
-pub fn return_loop_any_all(Function { body }) -> UnfilledHit[] {
+pub fn return_loop_any_all(Function { body }) -> LintHit[] {
     body
         .search_loops()
         .map(|found| {

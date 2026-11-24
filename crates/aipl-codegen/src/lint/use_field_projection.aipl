@@ -46,13 +46,11 @@ import {
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Function } from "../item.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { UnfilledHit, lint_function_messages, lint_message, quote } from "./lint_hit.aipl";
+import { LintHit, lint_function_messages, lint_message, quote } from "./lint_hit.aipl";
 import { slot_shown } from "./places.aipl";
 
 # A hit for each `map` in the program whose function is a `$` projection.
-pub fn use_field_projection(function: Function) -> UnfilledHit[] {
-    function.projections()$hit
-}.test({
+pub fn use_field_projection(function: Function) -> LintHit[] { function.projections()$hit }.test({
     // A member read, a method call with arguments, a chain, a builtin and a function name.
     assert(lint_function_messages(
         "struct P { name: str } fn shout(self: str) -> str { self } fn f(xs: P[], ys: str[]) -> i64 { xs.map(|p| p.name) }",
@@ -134,7 +132,7 @@ pub fn use_field_projection(function: Function) -> UnfilledHit[] {
 
 # What the rule says about a `map` call, and the span of the lambda it advised on (none for a
 # function name), so that a lint about lambdas can leave that lambda alone.
-struct Projection { hit: UnfilledHit, lambda: Span? }
+struct Projection { hit: LintHit, lambda: Span? }
 
 # The [`Projection`] of each `map` in `self`.
 pub fn projections(self: Function) -> Projection[] {
@@ -150,7 +148,7 @@ fn projection(self: Expr<Call>) -> Projection? {
         return some(Projection {
             hit: lint_message(
                 `"map" over the function "{function}" — write "{items}${function}()"`,
-                argument.span,
+                span=argument.span,
             ),
             lambda: none,
         });
@@ -162,7 +160,7 @@ fn projection(self: Expr<Call>) -> Projection? {
     some(Projection {
         hit: lint_message(
             `"map" with a lambda that only uses a member of its argument — write "{items}{steps.join()}"`,
-            argument.span,
+            span=argument.span,
         ),
         lambda: some(argument.span),
     })

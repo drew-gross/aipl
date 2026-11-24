@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-arm_block_value">arm_block_value</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn arm_block_value(self: Expr&#60;Match&#62;) -&#62; UnfilledHit[]</code></pre>
+          <pre class="signature"><code>pub fn arm_block_value(self: Expr&#60;Match&#62;) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>The hits for the arms of the match <code>self</code> whose block holds nothing but its value.</p></div>
 
@@ -48,7 +48,7 @@
             <a class="anchor" href="#item-block_hit">block_hit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn block_hit(self: MatchArm, within: Expr) -&#62; UnfilledHit?</code></pre>
+          <pre class="signature"><code>fn block_hit(self: MatchArm, within: Expr) -&#62; LintHit?</code></pre>
 
           <div class="doc"><p>The hit for <code>self</code>, an arm of the match <code>within</code>, when its body is written as a block that holds nothing but the value.</p></div>
 

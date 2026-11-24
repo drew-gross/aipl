@@ -38,17 +38,17 @@ import {
     is_advisable,
     plain_seeded_loop,
 } from "./accumulation.aipl";
-import { UnfilledHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
 
 # The hit for the array the binding `self` seeds, when it seeds it empty and a loop of `push`es
 # fills it.
-pub fn push_loop_pipeline(self: LetMut) -> UnfilledHit? {
+pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     let filling = self.plain_seeded_loop()?.accumulation(Push)?;
     if (!filling.is_advisable()) { return none; };
     some(filling.filled_hit(filling.element_stages()))
 }.test({
     // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<LetMut>()$kind$push_loop_pipeline().collect_ok()
     }
 

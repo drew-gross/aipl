@@ -30,11 +30,11 @@ import { AsCase, Some } from "../builtin_table.aipl";
 import { Call, Match, descendants_of_kind, show_expr } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { CasePattern, case_pattern, is_give_up } from "./case_match.aipl";
-import { UnfilledHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 
 # A hit for each `match` in the function that only asks whether a value is one case.
-pub fn match_case_as_case(self: Match(scrutinee, arms)) -> UnfilledHit? {
+pub fn match_case_as_case(self: Match(scrutinee, arms)) -> LintHit? {
     let [case_arm, other_arm] = arms else { return none; };
     let CasePattern { case } = case_arm.pattern.case_pattern()?;
     let Call(_, wrapped, _, Some) = case_arm.body.kind else { return none; };
@@ -46,7 +46,7 @@ pub fn match_case_as_case(self: Match(scrutinee, arms)) -> UnfilledHit? {
         other_arm.span,
     ))
 }.test({
-    fn flagged(Function { body }) -> UnfilledHit[] {
+    fn flagged(Function { body }) -> LintHit[] {
         body.descendants_of_kind::<Match>()$kind$match_case_as_case().collect_ok()
     }
     // The case, handed back as the value matched, and the hit on the catch-all.
