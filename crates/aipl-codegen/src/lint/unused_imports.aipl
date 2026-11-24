@@ -11,11 +11,11 @@
 
 import { collect_arms, equal as ==, filter, join, map } from builtins;
 import { Import, ImportDecl, Program, item_names, local } from "../item.aipl";
-import { LintHit, hit, lint_hits, lint_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_hits, lint_message, lint_messages } from "./lint_hit.aipl";
 import { difference, has, to_set, union_all } from sets;
 
 # A hit for each name `program` imports and nothing in it references.
-pub fn unused_imports(Program { items }) -> LintHit[] {
+pub fn unused_imports(Program { items }) -> UnfilledHit[] {
     // Every name the file mentions outside its own import lists: called and
     // referenced idents, constructed structs, match constructors, operator
     // spellings, and every name appearing in a type — signatures, struct fields, // variant payloads, and inline `let`/lambda annotations. Each item mentions
@@ -110,10 +110,10 @@ pub fn unused_imports(Program { items }) -> LintHit[] {
 fn imported(self: Import(ImportDecl { names })) -> #{str} { names$local().to_set() }
 
 # A hit for each name `self` imports that is in `unused`.
-fn unused_in(self: Import(ImportDecl { names }), unused: #{str}) -> LintHit[] {
+fn unused_in(self: Import(ImportDecl { names }), unused: #{str}) -> UnfilledHit[] {
     names
         .filter(|name| unused.has(name.local()))
-        .map(|name| hit(unused_message(name.local()), name.span))
+        .map(|name| lint_message(unused_message(name.local()), name.span))
 }
 
 # What is said of the import `name`.

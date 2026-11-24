@@ -106,6 +106,20 @@
 
 
 
+        <section class="item" id="item-lint_message">
+          <h3>
+            <a class="anchor" href="#item-lint_message">lint_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_message(message: str, span: Span) -&#62; UnfilledHit</code></pre>
+
+          <div class="doc"><p>A hit at <code>span</code> that names no builtin: the whole of its message is the <code>tail</code>, so filling it in changes nothing.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-advice">
           <h3>
             <a class="anchor" href="#item-advice">advice</a>
@@ -195,9 +209,9 @@
             <a class="anchor" href="#item-lint_hits">lint_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (ResolvedProgram) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_hits(src: str, lint: (ResolvedProgram) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]!ParseFailure</code></pre>
 
-          <div class="doc"><p>What <code>lint</code> reports for the program <code>src</code> parses to. The one way the lints' <code>.test</code> blocks run a lint over source text: pass the lint function itself.</p></div>
+          <div class="doc"><p>What the program lint <code>lint</code> says of the program <code>src</code> parses to, as it says it. The one way the program lints' <code>.test</code> blocks run a lint over source text: pass the lint function itself.</p></div>
 
 
         </section>
@@ -209,7 +223,7 @@
             <a class="anchor" href="#item-lint_messages">lint_messages</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (ResolvedProgram) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
+          <pre class="signature"><code>pub fn lint_messages(src: str, lint: (ResolvedProgram) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_hits</code>], keeping only the messages.</p></div>
 
@@ -260,34 +274,6 @@
 
 
 
-        <section class="item" id="item-hits">
-          <h3>
-            <a class="anchor" href="#item-hits">hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn hits(self: Function[], lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>What the function lint <code>lint</code> reports for each of <code>self</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-hits_once">
-          <h3>
-            <a class="anchor" href="#item-hits_once">hits_once</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn hits_once(self: Function[], lint: (Function) -&#62; LintHit?) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>[<code>hits</code>] for a lint that reports at most one hit for a function.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-unfilled_hits">
           <h3>
             <a class="anchor" href="#item-unfilled_hits">unfilled_hits</a>
@@ -295,49 +281,7 @@
           </h3>
           <pre class="signature"><code>pub fn unfilled_hits(self: Function[], lint: (Function) -&#62; UnfilledHit[]) -&#62; UnfilledHit[]</code></pre>
 
-          <div class="doc"><p>[<code>hits</code>] for a lint whose hits are [<code>UnfilledHit</code>]s, which [<code>filled</code>] fills in.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_function_hits">
-          <h3>
-            <a class="anchor" href="#item-lint_function_hits">lint_function_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_function_hits(src: str, lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to, with every builtin counting as imported: a lint's own tests are about the shape it finds, not the file's imports.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_function_once_hits">
-          <h3>
-            <a class="anchor" href="#item-lint_function_once_hits">lint_function_once_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_function_once_hits(src: str, lint: (Function) -&#62; LintHit?) -&#62; LintHit[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>What the lint <code>lint</code>, which reports at most one hit for a function, reports for the program <code>src</code> parses to.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_function_messages">
-          <h3>
-            <a class="anchor" href="#item-lint_function_messages">lint_function_messages</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_function_messages(src: str, lint: (Function) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>[<code>lint_function_hits</code>], keeping only the messages.</p></div>
+          <div class="doc"><p>What the function lint <code>lint</code> reports for each of <code>self</code>, the hits [<code>filled</code>] fills in.</p></div>
 
 
         </section>
@@ -386,6 +330,20 @@
 
 
 
+        <section class="item" id="item-lint_function_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_function_messages">lint_function_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_function_messages(src: str, lint: (Function) -&#62; UnfilledHit[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>[<code>lint_function_unfilled</code>], shown as messages.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-shown">
           <h3>
             <a class="anchor" href="#item-shown">shown</a>
@@ -394,34 +352,6 @@
           <pre class="signature"><code>pub fn shown(self: UnfilledHit[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p><code>self</code> as messages: each stretch of text followed by the builtin it names as <code>to_str</code> shows it, then the closing stretch. Not what a file's author is shown, which is <code>filled</code>'s, but enough for a lint's tests to say what advice it gives.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_in_hits">
-          <h3>
-            <a class="anchor" href="#item-lint_in_hits">lint_in_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_in_hits(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>What the function lint <code>lint</code>, which also reads the file's items, reports for the program <code>src</code> parses to.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_in_messages">
-          <h3>
-            <a class="anchor" href="#item-lint_in_messages">lint_in_messages</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_in_messages(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>[<code>lint_in_hits</code>], keeping only the messages.</p></div>
 
 
         </section>
@@ -449,7 +379,7 @@
           </h3>
           <pre class="signature"><code>pub fn lint_in_unfilled_hits(src: str, lint: (Function, Item[]) -&#62; UnfilledHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
-          <div class="doc"><p>[<code>lint_in_hits</code>] for a lint whose hits are [<code>UnfilledHit</code>]s, filled in for the imports <code>src</code> has.</p></div>
+          <div class="doc"><p>What the lint <code>lint</code>, which also reads the file's items, reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
 
 
         </section>

@@ -43,10 +43,10 @@ import { ArrayLit, Expr, LetMut, Spread, descendants_of_kind, is_ident } from ".
 import { Function } from "../item.aipl";
 import { Pushed, pushed } from "./accumulation.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, hit, lint_function_messages, quote } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_messages, lint_message, quote } from "./lint_hit.aipl";
 
 # A hit for each array the program binds `mut`, pushes onto and returns.
-pub fn push_array_literal(Function { body }) -> LintHit[] {
+pub fn push_array_literal(Function { body }) -> UnfilledHit[] {
     body.descendants_of_kind::<LetMut>()$kind$literal().collect_ok()
 }.test({
     // A seed spread into the literal, a run of pushes, and a literal seed spliced open.
@@ -216,7 +216,7 @@ pub fn push_array_literal(Function { body }) -> LintHit[] {
 
 # `self` as the hit for an array that is only pushed onto before it is returned, when it
 # is one.
-fn literal(self: LetMut(name, annotation, seed, body)) -> LintHit? {
+fn literal(self: LetMut(name, annotation, seed, body)) -> UnfilledHit? {
     // Every push, in order, for as long as they run consecutively. An annotation on the
     // `mut` is allowed (it is often what gives an empty seed its element type) and simply
     // goes away with the binding.
@@ -236,7 +236,7 @@ fn literal(self: LetMut(name, annotation, seed, body)) -> LintHit? {
     } else {
         [`..{seed.quote("<array>")}`]
     };
-    some(hit(
+    some(lint_message(
         `"{name}" is seeded and then only appended to before being returned — write "[{[..opening, ..elements$element_text()].join(sep=", ")}]" and drop the mut`,
         seed.span,
     ))

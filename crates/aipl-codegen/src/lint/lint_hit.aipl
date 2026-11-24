@@ -80,6 +80,17 @@ pub fn unfilled(builtin: Callee, before: str, after: str, span: Span) -> Unfille
     assert(unfilled(Len, "use ", "()", 1..2).span == 1..2);
 })
 
+# A hit at `span` that names no builtin: the whole of its message is the `tail`, so filling it in
+# changes nothing.
+pub fn lint_message(message: str, span: Span) -> UnfilledHit {
+    named: [],
+    tail: message,
+    span,
+}.test({
+    assert(lint_message("m", 3..5) == UnfilledHit { named: [], tail: "m", span: 3..5 });
+    assert([lint_message("m", 3..5)].shown() == ["m"]);
+})
+
 # An advice for a message `before` + the builtin's spelling + `after`.
 pub fn advice(builtin: Callee, before: str, after: str) -> Advice {
     named: [Named { text: before, builtin: Builtin(builtin) }],
@@ -229,26 +240,28 @@ pub fn filled(self: UnfilledHit[], items: Item[]) -> LintHit[] {
     )$message == ["use builtin_len, importing `len as builtin_len` from builtins"]);
 })
 
-# What `lint` reports for the program `src` parses to. The one way the lints'
-# `.test` blocks run a lint over source text: pass the lint function itself.
-pub fn lint_hits(src: str, lint: (ResolvedProgram) -> LintHit[]) -> LintHit[]!ParseFailure {
+# What the program lint `lint` says of the program `src` parses to, as it says it. The one way the
+# program lints' `.test` blocks run a lint over source text: pass the lint function itself.
+pub fn lint_hits(src: str, lint: (ResolvedProgram) -> UnfilledHit[]) -> UnfilledHit[]!ParseFailure {
     ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees()))
 }.test({
-    assert(lint_hits("fn f() { }", |program: ResolvedProgram| { [hit("found", 0..1)] })? == [
-        hit("found", 0..1),
-    ]);
+    assert(lint_hits(
+        "fn f() { }",
+        |program: ResolvedProgram| { [lint_message("found", 0..1)] },
+    )? == [lint_message("found", 0..1)]);
     assert(lint_hits("fn (", |program: ResolvedProgram| { [] }).is_err_and(
         |failure| failure.errors.is_nonempty(),
     ));
 })
 
 # [`lint_hits`], keeping only the messages.
-pub fn lint_messages(src: str, lint: (ResolvedProgram) -> LintHit[]) -> str[]!ParseFailure {
-    ok(lint_hits(src, lint)?$message)
+pub fn lint_messages(src: str, lint: (ResolvedProgram) -> UnfilledHit[]) -> str[]!ParseFailure {
+    ok(lint_hits(src, lint)?.shown())
 }.test({
-    assert(lint_messages("fn f() { }", |program: ResolvedProgram| { [hit("found", 0..1)] })? == [
-        "found",
-    ]);
+    assert(lint_messages(
+        "fn f() { }",
+        |program: ResolvedProgram| { [lint_message("found", 0..1)] },
+    )? == ["found"]);
 })
 
 # Whether `self`'s span covers exactly the text that spells it, so the source can be
@@ -321,39 +334,31 @@ pub fn functions(self: Program) -> Function[] {
     // Each function once, and the function each block is.
     assert(lint_function_messages(
         "fn f() { } fn g() { }",
-        |function| { [hit(function.name.text, 0..1)] },
+        |function| { [lint_message(function.name.text, 0..1)] },
     )? == ["f", "g"]);
     assert(lint_function_messages(
         "fn f() { }.test({ g(); })",
-        |function| { [hit(function.name.text, 0..1)] },
+        |function| { [lint_message(function.name.text, 0..1)] },
     )? == ["f", "__test$f"]);
     assert(lint_function_messages(
         "fn f() { }.benchmark({ g(); })",
-        |function| { [hit(function.name.text, 0..1)] },
+        |function| { [lint_message(function.name.text, 0..1)] },
     )? == ["f", "__benchmark$f", "__test$__benchmark$f"]);
     assert(lint_function_messages(
         "fn f() { }.test({ fn h() { } h(); })",
-        |function| { [hit(function.name.text, 0..1)] },
+        |function| { [lint_message(function.name.text, 0..1)] },
     )? == ["f", "__test$f", "__test$f$h"]);
 
     // A block has no parameters of its own.
     assert(lint_function_messages(
         "fn f(x: i64) { }.test({ g(); })",
-        |function| { [hit(`{function.sig.params.len()}`, 0..1)] },
+        |function| { [lint_message(`{function.sig.params.len()}`, 0..1)] },
     )? == ["1", "0"]);
 })
 
 fn declared(self: LoweredFn(function)) -> Function { function }
 
-# What the function lint `lint` reports for each of `self`.
-pub fn hits(self: Function[], lint: (Function) -> LintHit[]) -> LintHit[] { self$lint().join() }
-
-# [`hits`] for a lint that reports at most one hit for a function.
-pub fn hits_once(self: Function[], lint: (Function) -> LintHit?) -> LintHit[] {
-    self$lint().collect_ok()
-}
-
-# [`hits`] for a lint whose hits are [`UnfilledHit`]s, which [`filled`] fills in.
+# What the function lint `lint` reports for each of `self`, the hits [`filled`] fills in.
 pub fn unfilled_hits(self: Function[], lint: (Function) -> UnfilledHit[]) -> UnfilledHit[] {
     self.map(|function| function.outside_its_definition(lint(function))).join()
 }.test({
@@ -371,35 +376,6 @@ fn outside_its_definition(self: Function, hits: UnfilledHit[]) -> UnfilledHit[] 
     if (hits.is_empty()) { return []; };
     let table = lint_table();
     hits.filter(|hit| !hit.named.any(|part| part.builtin.is_builtin_named(self.name.text, table)))
-}
-
-# What the function lint `lint` reports for the program `src` parses to, with every builtin
-# counting as imported: a lint's own tests are about the shape it finds, not the file's imports.
-pub fn lint_function_hits(src: str, lint: (Function) -> LintHit[]) -> LintHit[]!ParseFailure {
-    ok(
-        aipl_parse_surface_file(src)?.program
-            .hoist_test_fns()
-            .resolve_with_every_builtin()
-            .functions()
-            .hits(lint),
-    )
-}
-
-# What the lint `lint`, which reports at most one hit for a function, reports for the program
-# `src` parses to.
-pub fn lint_function_once_hits(src: str, lint: (Function) -> LintHit?) -> LintHit[]!ParseFailure {
-    ok(
-        aipl_parse_surface_file(src)?.program
-            .hoist_test_fns()
-            .resolve_with_every_builtin()
-            .functions()
-            .hits_once(lint),
-    )
-}
-
-# [`lint_function_hits`], keeping only the messages.
-pub fn lint_function_messages(src: str, lint: (Function) -> LintHit[]) -> str[]!ParseFailure {
-    ok(lint_function_hits(src, lint)?$message)
 }
 
 # What the function lint `lint` reports for the program `src` parses to, filled in
@@ -434,6 +410,11 @@ pub fn lint_function_unfilled(
     )
 }
 
+# [`lint_function_unfilled`], shown as messages.
+pub fn lint_function_messages(src: str, lint: (Function) -> UnfilledHit[]) -> str[]!ParseFailure {
+    ok(lint_function_unfilled(src, lint)?.shown())
+}
+
 # `self` as messages: each stretch of text followed by the builtin it names as `to_str` shows it,
 # then the closing stretch. Not what a file's author is shown, which is `filled`'s, but enough for a
 # lint's tests to say what advice it gives.
@@ -442,20 +423,6 @@ pub fn shown(self: UnfilledHit[]) -> str[] {
 }.test({
     assert([unfilled(Len, "use ", "()", 1..2)].shown() == ["use Builtin(Len)()"]);
 })
-
-# What the function lint `lint`, which also reads the file's items, reports for the program
-# `src` parses to.
-pub fn lint_in_hits(src: str, lint: (Function, Item[]) -> LintHit[]) -> LintHit[]!ParseFailure {
-    let program = aipl_parse_surface_file(src)?.program
-        .hoist_test_fns()
-        .resolve_with_every_builtin();
-    ok(program.functions().hits(|function| lint(function, program.items)))
-}
-
-# [`lint_in_hits`], keeping only the messages.
-pub fn lint_in_messages(src: str, lint: (Function, Item[]) -> LintHit[]) -> str[]!ParseFailure {
-    ok(lint_in_hits(src, lint)?$message)
-}
 
 # What the lint `lint`, which also reads the file's items, says of the program `src` parses to: the
 # [`UnfilledHit`]s as [`lint_function_unfilled`] gives them.
@@ -469,19 +436,18 @@ pub fn lint_in_unfilled(
     ok(program.functions().unfilled_hits(|function| lint(function, program.items)))
 }
 
-# [`lint_in_hits`] for a lint whose hits are [`UnfilledHit`]s, filled in for the imports `src` has.
+# What the lint `lint`, which also reads the file's items, reports for the program `src` parses to,
+# filled in for the imports `src` has.
 pub fn lint_in_unfilled_hits(
     src: str,
     lint: (Function, Item[]) -> UnfilledHit[],
 ) -> LintHit[]!ParseFailure {
-    lint_hits(
-        src,
-        |program: ResolvedProgram| {
-            program
-                .functions()
-                .unfilled_hits(|function| lint(function, program.items))
-                .filled(program.items)
-        },
+    let program = aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees();
+    ok(
+        program
+            .functions()
+            .unfilled_hits(|function| lint(function, program.items))
+            .filled(program.items),
     )
 }
 

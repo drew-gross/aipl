@@ -30,7 +30,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-destructure">destructure</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn destructure(__spat$4979: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn destructure(__spat$4992: Function) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each parameter, <code>let</code> and pattern slot in the program whose name is only ever taken apart.</p></div>
 
@@ -126,7 +126,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-param_hits">param_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn param_hits(self: Signature, body: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn param_hits(self: Signature, body: Expr, reads: Read[]) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hits for each of <code>self</code>'s parameters.</p></div>
 
@@ -140,7 +140,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-hits">hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn hits(self: Param, body: Expr, reads: Read[], is_receiver: bool) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hit for one parameter, or its pattern's slots. The receiver of a method keeps its name, which is what makes the function callable as <code>recv.f(..)</code>.</p></div>
 
@@ -154,7 +154,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-binding_hits">binding_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn binding_hits(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read[]) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hit for <code>let name = value; inner</code>, at its value.</p></div>
 
@@ -168,7 +168,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-slot_hits">slot_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hits for the slots of <code>pattern</code>, the names it binds over <code>scope</code>, at <code>at</code>.</p></div>
 
@@ -182,7 +182,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-array_slot_hits">array_slot_hits</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn array_slot_hits(self: MatchArm) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn array_slot_hits(self: MatchArm) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hits for the slots of the case pattern a <code>let .. else</code> or <code>if let</code> arm matches, whose one use is the array pattern that opens the arm's body: <code>let Two(xs) = v else { .. }; let [a, b] = xs else { .. };</code> is <code>let Two([a, b]) = v else { .. };</code>.</p></div>
 
@@ -210,7 +210,7 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
             <a class="anchor" href="#item-slots_taken_apart">slots_taken_apart</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn slots_taken_apart(self: str[], case_name: str?, scope: Expr, reads: Read[], at: Span) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn slots_taken_apart(self: str[], case_name: str?, scope: Expr, reads: Read[], at: Span) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>The hits for the <code>names</code> a case pattern (or a tuple's, with no <code>case_name</code>) binds.</p></div>
 

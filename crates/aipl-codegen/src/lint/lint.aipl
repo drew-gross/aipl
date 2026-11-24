@@ -17,7 +17,8 @@ import {
     Slice,
     descendants_of_kind,
 } from "../expr.aipl";
-import { ParseFailure } from "../grammar_aipl.aipl";
+import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
+import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { Function, Item, SuperProgram } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
@@ -35,17 +36,7 @@ import { interp_to_str } from "./interp_to_str.aipl";
 import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
-import {
-    LintHit,
-    UnfilledHit,
-    filled,
-    functions,
-    hit_at,
-    hits,
-    hits_once,
-    lint_hits,
-    unfilled_hits,
-} from "./lint_hit.aipl";
+import { LintHit, UnfilledHit, filled, functions, hit_at, unfilled_hits } from "./lint_hit.aipl";
 import { map_constant_repeat } from "./map_constant_repeat.aipl";
 import { map_find_if_some } from "./map_find_if_some.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
@@ -90,38 +81,38 @@ pub fn lint(program: ResolvedProgram) -> LintHit[] {
         ..unused_imports(program),
         ..unused_functions(program),
         ..duplicate_import_source(program),
-        ..functions.hits(destructure),
-        ..functions.hits(unused_binding),
-        ..functions.hits_once(fn_body_type_stutter),
-        ..functions.unfilled_hits(match_lints).filled(items),
-        ..functions.unfilled_hits(match_case_try_as_case).filled(items),
-        ..functions.unfilled_hits(let_else_as_case).filled(items),
-        ..functions.unfilled_hits(let_mut_lints).filled(items),
-        ..functions.unfilled_hits(extend_loop_map_join).filled(items),
-        ..functions.unfilled_hits(union_loop_union_all).filled(items),
-        ..functions.hits(push_array_literal),
-        ..functions.unfilled_hits(return_loop_find_if).filled(items),
-        ..functions.unfilled_hits(return_loop_any_all).filled(items),
-        ..functions.hits(identity_lambda),
-        ..functions.hits(use_field_projection),
-        ..functions.unfilled_hits(push_loop_zip_with).filled(items),
-        ..functions.unfilled_hits(return_loop_find_index).filled(items),
-        ..functions.hits(interp_lints),
-        ..functions.hits(slice_lints),
-        ..functions.unfilled_hits(set_lints).filled(items),
-        ..functions.hits(match_hits),
-        ..functions.hits(construct_lints),
-        ..functions.hits(assign_lints),
-        ..functions.unfilled_hits(|function| assign_advice(function, items)).filled(items),
-        ..functions.hits(call_lints),
-        ..functions.unfilled_hits(call_advice).filled(items),
-    ]
+        ..functions.unfilled_hits(destructure),
+        ..functions.unfilled_hits(unused_binding),
+        ..functions.unfilled_hits(fn_body_type_stutter),
+        ..functions.unfilled_hits(match_lints),
+        ..functions.unfilled_hits(match_case_try_as_case),
+        ..functions.unfilled_hits(let_else_as_case),
+        ..functions.unfilled_hits(let_mut_lints),
+        ..functions.unfilled_hits(extend_loop_map_join),
+        ..functions.unfilled_hits(union_loop_union_all),
+        ..functions.unfilled_hits(push_array_literal),
+        ..functions.unfilled_hits(return_loop_find_if),
+        ..functions.unfilled_hits(return_loop_any_all),
+        ..functions.unfilled_hits(identity_lambda),
+        ..functions.unfilled_hits(use_field_projection),
+        ..functions.unfilled_hits(push_loop_zip_with),
+        ..functions.unfilled_hits(return_loop_find_index),
+        ..functions.unfilled_hits(interp_lints),
+        ..functions.unfilled_hits(slice_lints),
+        ..functions.unfilled_hits(set_lints),
+        ..functions.unfilled_hits(match_hits),
+        ..functions.unfilled_hits(construct_lints),
+        ..functions.unfilled_hits(assign_lints),
+        ..functions.unfilled_hits(|function| assign_advice(function, items)),
+        ..functions.unfilled_hits(call_lints),
+        ..functions.unfilled_hits(call_advice),
+    ].filled(items)
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()) == []);
 })
 
 # The lints over the `match`es of `function` that are not about what they say.
-fn match_hits(Function { body }) -> LintHit[] {
+fn match_hits(Function { body }) -> UnfilledHit[] {
     body.descendants_of_kind::<Match>()$arm_block_value().join()
 }
 
@@ -131,24 +122,24 @@ fn set_lints(Function { body }) -> UnfilledHit[] {
 }
 
 # The lints over the template interpolations of `function`, which are found once for all of them.
-fn interp_lints(Function { body }) -> LintHit[] {
+fn interp_lints(Function { body }) -> UnfilledHit[] {
     let interpolations = body.descendants_of_kind::<Interpolation>()$kind;
     [..interpolations$interp_to_str(), ..interpolations$interp_literal()].collect_ok()
 }
 
 # The lints over the slices of `function`, which are found once for all of them.
-fn slice_lints(Function { body }) -> LintHit[] {
+fn slice_lints(Function { body }) -> UnfilledHit[] {
     body.descendants_of_kind::<Slice>()$kind$redundant_slice_bound().collect_ok()
 }
 
 # The lints over the struct literals of `function`, which are found once for all of them.
-fn construct_lints(Function { body }) -> LintHit[] {
+fn construct_lints(Function { body }) -> UnfilledHit[] {
     let constructs = body.descendants_of_kind::<Construct>();
     constructs$kind$field_init_shorthand().join()
 }
 
 # The lints over the calls of `function`, which are found once for all of them.
-fn call_lints(Function { body }) -> LintHit[] {
+fn call_lints(Function { body }) -> UnfilledHit[] {
     body.descendants_of_kind::<Call>()$kind$value_or_compare().collect_ok()
 }
 
@@ -190,7 +181,7 @@ fn let_mut_lints(Function { body }) -> UnfilledHit[] {
 }
 
 # The lints over the assignments of `function`, which are found once for all of them.
-fn assign_lints(Function { body }) -> LintHit[] {
+fn assign_lints(Function { body }) -> UnfilledHit[] {
     body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
 }
 
@@ -210,6 +201,8 @@ fn assign_advice(Function { body }, items: Item[]) -> UnfilledHit[] {
 
 # The messages every lint reports for the program `src` parses to, which is how a lint's own tests
 # read what it says: they run all the lints, so a snippet must be one no other lint objects to.
-pub fn lint_str(src: str) -> str[]!ParseFailure { ok(lint_hits(src, lint)?$message) }.test({
+pub fn lint_str(src: str) -> str[]!ParseFailure {
+    ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees())$message)
+}.test({
     assert(lint_str("fn main() { }")? == []);
 })

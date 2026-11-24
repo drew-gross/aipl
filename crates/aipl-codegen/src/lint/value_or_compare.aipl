@@ -28,11 +28,11 @@ import { Equal, NotEqual, ValueOr } from "../builtin_table.aipl";
 import { Bool, Call, Char, Expr, Num, Str } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { lint_str } from "./lint.aipl";
-import { LintHit, hit } from "./lint_hit.aipl";
+import { UnfilledHit, lint_message } from "./lint_hit.aipl";
 
 # The hit for the comparison `self`, when it compares a `value_or` of one literal with a different
 # literal.
-pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
+pub fn value_or_compare(self: Call(_, args, _, callee)) -> UnfilledHit? {
     let operator = if (callee == Equal) {
         "=="
     } else if (callee == NotEqual) {
@@ -50,7 +50,7 @@ pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
         return none;
     };
     if (!default.is_literal() || default.kind == literal.kind) { return none; };
-    some(hit(
+    some(lint_message(
         `\`{spelled}\` here only supplies a value for the comparison to reject; compare the optional directly: \`{optional.source} {operator} some({literal.source})\``,
         default.span,
     ))

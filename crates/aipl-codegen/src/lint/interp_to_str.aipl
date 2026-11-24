@@ -16,10 +16,10 @@ import { ToStr } from "../builtin_table.aipl";
 import { Call, Expr, Interpolation, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { expr_text } from "./expr_text.aipl";
-import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
 
 # The hit for the interpolation `self`, when its whole value is a `to_str` call.
-pub fn interp_to_str(self: Interpolation(Expr { kind, span })) -> LintHit? {
+pub fn interp_to_str(self: Interpolation(Expr { kind, span })) -> UnfilledHit? {
     let Call(to_str, [argument], _, ToStr) = kind else { return none; };
 
     // The argument is written into the advice where it has a text to write.
@@ -27,10 +27,10 @@ pub fn interp_to_str(self: Interpolation(Expr { kind, span })) -> LintHit? {
         .expr_text()
         .map(|text| `write "\{{text}}"`)
         .value_or("interpolate the value itself");
-    some(hit(message(to_str, advice), span))
+    some(lint_message(message(to_str, advice), span))
 }.test({
     // The hits for each function's interpolations.
-    fn flagged(Function { body }) -> LintHit[] {
+    fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Interpolation>()$kind$interp_to_str().collect_ok()
     }
 

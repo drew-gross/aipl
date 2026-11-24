@@ -17,7 +17,7 @@ import {
 import { Callee, Ok } from "../builtin_table.aipl";
 import { Call, Expr, Match, descendants_of_kind, is_ident } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
-import { hit, lint_function_messages } from "./lint_hit.aipl";
+import { lint_function_messages, lint_message } from "./lint_hit.aipl";
 import { names_case, payload_binders } from "./option_match.aipl";
 
 # A `match` of exactly an `ok(ok_binder)` arm and an `err(err_binder)` arm, in either
@@ -53,7 +53,7 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
                 .descendants_of_kind::<Match>()$kind
                 $result_match()
                 .collect_ok()
-                .map(|m| hit(`{m.ok_binder} {m.err_binder}`, 0..0)),
+                .map(|m| lint_message(`{m.ok_binder} {m.err_binder}`, 0..0)),
         )
     }
     assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, err(e) => 0 } }")? == ["v e"]);
@@ -101,7 +101,7 @@ fn ok_arm_flags(body: str) -> str!ParseFailure {
             .descendants_of_kind::<Match>()$kind
             $result_match()
             .collect_ok()
-            .map(|m| hit(
+            .map(|m| lint_message(
                 `{m.ok_body.passes_through(Ok, m.ok_binder)} {m.ok_body.rebuilds(Ok, m.ok_binder)}`,
                 0..0,
             )),

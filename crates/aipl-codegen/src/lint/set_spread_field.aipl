@@ -30,12 +30,12 @@ import {
 import { Assign, Construct, Spread } from "../expr.aipl";
 import { mentions_any } from "./field_uses.aipl";
 import { lint_str } from "./lint.aipl";
-import { LintHit, hit, quote } from "./lint_hit.aipl";
+import { UnfilledHit, lint_message, quote } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 
 # The hit for the `set` `self`, when it sets a place to a literal that starts from the same place
 # and replaces fields.
-pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
+pub fn set_spread_field(self: Assign(target, value, _)) -> UnfilledHit? {
     let Construct(_, inits) = value.kind.as_case::<Construct>()?;
     let root = target.root_name()?;
     let spread = inits.first()?;
@@ -55,7 +55,7 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
     } else {
         ("replace some fields", "assign each field")
     };
-    some(hit(
+    some(lint_message(
         `this "set" rebuilds "{place}" from itself only to {what} — {advice} directly: "{stores}"`,
         spread.value.span,
     ))

@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-field_init_shorthand">field_init_shorthand</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn field_init_shorthand(self: Construct) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn field_init_shorthand(self: Construct) -&#62; UnfilledHit[]</code></pre>
 
           <div class="doc"><p>A hit for each field of the struct literal <code>self</code> (its kind) that is set to a name it shares.</p></div>
 
@@ -48,7 +48,7 @@
             <a class="anchor" href="#item-spelled_out">spelled_out</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn spelled_out(self: FieldInit) -&#62; LintHit?</code></pre>
+          <pre class="signature"><code>fn spelled_out(self: FieldInit) -&#62; UnfilledHit?</code></pre>
 
           <div class="doc"><p>The hit for the field <code>self</code>, if it is written out in full.</p></div>
 

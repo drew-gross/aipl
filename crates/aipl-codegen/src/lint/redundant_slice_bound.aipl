@@ -24,43 +24,51 @@
 import { collect_ok, equal as ==, is_empty, logical_and as &&, value_or } from builtins;
 import { Slice, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, hit, lint_function_hits, lint_function_messages } from "./lint_hit.aipl";
+import {
+    UnfilledHit,
+    lint_function_messages,
+    lint_function_unfilled,
+    lint_message,
+} from "./lint_hit.aipl";
 import { is_len_of, is_zero } from "./slice_bounds.aipl";
 
 # The hit for the slice `self`, when one of its bounds says what leaving it out would.
-pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> LintHit? {
+pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> UnfilledHit? {
     // An absent end already runs to the length; a present one has to say so.
     let reaches_end = end$is_len_of(receiver).value_or(true);
     let starts_at_edge = start$is_zero().value_or(true);
     if (starts_at_edge && reaches_end) {
         // The bound to point at: the `0` when it is written, else the end that says the length
         // (`receiver[..]` is not a form, so one of the two is there).
-        return some(hit(whole(receiver.source), start.value_or(end.value_or(receiver)).span));
+        return some(lint_message(
+            whole(receiver.source),
+            start.value_or(end.value_or(receiver)).span,
+        ));
     };
     let some(lower) = start else { return none; };
     let some(bound) = end else { return none; };
     if (bound.is_len_of(receiver)) {
-        some(hit(to_len(receiver.source, lower.source), bound.span))
+        some(lint_message(to_len(receiver.source, lower.source), bound.span))
     } else if (lower.is_zero()) {
-        some(hit(from_zero(receiver.source, bound.source), lower.span))
+        some(lint_message(from_zero(receiver.source, bound.source), lower.span))
     } else {
         none
     }
 }.test({
     // The hits for each function's slices.
-    fn flagged(Function { body }) -> LintHit[] {
+    fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Slice>()$kind$redundant_slice_bound().collect_ok()
     }
 
     // The whole receiver, in its three spellings, each pointing at a bound.
-    assert(lint_function_hits("fn f(s: str) -> str { s[0..] }", flagged)? == [
-        hit(whole("s"), 24..25),
+    assert(lint_function_unfilled("fn f(s: str) -> str { s[0..] }", flagged)? == [
+        lint_message(whole("s"), 24..25),
     ]);
-    assert(lint_function_hits("fn f(s: str) -> str { s[..s.len()] }", flagged)? == [
-        hit(whole("s"), 26..33),
+    assert(lint_function_unfilled("fn f(s: str) -> str { s[..s.len()] }", flagged)? == [
+        lint_message(whole("s"), 26..33),
     ]);
-    assert(lint_function_hits("fn f(s: str) -> str { s[0..s.len()] }", flagged)? == [
-        hit(whole("s"), 24..25),
+    assert(lint_function_unfilled("fn f(s: str) -> str { s[0..s.len()] }", flagged)? == [
+        lint_message(whole("s"), 24..25),
     ]);
 
     // The receiver is quoted as written, a call's arguments and all.
@@ -74,8 +82,8 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> LintHit? {
     ]);
 
     // An end that is the receiver's length, with a start worth keeping.
-    assert(lint_function_hits("fn f(s: str) -> str { s[3..s.len()] }", flagged)? == [
-        hit(to_len("s", "3"), 27..34),
+    assert(lint_function_unfilled("fn f(s: str) -> str { s[3..s.len()] }", flagged)? == [
+        lint_message(to_len("s", "3"), 27..34),
     ]);
 
     // A bound that is itself a computation is quoted whole.
@@ -84,8 +92,8 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> LintHit? {
     ]);
 
     // A written zero start, with an end short of the length.
-    assert(lint_function_hits("fn f(s: str) -> str { s[0..2] }", flagged)? == [
-        hit(from_zero("s", "2"), 24..25),
+    assert(lint_function_unfilled("fn f(s: str) -> str { s[0..2] }", flagged)? == [
+        lint_message(from_zero("s", "2"), 24..25),
     ]);
 
     // A call-shaped end is quoted whole, parentheses included.

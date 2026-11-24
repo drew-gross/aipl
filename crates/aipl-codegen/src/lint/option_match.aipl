@@ -29,7 +29,7 @@ import {
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Ctor, Pat } from "../pat.aipl";
-import { hit, lint_function_messages } from "./lint_hit.aipl";
+import { lint_function_messages, lint_message } from "./lint_hit.aipl";
 
 # A `match` of exactly a `some(binder)` arm and a `none` arm, in either order: the
 # value matched, the name the payload is bound to, and the two arms' bodies.
@@ -56,7 +56,7 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
                 .descendants_of_kind::<Match>()$kind
                 $option_match()
                 .collect_ok()
-                .map(|m| hit(`{m.binder} {m.scrutinee.receiver_text()}`, 0..0)),
+                .map(|m| lint_message(`{m.binder} {m.scrutinee.receiver_text()}`, 0..0)),
         )
     }
     assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")? == ["v o"]);

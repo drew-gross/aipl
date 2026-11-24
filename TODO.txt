@@ -300,9 +300,10 @@ clock:
   make units types
 
 char:
-  make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
+  make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace), but also separate types for strings that can contain those
 
 lsp:
+  go-to-refs should work for variant arm fields (e.g. go to uses of name field of ExprKind's Call's name field)
   "this document does not compile" error should name he document
   warm the cache in the background on start and on edit
   docs hover should work on Error, err, ok, etc.
@@ -485,11 +486,6 @@ types:
   After parsing we types should be "bounds" e.g. Is(ConcreteType), Bound(any), [Bound(a), Bound(b)]. Literals can have a type of OneOf(Case, CaseConstructor) or FlexInt, etc. Then they are unified by type checking.
   an array should be typed by ALL it's components, not just the first
   let ks: Case<Tok>[] = [Str, Num, End]; doesn't work.
-  you should be able to mut n = 0; and get the right integer type
-
-numbers:
-  remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range
-  divide by zero behaviour <--- investigate, should implement saturating div probably
 
 mod_aipl:
   create it
@@ -576,7 +572,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  the fn flagged() functions all over the lint tests seem non-DRY. Is that function basically just calling the linter on the string? Why not do that directly?
+  lets make the span argument to lint_message optional, and if not provided, the outer linter assumes it applies to the whole node that is being linted. Also lets renamed UnfilledHit to LintHit, since it's now the primary way to report lint errors (and thus deserves to own the primary name)
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map
@@ -588,7 +584,6 @@ lint:
   match_value_or_err shouldn't care about is_test_code.
   match_value_or_err should be able to leverage the actual can_defer (maybe this needs to go in a later stage? maybe can_defer needs to go earlier?)
   const function should be const var most of the time
-  make Call's Callee field non-optional
   lint after name resolution so we don't have to do the "names" check that makes sure things are imported with the expected names - lints should continue to work even if e.g import { len as foo } from builtins is done
   lint test helper so messages doesn't need to keep getting reimplemented
   allow declaring types in tests, and require a type to be declared in the test if it's only used in the test
@@ -876,6 +871,7 @@ coverage:
   make code coverage
 
 perfmon:
+  keep a database of various perf things, not checked it, so that it's slightly more possible to monitor handoff timings over time.
   put top down and bottom up flamegraph in same svg
   be more selective about what tests run per: we should switch to only the tests that are designed for it, plus some things we really care about (e.g. the compiler itself). We need better perf coverage first though.
   figure out ways to make perfmon refresh faster, seems like it's often the long pole in handoff

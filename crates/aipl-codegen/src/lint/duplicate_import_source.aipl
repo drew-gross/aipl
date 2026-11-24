@@ -5,16 +5,16 @@
 
 import { collect_arms, equal as ==, push } from builtins;
 import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
-import { LintHit, hit, lint_hits } from "./lint_hit.aipl";
+import { UnfilledHit, lint_hits, lint_message, shown } from "./lint_hit.aipl";
 import { has, insert } from sets;
 
 # A hit for each import of a source an earlier import already took names from,
 # in the order the imports are written.
-pub fn duplicate_import_source(Program { items }) -> LintHit[] {
+pub fn duplicate_import_source(Program { items }) -> UnfilledHit[] {
     mut seen: #{ImportSource} = #{};
-    mut hits: LintHit[] = [];
+    mut hits: UnfilledHit[] = [];
     for (let Import(ImportDecl { source, source_span }) : items.collect_arms::<Import>()) {
-        if (seen.has(source)) { set hits.push(hit(source.message(), source_span)); };
+        if (seen.has(source)) { set hits.push(lint_message(source.message(), source_span)); };
         set seen.insert(source);
     }
     hits
@@ -35,7 +35,7 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
     // its source.
     let src = "import { map } from builtins;\nimport { len } from builtins;\nfn f() { }";
     assert(lint_hits(src, duplicate_import_source)?$span == [50..58]);
-    assert(lint_hits(src, duplicate_import_source)?$message == [
+    assert(lint_hits(src, duplicate_import_source)?.shown() == [
         """duplicate import from "builtins"; merge the names into the first `import { .. } from builtins;`""",
     ]);
 
@@ -51,7 +51,7 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
         """,
         duplicate_import_source,
     )?;
-    assert(paths$message == [
+    assert(paths.shown() == [
         """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
         """duplicate import from "./a.aipl"; merge the names into the first `import { .. } from "./a.aipl";`""",
     ]);

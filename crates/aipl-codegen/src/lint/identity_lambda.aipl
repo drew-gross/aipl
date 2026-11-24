@@ -34,11 +34,11 @@ import {
 } from "../expr.aipl";
 import { is_operator_name } from "../is_operator_name.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
 import { projections } from "./use_field_projection.aipl";
 
 # A hit for each lambda in the program that only forwards its arguments.
-pub fn identity_lambda(function: Function) -> LintHit[] {
+pub fn identity_lambda(function: Function) -> UnfilledHit[] {
     // The lambdas the projection advice already covers are not advised on again.
     let advised = function.projections()$lambda.collect_ok();
     function.body
@@ -93,7 +93,7 @@ pub fn identity_lambda(function: Function) -> LintHit[] {
 # accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.
-fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
+fn forwarded(self: Expr<Lambda>, advised: Span[]) -> UnfilledHit? {
     let Lambda(parameters, body) = self.kind;
     if (advised.contains(self.span)) { return none; };
     let Call(name, arguments, _, _) = body.kind.as_case::<Call>()?;
@@ -110,7 +110,7 @@ fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
         ),
     );
     if (!forwards.all(|same| same)) { return none; };
-    some(hit(
+    some(lint_message(
         `lambda only forwards its argument(s) to "{name}" — pass "{name}" directly`,
         self.span,
     ))

@@ -13,10 +13,10 @@
 import { as_case, collect_ok, equal as ==, not_equal as !=, starts_with } from builtins;
 import { Construct, FieldInit, Ident } from "../expr.aipl";
 import { lint_str } from "./lint.aipl";
-import { LintHit, hit } from "./lint_hit.aipl";
+import { UnfilledHit, lint_message } from "./lint_hit.aipl";
 
 # A hit for each field of the struct literal `self` (its kind) that is set to a name it shares.
-pub fn field_init_shorthand(self: Construct(name, inits)) -> LintHit[] {
+pub fn field_init_shorthand(self: Construct(name, inits)) -> UnfilledHit[] {
     if (name.starts_with("__builtin_")) { return []; };
     inits$spelled_out().collect_ok()
 }.test({
@@ -39,11 +39,11 @@ pub fn field_init_shorthand(self: Construct(name, inits)) -> LintHit[] {
 })
 
 # The hit for the field `self`, if it is written out in full.
-fn spelled_out(self: FieldInit) -> LintHit? {
+fn spelled_out(self: FieldInit) -> UnfilledHit? {
     if (self.shorthand) { return none; };
     let Ident(name, _) = self.value.kind.as_case::<Ident>()?;
     if (name != self.name) { return none; };
-    some(hit(message(name), self.value.span))
+    some(lint_message(message(name), self.value.span))
 }
 
 fn message(name: str) -> str {

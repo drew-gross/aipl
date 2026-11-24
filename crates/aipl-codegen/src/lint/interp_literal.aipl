@@ -22,10 +22,10 @@ import {
 } from builtins;
 import { Char, Expr, Interpolation, Str, descendants_of_kind } from "../expr.aipl";
 import { Function } from "../item.aipl";
-import { LintHit, hit, lint_function_messages } from "./lint_hit.aipl";
+import { UnfilledHit, lint_function_messages, lint_message } from "./lint_hit.aipl";
 
 # The hit for the interpolation `self`, when its whole value is a string or char literal.
-pub fn interp_literal(self: Interpolation(Expr { source, kind, span })) -> LintHit? {
+pub fn interp_literal(self: Interpolation(Expr { source, kind, span })) -> UnfilledHit? {
     // The tree does not record which form a string literal was written in; its
     // first characters do.
     let raw = source.starts_with(`"""`);
@@ -36,10 +36,10 @@ pub fn interp_literal(self: Interpolation(Expr { source, kind, span })) -> LintH
     } else {
         return none;
     };
-    some(hit(message(what), span))
+    some(lint_message(message(what), span))
 }.test({
     // The hits for each function's interpolations.
-    fn flagged(Function { body }) -> LintHit[] {
+    fn flagged(Function { body }) -> UnfilledHit[] {
         body.descendants_of_kind::<Interpolation>()$kind$interp_literal().collect_ok()
     }
 

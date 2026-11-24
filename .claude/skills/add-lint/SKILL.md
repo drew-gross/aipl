@@ -10,8 +10,9 @@ registered in `lint/lint.aipl`, listed in `DOGFOOD_SOURCE_FILES`
 (`crates/aipl-codegen/src/lib.rs`), run on the program after hoisting (every body is a
 function, the `.test` and `.benchmark` blocks included) and before desugaring (so
 the source forms are still there), returning hits. Most lints are a function of one
-`Function`, run over the program's functions (`lint()` lists them once) by `hits`, `hits_once`
-and `unfilled_hits`; one that needs
+`Function`, run over the program's functions (`lint()` lists them once) by `unfilled_hits`; every lint
+returns `UnfilledHit`s, and a hit that names no builtin is `lint_message(message, span)`, which is
+an `UnfilledHit` with nothing named, so `lint()` fills them all in at the end; one that needs
 the file's imports (to find a call by the name it was written under) takes the program's `items`
 beside the function, as `push_loop_pipeline` does. A lint of the whole program
 (`unused_imports`) takes the `Program`. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
@@ -23,9 +24,9 @@ CLAUDE.md and in the add-builtin skill's step 4.
 
 DRY is critical here. Before writing a helper, search for it:
 
-- `lint/lint_hit.aipl` — `hit`, `UnfilledHit`, `functions`,
-  `hits`, `unfilled_hits`, the `lint_*` test drivers (`lint_in_messages` and
-  `lint_in_unfilled_messages` for a lint that takes `items`).
+- `lint/lint_hit.aipl` — `lint_message`, `UnfilledHit`, `functions`,
+  `unfilled_hits`, the `lint_*` test drivers (`lint_function_messages` and `lint_function_unfilled`;
+  `lint_in_unfilled` and `lint_in_unfilled_messages` for a lint that takes `items`).
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl` (reading a bound), `lint/option_match.aipl`,
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
   shape and its pipeline advice). Template interpolations are `Interpolation` nodes (`interp_lints` in `lint.aipl`).

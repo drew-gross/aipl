@@ -33,7 +33,7 @@ import {
 } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
 import { Ctor, Int, Nested, Pat, Wildcard, is_binder_name } from "../pat.aipl";
-import { hit, lint_function_messages } from "./lint_hit.aipl";
+import { lint_function_messages, lint_message } from "./lint_hit.aipl";
 
 # A constructor pattern for a case of a variant the program declares: its name, and
 # the names it binds (none for `K(..)` or a case with no payload).
@@ -152,7 +152,10 @@ fn tails(src: str) -> str[]!ParseFailure {
         src,
         |function| function.body
             .tail_matches()
-            .map(|e| hit(if (e.kind.is_case::<Match>()) { "Match" } else { "IfLet" }, 0..0)),
+            .map(|e| lint_message(
+                if (e.kind.is_case::<Match>()) { "Match" } else { "IfLet" },
+                0..0,
+            )),
     )
 }
 
