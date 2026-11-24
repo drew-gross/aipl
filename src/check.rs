@@ -81,11 +81,11 @@ impl Parts {
 
 /// One of `count` slices of a sorted file list, as `--shard index/count` names it.
 ///
-/// A file belongs to the shard its position in the list says: position `k` is in shard
-/// `k % count + 1`. The list is sorted and de-duplicated before the choice, so the same tree
-/// split the same way gives every process the same slice, the slices together are the whole list
-/// and none overlaps another. Neighbouring files, which tend to cost alike, land in different
-/// shards.
+/// Without costs, a file belongs to the shard its position in the list says: position `k` is in
+/// shard `k % count + 1`. With them ([`Shard::take_by_cost`]), the costliest file goes first, each
+/// to the shard that has the least so far. Either way the list is sorted and de-duplicated before
+/// the choice, so the same tree split the same way gives every process the same slice, the slices
+/// together are the whole list and none overlaps another.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shard {
     /// Which slice, from 1.
@@ -105,6 +105,31 @@ impl Shard {
             return Err(bad());
         }
         Ok(Shard { index, count })
+    }
+
+    /// The members of `files` (already in the order every process sees) that fall in this shard,
+    /// when each is given the cost of checking it: every file goes, costliest first, to the shard
+    /// with the least cost so far (ties go to the lower shard, and equal costs to the earlier
+    /// file), so no shard is far from the mean, which is what the slowest shard's time is
+    /// otherwise a poor estimate of.
+    pub fn take_by_cost<T>(&self, files: Vec<(T, u64)>) -> Vec<T> {
+        let mut order: Vec<usize> = (0..files.len()).collect();
+        order.sort_by(|&a, &b| files[b].1.cmp(&files[a].1).then(a.cmp(&b)));
+        let mut load = vec![0u64; self.count];
+        let mut owner = vec![0usize; files.len()];
+        for k in order {
+            let lightest = (0..self.count)
+                .min_by_key(|&shard| (load[shard], shard))
+                .expect("a shard count is at least one");
+            owner[k] = lightest;
+            load[lightest] += files[k].1;
+        }
+        files
+            .into_iter()
+            .enumerate()
+            .filter(|(position, _)| owner[*position] + 1 == self.index)
+            .map(|(_, (file, _))| file)
+            .collect()
     }
 
     /// The members of `files` (already in the order every process sees) that fall in this shard.
@@ -474,6 +499,29 @@ pub fn render_findings(label: &str, found: &[Finding]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn costed_shards_partition_the_list_and_even_out_the_cost() {
+        let costs: Vec<u64> = vec![90, 1, 1, 1, 50, 40, 40, 30, 5, 5, 5, 5, 20, 10];
+        let files: Vec<(usize, u64)> = costs.iter().copied().enumerate().collect();
+        let mut seen = Vec::new();
+        let mut loads = Vec::new();
+        for index in 1..=3 {
+            let taken = Shard { index, count: 3 }.take_by_cost(files.clone());
+            loads.push(taken.iter().map(|&k| costs[k]).sum::<u64>());
+            seen.extend(taken);
+        }
+        // Every file in exactly one shard, in the order it was given.
+        seen.sort();
+        assert_eq!(seen, (0..costs.len()).collect::<Vec<_>>());
+        // No shard is far above the mean of 101.
+        assert_eq!(loads.iter().sum::<u64>(), 303);
+        assert!(loads.iter().all(|&load| load <= 110), "{loads:?}");
+        // Every process chooses the same split, and a shard keeps its files in list order.
+        let again = Shard { index: 2, count: 3 }.take_by_cost(files.clone());
+        assert_eq!(again, Shard { index: 2, count: 3 }.take_by_cost(files));
+        assert!(again.windows(2).all(|w| w[0] < w[1]));
+    }
 
     #[test]
     fn a_shard_is_written_index_over_count() {

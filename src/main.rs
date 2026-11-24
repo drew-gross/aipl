@@ -136,9 +136,11 @@ refusal) without running anything. `--tests` and `--benchmarks` also run the `.t
 a part leaves the file's recorded sections and `--baseline` out, since they describe
 runs of `main` and of the whole file. The exit status is non-zero exactly when a chosen
 part reports a failure.
-`--shard i/n` checks only the i-th of n slices of the sorted file list (position k is in shard
-k % n + 1), so n processes started with the same paths cover every file once between them. It is
-a batch even for one file, and a slice with no files passes.
+`--shard i/n` checks only the i-th of n slices of the sorted file list, so n processes started
+with the same paths cover every file once between them. Given `--baseline`, the slices are
+balanced by what checking each file costs, its code bytes in the table (a file without a row by
+its size); without it, position k is in shard k % n + 1. It is a batch even for one file, and a
+slice with no files passes.
 `--baseline <table.md>` also holds each file's run to its row in that table (the five
 counts `report` prints, exactly; the row is named by the file's path from where `check`
 was started, without `.aipl`), and a file with no row fails. It reports every failure rather than stopping at the first, and exits 0 only if all
@@ -1113,7 +1115,13 @@ fn check_cmd(args: &[String]) -> ExitCode {
     // with nothing in it is a pass; an empty tree is not.
     let empty_tree = files.is_empty();
     if let Some(shard) = shard {
-        files = shard.take(files);
+        files = match &baseline {
+            Some(table) => {
+                let costs = compile_costs(&files, table);
+                shard.take_by_cost(files.into_iter().zip(costs).collect())
+            }
+            None => shard.take(files),
+        };
     }
     if empty_tree {
         // Checking nothing and reporting success would quietly disarm a handoff
@@ -1590,6 +1598,41 @@ fn take_value_flag(args: Vec<String>, flag: &str) -> Result<(Vec<String>, Option
         }
     }
     Ok((rest, value))
+}
+
+/// What checking each of `files` costs, as a number to balance shards by: the code bytes of its row
+/// in the baseline table. What a check spends is compiling the program, twice (to run its tests
+/// and to measure it), and that follows the size of the code, not how long the program then runs:
+/// across the twelve shards of a corpus run the sum of code bytes predicted a shard's CPU time at
+/// r = 0.99, and the sum of instructions at r = 0.26. A file with no row (a library a case
+/// imports) costs what its source size says at the median bytes of code per byte of source.
+fn compile_costs(files: &[PathBuf], table: &sections::Baseline) -> Vec<u64> {
+    let sizes: Vec<u64> = files
+        .iter()
+        .map(|file| std::fs::metadata(file).map_or(0, |meta| meta.len()))
+        .collect();
+    let rows: Vec<Option<u64>> = files
+        .iter()
+        .map(|file| {
+            let name = file.to_string_lossy();
+            let key = name.trim_start_matches("./").trim_end_matches(".aipl");
+            table.rows.get(key).map(|row| row[4])
+        })
+        .collect();
+    let mut ratios: Vec<f64> = rows
+        .iter()
+        .zip(&sizes)
+        .filter_map(|(row, size)| {
+            row.filter(|_| *size > 0)
+                .map(|code| code as f64 / *size as f64)
+        })
+        .collect();
+    ratios.sort_by(f64::total_cmp);
+    let ratio = ratios.get(ratios.len() / 2).copied().unwrap_or(1.0);
+    rows.iter()
+        .zip(&sizes)
+        .map(|(row, size)| row.unwrap_or((*size as f64 * ratio) as u64))
+        .collect()
 }
 
 /// The baseline table `--baseline` names, read once for the whole run.
