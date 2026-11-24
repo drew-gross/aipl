@@ -18,6 +18,7 @@ import {
     any,
     equal as ==,
     filter,
+    is_empty,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
@@ -73,14 +74,14 @@ pub fn unused_functions(program: Program) -> LintHit[] {
                 pub fn g() { shim prints { print = d } { 1 }; }
             """,
             unused_functions,
-        )? == [],
+        )?.is_empty(),
     );
 
     // A file with no `main` and nothing `pub` has no entry point, so nothing in it is dead.
-    assert(lint_messages("fn helper() { }", unused_functions)? == []);
+    assert(lint_messages("fn helper() { }", unused_functions)?.is_empty());
 
     // `pub` functions, and `main`, are reachable from outside the file.
-    assert(lint_messages("pub fn f() { } fn main() { }", unused_functions)? == []);
+    assert(lint_messages("pub fn f() { } fn main() { }", unused_functions)?.is_empty());
 
     // A function's own recursion does not keep it alive.
     assert(lint_messages("fn f(n: i64) -> i64 { f(n) } fn main() { }", unused_functions)? == [
@@ -88,23 +89,26 @@ pub fn unused_functions(program: Program) -> LintHit[] {
     ]);
 
     // Its own test does, as does another function's body or test.
-    assert(lint_messages("fn f() { }.test({ f(); }) fn main() { }", unused_functions)? == []);
-    assert(lint_messages("fn f() { }.test({ g(); }) pub fn g() { }", unused_functions)? == []);
-    assert(lint_messages("fn f() { } pub fn g() { f(); }", unused_functions)? == []);
-    assert(lint_messages("fn f() { } pub fn g() { }.test({ f(); })", unused_functions)? == []);
+    assert(lint_messages("fn f() { }.test({ f(); }) fn main() { }", unused_functions)?.is_empty());
+    assert(lint_messages("fn f() { }.test({ g(); }) pub fn g() { }", unused_functions)?.is_empty());
+    assert(lint_messages("fn f() { } pub fn g() { f(); }", unused_functions)?.is_empty());
+    assert(lint_messages("fn f() { } pub fn g() { }.test({ f(); })", unused_functions)?.is_empty());
 
     // A helper declared in a test block is used by that block.
-    assert(lint_messages("pub fn f() { }.test({ fn h() { } h(); })", unused_functions)? == []);
+    assert(lint_messages("pub fn f() { }.test({ fn h() { } h(); })", unused_functions)?.is_empty());
 
     // A constant's value and a struct field's default mention functions too.
     assert(
-        lint_messages("fn f() -> i64 { 1 } let C = f(); fn main() { }", unused_functions)? == [],
+        lint_messages(
+            "fn f() -> i64 { 1 } let C = f(); fn main() { }",
+            unused_functions,
+        )?.is_empty(),
     );
     assert(
         lint_messages(
             "fn f() -> i64 { 1 } struct S { x: i64 = f() } fn main() { }",
             unused_functions,
-        )? == [],
+        )?.is_empty(),
     );
 })
 

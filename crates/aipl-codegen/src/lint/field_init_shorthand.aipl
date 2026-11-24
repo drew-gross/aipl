@@ -6,7 +6,7 @@
 #
 # The hit points at the value.
 
-import { as_case, collect_ok, equal as ==, not_equal as != } from builtins;
+import { as_case, collect_ok, equal as ==, is_empty, not_equal as != } from builtins;
 import { Construct, FieldInit, Ident } from "../expr.aipl";
 import { lint_str } from "./lint.aipl";
 import { LintHit, lint_message } from "./lint_hit.aipl";
@@ -23,14 +23,14 @@ pub fn field_init_shorthand(self: Construct(name, inits)) -> LintHit[] {
     assert(lint_str("fn f(x: i64, y: i64) -> Q { P { x: x, y: y + 1, z: y } }")? == [message("x")]);
 
     // The shorthand itself, a different name, a spread and a range are not flagged.
-    assert(lint_str("fn f(x: i64) -> Q { P { x } }")? == []);
-    assert(lint_str("fn f(x: i64) -> Q { P { x: y } }")? == []);
-    assert(lint_str("fn f(p: P) -> Q { P { ..p, x: 1 } }")? == []);
-    assert(lint_str("fn f(a: u64, b: u64) -> u64[] { a..b }")? == []);
+    assert(lint_str("fn f(x: i64) -> Q { P { x } }")?.is_empty());
+    assert(lint_str("fn f(x: i64) -> Q { P { x: y } }")?.is_empty());
+    assert(lint_str("fn f(p: P) -> Q { P { ..p, x: 1 } }")?.is_empty());
+    assert(lint_str("fn f(a: u64, b: u64) -> u64[] { a..b }")?.is_empty());
 
     // A range inside a struct body desugars to a `Span` whose bound names match its fields, and the
     // value's preceding source character is the outer `span:` colon; neither is a written `field: field`.
-    assert(lint_str("fn tok(start: i64, end: i64) -> Tok { span: start..end }")? == []);
+    assert(lint_str("fn tok(start: i64, end: i64) -> Tok { span: start..end }")?.is_empty());
 })
 
 # The hit for the field `self`, if it is written out in full.

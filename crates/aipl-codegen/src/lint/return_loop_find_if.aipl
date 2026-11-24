@@ -141,7 +141,7 @@ pub fn return_loop_find_if(Function { body }) -> LintHit[] {
         "fn f(xs: i64[]) -> i64? { for (let x : xs) { if (x > 1) { g(x); return some(x); }; } none }",
         "fn f(n: i64) -> i64? { mut i = 0; while (i < n) { if (i == 3) { return some(i); }; set i++; } none }",
     ]) {
-        assert(lint_function_unfilled_messages(source, return_loop_find_if)? == []);
+        assert(lint_function_unfilled_messages(source, return_loop_find_if)?.is_empty());
     }
 
     // `any`'s shape reports only that a match existed, which is another lint's, and the rewrite

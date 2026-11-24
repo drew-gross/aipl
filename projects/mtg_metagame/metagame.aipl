@@ -15,6 +15,7 @@ import {
     float_div as /,
     get,
     greater_than as >,
+    is_empty,
     less_than as <,
     logical_not as !,
     logical_or as ||,
@@ -89,7 +90,7 @@ pub fn all_cards(self: Deck) -> Card[] { [..self.maindeck, ..self.sideboard] }.t
     let bolt = Card { name: "Bolt", count: 2, card_type: "Instant" };
     let deck = Deck { deck_id: "1", maindeck: [island], sideboard: [bolt] };
     assert(deck.all_cards() == [island, bolt]);
-    assert(Deck { ..deck, maindeck: [], sideboard: [] }.all_cards() == []);
+    assert((Deck { ..deck, maindeck: [], sideboard: [] }.all_cards()).is_empty());
 })
 
 # The decks of one or more tournaments and the matches they played. A match is held once, whichever

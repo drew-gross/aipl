@@ -76,9 +76,11 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
 
     // A swap reads the target, so it cannot be split; a different base or no replacement is no
     // field store either.
-    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: q.y, y: q.x }; q }")? == []);
-    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..p, x: 1 }; q }")? == []);
-    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q }; q }")? == []);
+    assert(
+        lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q, x: q.y, y: q.x }; q }")?.is_empty(),
+    );
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..p, x: 1 }; q }")?.is_empty());
+    assert(lint_str("fn f(p: P) -> P { mut q = p; set q = P { ..q }; q }")?.is_empty());
 
     // Shapes the lint flags, and what it says of them.
     assert(lint_str("""
@@ -100,7 +102,7 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
             fn swap(mut self: Point) {
                 set self = Point { ..self, x: self.y, y: self.x };
             }
-        """)? == [],
+        """)?.is_empty(),
     );
     assert(
         lint_str("""
@@ -111,6 +113,6 @@ pub fn set_spread_field(self: Assign(target, value, _)) -> LintHit? {
                 set p.swap();
                 print(to_str(p));
             }
-        """)? == [],
+        """)?.is_empty(),
     );
 })

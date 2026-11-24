@@ -7,6 +7,7 @@ import {
     contains,
     equal as ==,
     extend,
+    is_empty,
     is_err_and,
     len,
     not_equal as !=,
@@ -108,12 +109,12 @@ pub fn companion_files(src: str) -> Companion[]!str {
     assert(companion_files(inner)? == [Companion { path: "gap.txt", contents: "a\n\nb" }]);
 
     // A `check` section with flags is not a companion, and neither is the text under it.
-    assert(companion_files("fn main() {}\n--- check --tests ---\nok\n")? == []);
+    assert(companion_files("fn main() {}\n--- check --tests ---\nok\n")?.is_empty());
 
     // No `file:` sections at all -> nothing, whether or not other sections exist.
-    assert(companion_files("fn main() {}\n")? == []);
-    assert(companion_files("fn main() {}\n--- stdout ---\nok\n")? == []);
-    assert(companion_files("")? == []);
+    assert(companion_files("fn main() {}\n")?.is_empty());
+    assert(companion_files("fn main() {}\n--- stdout ---\nok\n")?.is_empty());
+    assert(companion_files("")?.is_empty());
 
     // Unusable paths are refused rather than staged somewhere unexpected.
     assert(companion_files("--- file: ---\nx\n").is_err_and(|e| e.starts_with("`file:`")));
@@ -125,7 +126,7 @@ pub fn companion_files(src: str) -> Companion[]!str {
     assert(companion_files("--- file:   spaced.txt   ---\nx\n")? == [
         Companion { path: "spaced.txt", contents: "x" },
     ]);
-    assert(companion_files("--- files: x.txt ---\nx\n")? == []);
+    assert(companion_files("--- files: x.txt ---\nx\n")?.is_empty());
 })
 
 # The path a `file:` section names, rejected when it can't be staged. Mirrors

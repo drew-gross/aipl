@@ -4,6 +4,7 @@ import {
     equal as ==,
     filter,
     greater_than as >,
+    is_empty,
     less_than as <,
     map,
     not_equal as !=,
@@ -31,7 +32,7 @@ fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({
     assert(xs.filter(is_even).map(|x| x * 2) == [4, 8, 12]);
 
     // Filtering down to nothing yields an empty array.
-    assert(xs.filter(|x| x > 100) == []);
+    assert(xs.filter(|x| x > 100).is_empty());
 
     // Works over other element types (str).
     let words = ["hi", "", "yo", ""];

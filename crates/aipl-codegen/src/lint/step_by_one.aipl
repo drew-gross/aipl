@@ -212,7 +212,7 @@ pub fn step_by_one(self: Assign(target, value, _)) -> LintHit? {
     assert(on_field("set c.n = c.n + 1;")? == [
         """adding 1 to "c.n" — use the increment form "set c.n++;", importing `wrapping_increment as ++` from builtins""",
     ]);
-    assert(on_field("set c.n = m + 1;")? == []);
+    assert(on_field("set c.n = m + 1;")?.is_empty());
 
     // An operator bound to one of the file's own functions is not the builtin, whatever it is called.
     assert(lint_in_unfilled(

@@ -22,7 +22,7 @@ fn below(xs: i64[], cap: i64) -> i64[]!str {
 
 // An empty array literal coerces inside `ok(...)` like any `[]`.
 fn nothing() -> i64[]!str { ok([]) }.test({
-    assert(nothing()? == []);
+    assert(nothing()?.is_empty());
     match (nothing()) {
         ok(v) => assert(v.is_empty()),
         err(..) => assert(false),

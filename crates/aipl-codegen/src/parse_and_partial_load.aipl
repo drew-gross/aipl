@@ -21,7 +21,7 @@
 # The formatter lays a file out from its tokens, and parses it only to refuse one that does
 # not parse.
 
-import { Span, contains, equal as ==, len, logical_not as ! } from builtins;
+import { Span, contains, equal as ==, is_empty, len, logical_not as ! } from builtins;
 import { desugar } from "./desugar.aipl";
 import {
     ParseFailure,
@@ -61,14 +61,14 @@ pub fn parse_and_partial_load(src: str) -> PartialLoad!ParseFailure {
     let kept = parse_and_partial_load(
         "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } } #[allow]",
     )?;
-    assert(kept.lints == []);
+    assert(kept.lints.is_empty());
     let stale = parse_and_partial_load("fn f() { } #[allow]")?;
     assert(stale.lints$message == ["this `#[allow]` squelches nothing — remove it"]);
 
     // A file with neither attribute and no type parameters is as it was parsed.
     let plain = parse_and_partial_load("fn f() { }")?;
     assert(plain.program == aipl_parse_file("fn f() { }")?.program);
-    assert(plain.lints == []);
+    assert(plain.lints.is_empty());
 
     // The ported lints' hits come with it.
     let unused = parse_and_partial_load("import { map } from builtins;\nfn f() { }")?;

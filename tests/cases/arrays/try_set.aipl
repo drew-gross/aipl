@@ -8,6 +8,7 @@
 
 import {
     equal as ==,
+    is_empty,
     print,
     repeat,
     reverse,
@@ -27,7 +28,7 @@ fn basics() {}.test({
     // Past the end, and an empty receiver: the array, as it was.
     assert([1, 2, 3].try_set(3, 9) == [1, 2, 3]);
     assert([1, 2, 3].try_set(100, 9) == [1, 2, 3]);
-    assert([1, 2][..0].try_set(0, 9) == []);
+    assert([1, 2][..0].try_set(0, 9).is_empty());
     assert(try_set([1, 2], 0, 7) == [7, 2]); // free-call form
     // As an expression the receiver is not changed.
     let xs = [1, 2, 3];
@@ -108,22 +109,22 @@ deallocations     24
 reallocations     0
 bytes allocated   2096
 peak live bytes   1163
-instructions      24579
-binary size       29488 bytes (code 18884, data 2645, metadata 7959)
+instructions      24516
+binary size       29464 bytes (code 18876, data 2653, metadata 7935)
 
 function                                 calls  code bytes
 __aipl_const_teardown                        1          92
 __eq_Cell                                    4         100
 __eq_Cell$arr                                2         240
 __eq_bool$arr                                3         160
-__eq_i64$arr                                17         264
+__eq_i64$arr                                16         264
 __eq_i64$arr$arr                             1         240
 __eq_str$arr                                 1         320
 __eq_u8$arr                                  1         264
 __test$__test_block_1                        1        3140
 __test$__test_block_1$shim_closure0          0        1384
 __test$__test_block_1$shim_closure1          1        1384
-__test$basics                                1        3364
+__test$basics                                1        3356
 __test$other_elements                        1        4004
 __test$statement                             1        2372
 __test$views                                 1         972

@@ -3,6 +3,7 @@
 import {
     equal as ==,
     get,
+    is_empty,
     join,
     push,
     to_dict,
@@ -44,5 +45,5 @@ pub fn card_counts(decks: Deck[]) -> Counted[] {
         Counted { name: "Island", count: 7 },
         Counted { name: "Bolt", count: 3 },
     ]);
-    assert(card_counts([]) == []);
+    assert(card_counts([]).is_empty());
 })

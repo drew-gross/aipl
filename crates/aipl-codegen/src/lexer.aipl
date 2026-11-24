@@ -1139,8 +1139,14 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     let base = [ws, ident, digits];
 
     // Empty / all-whitespace input produces no tokens.
-    assert(lex_kinds("", base)? == []);
-    assert(lex_kinds(" \t\n\r ", base)? == []);
+    assert(lex_kinds("", base)?.is_empty());
+    assert(
+        lex_kinds(
+            " \t\n
+ ",
+            base,
+        )?.is_empty(),
+    );
 
     // Each kind is a variant arm carrying its content: an identifier holds its
     // text, and its span still slices the same text from the source.
@@ -1482,7 +1488,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     // ToEol with skip: comments are dropped like whitespace.
     let cmt = [ws, TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true }, ident];
     assert(lex_kinds("a // b\nc", cmt)? == [Ident("a"), Ident("c")]);
-    assert(lex_kinds("// only", cmt)? == []);
+    assert(lex_kinds("// only", cmt)?.is_empty());
 
     // --- Rule sets resembling real languages. ---
 

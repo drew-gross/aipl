@@ -18,6 +18,7 @@ import {
     as_case,
     equal as ==,
     is_case,
+    is_empty,
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
@@ -82,13 +83,13 @@ pub fn value_or_compare(self: Call(_, args, _, callee)) -> LintHit? {
     ]);
 
     // The same literal is a genuine "none or that" test; a name is not a literal; `!=` needs its import.
-    assert(messages("value_or, equal as ==", "x.value_or('.') == '.'")? == []);
-    assert(messages("value_or, equal as ==", "x.value_or(y) == '.'")? == []);
-    assert(messages("value_or, equal as ==", "x.value_or(' ') != '.' && x == y")? == []);
-    assert(messages("equal as ==", "x == '.'")? == []);
+    assert(messages("value_or, equal as ==", "x.value_or('.') == '.'")?.is_empty());
+    assert(messages("value_or, equal as ==", "x.value_or(y) == '.'")?.is_empty());
+    assert(messages("value_or, equal as ==", "x.value_or(' ') != '.' && x == y")?.is_empty());
+    assert(messages("equal as ==", "x == '.'")?.is_empty());
 
     // Without the import the lint cannot tell what `==` or `value_or` mean.
-    assert(lint_str("fn f(c: char?) -> bool { c.value_or(' ') == '.' }")? == []);
+    assert(lint_str("fn f(c: char?) -> bool { c.value_or(' ') == '.' }")?.is_empty());
 
     // `#[allow]` keeps the longhand, and the rewrite it asks for agrees with it.
     fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' } #[allow]

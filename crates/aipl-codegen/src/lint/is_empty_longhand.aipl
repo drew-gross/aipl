@@ -86,8 +86,6 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
         flagged,
     )?.shown() == [`emptiness asked the long way — use "Builtin(IsEmpty)" on the receiver`]);
 
-    // The names the file gives the builtins do not matter.
-
     // `!= 0`, another number, an operator that is not the builtin one, and a `len` of the
     // file's own are not this.
     assert(
@@ -106,35 +104,6 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     // A `len` of the file's own is a different function answering a different question, and
     // `is_empty` does not even accept what it takes, so advising it would advise code that does not
     // compile. (A file cannot both define `len` and import the builtin one.)
-    assert(
-        lint_function_unfilled(
-            """
-                import { equal as == } from builtins;
-                variant List = Nil | Cons(i64)
-                fn len(self: List) -> i64 { match (self) { Nil => 0, Cons(..) => 1 } }
-                fn is_nil(xs: List) -> bool { xs.len() == 0 }
-            """,
-            flagged,
-        )?.is_empty(),
-    );
-    assert(
-        lint_function_unfilled(
-            """
-                import { equal as == } from builtins;
-                variant List = Nil | Cons(i64)
-                fn len(self: List) -> i64 { match (self) { Nil => 0, Cons(..) => 1 } }
-                fn is_nil(xs: List) -> bool { xs.len() == 0 }
-            """,
-            flagged,
-        )?.is_empty(),
-    );
-    assert(lint_function_unfilled(
-        "fn f(x: i64[]) -> bool { !x.is_nonempty() && x.is_empty() }",
-        flagged,
-    )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x.len() == 0 }", flagged)?.shown() == [
-        `emptiness asked the long way — use "x.Builtin(IsEmpty)()"`,
-    ]);
     assert(
         lint_function_unfilled(
             """

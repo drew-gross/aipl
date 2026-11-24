@@ -93,17 +93,6 @@ pub fn len_gt_zero(self: Call(_, args, _, callee)) -> LintHit? {
         flagged,
     )?.shown() == [`a length compared against 0 — use "Builtin(IsNonempty)" on the receiver`]);
 
-    // The names the file gives the builtins do not matter.
-
-    // Other comparisons, or an operator that is not the builtin one, are not this.
-
-    // A different bound is a different question. `>= 1` and `!= 0` mean the same thing but are not
-    // the two idioms the lint rewrites, and inventing a third spelling to flag would make the rule
-    // harder to state than to follow.
-
-    // Zero compared against anything that isn't a length; the spelling the lint asks for, which must
-    // not then flag itself; and the other question, an un-negated `is_empty`.
-
     assert(
         lint_function_unfilled("fn f(x: i64[]) -> bool { x.is_nonempty() }", flagged)?.is_empty(),
     );

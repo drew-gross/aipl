@@ -15,7 +15,7 @@
 # measured on `lexer.aipl`, 10 reallocations became 112 — while `push` grows
 # geometrically and needs no temporary sequence to hold the one element.
 
-import { equal as ==, push } from builtins;
+import { equal as ==, is_empty, push } from builtins;
 
 # Append what `other` holds, if it holds anything; leave `self` alone when it
 # holds nothing.
@@ -38,7 +38,7 @@ pub fn extend_optional<T: any>(mut self: T[], other: T?) {
     // Nothing at all, onto an array that stays empty.
     mut empty: i64[] = [];
     set empty.extend_optional(none);
-    assert(empty == []);
+    assert(empty.is_empty());
 
     // Any element type an array holds, including a heap one, whose refcount the
     // `push` handles exactly as a written-out one would.

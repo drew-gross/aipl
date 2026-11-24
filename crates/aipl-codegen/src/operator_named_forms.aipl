@@ -1,4 +1,4 @@
-import { all, equal as ==, is_nonempty } from builtins;
+import { all, equal as ==, is_empty, is_nonempty } from builtins;
 
 # The named builtins that provide the operator `self` — the names it is
 # imported under (`wrapping_add as +`) — in the order the compiler declares
@@ -48,9 +48,9 @@ pub fn operator_named_forms(self: str) -> str[] {
     assert("%".operator_named_forms() == ["saturating_remainder"]);
     assert("/=".operator_named_forms() == ["saturating_divide_assign"]);
     // Not an operator: nothing.
-    assert("wrapping_add".operator_named_forms() == []);
-    assert("=".operator_named_forms() == []);
-    assert("".operator_named_forms() == []);
+    assert("wrapping_add".operator_named_forms().is_empty());
+    assert("=".operator_named_forms().is_empty());
+    assert("".operator_named_forms().is_empty());
 })
 
 # Every operator spelling that has named forms, in the order `operator_named_forms` lists them. A

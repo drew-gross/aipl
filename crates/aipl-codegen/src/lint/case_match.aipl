@@ -126,7 +126,7 @@ pub fn tail_matches(self: Expr) -> Expr[] {
     // The `match` that ends the body is one; an inner one is not, since its value is
     // only a binding's.
     assert(tails("fn f(s: S) { match (s) { A(..) => 1, _ => 2 } }")? == ["Match"]);
-    assert(tails("fn f(s: S) { let x = match (s) { A(..) => 1, _ => 2 }; x }")? == []);
+    assert(tails("fn f(s: S) { let x = match (s) { A(..) => 1, _ => 2 }; x }")?.is_empty());
     assert(tails("fn f(s: S) { g(); match (s) { A(..) => 1, _ => 2 } }")? == ["Match"]);
 
     // Through an `if`'s branches and another `match`'s arms.

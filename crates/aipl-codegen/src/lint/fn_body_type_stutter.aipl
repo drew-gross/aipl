@@ -68,31 +68,31 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
         lint_function_unfilled(
             "fn f(x: i64) -> P { x, y: 0 }",
             |function| [..fn_body_type_stutter(function)],
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_unfilled(
             "fn f(x: i64) -> P { Q { x } }",
             |function| [..fn_body_type_stutter(function)],
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_unfilled(
             "fn f(x: i64) -> P { let y = x; P { x, y } }",
             |function| [..fn_body_type_stutter(function)],
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_unfilled(
             "fn f() -> P { P {} }",
             |function| [..fn_body_type_stutter(function)],
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         lint_function_unfilled(
             "fn f(P: i64) -> Q { P, y: 0 }",
             |function| [..fn_body_type_stutter(function)],
-        )? == [],
+        )?.is_empty(),
     );
 
     // A destructured parameter is not a statement.
@@ -106,7 +106,7 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
         lint_function_unfilled(
             "fn f(a: i64) -> Span { a..a }",
             |function| [..fn_body_type_stutter(function)],
-        )? == [],
+        )?.is_empty(),
     );
     // Shapes the lint must leave alone.
 })

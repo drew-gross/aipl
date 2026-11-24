@@ -7,7 +7,7 @@
 # else. A marker on a line where no lint fires is itself an error, so a marker never
 # outlives the code it excused.
 
-import { Span, any, equal as ==, filter, len, logical_not as !, map } from builtins;
+import { Span, any, equal as ==, filter, is_empty, len, logical_not as !, map } from builtins;
 import { lines } from "../lines.aipl";
 import { FilledHit, hit } from "./lint_hit.aipl";
 
@@ -44,10 +44,10 @@ pub fn squelch(src: str, allows: Span[], hits: FilledHit[]) -> FilledHit[] {
     assert(squelch(src, [], [hit("m", 0..1)]) == [
         hit("m (or append #[allow] to this line to keep it)", 0..1),
     ]);
-    assert(squelch(src, [], []) == []);
+    assert(squelch(src, [], []).is_empty());
 
     // One marker squelches every hit that starts on its line.
-    assert(squelch(src, [4..12], [hit("a", 2..3), hit("b", 4..5)]) == []);
+    assert(squelch(src, [4..12], [hit("a", 2..3), hit("b", 4..5)]).is_empty());
 })
 
 # `self` with how to keep what it flagged.

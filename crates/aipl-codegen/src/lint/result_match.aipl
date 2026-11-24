@@ -7,6 +7,7 @@ import {
     equal as ==,
     find_if,
     first,
+    is_empty,
     is_some_and,
     len,
     logical_not as !,
@@ -60,9 +61,11 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
     assert(shapes("fn f(r: i64!str) -> i64 { match (r) { err(e) => 0, ok(v) => v } }")? == ["v e"]);
 
     // Not the shape: a catch-all, an ignored payload, an optional.
-    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, _ => 0 } }")? == []);
-    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(..) => 1, err(e) => 0 } }")? == []);
-    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")? == []);
+    assert(shapes("fn f(r: i64!str) -> i64 { match (r) { ok(v) => v, _ => 0 } }")?.is_empty());
+    assert(
+        shapes("fn f(r: i64!str) -> i64 { match (r) { ok(..) => 1, err(e) => 0 } }")?.is_empty(),
+    );
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, none => 0 } }")?.is_empty());
 })
 
 # Whether `self` is `constructor(binder)`: the arm hands its own binding straight back to

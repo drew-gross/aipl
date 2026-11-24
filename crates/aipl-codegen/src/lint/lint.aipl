@@ -4,7 +4,7 @@
 # covers and says how to keep the rest. A lint is added by giving it its own file and
 # a line in `lint`; the hits come back in the order the lints are listed.
 
-import { collect_ok, equal as ==, join, map } from builtins;
+import { collect_ok, is_empty, join, map } from builtins;
 import {
     Assign,
     Call,
@@ -24,6 +24,7 @@ import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
+import { compare_empty_array } from "./compare_empty_array.aipl";
 import { compound_assign } from "./compound_assign.aipl";
 import { destructure } from "./destructure.aipl";
 import { duplicate_import_source } from "./duplicate_import_source.aipl";
@@ -108,7 +109,7 @@ pub fn lint(program: ResolvedProgram) -> FilledHit[] {
         ..functions.unfilled_hits(call_advice),
     ].filled(items)
 }.test({
-    assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()) == []);
+    assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()).is_empty());
 })
 
 # The lints over the `match`es of `function` that are not about what they say.
@@ -161,6 +162,7 @@ fn call_advice(Function { body }) -> LintHit[] {
         ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),
         ..calls.map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) }),
         ..calls.map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) }),
+        ..calls.map(|call: Expr<Call>| { call.hit_at(compare_empty_array(call.kind)) }),
     ].collect_ok()
 }
 
@@ -211,5 +213,5 @@ fn assign_advice(Function { body }, items: Item[]) -> LintHit[] {
 pub fn lint_str(src: str) -> str[]!ParseFailure {
     ok(lint(aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees())$message)
 }.test({
-    assert(lint_str("fn main() { }")? == []);
+    assert(lint_str("fn main() { }")?.is_empty());
 })

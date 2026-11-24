@@ -1,7 +1,7 @@
 # The compiler's own directory walk: `tests/fmt.rs` uses it to discover every
 # `.aipl` file whose formatting is enforced.
 
-import { ends_with, equal as ==, filter, list_files, sort } from builtins;
+import { ends_with, equal as ==, filter, is_empty, list_files, sort } from builtins;
 
 # Every file at or below `dir` whose path ends with `ext`, sorted. `err(..)` if
 # the tree can't be walked at all — see the `list_files` builtin.
@@ -26,11 +26,11 @@ pub fn with_extension(self: str[], ext: str) -> str[] {
     let paths = ["b/x.aipl", "a.txt", "a.aipl"];
     assert(paths.with_extension(".aipl") == ["a.aipl", "b/x.aipl"]); // filtered + sorted
     assert(paths.with_extension(".txt") == ["a.txt"]);
-    assert(paths.with_extension(".rs") == []); // nothing matches
+    assert(paths.with_extension(".rs").is_empty()); // nothing matches
     assert(paths.with_extension("") == ["a.aipl", "a.txt", "b/x.aipl"]); // empty suffix matches all
-    assert([].with_extension(".aipl") == []); // empty listing
+    assert([].with_extension(".aipl").is_empty()); // empty listing
 
     // The suffix is matched on the whole path, not just the name: an extension
     // that only appears mid-path doesn't match.
-    assert(["a.aipl/b.txt"].with_extension(".aipl") == []);
+    assert(["a.aipl/b.txt"].with_extension(".aipl").is_empty());
 })

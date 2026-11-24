@@ -4,6 +4,7 @@
 import {
     equal as ==,
     greater_than as >,
+    is_empty,
     less_than as <,
     logical_and as &&,
     logical_or as ||,
@@ -31,6 +32,6 @@ pub fn ranked(self: Counted[]) -> Counted[] {
     ]);
 
     // Nothing ranks to nothing, and one thing to itself.
-    assert([].ranked() == []);
+    assert([].ranked().is_empty());
     assert([Counted { name: "x", count: 1 }].ranked() == [Counted { name: "x", count: 1 }]);
 })

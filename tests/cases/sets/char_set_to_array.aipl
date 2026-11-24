@@ -1,7 +1,7 @@
 # `to_array` on an ordered set of chars is the chars in the set's order. A char set is a
 # bitfield, not an array block, so the array is built from the bits rather than shared.
 
-import { equal as ==, len, map_to_dict, wrapping_increment as ++ } from builtins;
+import { equal as ==, is_empty, len, map_to_dict, wrapping_increment as ++ } from builtins;
 import { to_array, to_set } from sets;
 
 fn ascending(text: str) -> char[] {
@@ -21,8 +21,8 @@ test({
     assert(ascending("zyx abc") == [' ', 'a', 'b', 'c', 'x', 'y', 'z']);
 
     // Nothing, one, and the whole of what a lexer rule names.
-    assert(ascending("") == []);
-    assert(descending("") == []);
+    assert(ascending("").is_empty());
+    assert(descending("").is_empty());
     assert(ascending("q") == ['q']);
     assert(ascending("0123456789").len() == 10);
 

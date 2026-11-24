@@ -2,7 +2,7 @@
 # `V` less every other case. The case is inferred from an argument, or written as a type
 # argument; written, it determines `V`, so the list may leave `V` out.
 
-import { equal as == } from builtins;
+import { equal as ==, is_empty } from builtins;
 
 variant Shape = Circle(r: i64) | Square(side: i64) | Dot
 
@@ -17,12 +17,12 @@ fn none_of<V: variant, A: arm of V>(self: V[]) -> A[] { [] }.test({
     let shapes = [Circle(1), Square(2)];
     // With the variant written and with it left out.
     let circles: Circle[] = shapes.none_of::<Shape, Circle>();
-    assert(circles == []);
-    assert(shapes.none_of::<Square>() == []);
-    assert(none_of::<Dot>(shapes) == []);
+    assert(circles.is_empty());
+    assert(shapes.none_of::<Square>().is_empty());
+    assert(none_of::<Dot>(shapes).is_empty());
 })
 
 // What a function says about its result is held to what was written.
 fn squares(shapes: Shape[]) -> Square[] { shapes.none_of::<Square>() }.test({
-    assert(squares([Dot]) == []);
+    assert(squares([Dot]).is_empty());
 })

@@ -7,6 +7,7 @@ import {
     contains,
     equal as ==,
     find_if,
+    is_empty,
     is_nonempty,
     len,
     logical_and as &&,
@@ -63,9 +64,9 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
     assert(shapes("fn f(o: i64?) -> i64 { match (o) { none => 0, some(v) => v } }")? == ["v o"]);
 
     // Not the shape: a catch-all, an ignored payload, a third arm.
-    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, _ => 0 } }")? == []);
-    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(..) => 1, none => 0 } }")? == []);
-    assert(shapes("fn f(o: i64!str) -> i64 { match (o) { ok(v) => v, err(e) => 0 } }")? == []);
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(v) => v, _ => 0 } }")?.is_empty());
+    assert(shapes("fn f(o: i64?) -> i64 { match (o) { some(..) => 1, none => 0 } }")?.is_empty());
+    assert(shapes("fn f(o: i64!str) -> i64 { match (o) { ok(v) => v, err(e) => 0 } }")?.is_empty());
 
     // The receiver is quoted as written when a method can follow it as it stands.
     assert(shapes("fn f(p: P) -> i64 { match (p.x) { some(v) => v, none => 0 } }")? == ["v p.x"]);

@@ -10,6 +10,7 @@ import {
     equal as ==,
     filter,
     greater_than as >,
+    is_empty,
     map,
     measure,
     not_equal as !=,
@@ -22,7 +23,7 @@ fn keep_gt3(xs: i64[]) -> i64[] { xs.filter(|x| x > 3) }.test({
     assert([1, 2, 3, 4, 5, 6].filter(|x| x > 3) == [4, 5, 6]);
 
     // Keep none / keep all (boundary cases for the compaction cursor).
-    assert([1, 2, 3].filter(|x| x > 100) == []);
+    assert([1, 2, 3].filter(|x| x > 100).is_empty());
     assert([1, 2, 3].filter(|x| x > 0) == [1, 2, 3]);
 
     // Heap (str) elements: exercises the move-kept / drop-filtered refcounting.

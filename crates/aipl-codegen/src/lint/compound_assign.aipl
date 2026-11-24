@@ -161,7 +161,7 @@ pub fn compound_assign(self: Assign(target, value, _), stepped: Callee[]) -> Lin
     assert(on_field("set c.n = c.n + 5;")? == [
         `"c.n" accumulates onto itself — use the compound form "set c.n += ...;"`,
     ]);
-    assert(on_field("set c.n = m + 5;")? == []);
+    assert(on_field("set c.n = m + 5;")?.is_empty());
 
     // An operator the file binds to a function of its own is not the builtin.
 })

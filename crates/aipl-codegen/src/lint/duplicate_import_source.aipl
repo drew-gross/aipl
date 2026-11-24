@@ -3,7 +3,7 @@
 # one path, in a single `import { .. }`; the better spelling merges the names
 # into the first.
 
-import { collect_arms, equal as ==, push } from builtins;
+import { collect_arms, equal as ==, is_empty, push } from builtins;
 import { Import, ImportDecl, ImportSource, Program } from "../item.aipl";
 import { LintHit, lint_hits, lint_message, shown } from "./lint_hit.aipl";
 import { has, insert } from sets;
@@ -28,7 +28,7 @@ pub fn duplicate_import_source(Program { items }) -> LintHit[] {
                 import { b } from "./b.aipl";
             """,
             duplicate_import_source,
-        )? == [],
+        )?.is_empty(),
     );
 
     // The second `builtins` import is the redundant one, and the caret goes under

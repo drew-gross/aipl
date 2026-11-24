@@ -89,9 +89,9 @@ pub fn seeded_loops(self: Expr) -> SeededLoop[] {
     assert(seeded_names(
         "{ mut a = []; for (let x : xs) { g(x); } mut b = []; for (let y : a) { g(y); } b }",
     )? == ["a", "b"]);
-    assert(seeded_names("{ mut a = []; g(); for (let x : xs) { g(x); } a }")? == []);
-    assert(seeded_names("{ mut a = []; for (let i, x : xs) { g(x); } a }")? == []);
-    assert(seeded_names("{ mut a = []; a }")? == []);
+    assert(seeded_names("{ mut a = []; g(); for (let x : xs) { g(x); } a }")?.is_empty());
+    assert(seeded_names("{ mut a = []; for (let i, x : xs) { g(x); } a }")?.is_empty());
+    assert(seeded_names("{ mut a = []; a }")?.is_empty());
 })
 
 # Every [`SeededLoop`] in `self` and under it whose loop is indexed: the same shape as
@@ -106,9 +106,9 @@ pub fn indexed_seeded_loops(self: Expr) -> SeededLoop[] {
 }.test({
     assert(indexed_names("{ mut a = []; for (let i, x : xs) { g(x); } a }")? == ["a"]);
     // A plain loop, a statement between the seed and the loop, and no loop at all.
-    assert(indexed_names("{ mut a = []; for (let x : xs) { g(x); } a }")? == []);
-    assert(indexed_names("{ mut a = []; g(); for (let i, x : xs) { g(x); } a }")? == []);
-    assert(indexed_names("{ mut a = []; a }")? == []);
+    assert(indexed_names("{ mut a = []; for (let x : xs) { g(x); } a }")?.is_empty());
+    assert(indexed_names("{ mut a = []; g(); for (let i, x : xs) { g(x); } a }")?.is_empty());
+    assert(indexed_names("{ mut a = []; a }")?.is_empty());
 })
 
 # The name of each [`indexed_seeded_loops`] the block `src` holds.
@@ -161,7 +161,7 @@ pub fn accumulations(self: Expr, adder: Callee) -> Accumulation[] {
         block_accumulations(
             "{ mut out = []; for (let x : xs) { set out.push(x); } out }",
             Extend,
-        )? == [],
+        )?.is_empty(),
     );
 })
 
@@ -209,43 +209,43 @@ pub fn accumulation(self: SeededLoop, adder: Callee) -> Accumulation? {
         block_accumulations(
             "{ mut out = [1]; for (let x : xs) { set out.push(x); } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         block_accumulations(
             "{ mut out = []; g(); for (let x : xs) { set out.push(x); } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let i, x : xs) { set out.push(x); } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { g(x); set out.push(x); } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { if (c) { set out.push(x); } else { g(x); }; } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { set out.push(out.len()); } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         block_accumulations(
             "{ mut out = []; for (let x : xs) { set out.push(g(x)?); } out }",
             Push,
-        )? == [],
+        )?.is_empty(),
     );
 })
 
@@ -264,11 +264,11 @@ pub fn pushed(self: Expr, acc: str, adder: Callee) -> Pushed? {
     assert(block_pushes("{ set out.push(x); out }", "out", Push)? == ["x"]);
 
     // Another binding, another adder, another arity and another statement are not it.
-    assert(block_pushes("{ set other.push(x); out }", "out", Push)? == []);
-    assert(block_pushes("{ set out.push(x); out }", "out", Extend)? == []);
-    assert(block_pushes("{ set out.push(x, y); out }", "out", Push)? == []);
-    assert(block_pushes("{ set out = g(x); out }", "out", Push)? == []);
-    assert(block_pushes("{ g(x); out }", "out", Push)? == []);
+    assert(block_pushes("{ set other.push(x); out }", "out", Push)?.is_empty());
+    assert(block_pushes("{ set out.push(x); out }", "out", Extend)?.is_empty());
+    assert(block_pushes("{ set out.push(x, y); out }", "out", Push)?.is_empty());
+    assert(block_pushes("{ set out = g(x); out }", "out", Push)?.is_empty());
+    assert(block_pushes("{ g(x); out }", "out", Push)?.is_empty());
 })
 
 # The element of the push `src`, a block, starts with, as the dump of its expression.

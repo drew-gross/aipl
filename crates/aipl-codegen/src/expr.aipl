@@ -198,7 +198,7 @@ pub fn struct_written(self: WrittenNames, i: u64) -> WrittenStruct {
     let written = WrittenStruct { fields: [WrittenName { text: "f", span: 2..3 }], binders: [] };
     let names = WrittenNames { cases: [], binders: [], structs: [written] };
     assert(names.struct_written(0) == written);
-    assert(names.struct_written(1).fields == []);
+    assert(names.struct_written(1).fields.is_empty());
 })
 
 # One arm of a `match`, and the `then` half of an `if let`. Its span is the
@@ -211,7 +211,7 @@ pub fn names_written(self: MatchArm) -> WrittenNames {
     self.written.value_or(WrittenNames { cases: [], binders: [], structs: [] })
 }.test({
     let arm = MatchArm { pattern: Wildcard, body: ident("x"), span: 0..0 };
-    assert(arm.names_written().cases == []);
+    assert(arm.names_written().cases.is_empty());
     let named = WrittenNames {
         cases: [WrittenName { text: "A", span: 1..2 }],
         binders: [],
@@ -831,7 +831,7 @@ pub fn subexprs(self: Expr) -> Expr[] {
         ],
     }
 }.test({
-    assert(ident("x").subexprs() == []);
+    assert(ident("x").subexprs().is_empty());
     let call = expr(Call("f", [ident("a"), num(1)], false, Unresolved));
     assert(call.subexprs() == [ident("a"), num(1)]);
     // A binder's name and type are not sub-expressions; its value and body are.
@@ -917,7 +917,7 @@ pub fn descendants_of_kind(self: Expr, arm: Case<ExprKind>) -> Expr[] {
     let call = expr(Call("f", [ident("a"), expr(Neg(ident("b")))], false, Unresolved));
     assert(call.descendants_of_kind::<Ident>()$show_expr() == ["a", "b"]);
     assert(call.descendants_of_kind::<Neg>()$show_expr() == ["Neg(b)"]);
-    assert(call.descendants_of_kind::<Num>() == []);
+    assert(call.descendants_of_kind::<Num>().is_empty());
     // The kind of each is taken apart as the one case.
     let Expr { kind, source } = call.descendants_of_kind::<Neg>()[0]?;
     let Neg(inner) = kind;
@@ -959,7 +959,7 @@ pub fn field_reads(self: Expr) -> Read[] {
         ident("x"),
     ));
     assert(pattern.field_reads()$field == ["x", "y"]);
-    assert(ident("x").field_reads() == []);
+    assert(ident("x").field_reads().is_empty());
 })
 
 # The reads a destructuring `let` or `for` makes of the value it takes apart: one
@@ -986,8 +986,8 @@ pub fn reads_off(self: Binding, base: str) -> Read[] {
         Read { field: "x", base: "v" },
         Read { field: "y", base: "v" },
     ]);
-    assert(ByTuple(["a", "b"]).reads_off("v") == []);
-    assert(ByCase("C", ["a"]).reads_off("v") == []);
+    assert(ByTuple(["a", "b"]).reads_off("v").is_empty());
+    assert(ByCase("C", ["a"]).reads_off("v").is_empty());
     assert(Alias("p", ByStruct("P", ["x"], ["x"], false)).reads_off("v") == [
         Read { field: "x", base: "v" },
     ]);

@@ -2027,7 +2027,7 @@ pub fn parse<K: variant, A: any>(
     let e_stmt: Rule<Tok> = Then([Term(Word), Expect(Literal(";"))]);
     let g_e = Grammar { prods: [one("stmts", e_stmts), one("stmt", e_stmt)] };
     assert(tree_of("a; b;", g_e, "stmts") == "(stmts (stmt a ;) (stmt b ;))");
-    assert(errors_of("a; b;", g_e, "stmts") == []);
+    assert(errors_of("a; b;", g_e, "stmts").is_empty());
 
     // Missing, it is reported and the parse goes on: the tree has the statement
     // with a marker where its `;` should be, which holds no text.
@@ -2084,7 +2084,7 @@ pub fn parse<K: variant, A: any>(
     let e_other: Rule<Tok> = Then([Term(Word), Literal("+")]);
     let e_plain_other: Rule<Tok> = OneOf([Then([Term(Word), Literal(";")]), e_other]);
     let e_commit_other: Rule<Tok> = OneOf([Then([Term(Word), Expect(Literal(";"))]), e_other]);
-    assert(errors_of("a +", Grammar { prods: [one("s", e_plain_other)] }, "s") == []);
+    assert(errors_of("a +", Grammar { prods: [one("s", e_plain_other)] }, "s").is_empty());
     assert(errors_of("a +", Grammar { prods: [one("s", e_commit_other)] }, "s") == [
         "expected `;`, found `+`",
     ]);
@@ -2097,7 +2097,7 @@ pub fn parse<K: variant, A: any>(
         Then([Term(Word), Term(Num)]),
     ]);
     let g_abandoned = Grammar { prods: [one("s", e_abandoned)] };
-    assert(errors_of("a 1", g_abandoned, "s") == []);
+    assert(errors_of("a 1", g_abandoned, "s").is_empty());
     assert(tree_of("a 1", g_abandoned, "s") == "(s a 1)");
 
     // Once the parse has failed there is no path to say which were the right ones,
@@ -2127,7 +2127,7 @@ pub fn parse<K: variant, A: any>(
     ]);
     let g_climb = Grammar { prods: [one("expr", e_expr), one("atom", e_atom)] };
     assert(errors_of("1 + (2 + 3", g_climb, "expr") == ["expected `)`, found end of input"]);
-    assert(errors_of("1 + (2 + 3)", g_climb, "expr") == []);
+    assert(errors_of("1 + (2 + 3)", g_climb, "expr").is_empty());
 
     // Through a separated, repeated list.
     let e_list: Rule<Tok> = Many(Named("stmt"), sep=Literal(","));
@@ -2225,7 +2225,7 @@ pub fn parse<K: variant, A: any>(
     let g_lead = Grammar { prods: [one("top", Then([Named("lead")])), one("lead", e_lead)] };
     assert(errors_of("a", g_lead, "top") == ["expected `(`, found `a`"]);
     assert(errors_of_prepared("a", g_lead, "top") == ["expected `(`, found `a`"]);
-    assert(errors_of_prepared("(a", g_lead, "top") == []);
+    assert(errors_of_prepared("(a", g_lead, "top").is_empty());
 
     // And an analysed grammar recovers exactly where a one-shot parse does.
     assert(errors_of_prepared("a b c;", g_e, "stmts") == errors_of("a b c;", g_e, "stmts"));

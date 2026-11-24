@@ -124,15 +124,15 @@ pub fn search_loops(self: Expr) -> SearchLoop[] {
     assert(
         search_variables(
             "{ for (let x : xs) { if (c(x)) { return some(x); } else { g(); }; } none }",
-        )? == [],
+        )?.is_empty(),
     );
     assert(
         search_variables(
             "{ for (let x : xs) { if (c(x)) { g(); return some(x); }; } none }",
-        )? == [],
+        )?.is_empty(),
     );
-    assert(search_variables("{ for (let x : xs) { g(x); } none }")? == []);
-    assert(search_variables("{ for (let x : xs) { if (c(x)) { g(x); }; } none }")? == []);
+    assert(search_variables("{ for (let x : xs) { g(x); } none }")?.is_empty());
+    assert(search_variables("{ for (let x : xs) { if (c(x)) { g(x); }; } none }")?.is_empty());
 })
 
 # The variable of each [`search_loops`] the block `src` holds.

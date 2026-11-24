@@ -21,6 +21,7 @@ import {
     filter,
     find_if,
     first,
+    is_empty,
     is_some_and,
     join,
     logical_and as &&,
@@ -226,7 +227,7 @@ fn imported_under(self: Item[], library: str, name: str) -> str[] {
     )?.program.hoist_test_fns().items;
     assert(items.imported_under("builtins", "len") == ["size", "len"]);
     assert(items.imported_under("sets", "insert") == ["insert"]);
-    assert(items.imported_under("sets", "len") == []);
+    assert(items.imported_under("sets", "len").is_empty());
 })
 
 fn locals_from(self: Import(ImportDecl { names, source }), library: str, name: str) -> str[] {

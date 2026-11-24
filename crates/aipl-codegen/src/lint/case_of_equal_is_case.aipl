@@ -7,7 +7,7 @@
 #
 # The hit points at the `==`, a short line the formatter keeps in place.
 
-import { collect_ok, count_if, equal as ==, len, not_equal as != } from builtins;
+import { collect_ok, count_if, equal as ==, is_empty, len, not_equal as != } from builtins;
 import { CaseOf, Equal, IsCase } from "../builtin_table.aipl";
 import { Call, Expr, descendants_of_kind } from "../expr.aipl";
 import { ParseFailure } from "../grammar_aipl.aipl";
@@ -57,19 +57,21 @@ pub fn case_of_equal_is_case(self: Call(_, operands, _, callee)) -> LintHit? {
     )? == [message(some("isa"))]);
 
     // Two `case_of`s compare two values' cases, which `is_case` cannot say.
-    assert(messages("fn f(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }")? == []);
+    assert(messages("fn f(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }")?.is_empty());
 
     // Neither side reads a case, or the comparison is another one.
-    assert(messages("fn f(a: i64, b: i64) -> bool { a == b }")? == []);
-    assert(messages("fn f(s: Shape) -> bool { s.case_of() != Circle }")? == []);
+    assert(messages("fn f(a: i64, b: i64) -> bool { a == b }")?.is_empty());
+    assert(messages("fn f(s: Shape) -> bool { s.case_of() != Circle }")?.is_empty());
 
     // Shapes the lint must leave alone.
     // Two values' cases against each other is `same_case`, which `is_case` cannot say.
     assert(
-        messages("fn same_kind(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }")? == [],
+        messages(
+            "fn same_kind(a: Shape, b: Shape) -> bool { a.case_of() == b.case_of() }",
+        )?.is_empty(),
     );
     // Cases held in variables compare without a `case_of()` call at all.
-    assert(messages("fn same_held(a: Case<Shape>, b: Case<Shape>) -> bool { a == b }")? == []);
+    assert(messages("fn same_held(a: Case<Shape>, b: Case<Shape>) -> bool { a == b }")?.is_empty());
 
     // Shapes the lint flags, and what it says of them.
     assert(messages("fn is_circle(shape: Shape) -> bool { shape.case_of() == Circle }")? == [

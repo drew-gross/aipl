@@ -533,10 +533,10 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(mended.token_leaves() == [0..1, 2..3]);
     assert(mended.extent() == 0..3);
     assert(mended.token_span() == some(0..3));
-    assert(mended.parts().children == []);
+    assert(mended.parts().children.is_empty());
     assert(mended.parts().tokens == [0..1, 2..3]);
     assert(mended.parts().slots() == [Tok(0..1), Tok(2..3)]);
-    assert(Missing(1, [], []).leaves() == []);
+    assert(Missing(1, [], []).leaves().is_empty());
     assert(Tree(1, [Missing(1, [], [])]).token_span() == none);
     assert(Tree(1, [Missing(1, [], [])]).extent() == 0..0);
     assert(mended.show(src, ["", "t"]) == "(t 1 <missing `;`> ~  +)");
@@ -560,12 +560,12 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // (the last leaf spans `" 2"`, hence the space this one keeps)
     assert(nested.token_text(src) == "1+ 2");
     assert(t.parts().tokens == [0..1, 2..3, 4..5]);
-    assert(t.parts().children == []);
+    assert(t.parts().children.is_empty());
 
     // A leaf has no kids at all, so both lists are empty.
     let leaf_parts = Leaf(0..1).parts();
-    assert(leaf_parts.tokens == []);
-    assert(leaf_parts.children == []);
+    assert(leaf_parts.tokens.is_empty());
+    assert(leaf_parts.children.is_empty());
     assert(Tree(0, []).parts().own_token_text(src) == "");
 
     // `slots` puts the two lists back in source order, which is what a rule's

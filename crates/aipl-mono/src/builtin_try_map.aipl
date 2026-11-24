@@ -9,7 +9,7 @@
 # `?` — the one array-building shape `map` could not absorb. This is that loop,
 # written once.
 
-import { equal as ==, is_err_and, len, less_than as <, push } from builtins;
+import { equal as ==, is_empty, is_err_and, len, less_than as <, push } from builtins;
 
 # `self` with `f` applied to each element, short-circuiting on failure: the
 # result is `ok` of every mapped value, in order, or the *first* `err` that
@@ -46,7 +46,7 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
 
     // An empty array never calls `f`, so it cannot fail.
     let empty: i64[] = [];
-    assert(empty.try_map(label)? == []);
+    assert(empty.try_map(label)?.is_empty());
 
     // A failure anywhere is the whole result.
     assert([1, -2].try_map(label).is_err_and(|e| e == "negative -2"));

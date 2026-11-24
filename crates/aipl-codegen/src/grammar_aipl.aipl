@@ -5967,7 +5967,7 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     ok(ParsedFile { program, allows, type_uses: tree.type_leaves(prod_names(GRAMMAR), false) })
 }.test({
     let LoweredFile { program, allows, type_uses } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
-    assert(type_uses == []);
+    assert(type_uses.is_empty());
 
     // The tokens written inside a type annotation, and only those.
     assert(aipl_parse_file("fn f(x: Pair) -> Q { }")?.type_uses == [8..12, 17..18]);
@@ -6047,7 +6047,7 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     }
 
     // An arm parameter names a `variant` parameter of its own list.
-    assert(messages("fn f<V: variant, A: arm of V>(a: V) { }") == []);
+    assert(messages("fn f<V: variant, A: arm of V>(a: V) { }").is_empty());
     assert(messages("fn f<A: arm of V>(a: A) { }") == [
         ```"A" is a case of "V", which is not a `variant` type parameter of this list```,
     ]);
@@ -6056,7 +6056,7 @@ pub fn aipl_parse_surface_file(src: str) -> ParsedFile!ParseFailure {
     ]);
 
     // A program that parses has no errors.
-    assert(messages("fn f() { let x = 1; x }") == []);
+    assert(messages("fn f() { let x = 1; x }").is_empty());
 
     // Each statement's `;` is committed to, so a missing one is reported where it
     // is and the parse reads on — which is why the second slip is found at all.

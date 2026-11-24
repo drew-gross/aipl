@@ -17,7 +17,7 @@
 # `xs.filter(|x| x.case_of() == Circle)`, is a different program (its elements are
 # still any case of `T`), not a worse spelling of this one.
 
-import { equal as ==, filter, is_case, len } from builtins;
+import { equal as ==, filter, is_case, is_empty, len } from builtins;
 
 # What the tests collect from.
 variant Shape = Circle(i64) | Square(i64) | Dot
@@ -38,7 +38,7 @@ pub fn collect_arms<T: variant>(self: T[], arm: Case<T>) -> T[] {
     // The function-call form is the same call.
     assert(collect_arms::<Square>(shapes) == [Square(2)]);
     // Nothing of that case.
-    assert([Dot, Dot].collect_arms::<Circle>() == []);
+    assert([Dot, Dot].collect_arms::<Circle>().is_empty());
     let empty: Shape[] = [];
-    assert(empty.collect_arms::<Dot>() == []);
+    assert(empty.collect_arms::<Dot>().is_empty());
 })

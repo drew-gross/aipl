@@ -140,7 +140,7 @@ pub fn pattern_reads(self: Param) -> Read[] {
         default: none,
         implicit_some: false,
     };
-    assert(plain.pattern_reads() == []);
+    assert(plain.pattern_reads().is_empty());
     assert(Param { ..plain, binding: ByStruct("P", ["x"], ["x"], false) }.pattern_reads() == [
         Read { field: "x", base: "__spat$0" },
     ]);

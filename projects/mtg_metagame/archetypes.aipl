@@ -340,7 +340,7 @@ pub fn load_identifiers(path: str, config: str) !read_files -> Identifier[]!str 
     shim read_files { read_file_to_string = |path| { ok(file) } } {
         let first = load_identifiers("archetypes.json", "First")?;
         assert(first$name == ["A"]);
-        assert(load_identifiers("archetypes.json", "Second")? == []);
+        assert(load_identifiers("archetypes.json", "Second")?.is_empty());
         assert(load_identifiers("archetypes.json", "Third") == err(
             `no archetype config named "Third"; the ones there are: First, Second`,
         ));

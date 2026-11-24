@@ -43,7 +43,7 @@ test({
 
         // It compares and reads like any other empty array — the representation is not
         // visible to the program, exactly as an inline `str` is not.
-        print(to_str(mid == [])); // true
+        print(to_str(mid.is_empty())); // true
         print(to_str(!(mid == xs))); // true
 
         // A slice past the end clamps to empty, and so does a backwards one.
