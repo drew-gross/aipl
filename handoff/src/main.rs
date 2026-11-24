@@ -130,27 +130,36 @@ use runner::{Cmd, Runner, BOLD, DIM, GREEN, OFF};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if !args.is_empty() {
-        // Refused rather than ignored: the gate is a several-minute run that
-        // formats and rewrites files, and `cargo handoff --help` silently
-        // *starting* one is a nasty way to find out it takes no arguments.
-        eprintln!(
-            "handoff: takes no arguments (got {})\n\n{USAGE}",
-            args.join(" ")
-        );
-        std::process::exit(2);
+    match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
+        [] => {}
+        // Asks only what the start of the gate asks of the machine, before it does anything.
+        ["--probe-environment"] => probe_environment(),
+        _ => {
+            // Refused rather than ignored: the gate is a several-minute run that
+            // formats and rewrites files, and `cargo handoff --help` silently
+            // *starting* one is a nasty way to find out what it takes.
+            eprintln!(
+                "handoff: unexpected argument (got {})\n\n{USAGE}",
+                args.join(" ")
+            );
+            std::process::exit(2);
+        }
     }
     handoff();
 }
 
 const USAGE: &str = "\
-usage: cargo handoff
+usage: cargo handoff [--probe-environment]
 
 Runs the pre-handoff gate: format, test, regenerate what a run proved stale, and
-confirm green. Takes no arguments; `HANDOFF_STEP_TIMEOUT` and `HANDOFF_VERBOSE`
-tune it (see the module docs). On macOS it refuses to run from a process tree that
-does not start from an application, which roughly doubles its time; set
-`HANDOFF_ALLOW_SLOW_LAUNCHES=1` to run anyway.";
+confirm green. `HANDOFF_STEP_TIMEOUT` and `HANDOFF_VERBOSE` tune it (see the module
+docs). On macOS it refuses to run from a process tree that does not start from an
+application, because every binary a case links would then be assessed one at a time,
+which roughly doubles its time. There is no way past the refusal: the tree is what
+to fix.
+
+`--probe-environment` makes that check and nothing else: it prints what the gate
+would print, exits 2 when the gate would refuse, and exits 0 otherwise.";
 
 /// Target selection for every whole-suite step.
 ///
@@ -486,6 +495,26 @@ fn clear_staged(staged: &std::path::Path) -> usize {
     removed
 }
 
+/// Every case links and runs two binaries, and macOS assesses a new binary one at a time unless
+/// the chain starts from an application exempted under Developer Tools (the terminal you added).
+/// A chain that does not makes the gate several times slower without making it wrong; the gate is
+/// the biggest part of a task's time, so it refuses rather than quietly doubling it, and nothing
+/// overrides that.
+fn refuse_slow_launches(warning: &str) -> ! {
+    eprintln!("{BOLD}handoff: refusing to run: slow launches{OFF}\n  {warning}");
+    std::process::exit(2);
+}
+
+/// `--probe-environment`: the gate's startup check on its own.
+fn probe_environment() -> ! {
+    match machine::check_launch() {
+        machine::Launch::Exempt(chain) => println!("ok: running under {chain}"),
+        machine::Launch::Unchecked(why) => println!("ok: launch not checked: {why}"),
+        machine::Launch::Slow(warning) => refuse_slow_launches(&warning),
+    }
+    std::process::exit(0);
+}
+
 fn handoff() -> ! {
     let repo = repo_root();
     std::env::set_current_dir(&repo).expect("repo root is a directory");
@@ -508,31 +537,11 @@ fn handoff() -> ! {
         );
     }
 
-    // The process chain this gate runs under. Every case links and runs two
-    // binaries, and macOS assesses a new binary one at a time unless the chain
-    // starts from an application exempted under Developer Tools (the terminal
-    // you added). A chain that does not makes the gate several times slower
-    // without making it wrong; the gate is the biggest part of a task's time, so
-    // it refuses rather than quietly doubling it, unless told to go on.
-    if cfg!(target_os = "macos") {
-        if let Some(chain) = machine::ancestry(std::process::id()) {
-            match machine::chain_warning(&chain) {
-                Some(warning) if machine::slow_launches_allowed() => {
-                    eprintln!("{BOLD}! slow launches{OFF}\n  {warning}\n");
-                }
-                Some(warning) => {
-                    eprintln!(
-                        "{BOLD}handoff: refusing to run: slow launches{OFF}\n  {warning}\n\n  \
-                         Set HANDOFF_ALLOW_SLOW_LAUNCHES=1 to run it here anyway."
-                    );
-                    std::process::exit(2);
-                }
-                None => eprintln!(
-                    "{DIM}(running under {}){OFF}",
-                    machine::render_chain(&chain)
-                ),
-            }
-        }
+    // The process chain this gate runs under: see `machine::check_launch`.
+    match machine::check_launch() {
+        machine::Launch::Exempt(chain) => eprintln!("{DIM}(running under {chain}){OFF}"),
+        machine::Launch::Unchecked(why) => eprintln!("{DIM}(launch not checked: {why}){OFF}"),
+        machine::Launch::Slow(warning) => refuse_slow_launches(&warning),
     }
 
     // A leftover staged artifact means a previous IR workflow was interrupted, and

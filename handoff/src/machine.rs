@@ -6,8 +6,8 @@
 //! (`pgrep`, `ps`, `vm_stat`, `free`). Most of it is only consulted on a timeout —
 //! a path that has already given up — and a missing tool degrades to a quieter
 //! message rather than an error. The exception is the process-chain check
-//! ([`ancestry`], [`chain_warning`]), which the gate runs once at startup and is
-//! silent when it cannot read the chain.
+//! ([`check_launch`]), which the gate runs once at startup and is silent when it
+//! cannot read the chain.
 
 use std::process::Command;
 
@@ -257,15 +257,37 @@ fn starts_from_an_application(chain: &[Link]) -> bool {
         .is_some_and(|root| root.path.contains(".app/Contents/MacOS/"))
 }
 
-/// Whether the person running the gate has said to run it under a chain that
-/// [`chain_warning`] complains about: `HANDOFF_ALLOW_SLOW_LAUNCHES` set to anything
-/// but empty or `0`.
-pub fn slow_launches_allowed() -> bool {
-    allowed(std::env::var("HANDOFF_ALLOW_SLOW_LAUNCHES").ok().as_deref())
+/// What the check of the process chain found. There is no way to run the gate past a
+/// [`Launch::Slow`]: the exemption it points at has to be fixed instead.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Launch {
+    /// The chain starts from an application, so macOS does not assess each new binary. Carries
+    /// the chain, rendered.
+    Exempt(String),
+    /// There was no chain to judge: not macOS, or `ps` could not walk it. Carries why.
+    Unchecked(&'static str),
+    /// The chain does not start from an application. Carries what to tell the person running
+    /// the gate.
+    Slow(String),
 }
 
-fn allowed(value: Option<&str>) -> bool {
-    value.is_some_and(|v| !v.is_empty() && v != "0")
+/// What the machine this runs on makes of the process that is running it.
+pub fn check_launch() -> Launch {
+    if !cfg!(target_os = "macos") {
+        return Launch::Unchecked("not macOS: nothing assesses a new binary");
+    }
+    match ancestry(std::process::id()) {
+        Some(chain) => classify(&chain),
+        None => Launch::Unchecked("the process chain could not be read (`ps` failed)"),
+    }
+}
+
+/// The verdict on `chain`.
+fn classify(chain: &[Link]) -> Launch {
+    match chain_warning(chain) {
+        Some(warning) => Launch::Slow(warning),
+        None => Launch::Exempt(render_chain(chain)),
+    }
 }
 
 /// What to tell the person running the gate about the chain it runs under —
@@ -281,7 +303,8 @@ pub fn chain_warning(chain: &[Link]) -> Option<String> {
   Developer Tools) covers processes started from the terminal app you add, so it
   cannot apply to this chain. macOS then assesses each freshly linked binary
   before it first runs, one at a time, and every case the suite links pays for
-  it. Run `cargo handoff` from that terminal.",
+  it. Run `cargo handoff` from that terminal; `cargo handoff --probe-environment`
+  says whether a process tree would pass without running anything else.",
         render_chain(chain)
     ))
 }
@@ -318,11 +341,20 @@ mod tests {
     }
 
     #[test]
-    fn slow_launches_are_allowed_only_when_asked_for() {
-        assert!(!allowed(None));
-        assert!(!allowed(Some("")));
-        assert!(!allowed(Some("0")));
-        assert!(allowed(Some("1")));
+    fn a_chain_that_starts_from_an_application_is_exempt() {
+        assert_eq!(
+            classify(&from_a_terminal()),
+            Launch::Exempt(render_chain(&from_a_terminal()))
+        );
+    }
+
+    #[test]
+    fn a_chain_that_does_not_is_slow_and_says_what_it_is() {
+        let Launch::Slow(warning) = classify(&background_host()) else {
+            panic!("a background host is not an application");
+        };
+        assert!(warning.contains("2.1.303 <- launchd"), "{warning}");
+        assert!(warning.contains("--probe-environment"), "{warning}");
     }
 
     #[test]
@@ -378,7 +410,8 @@ mod tests {
   Developer Tools) covers processes started from the terminal app you add, so it
   cannot apply to this chain. macOS then assesses each freshly linked binary
   before it first runs, one at a time, and every case the suite links pays for
-  it. Run `cargo handoff` from that terminal."
+  it. Run `cargo handoff` from that terminal; `cargo handoff --probe-environment`
+  says whether a process tree would pass without running anything else."
             )
         );
     }
