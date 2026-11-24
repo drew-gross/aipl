@@ -1,0 +1,24 @@
+# A local that can change is not narrowed by the arm that matched it: the arm's body could have
+# assigned it something else.
+
+variant Shape = Dot | Circle(i64) | Square(i64)
+
+fn circle_radius(self: Shape without Dot without Square) -> i64 {
+    match (self) {
+        Circle(r) => r,
+    }
+}
+
+fn radius(start: Shape) -> i64 {
+    mut shape = start;
+    match (shape) {
+        Circle(..) => circle_radius(shape),
+        _ => 0,
+    }
+}
+--- check --compile ---
+error: fn "circle_radius" arg 0: expected Shape without Dot without Square, got Shape: nothing shows it is not Square, Dot
+  --> ./tests/cases/variants/err_match_narrows_mutable.aipl:15:37
+   |
+15 |         Circle(..) => circle_radius(shape),
+   |                                     ^^^^^

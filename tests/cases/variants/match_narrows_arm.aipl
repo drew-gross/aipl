@@ -1,0 +1,63 @@
+# Inside the arm of a `match` the scrutinee is the case the arm names, and in a `_` arm the cases the
+# arms above it have not. That holds for a local and for a field path off a local that never changes.
+
+import { equal as == } from builtins;
+
+variant Shape = Dot | Circle(i64) | Square(i64)
+
+struct Holder { shape: Shape }
+
+fn circle_radius(self: Shape without Dot without Square) -> i64 {
+    match (self) {
+        Circle(r) => r,
+    }
+}
+
+fn not_circle(self: Shape without Circle) -> i64 {
+    match (self) {
+        Dot => 0,
+        Square(side) => side,
+    }
+}
+
+fn local_radius(shape: Shape) -> i64 {
+    match (shape) {
+        Circle(..) => circle_radius(shape),
+        _ => 0,
+    }
+}.test({
+    assert(local_radius(Circle(3)) == 3);
+    assert(local_radius(Square(3)) == 0);
+})
+
+fn field_radius(self: Holder) -> i64 {
+    match (self.shape) {
+        Circle(..) => circle_radius(self.shape),
+        _ => 0,
+    }
+}.test({
+    assert(Holder { shape: Circle(4) }.field_radius() == 4);
+    assert(Holder { shape: Dot }.field_radius() == 0);
+})
+
+// The `_` arm of a field path is what the arms above it left.
+fn field_rest(self: Holder) -> i64 {
+    match (self.shape) {
+        Circle(..) => 1,
+        _ => not_circle(self.shape),
+    }
+}.test({
+    assert(Holder { shape: Circle(4) }.field_rest() == 1);
+    assert(Holder { shape: Square(5) }.field_rest() == 5);
+    assert(Holder { shape: Dot }.field_rest() == 0);
+})
+
+// Arms that return the scrutinee agree, however each arm narrowed it.
+fn same(shape: Shape) -> Shape {
+    match (shape) {
+        Dot | Circle(..) => shape,
+        Square(..) => shape,
+    }
+}.test({
+    assert(same(Circle(1)) == Circle(1));
+})

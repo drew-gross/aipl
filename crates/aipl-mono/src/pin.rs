@@ -688,6 +688,10 @@ struct Pinner<'a> {
     /// `(case, parameter)` pairs known inside the code being typed: a value that matched `case`
     /// and is a `T without parameter` shows that `parameter` does not hold `case`.
     assumed: std::cell::RefCell<Vec<(String, String)>>,
+    /// The field paths a `match` arm has narrowed (`self.kind` inside the arm for `Call`), each
+    /// with where its root local was introduced, so a shadowing local of the same name is not
+    /// taken for it, and the type the path has inside the arm.
+    narrowed_paths: Vec<(String, Span, It)>,
 }
 
 /// A generic call's type arguments, held until the whole body has been typed.
@@ -1077,6 +1081,7 @@ fn pinner_for<'a>(
         case_names: HashMap::new(),
         domains: HashMap::new(),
         assumed: Default::default(),
+        narrowed_paths: Vec::new(),
     }
 }
 
@@ -2197,6 +2202,31 @@ impl Pinner<'_> {
         Ok(out)
     }
 
+    /// [`Pinner::joined`] for any number of values that already agree on what they are: the type
+    /// they share, which keeps each exclusion every one of them is known to meet.
+    fn joined_all(&mut self, values: &[&TExpr<It>]) -> Result<It, String> {
+        let first = values.first().expect("at least one value");
+        let base = self.table.shallow(&first.ty);
+        let mut candidates: Vec<aipl_syntax::ast::Exclusion> = Vec::new();
+        for v in values {
+            for x in self.table.exclusions(&v.ty) {
+                if !candidates.contains(&x) {
+                    candidates.push(x);
+                }
+            }
+        }
+        let mut out = base;
+        for x in candidates {
+            let met = values
+                .iter()
+                .all(|v| excluded_by(&self.table.exclusions(&v.ty), &x) || self.shows(v, &x));
+            if met && !self.table.exclusions(&out).contains(&x) {
+                out = It::Without(Box::new(out), x);
+            }
+        }
+        Ok(out)
+    }
+
     /// Whether two types are interchangeable here, binding variables as it goes.
     fn agree(&mut self, a: &It, e: &It) -> Result<(), String> {
         // A refined value goes where its base does; the reverse needs every exclusion shown.
@@ -2781,6 +2811,8 @@ impl Pinner<'_> {
                 let ty = self.field_type(&owner, field, &e.span)?;
                 // A value refined to lack a case throughout holds only parts that lack it too.
                 let ty = self.deepen(&ty, &self.throughout_cases(&x.ty));
+                // A path a `match` arm has narrowed is what the arm made of it.
+                let ty = self.narrowed_path(e).unwrap_or(ty);
                 self.node(K::Field(Box::new(x), field.clone()), ty, e)
             }
             ExprKind::Index(a, i) => {
@@ -3089,6 +3121,7 @@ impl Pinner<'_> {
                 let excluded = self.table.exclusions(&scrut.ty);
                 let result = self.fresh();
                 let mut out = Vec::new();
+                let mut live: Vec<usize> = Vec::new();
                 let mut covered: Vec<String> = Vec::new();
                 for arm in arms {
                     self.excluded_case(&st, &excluded, &arm.pattern, &arm.span)?;
@@ -3123,27 +3156,55 @@ impl Pinner<'_> {
                             (n, t, binder)
                         })
                         .collect();
+                    // Inside the arm the scrutinee is what the arm's pattern leaves it: a `_` or a
+                    // binder the cases above it have not matched, and a case's own arm that case
+                    // alone.
+                    let inside = match pattern_case(&arm.pattern) {
+                        Some(case) => {
+                            let case = case.split('@').next().unwrap_or(case);
+                            self.only_case(&scrut.ty, case)
+                        }
+                        None => remaining.clone(),
+                    };
+                    let narrows = self.table.exclusions(&inside).len() > excluded.len();
                     // A scrutinee that is a plain local is the narrowed value inside the arm.
-                    if let (ExprKind::Ident(name), true) = (
-                        &scrut_src.kind,
-                        self.table.exclusions(&remaining).len() > excluded.len(),
-                    ) {
+                    if let (ExprKind::Ident(name), true) = (&scrut_src.kind, narrows) {
                         if let Some(b) = self.env.get(name).filter(|b| !b.mutable) {
                             let binder = b.binder.clone();
                             if !binds.iter().any(|(n, ..)| n == name) {
-                                binds.push((name.clone(), remaining.clone(), binder));
+                                binds.push((name.clone(), inside.clone(), binder));
+                            }
+                        }
+                    }
+                    // So is a field path off a local that never changes (`self.kind`), wherever the
+                    // body reads it.
+                    let paths = self.narrowed_paths.len();
+                    if let (Some((root, path)), true) = (place_path(scrut_src), narrows) {
+                        if !matches!(scrut_src.kind, ExprKind::Ident(_)) {
+                            if let Some(binder) = self
+                                .env
+                                .get(&root)
+                                .filter(|b| !b.mutable)
+                                .and_then(|b| b.binder.clone())
+                            {
+                                self.narrowed_paths.push((path, binder, inside.clone()));
                             }
                         }
                     }
                     let assumed = self.note_matched(&scrut.ty, pattern_case(&arm.pattern));
                     let scoped = self.scoped(binds, |p| p.expr_at(&arm.body, pos));
+                    self.narrowed_paths.truncate(paths);
                     self.forget(assumed);
                     let (saved, body) = scoped?;
                     self.restore(saved);
                     if !aipl_syntax::diverges(&arm.body) {
-                        self.agree(&body.ty, &result).or_else(|m| {
+                        // The arms agree on what they are; what each is known not to be is joined
+                        // once they are all typed.
+                        let base = self.table.shallow(&body.ty);
+                        self.agree(&base, &result).or_else(|m| {
                             reject(format!("the arms of a `match` disagree ({m})"), &arm.span)
                         })?;
+                        live.push(out.len());
                     }
                     if let Pattern::Ctor { name, .. } = &arm.pattern {
                         covered.push(name.split('@').next().unwrap_or(name).to_string());
@@ -3155,8 +3216,17 @@ impl Pinner<'_> {
                     });
                 }
                 self.match_rules(&scrut.ty, arms, &e.span)?;
-                self.match_kind(&result, arms, pos, &e.span)?;
-                self.node(K::Match(Box::new(scrut), out), result, e)
+                // What the value is known not to be is what every arm that has one is known not to be.
+                let ty = if live.is_empty() {
+                    result
+                } else {
+                    let bodies: Vec<&TExpr<It>> = live.iter().map(|&i| &out[i].body).collect();
+                    self.joined_all(&bodies).or_else(|m| {
+                        reject(format!("the arms of a `match` disagree ({m})"), &e.span)
+                    })?
+                };
+                self.match_kind(&ty, arms, pos, &e.span)?;
+                self.node(K::Match(Box::new(scrut), out), ty, e)
             }
             // A closure with nothing to take its parameter types from has to write them.
             ExprKind::Lambda(params, body) if params.iter().all(|p| p.ty.is_some()) => {
@@ -3891,6 +3961,36 @@ impl Pinner<'_> {
             }
         }
         out
+    }
+
+    /// The type a `match` arm has narrowed the field path `e` to, when it is in one of them.
+    fn narrowed_path(&self, e: &Expr) -> Option<It> {
+        let (root, path) = place_path(e)?;
+        let binder = self.env.get(&root)?.binder.clone()?;
+        self.narrowed_paths
+            .iter()
+            .rev()
+            .find(|(p, b, _)| *p == path && *b == binder)
+            .map(|(_, _, t)| t.clone())
+    }
+
+    /// `st`, a scrutinee's type, as the value is inside the arm that matched `case`: the variant
+    /// with every other case excluded. Anything that is not a variant is unchanged.
+    fn only_case(&self, st: &It, case: &str) -> It {
+        let view = TypeView::new(self.decls);
+        let Some(cases) = crate::match_check::MatchInfo::cases_of(&view, &self.refined_type(st))
+        else {
+            return self.table.chase(st);
+        };
+        if !cases.iter().any(|(c, _)| c == case) {
+            return self.table.chase(st);
+        }
+        let others: Vec<String> = cases
+            .iter()
+            .map(|(c, _)| c.clone())
+            .filter(|c| c != case)
+            .collect();
+        self.narrowed(st, &others)
     }
 
     /// Note, for an arm of a match on `scrutinee`, that the scrutinee matched the case `case`
@@ -6024,6 +6124,19 @@ fn check_literals(e: &TExpr<Ty>, site: &Span) -> Res<()> {
 }
 
 /// The case a source pattern names, if it names one.
+/// The local a place is rooted in, and the whole path written: `self.kind` is `("self",
+/// "self.kind")`. `None` for anything that is not a name or a field path off one.
+fn place_path(e: &Expr) -> Option<(String, String)> {
+    match &e.kind {
+        ExprKind::Ident(name) => Some((name.clone(), name.clone())),
+        ExprKind::Field(obj, field) => {
+            let (root, path) = place_path(obj)?;
+            Some((root, format!("{path}.{field}")))
+        }
+        _ => None,
+    }
+}
+
 fn pattern_case(p: &Pattern) -> Option<&str> {
     match p {
         Pattern::Ctor { name, .. } | Pattern::Nested { name, .. } => Some(name),

@@ -11,7 +11,6 @@
 # text of one is no spelling of it.
 
 import {
-    as_case,
     contains,
     drop_first,
     equal as ==,
@@ -59,7 +58,8 @@ fn is_infix(self: str) -> bool {
 
 # The text that writes `self`, or `none` when it is a form this does not write.
 pub fn expr_text(self: Expr) -> str? {
-    match (self.kind) {
+    let k = self.kind;
+    match (k) {
         Num(n) => some(`{n}`),
         FloatLit(text) => some(text),
         Bool(b) => some(`{b}`),
@@ -68,7 +68,7 @@ pub fn expr_text(self: Expr) -> str? {
         Ident(name, _) => some(name),
         None => some("none"),
         Unit => some("()"),
-        Call(..) => self.call_text(),
+        Call(..) => k.call_text(),
         _ => self.compound_text(),
     }
 }.test({
@@ -183,8 +183,8 @@ fn compound_text(self: Expr) -> str? {
 
 # A call, written the way it is: infix for an operator, `recv.f(..)` for a method call, `f(..)`
 # otherwise. A call the parser made of another form (`__builtin_..`) has no spelling to write.
-fn call_text(self: Expr) -> str? {
-    let Call(name, args, method_style, _) = self.kind.as_case::<Call>()?;
+fn call_text(self: Call) -> str? {
+    let Call(name, args, method_style, _) = self;
     if (name.starts_with("__")) { return none; };
     if (name.is_infix() && args.len() == 2) {
         return some(`{args[0]?.operand_text()?} {name} {args[1]?.operand_text()?}`);
