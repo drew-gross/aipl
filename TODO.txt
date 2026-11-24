@@ -572,7 +572,6 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  fn_body_type_stutter should not be looking at __builtin_ because it should see the code before it is transformed to reference __builtin_
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   foo() == [] should lint to foo().is_empty()
   slots_taken_apart should lint to a filter map
@@ -943,6 +942,8 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  Letsremove HANDOFF_ALLOW_SLOW_LAUNCHES. It is critical that we not trip the macOS security assessment, and you've proven that if a bypass exists, it will abused. If the process hierarchy check triggers, I need to know so I can fix it (and if it's a false positive, I'll figure out what cause the false positive and fix that)
+  lets make handoff faster by speculatively starting IR regeneration in parallel with discovery. That way, if discovery succeeds, we've already made a bunch of progress, and if discovery fails, we can kill the IR regeneration with no real cost
   make a graph based builder that doesn't rebuild, like bazel
   lets not actually store the project compilers in git, handoff can recreate them and we can .gitignore them, that way project development still works
   dynamic work queue for running tests to balance work across shards better

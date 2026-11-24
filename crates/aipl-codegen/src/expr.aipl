@@ -317,6 +317,10 @@ variant ExprKind =
     # `__template_interp` call (`to_str` under another name) it means; `desugar.aipl` lowers it
     # to that call and nothing downstream of it ever sees the node.
     | Interpolation(Expr)
+    # `start..end`, as written, so the lints see a range and not the `Span` construct it builds;
+    # `desugar.aipl` lowers it to `__builtin_Span { start, end }`, and nothing downstream of it
+    # ever sees the node.
+    | Range(start: Expr, end: Expr)
 
 # What a `let`, a `for` or a parameter binds a value to, as written. A plain name
 # is the simplest binding; the rest take the value apart. A tuple's slots are its
@@ -406,6 +410,7 @@ pub fn show_expr(self: Expr) -> str {
         LetPattern(binding, value, body) => `LetPattern({binding.show_binding()}, {value.show_expr()}, {body.show_expr()})`,
         ProviderShim(provider, args, body) => `ProviderShim({provider}, [{show_exprs(args)}], {body.show_expr()})`,
         Interpolation(value) => `Interpolation({value.show_expr()})`,
+        Range(start, end) => `{start.show_expr()}..{end.show_expr()}`,
         FieldProjection(receiver, name) => `{receiver.show_expr()}${name}`,
         MethodProjection(receiver, name, args) => `{receiver.show_expr()}${name}({show_exprs(args)})`,
         ForPattern(binding, iterable, body, index) => match (index) {
@@ -684,6 +689,7 @@ pub fn mapped<X: cases>(
         LetPattern(pattern, value, body) => LetPattern(pattern, f(value), f(body)),
         ProviderShim(provider, args, body) => ProviderShim(provider, args.map(f), f(body)),
         Interpolation(value) => Interpolation(f(value)),
+        Range(start, end) => Range(f(start), f(end)),
         FieldProjection(receiver, name) => FieldProjection(f(receiver), name),
         MethodProjection(receiver, name, args) => MethodProjection(f(receiver), name, args.map(f)),
         ForPattern(pattern, iterable, body, index) => ForPattern(
@@ -793,6 +799,7 @@ pub fn subexprs(self: Expr) -> Expr[] {
         Call(_, args, _, _) | ArrayLit(args) | SetLit(args, _) | TupleLit(args) => args,
         ProviderShim(_, args, body) => [..args, body],
         MethodProjection(receiver, _, args) => [receiver, ..args],
+        Range(start, end) => [start, end],
         Neg(x)
         | Field(x, _)
         | FieldProjection(x, _)

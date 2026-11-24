@@ -211,6 +211,7 @@ import {
     None,
     Num,
     ProviderShim,
+    Range,
     Return,
     Seq,
     Shim,
@@ -1490,19 +1491,19 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 // The third slice, and the one the rest of the grammar waits on: statements
 // lower to expressions too, and every item that carries a default holds one.
 //
-// Three things here are *desugarings* rather than translations — the AST has no
+// Two things here are *desugarings* rather than translations — the AST has no
 // node for them, because the language stops having them at this point:
 //
 //   - **An operator is a call on its spelling.** `a + b` is `+(a, b)`, `!x` is
 //     `!(x)`, and an operator passed as a value is a two-parameter lambda whose
 //     body is that call. Nothing downstream can tell an operator was written.
-//   - **A range is a construct.** `a..b` builds the builtin `Span`. No name is
-//     written, so no import is needed — which is why the desugar has to happen
-//     here rather than in the loader.
 //   - **A template is a concat chain.** Each interpolation is an `Interpolation` node
-//     and the pieces go through `__aipl_concat`, folded from
-//     the tail backwards so the tree matches the one the right-recursive
-//     `template_rest` produces.
+//     (lowered to `__template_interp` by `desugar.aipl`) and the pieces go through
+//     `__aipl_concat`, folded from the tail backwards so the tree matches the one the
+//     right-recursive `template_rest` produces.
+//
+// A range `a..b` is a `Range` node, kept as written for the lints and lowered to the builtin
+// `Span` by `desugar.aipl`.
 //
 // A `suffix` and a `#{ .. }` entry get `Ast` cases of their own (`ASuffix`,
 // `AEntry`) because neither is an expression on its own: a suffix has no
@@ -1599,15 +1600,7 @@ fn lower_expr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let rhs = kid_expr(kids, 1, sp)?;
     let tsp = node.tok_span();
     let op = node.own_token_text(src);
-    if (op == "..") {
-        return ok(AExpr(at(
-            Construct(
-                "__builtin_Span",
-                [FieldInit { name: "start", value: lhs }, FieldInit { name: "end", value: rhs }],
-            ),
-            tsp,
-        )));
-    };
+    if (op == "..") { return ok(AExpr(at(Range(lhs, rhs), tsp))); };
     ok(AExpr(at(Call(op, [lhs, rhs], false, Unresolved), tsp)))
 }
 

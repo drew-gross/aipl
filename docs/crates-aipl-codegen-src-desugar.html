@@ -97,7 +97,7 @@
             <a class="anchor" href="#item-CoreExpr">CoreExpr</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout</code></pre>
+          <pre class="signature"><code>variant CoreExpr = Expr without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout</code></pre>
 
           <div class="doc"><p>The tree every pass after this one is handed: an expression with none of the surface forms <code>desugared</code> lowers anywhere in it.</p></div>
 
@@ -111,7 +111,21 @@
             <a class="anchor" href="#item-CoreKind">CoreKind</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout</code></pre>
+          <pre class="signature"><code>variant CoreKind = ExprKind without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-CoreFieldInit">
+          <h3>
+            <a class="anchor" href="#item-CoreFieldInit">CoreFieldInit</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant CoreFieldInit = FieldInit without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -125,7 +139,7 @@
             <a class="anchor" href="#item-CoreMatchArm">CoreMatchArm</a>
             <span class="kind kind-variant">variant</span>
           </h3>
-          <pre class="signature"><code>variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout</code></pre>
+          <pre class="signature"><code>variant CoreMatchArm = MatchArm without LetPattern throughout without ForPattern throughout without ProviderShim throughout without FieldProjection throughout without MethodProjection throughout without Interpolation throughout without Range throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -202,7 +216,7 @@
             <a class="anchor" href="#item-core_with_kind">core_with_kind</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn core_with_kind(__spat$11305: Expr, kind: CoreKind) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn core_with_kind(__spat$11888: Expr, kind: CoreKind) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p><code>base</code> with another kind: its spans and source stay.</p></div>
 
@@ -300,7 +314,7 @@
             <a class="anchor" href="#item-projected">projected</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn projected(self: CoreExpr, __spat$18850: Expr, step: (CoreExpr) -&#62; CoreExpr) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn projected(self: CoreExpr, __spat$19764: Expr, step: (CoreExpr) -&#62; CoreExpr) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p>What <code>receiver$step</code> means: <code>receiver.map(|e| step)</code>, where <code>step</code> is the projection written against the element <code>e</code>, which sits where the step's name is written so an error about it points at the name. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident; it carries the projection's span, so no two projections of a function name their element alike.</p></div>
 
@@ -496,7 +510,7 @@
             <a class="anchor" href="#item-bind_one_param">bind_one_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_one_param(__spat$30612: Param, body: CoreExpr) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn bind_one_param(__spat$31526: Param, body: CoreExpr) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p>A destructured parameter's bindings in front of <code>body</code>: the case's payload, or the struct's fields, read off the parameter itself. Folded from the right by the caller so they come out in source order.</p></div>
 

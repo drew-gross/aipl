@@ -4,20 +4,15 @@
 # The parser records which fields are written as the shorthand (`FieldInit.shorthand`), so a field
 # whose value is the identifier it is named for is flagged unless it is one.
 #
-# A literal the parser synthesizes from other syntax carries a `__builtin_`-prefixed name a user
-# cannot write — a range `start..end` is `__builtin_Span { start: start, end: end }` — and its
-# bound identifiers are not a written `field: field`, so those are skipped.
-#
 # The hit points at the value.
 
-import { as_case, collect_ok, equal as ==, not_equal as !=, starts_with } from builtins;
+import { as_case, collect_ok, equal as ==, not_equal as != } from builtins;
 import { Construct, FieldInit, Ident } from "../expr.aipl";
 import { lint_str } from "./lint.aipl";
 import { LintHit, lint_message } from "./lint_hit.aipl";
 
 # A hit for each field of the struct literal `self` (its kind) that is set to a name it shares.
 pub fn field_init_shorthand(self: Construct(name, inits)) -> LintHit[] {
-    if (name.starts_with("__builtin_")) { return []; };
     inits$spelled_out().collect_ok()
 }.test({
     // `lint_str` runs every lint, so the snippets return a type other than the literal's: `-> P { P { .. } }`

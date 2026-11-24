@@ -438,6 +438,13 @@
 
             </li>
 
+            <li id="item-Range"><code>Range(start: Expr, end: Expr)</code>
+
+              <div class="doc"><p><code>start..end</code>, as written, so the lints see a range and not the <code>Span</code> construct it builds; <code>desugar.aipl</code> lowers it to <code>__builtin_Span { start, end }</code>, and nothing downstream of it ever sees the node.</p></div>
+
+
+            </li>
+
           </ul>
 
         </section>

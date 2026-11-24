@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-codegen/src/lint/field_init_shorthand.aipl</code></h1>
 
-      <div class="module-doc"><p>The <code>field_init_shorthand</code> lint: <code>Point { x: x }</code> — a field initialized with the bare identifier of the same name; <code>Point { x }</code> is the same literal.</p><p>The parser records which fields are written as the shorthand (<code>FieldInit.shorthand</code>), so a field whose value is the identifier it is named for is flagged unless it is one.</p><p>A literal the parser synthesizes from other syntax carries a <code>__builtin_</code>-prefixed name a user cannot write — a range <code>start..end</code> is <code>__builtin_Span { start: start, end: end }</code> — and its bound identifiers are not a written <code>field: field</code>, so those are skipped.</p><p>The hit points at the value.</p></div>
+      <div class="module-doc"><p>The <code>field_init_shorthand</code> lint: <code>Point { x: x }</code> — a field initialized with the bare identifier of the same name; <code>Point { x }</code> is the same literal.</p><p>The parser records which fields are written as the shorthand (<code>FieldInit.shorthand</code>), so a field whose value is the identifier it is named for is flagged unless it is one.</p><p>The hit points at the value.</p></div>
 
 
 

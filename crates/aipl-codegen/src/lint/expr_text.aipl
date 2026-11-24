@@ -40,6 +40,7 @@ import {
     Neg,
     None,
     Num,
+    Range,
     Slice,
     Spread,
     Str,
@@ -117,6 +118,8 @@ pub fn expr_text(self: Expr) -> str? {
     assert(text("[1, ..a]")? == ["[1, ..a]"]);
     assert(text("(a, b)")? == ["(a, b)"]);
     assert(text("f()?")? == ["f()?"]);
+    assert(text("0..n")? == ["0..n"]);
+    assert(text("(a + b)..n")? == ["(a + b)..n"]);
 
     // What it does not write.
     assert(text("|x| x")?.is_empty());
@@ -129,7 +132,7 @@ pub fn expr_text(self: Expr) -> str? {
 pub fn operand_text(self: Expr) -> str? {
     let text = self.expr_text()?;
     let loose = match (self.kind) {
-        Neg(..) => true,
+        Neg(..) | Range(..) => true,
         Call(name, args, _, _) => name.is_infix() && args.len() == 2 || name == "!" && args.len() == 1,
         _ => false,
     };
@@ -162,6 +165,7 @@ fn compound_text(self: Expr) -> str? {
         },
         Try(inner) => some(`{inner.operand_text()?}?`),
         Neg(inner) => some(`-{inner.operand_text()?}`),
+        Range(start, end) => some(`{start.operand_text()?}..{end.operand_text()?}`),
         Spread(inner) => some(`..{inner.expr_text()?}`),
         ArrayLit(elements) => some(`[{elements.texts()?.join(sep=", ")}]`),
         // A one-element tuple has no spelling of its own.

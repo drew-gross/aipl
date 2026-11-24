@@ -76,6 +76,7 @@ import {
     None,
     Num,
     ProviderShim,
+    Range,
     Return,
     Seq,
     SetLit,
@@ -504,6 +505,10 @@ fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -> Res
             body.resolved(imported, [..locals, ..binding.binders()]),
         ),
         Interpolation(value) => Interpolation(value.resolved(imported, locals)),
+        Range(start, end) => Range(
+            start.resolved(imported, locals),
+            end.resolved(imported, locals),
+        ),
         FieldProjection(receiver, name) => FieldProjection(
             receiver.resolved(imported, locals),
             name,

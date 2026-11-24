@@ -18,7 +18,6 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
-    starts_with,
     value_or,
 } from builtins;
 import { Construct, Expr, FieldInit, is_ident } from "../expr.aipl";
@@ -36,11 +35,8 @@ pub fn fn_body_type_stutter(Function { name as function, shorthand_body, sig, bo
     let Expr { kind, span } = body;
     let Construct(name, inits) = kind.as_case::<Construct>()?;
 
-    // A construct the parser synthesized from other syntax (a range is
-    // `__builtin_Span { .. }`) is not a literal anyone wrote, and its name can't be
-    // spelled, so it has no shorter form. `{}` has no shorthand either (it would
-    // read as an empty block).
-    if (name != ret || name.starts_with("__builtin_") || inits.is_empty()) { return none; };
+    // `{}` has no shorthand (it would read as an empty block).
+    if (name != ret || inits.is_empty()) { return none; };
     some(lint_message(message(function.text, name, inits.lone_shorthand()), span=span))
 }.test({
     let found = lint_function_unfilled(

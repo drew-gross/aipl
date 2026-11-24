@@ -112,6 +112,7 @@ mtg_metagame workarounds:
   `str[i]` is a byte (invalid UTF-8 chars show as �); fine for scanning, but no char iteration by code point
 
 handoff:
+  handoff's ir_is_behind_sources reads only crates/aipl-codegen/src/*.aipl (read_dir is not recursive), so an edit under lint/ does not trigger the pre-discovery IR regeneration; the gate then fails on a stale project compiler it cannot refill. It should walk the directory, or take the list from DOGFOOD_SOURCE_FILES
 parser library perf (builtin parse_json, 10MB: lex 0.77s / parse_cst 1.1s / lower 0.7s, vs ~1s for a hand-written parser; ~10 allocations and ~8k instructions per token):
   match_* thread a Step {kids, far: Far{3 arrays}} by value through every rule: refcount traffic on Far's arrays is ~30% of the parse
   a JSON value is value -> (array|object|..) -> group nodes: ~2-3 Tree nodes per scalar, each with its own Parts (3 allocations) in lowering

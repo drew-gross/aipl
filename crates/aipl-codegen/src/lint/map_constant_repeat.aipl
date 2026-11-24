@@ -26,8 +26,8 @@
 import {
     all,
     collect_ok,
-    ends_with,
     equal as ==,
+    is_case,
     is_empty,
     logical_and as &&,
     logical_not as !,
@@ -48,6 +48,7 @@ import {
     Neg,
     None,
     Num,
+    Range,
     SetLit,
     Str,
     TupleLit,
@@ -141,11 +142,6 @@ fn is_constant(self: Expr, parameter: str) -> bool {
     }
 }
 
-# Whether `self` is a range (`a..b`), which builds the builtin `Span` — the one receiver of
-# `map` that is known from syntax alone not to be an array or an optional.
-fn is_range(self: Expr) -> bool {
-    match (self.kind) {
-        Construct(name, _) => name.ends_with("Span"),
-        _ => false,
-    }
-}
+# Whether `self` is a range (`a..b`) — the one receiver of `map` that is known from syntax alone
+# not to be an array or an optional.
+fn is_range(self: Expr) -> bool { self.kind.is_case::<Range>() }

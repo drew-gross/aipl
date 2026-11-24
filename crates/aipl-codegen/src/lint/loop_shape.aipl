@@ -20,7 +20,6 @@ import {
 } from builtins;
 import {
     Assign,
-    Construct,
     Expr,
     For,
     If,
@@ -86,7 +85,7 @@ pub fn is_lambda_safe(self: Expr) -> bool { self.descendants_of_kind::<Try>().is
 # before its closing paren).
 pub fn iterable_text(self: Expr) -> str {
     match (self.kind) {
-        Construct("__builtin_Span", _) => "(<range>)",
+        Range(..) => "(<range>)",
         _ => if (self.spans_its_text()) { self.source } else { "<iterable>" },
     }
 }

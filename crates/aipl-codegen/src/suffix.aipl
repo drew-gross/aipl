@@ -5,13 +5,12 @@ import { Span, equal as == } from builtins;
 import { Unresolved } from "./builtin_table.aipl";
 import {
     Call,
-    Construct,
     Expr,
     Field as FieldExpr,
-    FieldInit,
     FieldProjection,
     Index as IndexExpr,
     MethodProjection,
+    Range,
     Slice,
     Try as TryExpr,
     TypeArgs,
@@ -105,13 +104,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     assert(apply_suffix(p, MapField(at_5), 0..6).name_span == 5..6);
     assert(apply_suffix(p, MapMethod(at_5, []), 0..8).name_span == 5..6);
     // A range literal written as an index is the closed slice form.
-    let range = at(
-        Construct(
-            "__builtin_Span",
-            [FieldInit { name: "start", value: num(1) }, FieldInit { name: "end", value: num(2) }],
-        ),
-        0..0,
-    );
+    let range = at(Range(num(1), num(2)), 0..0);
     assert(apply_suffix(p, Index(range), 0..0).show_expr() == "Slice(p, 1, 2)");
 })
 
@@ -129,17 +122,7 @@ fn index_or_slice(recv: Expr, index: Expr, span: Span) -> Expr {
     }
 }
 
-# The two ends of `self`, if it is the `Span` construct a range desugars to.
+# The two ends of `self`, if it is a range.
 fn range_bounds(self: Expr) -> (Expr, Expr)? {
-    if (let Construct(name, inits) = self.kind) {
-        if (name == "__builtin_Span") { return two_values(inits); };
-    };
-    none
-}
-
-fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
-    match (self) {
-        [a, b] => some((a.value, b.value)),
-        _ => none,
-    }
+    if (let Range(start, end) = self.kind) { some((start, end)) } else { none }
 }

@@ -23,6 +23,7 @@ import {
     drop_last,
     equal as ==,
     filter,
+    is_case,
     is_empty,
     is_nonempty,
     is_some,
@@ -40,11 +41,11 @@ import {
     ArrayLit,
     Assign,
     Call,
-    Construct,
     Expr,
     For,
     If,
     LetMut,
+    Range,
     Seq,
     Unit,
     descendants_of_kind,
@@ -292,15 +293,10 @@ pub fn is_liftable(self: Expr, acc: str) -> bool {
     assert(!lower_aipl_block_surface("{ f(a?) }")?.is_liftable("out"));
 })
 
-# Whether the loop walks a range (`a..b`, a `Span` construction), which is not an
+# Whether the loop walks a range (`a..b`), which is not an
 # array: only `map` takes one, so a guard has no `filter` to become and an element
 # added unchanged is the range as an array, which has no spelling to advise.
-pub fn is_range(self: Accumulation) -> bool {
-    match (self.seeded.iterable.kind) {
-        Construct("__builtin_Span", _) => true,
-        _ => false,
-    }
-}
+pub fn is_range(self: Accumulation) -> bool { self.seeded.iterable.kind.is_case::<Range>() }
 
 # Whether the loop adds something derived from its element, rather than the element
 # itself, which a pipeline just leaves out.
