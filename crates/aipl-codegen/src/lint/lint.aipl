@@ -35,6 +35,7 @@ import { interp_to_str } from "./interp_to_str.aipl";
 import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
+import { let_else_only } from "./let_else_only.aipl";
 import {
     FilledHit,
     Lint,
@@ -67,6 +68,7 @@ import { match_is_some_and } from "./match_is_some_and.aipl";
 import { match_map_err } from "./match_map_err.aipl";
 import { match_map_ok } from "./match_map_ok.aipl";
 import { match_map_value_or } from "./match_map_value_or.aipl";
+import { match_only } from "./match_only.aipl";
 import { match_value_or } from "./match_value_or.aipl";
 import { match_value_or_err } from "./match_value_or_err.aipl";
 import { push_array_literal } from "./push_array_literal.aipl";
@@ -114,6 +116,8 @@ pub fn all_lints() -> Lint[] {
         Lint { name: "match_case_as_case", run: OfMatch(|m| [..match_case_as_case(m)]) },
         Lint { name: "match_case_try_as_case", run: OfFunction(match_case_try_as_case) },
         Lint { name: "let_else_as_case", run: OfFunction(let_else_as_case) },
+        Lint { name: "let_else_only", run: OfFunction(let_else_only) },
+        Lint { name: "match_only", run: OfMatch(|m| [..match_only(m)]) },
         Lint { name: "push_loop_pipeline", run: OfLetMut(|seed| [..push_loop_pipeline(seed)]) },
         Lint { name: "push_loop_collect_ok", run: OfLetMut(|seed| [..push_loop_collect_ok(seed)]) },
         Lint { name: "extend_loop_map_join", run: OfFunction(extend_loop_map_join) },

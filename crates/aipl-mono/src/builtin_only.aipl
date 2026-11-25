@@ -1,0 +1,23 @@
+# The AIPL implementation of the `only` builtin. The loader names this function by the canonical
+# name `__builtin_only`, so a user's `xs.only()` resolves through the ordinary generic machinery.
+#
+# It is what `let [x] = xs else { return none; };` asks, as an expression: `let x = xs.only()?;`.
+# `first` is the element of an array that has one, `last` the element at the end, and this is
+# the element of an array that is *only* that — none when there is no element, and none when
+# there is more than one, since nothing says which was meant.
+
+import { equal as ==, len } from builtins;
+
+# The one element of an array of exactly one, or `none` when it holds none or several.
+pub fn only<T: any>(self: T[]) -> T? { if (self.len() == 1) { self[0] } else { none } }.test({
+    assert([7].only() == some(7));
+    assert(only(["a"]) == some("a")); // free-call form
+    // None, or more than one: there is no one element to hand back.
+    assert([1, 2][..0].only() == none);
+    assert([1, 2].only() == none);
+    assert([1, 2, 3].only() == none);
+    // The element is whatever there is, `none`-able or not, and the receiver may be a `str`.
+    assert([some(3)].only() == some(some(3)));
+    assert("x".only() == some('x'));
+    assert("xy".only() == none);
+})

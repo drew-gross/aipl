@@ -1,0 +1,191 @@
+# The `match_only` lint:
+#
+#     match (xs) { [x] => some(x), _ => none }
+#
+# — an array's one element, and `none` when it holds none or several. That is exactly `xs.only()`.
+# With a fallback in place of `none`,
+#
+#     match (xs) { [x] => x, _ => d }
+#
+# it is `xs.only().value_or(d)`.
+#
+# The `[x]` arm has to be one plain name and hand it back unchanged, bare or in `some(..)`: an arm
+# that does something with the element is a `map` over what `only` finds, which is not this
+# lint's to advise. The default is held to the bar `match_value_or` holds its own to
+# (`is_constant_default`), since `value_or`'s default is evaluated whether or not the array held
+# one element; and `none` is not a default there, where the answer is an optional of its own.
+#
+# The hit points at the catch-all arm's body, one short expression on one line, so `#[allow]`
+# squelches it.
+
+import {
+    as_case,
+    equal as ==,
+    first,
+    is_case,
+    is_empty,
+    last,
+    len,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+    only,
+} from builtins;
+import { Only, Some, ValueOr } from "../builtin_table.aipl";
+import { Call, Ident, Match, None } from "../expr.aipl";
+import { Wildcard } from "../pat.aipl";
+import { is_give_up } from "./case_match.aipl";
+import { is_constant_default } from "./constant_default.aipl";
+import { single_binder } from "./let_else_only.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, Named, shown, unfilled } from "./lint_hit.aipl";
+import { default_text, receiver_text } from "./option_match.aipl";
+import { Builtin } from "./spelling.aipl";
+
+# The hit for the `match` `self`, when it hands back an array's one element or gives up.
+pub fn match_only(self: Match(scrutinee, arms)) -> LintHit? {
+    if (arms.len() != 2) { return none; };
+    let one = arms.first()?;
+    let rest = arms.last()?;
+    let binder = one.pattern.single_binder()?;
+    if (binder == "_") { return none; };
+    let receiver = scrutinee.receiver_text();
+
+    // `[x] => some(x), _ => none`: the element or nothing.
+    if (let Call(_, wrapped, _, Some) = one.body.kind) {
+        let Ident(name, _) = wrapped.only()?.kind.as_case::<Ident>()?;
+        if (name != binder || !rest.is_give_up()) { return none; };
+        return some(unfilled(
+            Only,
+            `this \`match\` hands back an array's one element or \`none\` — write "{receiver}.`,
+            `()" instead`,
+            rest.body.span,
+        ));
+    };
+
+    // `[x] => x, _ => d`: the element or a default.
+    let Ident(name, _) = one.body.kind.as_case::<Ident>()?;
+    if (name != binder || !rest.pattern.is_case::<Wildcard>()) { return none; };
+    if (rest.body.kind == None || !rest.body.is_constant_default()) { return none; };
+    some(LintHit {
+        named: [
+            Named {
+                text: `this \`match\` hands back an array's one element or a default — write "{receiver}.`,
+                builtin: Builtin(Only),
+            },
+            Named { text: "().", builtin: Builtin(ValueOr) },
+        ],
+        tail: `({rest.body.default_text()})" instead`,
+        span: rest.body.span,
+    })
+}.test({
+    // The element or nothing, and the hit on the catch-all's `none`.
+    assert(lint_with_unfilled(
+        "fn f(xs: i64[]) -> i64? { match (xs) { [x] => some(x), _ => none } }",
+        "match_only",
+    )?.shown() == [
+        """this `match` hands back an array's one element or `none` — write "xs.Builtin(Only)()" instead""",
+    ]);
+    assert(lint_with_unfilled(
+        "fn f(xs: i64[]) -> i64? { match (xs) { [x] => some(x), _ => none } }",
+        "match_only",
+    )?$span == [60..64]);
+
+    // The element or a default, and the hit on the default.
+    assert(lint_with_unfilled(
+        "fn f(xs: i64[]) -> i64 { match (xs) { [x] => x, _ => 0 } }",
+        "match_only",
+    )?.shown() == [
+        """this `match` hands back an array's one element or a default — write "xs.Builtin(Only)().Builtin(ValueOr)(0)" instead""",
+    ]);
+    assert(lint_with_unfilled(
+        "fn f(xs: i64[]) -> i64 { match (xs) { [x] => x, _ => 0 } }",
+        "match_only",
+    )?$span == [53..54]);
+
+    // The default is quoted as written, a struct literal included, and the receiver as far as a
+    // method can follow it.
+    assert(lint_with_unfilled(
+        "fn f(p: P) -> P { match (p.xs) { [x] => x, _ => P { x: 0, y: 1 } } }",
+        "match_only",
+    )?.shown() == [
+        """this `match` hands back an array's one element or a default — write "p.xs.Builtin(Only)().Builtin(ValueOr)(P { x: 0, y: 1 })" instead""",
+    ]);
+    assert(lint_with_unfilled(
+        "fn f(a: i64[], b: i64[]) -> i64? { match (a || b) { [x] => some(x), _ => none } }",
+        "match_only",
+    )?.shown() == [
+        """this `match` hands back an array's one element or `none` — write "<value>.Builtin(Only)()" instead""",
+    ]);
+
+    // Shapes the lint must leave alone.
+    // The element is transformed on the way out: a `map` over what `only` finds.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [x] => some(g(x)), _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64 { match (xs) { [x] => g(x), _ => 0 } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    // Another name handed back, or a `some` of another value.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [x] => some(y), _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    // A default that does work would move it onto the path that did not run it.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64 { match (xs) { [x] => x, _ => h() } }",
+            "match_only",
+        )?.is_empty(),
+    );
+
+    // The catch-all gives `none` for an element that is itself an optional: the answers differ in
+    // type, and `value_or(none)` is not what was written.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64?[]) -> i64? { match (xs) { [x] => x, _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    // Not exactly one plain name: two elements, a literal, a trailing `..`, `_`.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [a, b] => some(a), _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [1] => some(1), _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [a, ..] => some(a), _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    // A third arm: the catch-all is not what is left.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [x] => some(x), [] => some(0), _ => none } }",
+            "match_only",
+        )?.is_empty(),
+    );
+    // A catch-all that is not `none` over `some(x)`: another question.
+    assert(
+        lint_with_unfilled(
+            "fn f(xs: i64[]) -> i64? { match (xs) { [x] => some(x), _ => some(0) } }",
+            "match_only",
+        )?.is_empty(),
+    );
+})

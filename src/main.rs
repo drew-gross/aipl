@@ -104,7 +104,7 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--jobs n]
+  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--jobs n] [--batch]
                                             run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
@@ -139,6 +139,8 @@ runs of `main` and of the whole file. The exit status is non-zero exactly when a
 part reports a failure.
 A run ends with one line on stderr saying what it took (`check: 1179 files in 306.2s (12
 threads)`), which stdout, being recorded and parsed, leaves out.
+`--batch` reports one file as a batch does, with its file named in its failures and the totals line a
+caller can read, instead of the single-file report.
 `--jobs n` sets how many files are checked at once: one per core by default. The files are
 taken costliest first (by the code bytes of the file's row in the `--baseline` table, else by
 size), and reported in the order they were given.
@@ -1102,6 +1104,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
     let parts = selected.unwrap_or(Parts::ALL);
     let validate_sections = selected.is_none() && !args.iter().any(|a| a == "--ignore-sections");
     let fix = args.iter().any(|a| a == "--fix");
+    let batch = args.iter().any(|a| a == "--batch");
     let (args, baseline_path) = match take_value_flag(args, "--baseline") {
         Ok(taken) => taken,
         Err(msg) => {
@@ -1133,14 +1136,15 @@ fn check_cmd(args: &[String]) -> ExitCode {
     };
     let args: Vec<String> = args
         .into_iter()
-        .filter(|a| a != "--ignore-sections" && a != "--fix")
+        .filter(|a| a != "--ignore-sections" && a != "--fix" && a != "--batch")
         .collect();
 
     // One explicit file keeps the single-file report: bare `test <name>` headers
     // and the runtime's own summary line. Anything else — no argument, a
     // directory, or several paths — is a batch, which prefixes failures with
-    // their file and prints one aggregate.
-    let single = args.len() == 1 && Path::new(&args[0]).is_file();
+    // their file and prints one aggregate; so is one file under `--batch`, for a caller
+    // that reads the aggregate whatever it asked about.
+    let single = args.len() == 1 && Path::new(&args[0]).is_file() && !batch;
 
     let mut files = Vec::new();
     if args.is_empty() {

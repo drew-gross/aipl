@@ -552,6 +552,24 @@ fn a_run_says_on_stderr_what_it_took() {
     assert!(!String::from_utf8_lossy(&out.stdout).contains("threads"));
 }
 
+/// `--batch` makes one named file report as a batch does, which is how a caller that reads the
+/// totals line asks about a single file.
+#[test]
+fn batch_makes_one_named_file_report_as_a_batch() {
+    let (stdout, _, code) = check_tree(
+        "batch_named",
+        &[("only.aipl", PASSES)],
+        &["--batch", "only.aipl"],
+    );
+    assert_eq!(code, 0, "{stdout}");
+    assert!(
+        stdout.contains("1 file, 1 tests: 1 passed, 0 failed"),
+        "{stdout}"
+    );
+    let (alone, _, _) = check_tree("batch_alone", &[("only.aipl", PASSES)], &["only.aipl"]);
+    assert!(!alone.contains("1 file,"), "{alone}");
+}
+
 #[test]
 fn all_tests_pass_is_silent_and_exit_zero() {
     let (stdout, _stderr, code) = check(

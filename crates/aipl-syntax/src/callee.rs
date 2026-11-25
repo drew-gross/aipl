@@ -69,6 +69,8 @@ pub enum Callee {
     CountIfIsEqual,
     CountIfIsNotEqual,
     First,
+    /// `only(self: T[]) -> T?` — the element of an array of exactly one.
+    Only,
     /// `grid_get(self: T[,], row: u64, column: u64) -> T?` — the cell at `row`,
     /// `column`, or `none` off the grid. What `grid[row, column]` is written as.
     GridGet,
@@ -483,6 +485,7 @@ impl Callee {
         Callee::CountIfIsEqual,
         Callee::CountIfIsNotEqual,
         Callee::First,
+        Callee::Only,
         Callee::GridGet,
         Callee::GridFrom,
         Callee::GridOf,
@@ -726,6 +729,7 @@ impl Callee {
             Callee::CountIfIsEqual => "__builtin_count_if_is_equal",
             Callee::CountIfIsNotEqual => "__builtin_count_if_is_not_equal",
             Callee::First => "__builtin_first",
+            Callee::Only => "__builtin_only",
             Callee::GridGet => "__builtin_grid_get",
             Callee::GridFrom => "__builtin_grid_from",
             Callee::GridOf => "__builtin_grid_of",

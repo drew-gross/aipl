@@ -50,6 +50,7 @@ variant Callee =
     | CountIfIsEqual
     | CountIfIsNotEqual
     | First
+    | Only
     | GridGet
     | GridFrom
     | GridOf
@@ -451,6 +452,11 @@ pub fn builtin_table() -> BuiltinEntry[] {
             arm: First,
             callee: "__builtin_first",
             definition: Written("builtin_first.aipl"),
+        },
+        BuiltinEntry {
+            arm: Only,
+            callee: "__builtin_only",
+            definition: Written("builtin_only.aipl"),
         },
         BuiltinEntry {
             arm: GridGet,

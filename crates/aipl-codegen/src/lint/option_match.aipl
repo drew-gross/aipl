@@ -15,6 +15,7 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
+    only,
 } from builtins;
 import {
     Call,
@@ -45,7 +46,7 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
     let none_arm = arms.find_if(|arm| arm.pattern.names_case("none"))?;
     let bindings = some_arm.pattern.payload_binders()?;
     let none_bindings = none_arm.pattern.payload_binders()?;
-    let [binder] = bindings else { return none; };
+    let binder = bindings.only()?;
     if (none_bindings.is_nonempty()) { return none; };
     some(OptionMatch { scrutinee, binder, some_body: some_arm.body, none_body: none_arm.body })
 }.test({
@@ -115,7 +116,7 @@ pub fn default_text(self: Expr) -> str {
 
 fn takes_a_method(self: Expr) -> bool {
     match (self.kind) {
-        Ident(..) | Field(..) | Index(..) | Slice(..) => true,
+        Ident(..) | Field(..) | Index(..) | Slice(..) | Try(..) => true,
         Call(name, _, _, _) => !name.is_operator_name(),
         _ => false,
     }

@@ -33,6 +33,7 @@ import {
     logical_not as !,
     logical_or as ||,
     not_equal as !=,
+    only,
 } from builtins;
 import { Callee, CollectOk, Map, Push } from "../builtin_table.aipl";
 import { ArrayLit, IfLet, LetMut, Unit, is_ident } from "../expr.aipl";
@@ -51,7 +52,7 @@ pub fn push_loop_collect_ok(self: LetMut) -> LintHit? {
     let IfLet(arm, scrutinee, otherwise) = looped.body.lone_statement()?.kind.as_case::<IfLet>()?;
     if (otherwise.kind != Unit || !arm.pattern.names_case("some")) { return none; };
     // `some` binds exactly its payload: `some(..)` binds nothing, and `_` is no name.
-    let [bound] = arm.pattern.payload_binders()? else { return none; };
+    let bound = arm.pattern.payload_binders()?.only()?;
     if (bound == "_") { return none; };
     let element = arm.body.lone_statement()?.pushed(looped.name, Push)?.element;
     if (!scrutinee.is_liftable(looped.name) || !element.is_liftable(looped.name)) { return none; };

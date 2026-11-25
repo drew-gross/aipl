@@ -290,7 +290,7 @@ fn check_corpus(paths: &[String]) -> Cmd {
         .args([
             "-c",
             r#"aipl=$1; shift
-exec "$aipl" check --baseline tests/performance_baseline.md "$@" 2>&1"#,
+exec "$aipl" check --batch --baseline tests/performance_baseline.md "$@" 2>&1"#,
             "sh",
             &aipl,
         ])

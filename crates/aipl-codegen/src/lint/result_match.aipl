@@ -13,6 +13,7 @@ import {
     logical_not as !,
     map,
     not_equal as !=,
+    only,
     value_or,
 } from builtins;
 import { Callee, Ok } from "../builtin_table.aipl";
@@ -37,8 +38,8 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
     if (arms.len() != 2) { return none; };
     let ok_arm = arms.find_if(|arm| arm.pattern.names_case("ok"))?;
     let err_arm = arms.find_if(|arm| arm.pattern.names_case("err"))?;
-    let [ok_binder] = ok_arm.pattern.payload_binders()? else { return none; };
-    let [err_binder] = err_arm.pattern.payload_binders()? else { return none; };
+    let ok_binder = ok_arm.pattern.payload_binders()?.only()?;
+    let err_binder = err_arm.pattern.payload_binders()?.only()?;
     some(ResultMatch {
         scrutinee,
         ok_binder,
