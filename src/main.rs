@@ -137,6 +137,8 @@ refusal) without running anything. `--tests` and `--benchmarks` also run the `.t
 a part leaves the file's recorded sections and `--baseline` out, since they describe
 runs of `main` and of the whole file. The exit status is non-zero exactly when a chosen
 part reports a failure.
+A run ends with one line on stderr saying what it took (`check: 1179 files in 306.2s (12
+threads)`), which stdout, being recorded and parsed, leaves out.
 `--jobs n` sets how many files are checked at once: one per core by default. The files are
 taken costliest first (by the code bytes of the file's row in the `--baseline` table, else by
 size), and reported in the order they were given.
@@ -1092,6 +1094,7 @@ fn check_path(
 /// rather than the first one. Exit code 0 only if every file was formatted,
 /// compiled, had every test pass, and matched its sections.
 fn check_cmd(args: &[String]) -> ExitCode {
+    let started = std::time::Instant::now();
     let (args, dbg) = take_debug_flag(args);
     let (args, selected) = Parts::take_from(args);
     // A selector names the parts to run, and a file's recorded sections are not among them: they
@@ -1299,6 +1302,10 @@ fn check_cmd(args: &[String]) -> ExitCode {
         print!("{}", totals.render());
         passed = totals.passed_all();
     }
+    eprint!(
+        "{}",
+        check::render_runtime(resolved.len(), started.elapsed(), jobs)
+    );
     if passed {
         ExitCode::SUCCESS
     } else {

@@ -14,6 +14,18 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+/// `stderr` without the line `check` ends with saying what the run took, which differs on every
+/// run.
+pub(crate) fn without_runtime(stderr: &str) -> String {
+    stderr
+        .lines()
+        .filter(|line| {
+            !(line.starts_with("check: ") && line.contains(" in ") && line.ends_with(')'))
+        })
+        .map(|line| format!("{line}\n"))
+        .collect()
+}
+
 /// Write `src` to a uniquely-named temp file, run `aipl check` on it, and return
 /// `(stdout, stderr, exit_code)`. `name` keeps temp files distinct across tests
 /// (which run in parallel).
@@ -30,7 +42,7 @@ fn check(name: &str, src: &str) -> (String, String, i32) {
     let norm = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
     (
         norm(&out.stdout),
-        norm(&out.stderr),
+        without_runtime(&norm(&out.stderr)),
         out.status.code().unwrap_or(-1),
     )
 }
@@ -59,7 +71,7 @@ fn check_tree(name: &str, files: &[(&str, &str)], args: &[&str]) -> (String, Str
     let norm = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
     (
         norm(&out.stdout),
-        norm(&out.stderr),
+        without_runtime(&norm(&out.stderr)),
         out.status.code().unwrap_or(-1),
     )
 }
@@ -514,6 +526,32 @@ fn a_job_count_must_be_a_positive_number() {
     assert_eq!(code, 1);
 }
 
+/// A run ends with a line on stderr saying what it took, and stdout, which is recorded and parsed,
+/// does not mention it.
+#[test]
+fn a_run_says_on_stderr_what_it_took() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("check_tree")
+        .join("runtime_line");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create temp dir");
+    fs::write(dir.join("a.aipl"), PASSES).expect("write temp source");
+    fs::write(dir.join("b.aipl"), PASSES).expect("write temp source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .args(["check", "--jobs", "2"])
+        .current_dir(&dir)
+        .output()
+        .expect("run aipl check");
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    let (head, seconds) = stderr
+        .trim_end()
+        .rsplit_once(" in ")
+        .expect("a runtime line");
+    assert_eq!(head, "check: 2 files");
+    assert!(seconds.ends_with("s (2 threads)"), "{stderr}");
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("threads"));
+}
+
 #[test]
 fn all_tests_pass_is_silent_and_exit_zero() {
     let (stdout, _stderr, code) = check(
@@ -742,7 +780,7 @@ fn check_here(name: &str, src: &str) -> (String, String, i32) {
     let norm = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
     (
         norm(&out.stdout),
-        norm(&out.stderr),
+        without_runtime(&norm(&out.stderr)),
         out.status.code().unwrap_or(-1),
     )
 }
@@ -1137,7 +1175,7 @@ fn ignore_sections_checks_the_tests_alone() {
     assert_eq!(
         (
             String::from_utf8_lossy(&out.stdout).into_owned(),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
+            without_runtime(&String::from_utf8_lossy(&out.stderr)),
             out.status.code()
         ),
         (NO_TESTS.to_string(), String::new(), Some(0))
@@ -1315,7 +1353,7 @@ fn check_leaking(name: &str, src: &str, leak: bool) -> (String, String, Option<i
     let out = command.output().expect("run aipl check");
     (
         String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
-        String::from_utf8_lossy(&out.stderr).into_owned(),
+        without_runtime(&String::from_utf8_lossy(&out.stderr)),
         out.status.code(),
     )
 }
@@ -1616,7 +1654,7 @@ fn a_benchmark_block_that_leaks_fails_the_file_like_a_failing_test() {
             .expect("run aipl check");
         (
             String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
+            without_runtime(&String::from_utf8_lossy(&out.stderr)),
             out.status.code(),
         )
     };
@@ -1664,7 +1702,7 @@ fn a_benchmark_block_is_left_out_of_what_run_and_build_make() {
     assert_eq!(
         (
             String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
+            without_runtime(&String::from_utf8_lossy(&out.stderr)),
             out.status.code()
         ),
         ("hi\n".to_string(), String::new(), Some(0))
@@ -1725,7 +1763,7 @@ hi
     assert_eq!(
         (
             String::from_utf8_lossy(&again.stdout).into_owned(),
-            String::from_utf8_lossy(&again.stderr).into_owned(),
+            without_runtime(&String::from_utf8_lossy(&again.stderr)),
             again.status.code()
         ),
         (NO_TESTS.to_string(), String::new(), Some(0))
@@ -1890,7 +1928,7 @@ fn check_against(name: &str, table: &str) -> (String, String, i32) {
         .expect("run aipl check");
     (
         String::from_utf8_lossy(&out.stdout).into_owned(),
-        String::from_utf8_lossy(&out.stderr).into_owned(),
+        without_runtime(&String::from_utf8_lossy(&out.stderr)),
         out.status.code().unwrap_or(-1),
     )
 }

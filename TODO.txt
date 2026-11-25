@@ -903,8 +903,9 @@ gui:
   screenshot testing
 
 check:
+  make a flag to not print runtime (for sections and machines) then put runtime back into stdout (not stderr)
+  make a flag for machine readable output that handoff can use
   check on a folder so we can e.g. check all the lints at oncez
-  check should print it's runtime
   check should error on lint failures, but still run tests and report results
   can recover from parse errors too and run tests
   can recover from type errors even?

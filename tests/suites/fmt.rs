@@ -287,7 +287,7 @@ fn cli_check_formats_with_fix() {
             .expect("spawn aipl");
         (
             String::from_utf8_lossy(&out.stdout).into_owned(),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
+            super::check::without_runtime(&String::from_utf8_lossy(&out.stderr)),
             out.status.code(),
         )
     };

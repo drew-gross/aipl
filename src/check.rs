@@ -79,6 +79,20 @@ impl Parts {
     }
 }
 
+/// The line `check` ends with on stderr, saying what the run took: `check: 1179 files in 306.2s
+/// (12 threads)`. Stderr, not stdout: the time differs on every run, and what `check` prints on
+/// stdout is recorded byte for byte by the `check` sections and read by the gate.
+pub fn render_runtime(files: usize, elapsed: std::time::Duration, threads: usize) -> String {
+    let plural =
+        |n: usize, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
+    format!(
+        "check: {} in {:.1}s ({})\n",
+        plural(files, "file", "files"),
+        elapsed.as_secs_f64(),
+        plural(threads, "thread", "threads")
+    )
+}
+
 /// The order to take files from the queue in, given what each costs: the costliest first, so the
 /// one that takes longest is not left for last, when everything else is done and only one worker
 /// has anything to do. Ties keep the order the files were given in, so the order is the same on
@@ -455,6 +469,19 @@ pub fn render_findings(label: &str, found: &[Finding]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_runtime_is_one_line_naming_the_files_the_time_and_the_threads() {
+        use std::time::Duration;
+        assert_eq!(
+            render_runtime(1179, Duration::from_millis(306_240), 12),
+            "check: 1179 files in 306.2s (12 threads)\n"
+        );
+        assert_eq!(
+            render_runtime(1, Duration::from_millis(40), 1),
+            "check: 1 file in 0.0s (1 thread)\n"
+        );
+    }
 
     #[test]
     fn the_costliest_file_is_taken_first_and_ties_keep_their_order() {
