@@ -94,8 +94,8 @@ pub struct TestRun {
 }
 
 /// Run a `.benchmark` driver: build it instrumented, link it against the
-/// instrumented runtime, and run it once in the current directory (the caller has
-/// staged the file's companions there).
+/// instrumented runtime, and run it once in `run_dir` (the caller has staged the file's companions
+/// there).
 ///
 /// The blocks run apart from the file's `.test` blocks because their counts exist
 /// only in the instrumented build, which the in-process JIT is not. The program
@@ -106,6 +106,7 @@ pub fn run_benchmark_tests(
     driver: &Program,
     stem: &str,
     file_label: &str,
+    run_dir: &Path,
     dbg: DebugOptions,
 ) -> Result<TestRun, MeasureError> {
     let object = ObjectCompilation::new(&driver_as_main(driver), stem, dbg, true)
@@ -118,6 +119,7 @@ pub fn run_benchmark_tests(
         let tally_path = dir.join("tally.txt");
         let stats_path = dir.join("alloc_stats.txt");
         let output = Command::new(&exe)
+            .current_dir(run_dir)
             .env("AIPL_TEST_REPORT", file_label)
             .env("AIPL_TEST_TALLY", &tally_path)
             .env("AIPL_ALLOC_STATS", &stats_path)

@@ -409,6 +409,24 @@ fn collect_aipl(dir: &Path, out: &mut Vec<PathBuf>) {
 struct Staged {
     entry: PathBuf,
     root: PathBuf,
+    /// The directory the file's programs run in: a scratch directory holding its companions.
+    run_dir: PathBuf,
+}
+
+/// This thread's programs run in a directory for as long as it lives.
+struct WorkingDir;
+
+impl WorkingDir {
+    fn enter(dir: &Path) -> WorkingDir {
+        aipl::codegen::set_working_dir(Some(dir.to_path_buf()));
+        WorkingDir
+    }
+}
+
+impl Drop for WorkingDir {
+    fn drop(&mut self) {
+        aipl::codegen::set_working_dir(None);
+    }
 }
 
 /// Load, compile, and run one file's `__test_main` driver, then validate its
@@ -519,7 +537,7 @@ fn check_file(
             .and_then(OsStr::to_str)
             .unwrap_or("a.out");
         let batch_label = aipl::codegen::test_file().unwrap_or_default();
-        match aipl::perf::run_benchmark_tests(&driver, stem, &batch_label, dbg) {
+        match aipl::perf::run_benchmark_tests(&driver, stem, &batch_label, &staged.run_dir, dbg) {
             Ok(bench) => {
                 run.add_failure_report(&bench.report);
                 let mut failed = bench.failed;
@@ -751,7 +769,17 @@ fn in_staged_dir<T>(
     project_root: &Path,
     f: impl FnOnce(&Staged) -> T,
 ) -> Result<T, String> {
-    let dir = binary::scratch_dir("check").map_err(|e| e.to_string())?;
+    // Named for the file, so a directory left behind says whose it is.
+    let canonical_root = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
+    let name = file
+        .strip_prefix(&canonical_root)
+        .unwrap_or(file)
+        .with_extension("")
+        .to_string_lossy()
+        .into_owned();
+    let dir = binary::scratch_dir_for("check", &name).map_err(|e| e.to_string())?;
     // The staged entry, and the directory the run happens in: the scratch directory, or
     // for a file with companions the directory they were staged beside it.
     let staged = (|| {
@@ -760,6 +788,7 @@ fn in_staged_dir<T>(
                 Staged {
                     entry: file.to_path_buf(),
                     root: project_root.to_path_buf(),
+                    run_dir: dir.clone(),
                 },
                 dir.clone(),
             ));
@@ -785,25 +814,25 @@ fn in_staged_dir<T>(
             Staged {
                 entry,
                 root: dir.clone(),
+                run_dir: entry_dir.clone(),
             },
             entry_dir,
         ))
     })();
-    let (staged, run_dir) = match staged {
+    let (staged, _) = match staged {
         Ok(s) => s,
         Err(e) => {
             let _ = std::fs::remove_dir_all(&dir);
             return Err(e);
         }
     };
-    let prev = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
-    env::set_current_dir(&run_dir).map_err(|e| format!("enter {}: {e}", run_dir.display()))?;
-    let out = f(&staged);
-    // Restore first, so a failure to clean up can't leave the process parked in
-    // a directory it is about to delete.
-    let restored = env::set_current_dir(&prev);
+    // The working directory is this thread's own (see `aipl::codegen::set_working_dir`), so
+    // nothing else running is moved, and it is put back however `f` ends.
+    let out = {
+        let _in_dir = WorkingDir::enter(&staged.run_dir);
+        f(&staged)
+    };
     let _ = std::fs::remove_dir_all(&dir);
-    restored.map_err(|e| format!("return to {}: {e}", prev.display()))?;
     Ok(out)
 }
 
@@ -1330,8 +1359,7 @@ fn report_file(
         .and_then(OsStr::to_str)
         .unwrap_or("a.out");
     // The staged scratch directory the program runs in (see `in_staged_dir`).
-    let dir = env::current_dir().map_err(|e| format!("current dir: {e}"))?;
-    aipl::perf::measure_program(&program, stem, cli, &dir, dbg).map_err(|e| match e {
+    aipl::perf::measure_program(&program, stem, cli, &staged.run_dir, dbg).map_err(|e| match e {
         aipl::perf::MeasureError::Compile(errors) => render(errors),
         aipl::perf::MeasureError::Link(e) => e.to_string(),
         aipl::perf::MeasureError::Run(msg) => msg,

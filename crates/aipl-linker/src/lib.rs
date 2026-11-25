@@ -101,6 +101,24 @@ pub fn scratch_dir(prefix: &str) -> Result<PathBuf, Error> {
     Ok(dir)
 }
 
+/// [`scratch_dir`] named for what it is for: `aipl-<prefix>-<name>-…`, with `name` (a test's path,
+/// say) cut down to characters a directory name can hold and to its last 80, so the directory says
+/// whose it is when it is found lying around.
+pub fn scratch_dir_for(prefix: &str, name: &str) -> Result<PathBuf, Error> {
+    let kept: Vec<char> = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let tail: String = kept[kept.len().saturating_sub(80)..].iter().collect();
+    scratch_dir(&format!("{prefix}-{tail}"))
+}
+
 fn staging_dir() -> Result<PathBuf, Error> {
     scratch_dir("build")
 }
@@ -114,4 +132,31 @@ fn which(prog: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_scratch_directory_is_named_for_what_it_is_for() {
+        let dir = scratch_dir_for("check", "tests/cases/files/read file").unwrap();
+        let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(
+            name.starts_with("aipl-check-tests_cases_files_read_file-"),
+            "{name}"
+        );
+        assert!(dir.is_dir());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_long_name_keeps_its_end() {
+        let long = format!("{}/the_test", "x".repeat(200));
+        let dir = scratch_dir_for("check", &long).unwrap();
+        let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(name.contains("_the_test-"), "{name}");
+        assert!(name.len() < 120, "{name}");
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }

@@ -202,7 +202,12 @@ fn list_files_paths(dir: *const str24::Str) -> Option<Vec<String>> {
     let dv = unsafe { *dir };
     let root = std::str::from_utf8(dv.bytes(&mut scratch)).ok()?;
     let mut files: Vec<String> = Vec::new();
-    walk_dir(root, &mut files).ok()?;
+    walk_dir(
+        root,
+        &in_working_dir(std::path::Path::new(root)),
+        &mut files,
+    )
+    .ok()?;
     Some(files)
 }
 
@@ -211,14 +216,14 @@ fn list_files_paths(dir: *const str24::Str) -> Option<Vec<String>> {
 /// short: an unreadable directory, a name that isn't UTF-8, or an entry whose
 /// kind the filesystem won't report (`file_type` falls back to `lstat` when the
 /// directory entry itself says "unknown", and only fails if that fails too).
-fn walk_dir(dir: &str, out: &mut Vec<String>) -> Result<(), ()> {
-    for entry in std::fs::read_dir(dir).map_err(|_| ())? {
+fn walk_dir(dir: &str, real: &std::path::Path, out: &mut Vec<String>) -> Result<(), ()> {
+    for entry in std::fs::read_dir(real).map_err(|_| ())? {
         let entry = entry.map_err(|_| ())?;
         let name = entry.file_name();
         let name = name.to_str().ok_or(())?;
         let path = join_path(dir, name);
         if entry.file_type().map_err(|_| ())?.is_dir() {
-            walk_dir(&path, out)?;
+            walk_dir(&path, &real.join(name), out)?;
         } else {
             out.push(path);
         }
@@ -295,6 +300,38 @@ fn monotonic_nanos() -> i64 {
 #[cfg(not(unix))]
 fn monotonic_nanos() -> i64 {
     0
+}
+
+// ---------- The working directory ----------
+//
+// A program's relative paths mean "relative to where it runs". The process has one working
+// directory, which a program run beside others on other threads cannot move, so a thread that runs
+// a program somewhere else says where, and the file operations (`read_file_to_string`,
+// `write_string_to_file`, `list_files`, `execute_program`) resolve a relative path against it.
+// Nothing about what a program sees changes: a listing names its files as the program wrote the
+// directory.
+
+thread_local! {
+    static WORKING_DIR: std::cell::RefCell<Option<std::path::PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Run this thread's programs from `dir`, or from the process's working directory for `None`.
+pub fn set_working_dir(dir: Option<std::path::PathBuf>) {
+    WORKING_DIR.with(|cell| *cell.borrow_mut() = dir);
+}
+
+/// What [`set_working_dir`] last set on this thread.
+pub fn working_dir() -> Option<std::path::PathBuf> {
+    WORKING_DIR.with(|cell| cell.borrow().clone())
+}
+
+/// Where `path`, as a program wrote it, is on disk.
+pub(crate) fn in_working_dir(path: &std::path::Path) -> std::path::PathBuf {
+    match working_dir() {
+        Some(dir) => dir.join(path),
+        None => path.to_path_buf(),
+    }
 }
 
 // ---------- Effect shims ----------
@@ -548,10 +585,12 @@ extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24::Str
 /// launched, or if either stream holds a NUL byte (which a NUL-terminated `str`
 /// cannot represent — the same constraint `read_file_to_string` has).
 fn run_program(program: &str, args: &[String]) -> Option<(Vec<u8>, Vec<u8>, i64)> {
-    let output = std::process::Command::new(program)
-        .args(args)
-        .output()
-        .ok()?;
+    let mut command = std::process::Command::new(program);
+    command.args(args);
+    if let Some(dir) = working_dir() {
+        command.current_dir(dir);
+    }
+    let output = command.output().ok()?;
     if output.stdout.contains(&0) || output.stderr.contains(&0) {
         return None;
     }

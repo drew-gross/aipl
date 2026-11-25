@@ -164,6 +164,65 @@ fn a_shim_on_one_thread_does_not_reach_a_program_on_another() {
     }
 }
 
+/// A program's relative paths are relative to its thread's working directory, so threads running
+/// programs in different directories read and write different files with the same names, and the
+/// process's own directory is left where it was.
+#[test]
+fn threads_running_programs_in_different_directories_see_their_own_files() {
+    const MAIN: &str =
+        "import { equal as ==, read_file_to_string, write_string_to_file } from builtins;
+        fn main() !read_files !write_files -> i64 {
+            match (write_string_to_file(\"copy.txt\", \"written\")) {
+                ok => match (read_file_to_string(\"note.txt\")) {
+                    ok(text) => if (text == \"A\") { 10 } else { 20 },
+                    err(..) => 30,
+                },
+                err(..) => 40,
+            }
+        }";
+    let process_dir = std::env::current_dir().expect("a working directory");
+    let base = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("working_dirs");
+    let _ = std::fs::remove_dir_all(&base);
+    let threads: Vec<_> = [("a", "A", 10), ("b", "B", 20)]
+        .into_iter()
+        .map(|(name, note, expected)| {
+            let dir = base.join(name);
+            std::fs::create_dir_all(&dir).expect("create a directory");
+            std::fs::write(dir.join("note.txt"), note).expect("write a note");
+            std::thread::Builder::new()
+                .stack_size(256 * 1024 * 1024)
+                .spawn(move || {
+                    aipl::install_parser_hooks();
+                    let program = aipl::loader::load_program_sources(
+                        &[("./main.aipl", MAIN)],
+                        DebugOptions::OFF,
+                    )
+                    .expect("load");
+                    let comp = Compilation::new(&program, DebugOptions::OFF, &[]).expect("compile");
+                    aipl::codegen::set_working_dir(Some(dir.clone()));
+                    let code = (0..20)
+                        .map(|_| comp.run_cli("main", &[]).expect("run"))
+                        .collect::<Vec<_>>();
+                    aipl::codegen::set_working_dir(None);
+                    assert!(code.iter().all(|c| *c == expected), "{code:?}");
+                    assert_eq!(
+                        std::fs::read_to_string(dir.join("copy.txt")).expect("the copy"),
+                        "written"
+                    );
+                })
+                .expect("spawn a thread")
+        })
+        .collect();
+    for thread in threads {
+        thread.join().expect("a thread");
+    }
+    assert_eq!(
+        std::env::current_dir().expect("a working directory"),
+        process_dir
+    );
+    assert!(!process_dir.join("copy.txt").exists());
+}
+
 #[test]
 fn empty_program_compiles() {
     // Empty source has no main; cases harness requires one, so this

@@ -58,7 +58,7 @@ fn path_of<'a>(s: &'a Str, scratch: &'a mut [u8; INLINE_CAP]) -> Option<&'a str>
 pub(super) fn read_file_to_string(path: Str) -> Option<Str> {
     let mut scratch = [0u8; INLINE_CAP];
     let name = path_of(&path, &mut scratch)?;
-    let bytes = std::fs::read(name).ok()?;
+    let bytes = std::fs::read(super::in_working_dir(std::path::Path::new(name))).ok()?;
     Some(from_bytes(&bytes))
 }
 
@@ -69,7 +69,7 @@ pub(super) fn write_string_to_file(path: Str, contents: Str) -> bool {
     let Some(name) = path_of(&path, &mut scratch) else {
         return false;
     };
-    let Ok(file) = std::fs::File::create(name) else {
+    let Ok(file) = std::fs::File::create(super::in_working_dir(std::path::Path::new(name))) else {
         return false;
     };
     let mut file = std::io::BufWriter::new(file);
