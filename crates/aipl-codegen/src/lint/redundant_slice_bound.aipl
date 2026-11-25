@@ -19,17 +19,12 @@
 # exactly one hit whichever way it was written, and its advice (`x`) is not the `x[0..]` or
 # `x[..x.len()]` the other two would have started a second round trip on. Purely syntactic: the
 # receiver and the `len` argument must be the same expression, so aliases or computed receivers
-# that merely happen to be equal at runtime are not flagged.
+# that merely happen to be equal at runtime are not "redundant_slice_bound".
 
-import { collect_ok, equal as ==, is_empty, logical_and as &&, value_or } from builtins;
-import { Slice, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
-import {
-    LintHit,
-    lint_function_messages,
-    lint_function_unfilled,
-    lint_message,
-} from "./lint_hit.aipl";
+import { equal as ==, is_empty, logical_and as &&, value_or } from builtins;
+import { Slice } from "../expr.aipl";
+import { lint_with_messages, lint_with_unfilled } from "./lint.aipl";
+import { LintHit, lint_message } from "./lint_hit.aipl";
 import { is_len_of, is_zero } from "./slice_bounds.aipl";
 
 # The hit for the slice `self`, when one of its bounds says what leaving it out would.
@@ -55,63 +50,73 @@ pub fn redundant_slice_bound(self: Slice(receiver, start, end)) -> LintHit? {
         none
     }
 }.test({
-    // The hits for each function's slices.
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<Slice>()$kind$redundant_slice_bound().collect_ok()
-    }
-
     // The whole receiver, in its three spellings, each pointing at a bound.
-    assert(lint_function_unfilled("fn f(s: str) -> str { s[0..] }", flagged)? == [
+    assert(lint_with_unfilled("fn f(s: str) -> str { s[0..] }", "redundant_slice_bound")? == [
         lint_message(whole("s"), span=24..25),
     ]);
-    assert(lint_function_unfilled("fn f(s: str) -> str { s[..s.len()] }", flagged)? == [
+    assert(lint_with_unfilled("fn f(s: str) -> str { s[..s.len()] }", "redundant_slice_bound")? == [
         lint_message(whole("s"), span=26..33),
     ]);
-    assert(lint_function_unfilled("fn f(s: str) -> str { s[0..s.len()] }", flagged)? == [
-        lint_message(whole("s"), span=24..25),
-    ]);
+    assert(lint_with_unfilled(
+        "fn f(s: str) -> str { s[0..s.len()] }",
+        "redundant_slice_bound",
+    )? == [lint_message(whole("s"), span=24..25)]);
 
     // The receiver is quoted as written, a call's arguments and all.
-    assert(lint_function_messages("fn f(x: str) -> str { g(x)[0..] }", flagged)? == [
+    assert(lint_with_messages("fn f(x: str) -> str { g(x)[0..] }", "redundant_slice_bound")? == [
         whole("g(x)"),
     ]);
 
     // The `.test` block is held to it too.
-    assert(lint_function_messages("fn f() { }.test({ assert(s[0..] == s); })", flagged)? == [
-        whole("s"),
-    ]);
+    assert(lint_with_messages(
+        "fn f() { }.test({ assert(s[0..] == s); })",
+        "redundant_slice_bound",
+    )? == [whole("s")]);
 
     // An end that is the receiver's length, with a start worth keeping.
-    assert(lint_function_unfilled("fn f(s: str) -> str { s[3..s.len()] }", flagged)? == [
-        lint_message(to_len("s", "3"), span=27..34),
-    ]);
+    assert(lint_with_unfilled(
+        "fn f(s: str) -> str { s[3..s.len()] }",
+        "redundant_slice_bound",
+    )? == [lint_message(to_len("s", "3"), span=27..34)]);
 
     // A bound that is itself a computation is quoted whole.
-    assert(lint_function_messages("fn f(s: str) -> str { s[n + 1..s.len()] }", flagged)? == [
-        to_len("s", "n + 1"),
-    ]);
+    assert(lint_with_messages(
+        "fn f(s: str) -> str { s[n + 1..s.len()] }",
+        "redundant_slice_bound",
+    )? == [to_len("s", "n + 1")]);
 
     // A written zero start, with an end short of the length.
-    assert(lint_function_unfilled("fn f(s: str) -> str { s[0..2] }", flagged)? == [
+    assert(lint_with_unfilled("fn f(s: str) -> str { s[0..2] }", "redundant_slice_bound")? == [
         lint_message(from_zero("s", "2"), span=24..25),
     ]);
 
     // A call-shaped end is quoted whole, parentheses included.
-    assert(lint_function_messages("fn f(s: str, t: str) -> str { s[0..t.len()] }", flagged)? == [
-        from_zero("s", "t.len()"),
-    ]);
+    assert(lint_with_messages(
+        "fn f(s: str, t: str) -> str { s[0..t.len()] }",
+        "redundant_slice_bound",
+    )? == [from_zero("s", "t.len()")]);
 
     // Nothing is redundant: a start worth keeping, an end that is not the length, another
     // receiver's length, an elided start with an end short of the length, or an open end.
-    assert(lint_function_messages("fn f(s: str) -> str { s[1..] }", flagged)?.is_empty());
-    assert(lint_function_messages("fn f(s: str) -> str { s[1..2] }", flagged)?.is_empty());
-    assert(lint_function_messages("fn f(s: str) -> str { s[..2] }", flagged)?.is_empty());
-    assert(lint_function_messages("fn f(s: str) -> str { s[3..] }", flagged)?.is_empty());
-    assert(lint_function_messages("fn f(s: str) -> str { s[3..5] }", flagged)?.is_empty());
     assert(
-        lint_function_messages(
+        lint_with_messages("fn f(s: str) -> str { s[1..] }", "redundant_slice_bound")?.is_empty(),
+    );
+    assert(
+        lint_with_messages("fn f(s: str) -> str { s[1..2] }", "redundant_slice_bound")?.is_empty(),
+    );
+    assert(
+        lint_with_messages("fn f(s: str) -> str { s[..2] }", "redundant_slice_bound")?.is_empty(),
+    );
+    assert(
+        lint_with_messages("fn f(s: str) -> str { s[3..] }", "redundant_slice_bound")?.is_empty(),
+    );
+    assert(
+        lint_with_messages("fn f(s: str) -> str { s[3..5] }", "redundant_slice_bound")?.is_empty(),
+    );
+    assert(
+        lint_with_messages(
             "fn f(s: str, t: str) -> str { s[3..t.len()] }",
-            flagged,
+            "redundant_slice_bound",
         )?.is_empty(),
     );
 })

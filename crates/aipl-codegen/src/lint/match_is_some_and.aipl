@@ -24,7 +24,6 @@
 
 import {
     Span,
-    collect_ok,
     equal as ==,
     is_empty,
     is_some_and,
@@ -33,9 +32,9 @@ import {
     to_str,
 } from builtins;
 import { IsSomeAnd } from "../builtin_table.aipl";
-import { Bool, Match, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
-import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { Bool, Match } from "../expr.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, shown, unfilled } from "./lint_hit.aipl";
 import { OptionMatch, option_match, receiver_text } from "./option_match.aipl";
 
 # The hit for the `match` `self`, when it only asks whether an optional holds a value its arm
@@ -45,39 +44,36 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
     if (none_body.kind != Bool(false) || some_body.kind == Bool(true)) { return none; };
     some(advice(scrutinee.receiver_text(), binder, none_body.span))
 }.test({
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<Match>()$kind$match_is_some_and().collect_ok()
-    }
     // The `none => false` arm is what is pointed at, in either arm order.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } }",
-        flagged,
+        "match_is_some_and",
     )?.shown() == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.Builtin(IsSomeAnd)(|v| ..)" instead""",
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => false } }",
-        flagged,
+        "match_is_some_and",
     )?$span == [62..67]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(o: i64?) -> bool { match (o) { none => false, some(v) => v > 1 } }",
-        flagged,
+        "match_is_some_and",
     )?.shown() == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.Builtin(IsSomeAnd)(|v| ..)" instead""",
     ]);
 
     // A receiver that cannot take a method as written is not quoted.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(a: i64?, b: i64?) -> bool { match (a || b) { some(v) => v > 1, none => false } }",
-        flagged,
+        "match_is_some_and",
     )?.shown() == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "<value>.Builtin(IsSomeAnd)(|v| ..)" instead""",
     ]);
 
     // The `.test` block is held to it too.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f() { }.test({ assert(match (o) { some(v) => v > 1, none => false }); })",
-        flagged,
+        "match_is_some_and",
     )?.shown() == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.Builtin(IsSomeAnd)(|v| ..)" instead""",
     ]);
@@ -85,21 +81,21 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
     // A `none` arm that is not `false`, a `some` arm that is `true`, and a catch-all
     // are left alone.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, none => flag } }",
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(o: i64?) -> bool { match (o) { some(v) => true, none => false } }",
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(o: i64?) -> bool { match (o) { some(v) => v > 1, _ => false } }",
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
 
@@ -107,7 +103,7 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
     // `none => true` is the opposite question, and inverting the predicate to fit
     // `is_some_and` would obscure it.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn missing_or_five(o: i64?) -> bool {
                     match (o) {
@@ -118,7 +114,7 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
 
@@ -126,7 +122,7 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
     // there, so this has no `is_some_and` spelling (it does have a
     // `match_map_value_or` one, squelched here for the same reason as above).
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn five_or_flag(o: i64?, flag: bool) -> bool {
                     match (o) {
@@ -135,7 +131,7 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
 
@@ -143,7 +139,7 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
     // populated. That is an `is_some`, which is not a builtin; advising
     // `is_some_and(|v| true)` would be worse than what is written here.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn is_present(o: i64?) -> bool {
                     match (o) {
@@ -152,12 +148,12 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
     // Not a bool at all.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn or_zero(o: i64?) -> i64 {
                     match (o) {
@@ -166,12 +162,12 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_is_some_and",
         )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn has_five(o: i64?) -> bool {
                 match (o) {
@@ -180,11 +176,11 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
                 }
             }
         """,
-        flagged,
+        "match_is_some_and",
     )?.shown() == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.Builtin(IsSomeAnd)(|v| ..)" instead""",
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn none_first(o: i64?) -> bool {
                 match (o) {
@@ -193,7 +189,7 @@ pub fn match_is_some_and(self: Match) -> LintHit? {
                 }
             }
         """,
-        flagged,
+        "match_is_some_and",
     )?.shown() == [
         """this `match` only asks whether the optional holds a value the arm accepts — write "o.Builtin(IsSomeAnd)(|v| ..)" instead""",
     ]);

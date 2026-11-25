@@ -31,7 +31,6 @@
 import {
     any,
     as_case,
-    collect_ok,
     drop_first,
     equal as ==,
     extend,
@@ -46,11 +45,11 @@ import {
     to_str,
 } from builtins;
 import { Extend, Push } from "../builtin_table.aipl";
-import { ArrayLit, Assign, Spread, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { ArrayLit, Assign, Spread } from "../expr.aipl";
 import { expr_text } from "./expr_text.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, Named, shown } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 import { Builtin } from "./spelling.aipl";
 
@@ -85,14 +84,9 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
     }
     some(LintHit { named, tail: `{text}"`, span: spread.span })
 }.test({
-    // The hits for each function's `set`s.
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<Assign>()$kind$set_spread_push().collect_ok()
-    }
-
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [..out, x]; out }",
-        flagged,
+        "set_spread_push",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to append to it — append in place: "set out.Builtin(Push)(x);"`,
     ]);
@@ -100,23 +94,23 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
     // A spread appends a whole array, and each is one call, in the names the file imports.
 
     // What the file lacks is named once each.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [..out, x, 1, ..xs]; out }",
-        flagged,
+        "set_spread_push",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.Builtin(Push)(x); set out.Builtin(Push)(1); set out.Builtin(Extend)(xs);"`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [..out, g(x)]; out }",
-        flagged,
+        "set_spread_push",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to append to it — append in place: "set out.Builtin(Push)(g(x));"`,
     ]);
 
     // The target may be a field path.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[], x: i64) -> i64[] { mut s = P { a: xs }; set s.a = [..s.a, x]; s.a }",
-        flagged,
+        "set_spread_push",
     )?.shown() == [
         `this "set" rebuilds "s.a" from itself only to append to it — append in place: "set s.a.Builtin(Push)(x);"`,
     ]);
@@ -124,32 +118,32 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
     // Not the shape: the spread is not first, it is of another array, nothing is appended, or
     // several elements read the target.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [x, ..out]; out }",
-            flagged,
+            "set_spread_push",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [..xs, x]; out }",
-            flagged,
+            "set_spread_push",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [..out]; out }",
-            flagged,
+            "set_spread_push",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[], x: i64) -> i64[] { mut out = xs; set out = [..out, out.len(), out.len()]; out }",
-            flagged,
+            "set_spread_push",
         )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn grow(mut out: i64[], more: i64[]) {
                 set out = [..out, 1];
@@ -157,28 +151,28 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
                 set out = [..out, ..more];
             }
         """,
-        flagged,
+        "set_spread_push",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to append to it — append in place: "set out.Builtin(Push)(1);"`,
         `this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.Builtin(Push)(2); set out.Builtin(Push)(3);"`,
         `this "set" rebuilds "out" from itself only to append to it — append in place: "set out.Builtin(Extend)(more);"`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn stash(mut self: Bag, x: i64) {
                 set self.hits = [..self.hits, x];
             }
         """,
-        flagged,
+        "set_spread_push",
     )?.shown() == [
         `this "set" rebuilds "self.hits" from itself only to append to it — append in place: "set self.hits.Builtin(Push)(x);"`,
     ]);
 
-    // Not flagged: a prepend and a rebuild from a *different* array are not
+    // Not "set_spread_push": a prepend and a rebuild from a *different* array are not
     // appends, and a multi-element rewrite whose elements read the target would see
     // it grow between the two pushes.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn other(mut out: u64[], xs: u64[]) {
                     set out = [0, ..out];
@@ -186,11 +180,11 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
                     set out = [..out, out.len(), out.len()];
                 }
             """,
-            flagged,
+            "set_spread_push",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn subject() !prints {
                     mut xs = [1];
@@ -204,7 +198,7 @@ pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
                     print(to_str(us));
                 }
             """,
-            flagged,
+            "set_spread_push",
         )?.is_empty(),
     );
 

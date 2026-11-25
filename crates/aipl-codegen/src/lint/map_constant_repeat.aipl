@@ -25,7 +25,6 @@
 
 import {
     all,
-    collect_ok,
     equal as ==,
     is_case,
     is_empty,
@@ -53,12 +52,11 @@ import {
     Str,
     TupleLit,
     Unit,
-    descendants_of_kind,
     synthesized_name,
 } from "../expr.aipl";
-import { Function } from "../item.aipl";
 import { expr_text, operand_text } from "./expr_text.aipl";
-import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, Named, shown } from "./lint_hit.aipl";
 import { Builtin } from "./spelling.aipl";
 
 # The hit for the call `self`, when it is a `map` over a function that ignores its argument.
@@ -83,29 +81,24 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
         span: lambda.span,
     })
 }.test({
-    // The hits for each function's calls.
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<Call>()$kind$map_constant_repeat().collect_ok()
-    }
-
     // What the lint says of a `map` of `items` to `element`.
 
     // A literal, a name, a construction and an array literal of those are constant.
-    assert(lint_function_unfilled("fn f() { xs.map(|x| 0) }", flagged)?.shown() == [
+    assert(lint_with_unfilled("fn f() { xs.map(|x| 0) }", "map_constant_repeat")?.shown() == [
         `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].Builtin(Repeat)(xs.Builtin(Len)())"`,
     ]);
-    assert(lint_function_unfilled("fn f() { xs.map(|x| c) }", flagged)?.shown() == [
+    assert(lint_with_unfilled("fn f() { xs.map(|x| c) }", "map_constant_repeat")?.shown() == [
         `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[c].Builtin(Repeat)(xs.Builtin(Len)())"`,
     ]);
-    assert(lint_function_unfilled("""fn f() { xs.map(|x| "") }""", flagged)?.shown() == [
+    assert(lint_with_unfilled("""fn f() { xs.map(|x| "") }""", "map_constant_repeat")?.shown() == [
         `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[""].Builtin(Repeat)(xs.Builtin(Len)())"`,
     ]);
-    assert(lint_function_unfilled("fn f() { xs.map(|x| [c, 1]) }", flagged)?.shown() == [
+    assert(lint_with_unfilled("fn f() { xs.map(|x| [c, 1]) }", "map_constant_repeat")?.shown() == [
         `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[[c, 1]].Builtin(Repeat)(xs.Builtin(Len)())"`,
     ]);
 
     // An iterable that is a call is written out.
-    assert(lint_function_unfilled("fn f() { g().map(|x| 0) }", flagged)?.shown() == [
+    assert(lint_with_unfilled("fn f() { g().map(|x| 0) }", "map_constant_repeat")?.shown() == [
         `"Builtin(Map)" with a function that ignores its argument builds the same value once per element — for a sequence, write "[0].Builtin(Repeat)(g().Builtin(Len)())"`,
     ]);
 
@@ -113,14 +106,14 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
 
     // Not the shape: a body that reads the parameter, a call, a range, a function that is not a
     // lambda, and a `map` that is not the builtin.
-    assert(lint_function_unfilled("fn f() { xs.map(|x| x) }", flagged)?.is_empty());
-    assert(lint_function_unfilled("fn f() { xs.map(|x| g()) }", flagged)?.is_empty());
-    assert(lint_function_unfilled("fn f() { (0..3).map(|x| 0) }", flagged)?.is_empty());
-    assert(lint_function_unfilled("fn f() { xs.map(g) }", flagged)?.is_empty());
+    assert(lint_with_unfilled("fn f() { xs.map(|x| x) }", "map_constant_repeat")?.is_empty());
+    assert(lint_with_unfilled("fn f() { xs.map(|x| g()) }", "map_constant_repeat")?.is_empty());
+    assert(lint_with_unfilled("fn f() { (0..3).map(|x| 0) }", "map_constant_repeat")?.is_empty());
+    assert(lint_with_unfilled("fn f() { xs.map(g) }", "map_constant_repeat")?.is_empty());
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn map(xs: i64[], f: (i64) -> i64) { } fn f() { xs.map(|x| 0) }",
-            flagged,
+            "map_constant_repeat",
         )?.is_empty(),
     );
 })

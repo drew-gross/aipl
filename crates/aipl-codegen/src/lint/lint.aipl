@@ -2,33 +2,22 @@
 #
 # `squelch` is applied to what these return: it drops the hits an `#[allow]` marker
 # covers and says how to keep the rest. A lint is added by giving it its own file and
-# a line in `lint`; the hits come back in the order the lints are listed.
+# an entry in `all_lints`; the hits come back in the order the lints are listed.
 
 import {
-    any,
-    collect_ok,
+    contains,
     equal as ==,
     filter,
+    find_if,
     is_empty,
-    join,
+    logical_and as &&,
     logical_not as !,
-    map,
+    not_equal as !=,
 } from builtins;
-import {
-    Assign,
-    Call,
-    Construct,
-    Expr,
-    Interpolation,
-    LetMut,
-    Match,
-    SetLit,
-    Slice,
-    descendants_of_kind,
-} from "../expr.aipl";
+import { ParseError } from "../grammar.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
-import { Function, SuperProgram } from "../item.aipl";
+import { SuperProgram } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
@@ -46,7 +35,29 @@ import { interp_to_str } from "./interp_to_str.aipl";
 import { is_empty_longhand } from "./is_empty_longhand.aipl";
 import { len_gt_zero } from "./len_gt_zero.aipl";
 import { let_else_as_case } from "./let_else_as_case.aipl";
-import { FilledHit, LintHit, filled, functions, hit_at, unfilled_hits } from "./lint_hit.aipl";
+import {
+    FilledHit,
+    Lint,
+    LintHit,
+    OfAssign,
+    OfCall,
+    OfConstruct,
+    OfFunction,
+    OfInterpolation,
+    OfLetMut,
+    OfMatch,
+    OfMatchIn,
+    OfMatchNode,
+    OfSetLitNode,
+    OfSlice,
+    filled,
+    functions,
+    hit,
+    lint_lints_filled_messages,
+    lint_lints_unfilled,
+    shown,
+    unfilled_hits_of,
+} from "./lint_hit.aipl";
 import { map_constant_repeat } from "./map_constant_repeat.aipl";
 import { map_find_if_some } from "./map_find_if_some.aipl";
 import { match_bool_is_case } from "./match_bool_is_case.aipl";
@@ -79,160 +90,127 @@ import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
 import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 
+# Every lint of one function, under the name of its file, in the order its hits are reported. A lint
+# of one kind of node is run over each node of that kind in a function's body; one that finds at
+# most one hit is written `[..hit]` to say so.
+pub fn all_lints() -> Lint[] {
+    [
+        Lint { name: "destructure", run: OfFunction(destructure) },
+        Lint { name: "unused_binding", run: OfFunction(unused_binding) },
+        Lint {
+            name: "fn_body_type_stutter",
+            run: OfFunction(|function| [..fn_body_type_stutter(function)]),
+        },
+        Lint { name: "match_bool_is_case", run: OfMatch(|m| [..match_bool_is_case(m)]) },
+        Lint { name: "match_is_some_and", run: OfMatch(|m| [..match_is_some_and(m)]) },
+        Lint { name: "match_value_or", run: OfMatch(|m| [..match_value_or(m)]) },
+        Lint {
+            name: "match_value_or_err",
+            run: OfMatchIn(|m, function| [..match_value_or_err(m, function)]),
+        },
+        Lint { name: "match_map_value_or", run: OfMatch(|m| [..match_map_value_or(m)]) },
+        Lint { name: "match_map_err", run: OfMatch(|m| [..match_map_err(m)]) },
+        Lint { name: "match_map_ok", run: OfMatch(|m| [..match_map_ok(m)]) },
+        Lint { name: "match_case_as_case", run: OfMatch(|m| [..match_case_as_case(m)]) },
+        Lint { name: "match_case_try_as_case", run: OfFunction(match_case_try_as_case) },
+        Lint { name: "let_else_as_case", run: OfFunction(let_else_as_case) },
+        Lint { name: "push_loop_pipeline", run: OfLetMut(|seed| [..push_loop_pipeline(seed)]) },
+        Lint { name: "push_loop_collect_ok", run: OfLetMut(|seed| [..push_loop_collect_ok(seed)]) },
+        Lint { name: "extend_loop_map_join", run: OfFunction(extend_loop_map_join) },
+        Lint { name: "union_loop_union_all", run: OfFunction(union_loop_union_all) },
+        Lint { name: "push_array_literal", run: OfFunction(push_array_literal) },
+        Lint { name: "return_loop_find_if", run: OfFunction(return_loop_find_if) },
+        Lint { name: "return_loop_any_all", run: OfFunction(return_loop_any_all) },
+        Lint { name: "identity_lambda", run: OfFunction(identity_lambda) },
+        Lint { name: "use_field_projection", run: OfFunction(use_field_projection) },
+        Lint { name: "push_loop_zip_with", run: OfFunction(push_loop_zip_with) },
+        Lint { name: "return_loop_find_index", run: OfFunction(return_loop_find_index) },
+        Lint { name: "interp_to_str", run: OfInterpolation(|i| [..interp_to_str(i)]) },
+        Lint { name: "interp_literal", run: OfInterpolation(|i| [..interp_literal(i)]) },
+        Lint { name: "redundant_slice_bound", run: OfSlice(|s| [..redundant_slice_bound(s)]) },
+        Lint { name: "char_set_literal", run: OfSetLitNode(|node| [..char_set_literal(node)]) },
+        Lint { name: "arm_block_value", run: OfMatchNode(arm_block_value) },
+        Lint { name: "field_init_shorthand", run: OfConstruct(field_init_shorthand) },
+        Lint { name: "set_spread_field", run: OfAssign(|a| [..set_spread_field(a)]) },
+        Lint { name: "set_spread_insert", run: OfAssign(|a| [..set_spread_insert(a)]) },
+        Lint { name: "set_spread_push", run: OfAssign(|a| [..set_spread_push(a)]) },
+        Lint { name: "step_by_one", run: OfAssign(|a| [..step_by_one(a)]) },
+        Lint { name: "compound_assign", run: OfAssign(|a| [..compound_assign(a)]) },
+        Lint { name: "value_or_compare", run: OfCall(|call| [..value_or_compare(call)]) },
+        Lint { name: "map_constant_repeat", run: OfCall(|call| [..map_constant_repeat(call)]) },
+        Lint { name: "map_find_if_some", run: OfCall(|call| [..map_find_if_some(call)]) },
+        Lint { name: "zip_with_pair_zip", run: OfCall(|call| [..zip_with_pair_zip(call)]) },
+        Lint { name: "with_value_or_self", run: OfCall(|call| [..with_value_or_self(call)]) },
+        Lint { name: "case_of_equal_is_case", run: OfCall(|call| [..case_of_equal_is_case(call)]) },
+        Lint { name: "len_gt_zero", run: OfCall(|call| [..len_gt_zero(call)]) },
+        Lint { name: "is_empty_longhand", run: OfCall(|call| [..is_empty_longhand(call)]) },
+        Lint { name: "compare_empty_array", run: OfCall(|call| [..compare_empty_array(call)]) },
+    ]
+}
+
+# The lints named `names`, or the first name no lint has.
+fn lints_named(names: str[]) -> Lint[]!ParseFailure {
+    let registry = all_lints();
+    let known = registry$name;
+    if (let some(missing) = names.find_if(|name| !known.contains(name))) {
+        return err(ParseFailure {
+            errors: [ParseError { message: `no lint is named "{missing}"`, span: 0..0 }],
+        });
+    };
+    ok(registry.filter(|lint| names.contains(lint.name)))
+}
+
+# What the lints named `names` say of the program `src` parses to, as they say it, before any file's
+# imports decide how they are written. Every builtin counts as imported, so a lint's own tests are
+# about the shape it finds and nothing about imports, or about any other lint.
+pub fn lint_with_unfilled(src: str, names: str*) -> LintHit[]!ParseFailure {
+    lint_lints_unfilled(src, lints_named(names)?)
+}
+
+# [`lint_with_unfilled`], shown as messages.
+pub fn lint_with_messages(src: str, names: str*) -> str[]!ParseFailure {
+    ok(lint_with_unfilled(src, names)?.shown())
+}
+
+# What the lints named `names` report for the program `src` parses to, filled in for the imports
+# `src` has.
+pub fn lint_with_filled_messages(src: str, names: str*) -> str[]!ParseFailure {
+    lint_lints_filled_messages(src, lints_named(names)?)
+}
+
+# `self` less the hits at a place `others` has a hit at.
+fn not_at(self: FilledHit[], others: FilledHit[]) -> FilledHit[] {
+    let places = others$span;
+    self.filter(|hit| !places.contains(hit.span))
+}.test({
+    assert([hit("a", 1..2), hit("b", 3..4)].not_at([hit("c", 3..4)]) == [hit("a", 1..2)]);
+})
+
 # Every hit the ported lints find in `program`.
 #
 # A lint is either a function of the whole program or of one function. The program's functions
-# are listed once, and each function lint is run over them: every body that is code. One that
-# also needs the file's imports takes the program's `items` beside the function.
+# are listed once, and each function lint is run over them: every body that is code.
 pub fn lint(program: ResolvedProgram) -> FilledHit[] {
     let items = program.items;
     let functions = program.functions();
+    let registry = all_lints();
+    let step = registry.filter(|lint| lint.name == "step_by_one");
+    let compound = registry.filter(|lint| lint.name == "compound_assign");
+    let ordinary = registry.filter(
+        |lint| lint.name != "step_by_one" && lint.name != "compound_assign",
+    );
     let others = [
         ..unused_imports(program),
         ..unused_functions(program),
         ..duplicate_import_source(program),
-        ..functions.unfilled_hits(destructure),
-        ..functions.unfilled_hits(unused_binding),
-        ..functions.unfilled_hits(fn_body_type_stutter),
-        ..functions.unfilled_hits(match_lints),
-        ..functions.unfilled_hits(match_case_try_as_case),
-        ..functions.unfilled_hits(let_else_as_case),
-        ..functions.unfilled_hits(let_mut_lints),
-        ..functions.unfilled_hits(extend_loop_map_join),
-        ..functions.unfilled_hits(union_loop_union_all),
-        ..functions.unfilled_hits(push_array_literal),
-        ..functions.unfilled_hits(return_loop_find_if),
-        ..functions.unfilled_hits(return_loop_any_all),
-        ..functions.unfilled_hits(identity_lambda),
-        ..functions.unfilled_hits(use_field_projection),
-        ..functions.unfilled_hits(push_loop_zip_with),
-        ..functions.unfilled_hits(return_loop_find_index),
-        ..functions.unfilled_hits(interp_lints),
-        ..functions.unfilled_hits(slice_lints),
-        ..functions.unfilled_hits(set_lints),
-        ..functions.unfilled_hits(match_hits),
-        ..functions.unfilled_hits(construct_lints),
-        ..functions.unfilled_hits(assign_lints),
-        ..functions.unfilled_hits(assign_advice),
-        ..functions.unfilled_hits(call_lints),
-        ..functions.unfilled_hits(call_advice),
+        ..functions.unfilled_hits_of(ordinary),
     ].filled(items);
-
-    // `set x = x + 1;` is `set x++;` where the file can take the step form, and `set x += 1;` where it cannot:
-    // the compound lint's hit for a `set` the step lint has advice for is the worse of the two.
-    let steps = functions.unfilled_hits(step_hits).filled(items);
-    let compounds = functions
-        .unfilled_hits(compound_hits)
-        .filled(items)
-        .filter(|hit| !steps.any(|step| step.span == hit.span));
+    let steps = functions.unfilled_hits_of(step).filled(items);
+    let compounds = functions.unfilled_hits_of(compound).filled(items).not_at(steps);
     [..others, ..steps, ..compounds]
 }.test({
     assert(lint(SuperProgram { items: [], doc: none }.resolve_callees()).is_empty());
 })
-
-# The lints over the `match`es of `function` that are not about what they say.
-fn match_hits(Function { body }) -> LintHit[] {
-    body.descendants_of_kind::<Match>()$arm_block_value().join()
-}
-
-# The lints over the set literals of `function`, which are found once for all of them.
-fn set_lints(Function { body }) -> LintHit[] {
-    body.descendants_of_kind::<SetLit>()$char_set_literal().collect_ok()
-}
-
-# The lints over the template interpolations of `function`, which are found once for all of them.
-fn interp_lints(Function { body }) -> LintHit[] {
-    let interpolations = body.descendants_of_kind::<Interpolation>();
-    [
-        ..interpolations.map(|node: Expr<Interpolation>| {
-            node.hit_at(node.kind.interp_to_str())
-        }),
-        ..interpolations.map(|node: Expr<Interpolation>| {
-            node.hit_at(node.kind.interp_literal())
-        }),
-    ].collect_ok()
-}
-
-# The lints over the slices of `function`, which are found once for all of them.
-fn slice_lints(Function { body }) -> LintHit[] {
-    body.descendants_of_kind::<Slice>()$kind$redundant_slice_bound().collect_ok()
-}
-
-# The lints over the struct literals of `function`, which are found once for all of them.
-fn construct_lints(Function { body }) -> LintHit[] {
-    let constructs = body.descendants_of_kind::<Construct>();
-    constructs$kind$field_init_shorthand().join()
-}
-
-# The lints over the calls of `function`, which are found once for all of them.
-fn call_lints(Function { body }) -> LintHit[] {
-    body.descendants_of_kind::<Call>()$kind$value_or_compare().collect_ok()
-}
-
-# The lints over the calls of `function` that advise a builtin.
-fn call_advice(Function { body }) -> LintHit[] {
-    let calls = body.descendants_of_kind::<Call>();
-    [
-        ..calls$kind$map_constant_repeat(),
-        ..calls.map(|call: Expr<Call>| { call.hit_at(call.kind.map_find_if_some()) }),
-        ..calls$kind$zip_with_pair_zip(),
-        ..calls$kind$with_value_or_self(),
-        ..calls.map(|call: Expr<Call>| { call.hit_at(case_of_equal_is_case(call.kind)) }),
-        ..calls.map(|call: Expr<Call>| { call.hit_at(len_gt_zero(call.kind)) }),
-        ..calls.map(|call: Expr<Call>| { call.hit_at(is_empty_longhand(call.kind)) }),
-        ..calls.map(|call: Expr<Call>| { call.hit_at(compare_empty_array(call.kind)) }),
-    ].collect_ok()
-}
-
-# The lints over the `match`es of `function`, which are found once for all of them. One that is about
-# the function it is in takes it as well.
-fn match_lints(function: Function) -> LintHit[] {
-    let matches = function.body.descendants_of_kind::<Match>()$kind;
-    [
-        ..matches$match_bool_is_case(),
-        ..matches$match_is_some_and(),
-        ..matches$match_value_or(),
-        ..matches$match_value_or_err(function),
-        ..matches$match_map_value_or(),
-        ..matches$match_map_err(),
-        ..matches$match_map_ok(),
-        ..matches$match_case_as_case(),
-    ].collect_ok()
-}
-
-# The lints over the `mut` bindings of `function`, which are found once for all of them: each is
-# about an array or set seeded and then filled by the loop that follows.
-fn let_mut_lints(Function { body }) -> LintHit[] {
-    let seeds = body.descendants_of_kind::<LetMut>()$kind;
-    [..seeds$push_loop_pipeline(), ..seeds$push_loop_collect_ok()].collect_ok()
-}
-
-# The lints over the assignments of `function`, which are found once for all of them.
-fn assign_lints(Function { body }) -> LintHit[] {
-    body.descendants_of_kind::<Assign>()$kind$set_spread_field().collect_ok()
-}
-
-# The lints over the assignments of `function` that advise a builtin.
-fn assign_advice(Function { body }) -> LintHit[] {
-    let assigns = body.descendants_of_kind::<Assign>();
-    [..assigns$kind$set_spread_insert(), ..assigns$kind$set_spread_push()].collect_ok()
-}
-
-# The step lint's hits for the assignments of `function`.
-fn step_hits(Function { body }) -> LintHit[] {
-    body
-        .descendants_of_kind::<Assign>()
-        .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.step_by_one()) })
-        .collect_ok()
-}
-
-# The compound lint's hits for the assignments of `function`.
-fn compound_hits(Function { body }) -> LintHit[] {
-    body
-        .descendants_of_kind::<Assign>()
-        .map(|assign: Expr<Assign>| { assign.hit_at(assign.kind.compound_assign()) })
-        .collect_ok()
-}
 
 # The messages every lint reports for the program `src` parses to, which is how a lint's own tests
 # read what it says: they run all the lints, so a snippet must be one no other lint objects to.

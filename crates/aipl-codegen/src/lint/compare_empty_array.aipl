@@ -12,19 +12,12 @@
 #
 # The hit points at the comparison, which begins on the line the `#[allow]` would be written on.
 
-import {
-    collect_ok,
-    equal as ==,
-    is_empty,
-    logical_and as &&,
-    logical_not as !,
-    map,
-} from builtins;
+import { equal as ==, is_empty, logical_and as &&, logical_not as ! } from builtins;
 import { Equal, IsEmpty, IsNonempty, NotEqual } from "../builtin_table.aipl";
-import { ArrayLit, Call, Expr, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { ArrayLit, Call, Expr } from "../expr.aipl";
 import { operand_text } from "./expr_text.aipl";
-import { LintHit, advice, hit_at, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, advice, shown } from "./lint_hit.aipl";
 
 # The advice for the call `self`, when it is a comparison of something with an empty array literal
 # for equality or inequality.
@@ -50,57 +43,63 @@ pub fn compare_empty_array(self: Call(_, args, _, callee)) -> LintHit? {
         `()"`,
     ))
 }.test({
-    // The hits for each function's calls.
-    fn flagged(Function { body }) -> LintHit[] {
-        body
-            .descendants_of_kind::<Call>()
-            .map(|call: Expr<Call>| { call.hit_at(call.kind.compare_empty_array()) })
-            .collect_ok()
-    }
-
     // Either side, a name or a call as the receiver.
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x == [] }", flagged)?.shown() == [
-        `comparing with an empty array — use "x.Builtin(IsEmpty)()"`,
-    ]);
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { [] == x }", flagged)?.shown() == [
-        `comparing with an empty array — use "x.Builtin(IsEmpty)()"`,
-    ]);
-    assert(lint_function_unfilled("fn f() -> bool { foo() == [] }", flagged)?.shown() == [
+    assert(lint_with_unfilled(
+        "fn f(x: i64[]) -> bool { x == [] }",
+        "compare_empty_array",
+    )?.shown() == [`comparing with an empty array — use "x.Builtin(IsEmpty)()"`]);
+    assert(lint_with_unfilled(
+        "fn f(x: i64[]) -> bool { [] == x }",
+        "compare_empty_array",
+    )?.shown() == [`comparing with an empty array — use "x.Builtin(IsEmpty)()"`]);
+    assert(lint_with_unfilled("fn f() -> bool { foo() == [] }", "compare_empty_array")?.shown() == [
         `comparing with an empty array — use "foo().Builtin(IsEmpty)()"`,
     ]);
 
     // An operator use is parenthesized to stay the receiver, and a form with no text is a placeholder.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(a: i64[], b: i64[]) -> bool { a + b == [] }",
-        flagged,
+        "compare_empty_array",
     )?.shown() == [`comparing with an empty array — use "(a + b).Builtin(IsEmpty)()"`]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(c: bool, a: i64[], b: i64[]) -> bool { (if (c) { a } else { b }) == [] }",
-        flagged,
+        "compare_empty_array",
     )?.shown() == [
         "comparing with an empty array — use \"(if (c) { a } else { b }).Builtin(IsEmpty)()\"",
     ]);
 
     // Inequality is the non-empty test, with either side the literal.
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x != [] }", flagged)?.shown() == [
-        `comparing with an empty array — use "x.Builtin(IsNonempty)()"`,
-    ]);
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { [] != x }", flagged)?.shown() == [
-        `comparing with an empty array — use "x.Builtin(IsNonempty)()"`,
-    ]);
+    assert(lint_with_unfilled(
+        "fn f(x: i64[]) -> bool { x != [] }",
+        "compare_empty_array",
+    )?.shown() == [`comparing with an empty array — use "x.Builtin(IsNonempty)()"`]);
+    assert(lint_with_unfilled(
+        "fn f(x: i64[]) -> bool { [] != x }",
+        "compare_empty_array",
+    )?.shown() == [`comparing with an empty array — use "x.Builtin(IsNonempty)()"`]);
 
     // The hit points at the comparison.
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x == [] }", flagged)?$span == [25..32]);
+    assert(lint_with_unfilled(
+        "fn f(x: i64[]) -> bool { x == [] }",
+        "compare_empty_array",
+    )?$span == [25..32]);
 
     // Not the shape: an array that is not empty, two empty literals, another operator, and an
     // `==` of the file's own.
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x < [] }", flagged)?.is_empty());
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x == [1] }", flagged)?.is_empty());
-    assert(lint_function_unfilled("fn f() -> bool { [] == [] }", flagged)?.is_empty());
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled("fn f(x: i64[]) -> bool { x < [] }", "compare_empty_array")?.is_empty(),
+    );
+    assert(
+        lint_with_unfilled(
+            "fn f(x: i64[]) -> bool { x == [1] }",
+            "compare_empty_array",
+        )?.is_empty(),
+    );
+    assert(lint_with_unfilled("fn f() -> bool { [] == [] }", "compare_empty_array")?.is_empty());
+    assert(
+        lint_with_unfilled(
             "fn equal(a: i64[], b: i64[]) -> bool { true } fn f(x: i64[]) -> bool { equal(x, []) }",
-            flagged,
+            "compare_empty_array",
         )?.is_empty(),
     );
 })

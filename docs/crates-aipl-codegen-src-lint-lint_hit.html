@@ -57,7 +57,7 @@
           </h3>
           <pre class="signature"><code>struct LintHit</code></pre>
 
-          <div class="doc"><p>A hit whose message names builtins the way the file that was linted spells them. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in parts — each stretch of text followed by the builtin its rewrite uses, then a closing stretch — and the framework writes each in the way the file can take (see <code>spelling.aipl</code>), adding the import the file lacks.</p><p>The <code>span</code> is where the hit points. A lint that says nothing about it leaves it empty (an empty span is no location), and the framework that ran the lint over a node points the hit at the whole node ([<code>hit_at</code>]), or over a function at the function's name ([<code>unfilled_hits</code>]).</p></div>
+          <div class="doc"><p>A hit whose message names builtins the way the file that was linted spells them. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in parts — each stretch of text followed by the builtin its rewrite uses, then a closing stretch — and the framework writes each in the way the file can take (see <code>spelling.aipl</code>), adding the import the file lacks.</p><p>The <code>span</code> is where the hit points. A lint that says nothing about it leaves it empty (an empty span is no location), and the framework that ran the lint over a node points the hit at the whole node (<code>run_lints</code>), or over a function at the function's name ([<code>unfilled_hits</code>]).</p></div>
 
 
         </section>
@@ -114,20 +114,6 @@
           <pre class="signature"><code>pub fn advice(builtin: Callee, before: str, after: str) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>An advice for a message <code>before</code> + the builtin's spelling + <code>after</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-hit_at">
-          <h3>
-            <a class="anchor" href="#item-hit_at">hit_at</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn hit_at(self: Expr, hit: LintHit?) -&#62; LintHit?</code></pre>
-
-          <div class="doc"><p><code>hit</code>, when there is one, as a hit at the node <code>self</code>: a lint of one node says what is wrong with it, and unless it points somewhere in particular the node's own span is where that is pointed.</p></div>
 
 
         </section>
@@ -246,6 +232,107 @@
 
 
 
+        <section class="item" id="item-LintRun">
+          <h3>
+            <a class="anchor" href="#item-LintRun">LintRun</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant LintRun</code></pre>
+
+          <div class="doc"><p>A lint of one function, by what it reads: the function (once), or each node of one kind in its body. A lint of the kind reads the kind's payload; one that needs the node itself (its source, or its span) is the <code>Node</code> case. What each says is a list of hits, which a lint that finds at most one writes as <code>[..hit]</code>.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-OfFunction"><code>OfFunction((Function) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfCall"><code>OfCall((Call) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfMatch"><code>OfMatch((Match) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfMatchIn"><code>OfMatchIn((Match, Function) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfMatchNode"><code>OfMatchNode((Expr) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfAssign"><code>OfAssign((Assign) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfSetLitNode"><code>OfSetLitNode((Expr) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfInterpolation"><code>OfInterpolation((Interpolation) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfSlice"><code>OfSlice((Slice) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfConstruct"><code>OfConstruct((Construct) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfLetMut"><code>OfLetMut((LetMut) -&#62; LintHit[])</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Lint">
+          <h3>
+            <a class="anchor" href="#item-Lint">Lint</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Lint</code></pre>
+
+          <div class="doc"><p>A lint, under the name of its file.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-run_lints">
+          <h3>
+            <a class="anchor" href="#item-run_lints">run_lints</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn run_lints(self: Function, lints: Lint[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>What each of <code>lints</code> says of <code>self</code>: a lint of one kind of node is run over every node of that kind in the body, and what it says points at its node unless it points somewhere in particular.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-unfilled_hits">
           <h3>
             <a class="anchor" href="#item-unfilled_hits">unfilled_hits</a>
@@ -254,6 +341,48 @@
           <pre class="signature"><code>pub fn unfilled_hits(self: Function[], lint: (Function) -&#62; LintHit[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>What the function lint <code>lint</code> reports for each of <code>self</code>, the hits [<code>filled</code>] fills in.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unfilled_hits_of">
+          <h3>
+            <a class="anchor" href="#item-unfilled_hits_of">unfilled_hits_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unfilled_hits_of(self: Function[], lints: Lint[]) -&#62; LintHit[]</code></pre>
+
+          <div class="doc"><p>What <code>lints</code> report for each of <code>self</code>: each function's hits, those of a function that point nowhere in particular at its name. Not [<code>unfilled_hits</code>] with a lambda: a lambda cannot capture lints.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_lints_unfilled">
+          <h3>
+            <a class="anchor" href="#item-lint_lints_unfilled">lint_lints_unfilled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_lints_unfilled(src: str, lints: Lint[]) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What <code>lints</code> say of the program <code>src</code> parses to, as they say it: the [<code>LintHit</code>]s, before any file's imports decide how they are written. Every builtin counts as imported.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_lints_filled_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_lints_filled_messages">lint_lints_filled_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_lints_filled_messages(src: str, lints: Lint[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What <code>lints</code> report for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
 
 
         </section>
@@ -324,48 +453,6 @@
           <pre class="signature"><code>pub fn shown(self: LintHit[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p><code>self</code> as messages: each stretch of text followed by the builtin it names as <code>to_str</code> shows it, then the closing stretch. Not what a file's author is shown, which is <code>filled</code>'s, but enough for a lint's tests to say what advice it gives.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_in_unfilled">
-          <h3>
-            <a class="anchor" href="#item-lint_in_unfilled">lint_in_unfilled</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_in_unfilled(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>What the lint <code>lint</code>, which also reads the file's items, says of the program <code>src</code> parses to: the [<code>LintHit</code>]s as [<code>lint_function_unfilled</code>] gives them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_in_unfilled_hits">
-          <h3>
-            <a class="anchor" href="#item-lint_in_unfilled_hits">lint_in_unfilled_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_in_unfilled_hits(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; FilledHit[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>What the lint <code>lint</code>, which also reads the file's items, reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lint_in_unfilled_messages">
-          <h3>
-            <a class="anchor" href="#item-lint_in_unfilled_messages">lint_in_unfilled_messages</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lint_in_unfilled_messages(src: str, lint: (Function, Item[]) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
-
-          <div class="doc"><p>[<code>lint_in_unfilled_hits</code>], keeping only the messages.</p></div>
 
 
         </section>

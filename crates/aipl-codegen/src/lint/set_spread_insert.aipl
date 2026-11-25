@@ -28,7 +28,6 @@
 import {
     any,
     as_case,
-    collect_ok,
     drop_first,
     equal as ==,
     first,
@@ -43,12 +42,12 @@ import {
     to_str,
 } from builtins;
 import { Insert } from "../builtin_table.aipl";
-import { Assign, SetLit, Spread, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { Assign, SetLit, Spread } from "../expr.aipl";
 import { Unordered } from "../ty.aipl";
 import { expr_text } from "./expr_text.aipl";
 import { mentions_any } from "./field_uses.aipl";
-import { LintHit, Named, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, Named, shown } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 import { Builtin } from "./spelling.aipl";
 import { insert } from sets;
@@ -84,14 +83,9 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
     }
     some(LintHit { named, tail: `{text}"`, span: spread.span })
 }.test({
-    // The hits for each function's `set`s.
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<Assign>()$kind$set_spread_insert().collect_ok()
-    }
-
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, x}; out }",
-        flagged,
+        "set_spread_insert",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to add to it — add in place: "set out.Builtin(Insert)(x);"`,
     ]);
@@ -99,23 +93,23 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
     // Several elements are one call each, in the name the file imports.
 
     // What the file lacks is named once.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, x, 1}; out }",
-        flagged,
+        "set_spread_insert",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to add to it — add each in place: "set out.Builtin(Insert)(x); set out.Builtin(Insert)(1);"`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, g(x)}; out }",
-        flagged,
+        "set_spread_insert",
     )?.shown() == [
         `this "set" rebuilds "out" from itself only to add to it — add in place: "set out.Builtin(Insert)(g(x));"`,
     ]);
 
     // The target may be a field path.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: #{i64}, x: i64) -> #{i64} { mut s = P { a: xs }; set s.a = #{..s.a, x}; s.a }",
-        flagged,
+        "set_spread_insert",
     )?.shown() == [
         `this "set" rebuilds "s.a" from itself only to add to it — add in place: "set s.a.Builtin(Insert)(x);"`,
     ]);
@@ -123,75 +117,75 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
     // Not the shape: the spread is not first, it is of another set, nothing is added, a whole set
     // is added, or several elements read the target.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{x, ..out}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..xs, x}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #>{..out, x}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, ..xs}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, ..xs, x}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: #{i64}, x: i64) -> #{i64} { mut out = xs; set out = #{..out, out.len(), out.len()}; out }",
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn grow(mut seen: #{i64}) {
                 set seen = #{..seen, 1};
                 set seen = #{..seen, 2, 3};
             }
         """,
-        flagged,
+        "set_spread_insert",
     )?.shown() == [
         `this "set" rebuilds "seen" from itself only to add to it — add in place: "set seen.Builtin(Insert)(1);"`,
         `this "set" rebuilds "seen" from itself only to add to it — add each in place: "set seen.Builtin(Insert)(2); set seen.Builtin(Insert)(3);"`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn stash(mut self: Bag, x: i64) {
                 set self.seen = #{..self.seen, x};
             }
         """,
-        flagged,
+        "set_spread_insert",
     )?.shown() == [
         `this "set" rebuilds "self.seen" from itself only to add to it — add in place: "set self.seen.Builtin(Insert)(x);"`,
     ]);
 
-    // Not flagged: a rebuild that is not an addition of elements to the same set.
+    // Not "set_spread_insert": a rebuild that is not an addition of elements to the same set.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn other(mut out: #{u64}, xs: #{u64}) {
                     set out = #{0, ..out};
@@ -200,7 +194,7 @@ pub fn set_spread_insert(self: Assign(target, value, _)) -> LintHit? {
                     set out = #{..out, out.len(), out.len()};
                 }
             """,
-            flagged,
+            "set_spread_insert",
         )?.is_empty(),
     );
 

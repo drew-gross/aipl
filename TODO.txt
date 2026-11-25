@@ -575,6 +575,7 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
+  various registry cleanups (do lints really need names? can we do descendants instead of descendents_of_kind()?)
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   slots_taken_apart should lint to a filter map
   tag/resolve Idents the same way as calls, so that we can do the same kind of destructuring in lints
@@ -897,6 +898,7 @@ flamegraph:
   profile other things than run e.g. formatting, running tests, etc.
 
 check:
+  check on a folder so we can e.g. check all the lints at oncez
   check should print it's runtime
   check should error on lint failures, but still run tests and report results
   can recover from parse errors too and run tests

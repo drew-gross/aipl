@@ -47,16 +47,16 @@ import {
     not_equal as !=,
 } from builtins;
 import { ToSet } from "../builtin_table.aipl";
-import { Char, Expr, SetLit, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { Char, Expr, SetLit } from "../expr.aipl";
 import { Unordered } from "../ty.aipl";
-import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, shown, unfilled } from "./lint_hit.aipl";
 import { has, to_set } from sets;
 
 # The hit for `self`, when it is a one-line unordered set of at least three character literals
 # that a string can spell.
-pub fn char_set_literal(self: Expr<SetLit>) -> LintHit? {
-    let SetLit(elements, order) = self.kind;
+pub fn char_set_literal(self: Expr) -> LintHit? {
+    let SetLit(elements, order) = self.kind.as_case::<SetLit>()?;
     if (!order.is_case::<Unordered>()) { return none; };
     // How many spelled-out elements it takes before the string form wins.
     let minimum_elements = 3;
@@ -75,42 +75,43 @@ pub fn char_set_literal(self: Expr<SetLit>) -> LintHit? {
         self.span,
     ))
 }.test({
-    // The hits for each function's set literals.
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<SetLit>()$char_set_literal().collect_ok()
-    }
-
-    assert(lint_function_unfilled("fn f() -> #{char} { #{'a', 'b', 'c'} }", flagged)?.shown() == [
-        """a char set of 3 elements spelled out — write `"abc".Builtin(ToSet)()`""",
-    ]);
+    assert(lint_with_unfilled(
+        "fn f() -> #{char} { #{'a', 'b', 'c'} }",
+        "char_set_literal",
+    )?.shown() == ["""a char set of 3 elements spelled out — write `"abc".Builtin(ToSet)()`"""]);
 
     // The file's spelling of `to_set`, or the import to add.
 
     // The escapes a string takes.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """fn f() -> #{char} { #{'"', '\\', '\n', 'x'} }""",
-        flagged,
+        "char_set_literal",
     )?.shown() == [
         """a char set of 4 elements spelled out — write `"\"\\\nx".Builtin(ToSet)()`""",
     ]);
 
     // Two elements are a tie, an ordered set is another thing, a character with no spelling and
     // a literal broken over lines are left alone.
-    assert(lint_function_unfilled("fn f() -> #{char} { #{'a', 'b'} }", flagged)?.is_empty());
-    assert(lint_function_unfilled("fn f() -> #{char} { #<{'a', 'b', 'c'} }", flagged)?.is_empty());
+    assert(lint_with_unfilled("fn f() -> #{char} { #{'a', 'b'} }", "char_set_literal")?.is_empty());
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
+            "fn f() -> #{char} { #<{'a', 'b', 'c'} }",
+            "char_set_literal",
+        )?.is_empty(),
+    );
+    assert(
+        lint_with_unfilled(
             "fn f() -> #{char} { #{'a',
  'b',
  'c'} }",
-            flagged,
+            "char_set_literal",
         )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
 
     // Shapes the lint flags, and what it says of them.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn subject() !prints {
                 // Three is the threshold: below it the two spellings are a tie.
@@ -124,7 +125,7 @@ pub fn char_set_literal(self: Expr<SetLit>) -> LintHit? {
                 print(`{abc.has('b')} {digits.has('7')} {escapes.has('\n')}`);
             }
         """,
-        flagged,
+        "char_set_literal",
     )?.shown() == [
         """a char set of 3 elements spelled out — write `"abc".Builtin(ToSet)()`""",
         """a char set of 10 elements spelled out — write `"0123456789".Builtin(ToSet)()`""",

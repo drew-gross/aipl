@@ -8,6 +8,7 @@ import {
     collect_ok,
     distinct,
     equal as ==,
+    extend,
     filter,
     find_if,
     is_empty,
@@ -34,7 +35,22 @@ import {
     import_name,
     lint_table,
 } from "../builtin_table.aipl";
-import { Call, Expr, Field, Ident, expr, ident } from "../expr.aipl";
+import {
+    Assign,
+    Call,
+    Construct,
+    Expr,
+    Field,
+    Ident,
+    Interpolation,
+    LetMut,
+    Match,
+    SetLit,
+    Slice,
+    descendants_of_kind,
+    expr,
+    ident,
+} from "../expr.aipl";
 import { ParseFailure, aipl_parse_surface_file } from "../grammar_aipl.aipl";
 import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { Function, Item, LoweredFn, Program } from "../item.aipl";
@@ -60,7 +76,7 @@ pub fn hit(message: str, span: Span) -> FilledHit { message, span }.test({
 #
 # The `span` is where the hit points. A lint that says nothing about it leaves it empty (an empty
 # span is no location), and the framework that ran the lint over a node points the hit at the whole
-# node ([`hit_at`]), or over a function at the function's name ([`unfilled_hits`]).
+# node (`run_lints`), or over a function at the function's name ([`unfilled_hits`]).
 struct LintHit { named: Named[], tail: str, span: Span = 0..0 }
 
 # Some text and what its message goes on to name.
@@ -94,10 +110,6 @@ pub fn advice(builtin: Callee, before: str, after: str) -> LintHit {
 }.test({
     assert(advice(Len, "use ", "()").named == [Named { text: "use ", builtin: Builtin(Len) }]);
 })
-
-# `hit`, when there is one, as a hit at the node `self`: a lint of one node says what is wrong with
-# it, and unless it points somewhere in particular the node's own span is where that is pointed.
-pub fn hit_at(self: Expr, hit: LintHit?) -> LintHit? { some(hit?.at(self.span)) }
 
 # The hit that `self` is when it is about what spans `span`: where it points already, or there.
 pub fn at(self: LintHit, span: Span) -> LintHit {
@@ -319,6 +331,123 @@ pub fn functions(self: Program) -> Function[] {
     )? == ["1", "0"]);
 })
 
+# A lint of one function, by what it reads: the function (once), or each node of one kind in its
+# body. A lint of the kind reads the kind's payload; one that needs the node itself (its source, or
+# its span) is the `Node` case. What each says is a list of hits, which a lint that finds at most one
+# writes as `[..hit]`.
+variant LintRun =
+    | OfFunction((Function) -> LintHit[])
+    | OfCall((Call) -> LintHit[])
+    | OfMatch((Match) -> LintHit[])
+    | OfMatchIn((Match, Function) -> LintHit[])
+    | OfMatchNode((Expr) -> LintHit[])
+    | OfAssign((Assign) -> LintHit[])
+    | OfSetLitNode((Expr) -> LintHit[])
+    | OfInterpolation((Interpolation) -> LintHit[])
+    | OfSlice((Slice) -> LintHit[])
+    | OfConstruct((Construct) -> LintHit[])
+    | OfLetMut((LetMut) -> LintHit[])
+
+# A lint, under the name of its file.
+struct Lint { name: str, run: LintRun }
+
+# What each of `lints` says of `self`: a lint of one kind of node is run over every node of that kind
+# in the body, and what it says points at its node unless it points somewhere in particular.
+pub fn run_lints(self: Function, lints: Lint[]) -> LintHit[] {
+    let body = self.body;
+    mut hits: LintHit[] = [];
+    for (let Lint { run } : lints) {
+        match (run) {
+            OfFunction(lint_run) => {
+                set hits.extend(lint_run(self));
+            },
+            OfCall(lint_run) => {
+                for (let node : body.descendants_of_kind::<Call>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+            OfMatch(lint_run) => {
+                for (let node : body.descendants_of_kind::<Match>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+            OfMatchIn(lint_run) => {
+                for (let node : body.descendants_of_kind::<Match>()) {
+                    set hits.extend(lint_run(node.kind, self)$at(node.span));
+                }
+            },
+            OfMatchNode(lint_run) => {
+                for (let node : body.descendants_of_kind::<Match>()) {
+                    set hits.extend(lint_run(node)$at(node.span));
+                }
+            },
+            OfAssign(lint_run) => {
+                for (let node : body.descendants_of_kind::<Assign>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+            OfSetLitNode(lint_run) => {
+                for (let node : body.descendants_of_kind::<SetLit>()) {
+                    set hits.extend(lint_run(node)$at(node.span));
+                }
+            },
+            OfInterpolation(lint_run) => {
+                for (let node : body.descendants_of_kind::<Interpolation>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+            OfSlice(lint_run) => {
+                for (let node : body.descendants_of_kind::<Slice>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+            OfConstruct(lint_run) => {
+                for (let node : body.descendants_of_kind::<Construct>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+            OfLetMut(lint_run) => {
+                for (let node : body.descendants_of_kind::<LetMut>()) {
+                    set hits.extend(lint_run(node.kind)$at(node.span));
+                }
+            },
+        };
+    }
+    hits
+}.test({
+    fn named(name: str, run: LintRun) -> Lint { name, run }
+
+    // A lint of calls is run over each call, a lint of the function once, and each hit points at the
+    // node it was found in unless the lint said where.
+    assert(lint_function_messages(
+        "fn f() { g(h(1)); }",
+        |function| function.run_lints([named("calls", OfCall(|call| [lint_message(call.name)]))]),
+    )? == ["g", "h"]);
+    assert(lint_function_unfilled(
+        "fn f() { g(h(1)); }",
+        |function| function.run_lints([named("calls", OfCall(|call| [lint_message(call.name)]))]),
+    )?$span$start == [9, 11]);
+    assert(lint_function_messages(
+        "fn f() { g(h(1)); }",
+        |function| function.run_lints([named("once", OfFunction(|f| [lint_message(f.name.text)]))]),
+    )? == ["f"]);
+    assert(lint_function_unfilled(
+        "fn f() { g(1); }",
+        |function| function.run_lints([
+            named("far", OfCall(|call| [lint_message("m", span=0..1)])),
+        ]),
+    )?$span == [0..1]);
+
+    // Several at once, in the order given, and none at all.
+    assert(lint_function_messages(
+        "fn f() { g(1); }",
+        |function| function.run_lints([
+            named("a", OfCall(|call| [lint_message("a")])),
+            named("none", OfCall(|call| [])),
+        ]),
+    )? == ["a"]);
+})
+
 fn declared(self: LoweredFn(function)) -> Function { function }
 
 # What the function lint `lint` reports for each of `self`, the hits [`filled`] fills in.
@@ -340,6 +469,36 @@ pub fn unfilled_hits(self: Function[], lint: (Function) -> LintHit*) -> LintHit[
         |function| { [unfilled(Any, `in {function.name.text}: use `, "", 0..1)] },
     )? == ["in f: use builtin_any, importing `any as builtin_any` from builtins"]);
 })
+
+# What `lints` report for each of `self`: each function's hits, those of a function that point nowhere
+# in particular at its name. Not [`unfilled_hits`] with a lambda: a lambda cannot capture lints.
+pub fn unfilled_hits_of(self: Function[], lints: Lint[]) -> LintHit[] {
+    mut hits: LintHit[] = []; #[allow]
+    for (let function : self) {
+        set hits.extend(function
+            .outside_its_definition(function.run_lints(lints))
+            $at(function.name.span));
+    }
+    hits
+}
+
+# What `lints` say of the program `src` parses to, as they say it: the [`LintHit`]s, before any file's
+# imports decide how they are written. Every builtin counts as imported.
+pub fn lint_lints_unfilled(src: str, lints: Lint[]) -> LintHit[]!ParseFailure {
+    ok(
+        aipl_parse_surface_file(src)?.program
+            .hoist_test_fns()
+            .resolve_with_every_builtin()
+            .functions()
+            .unfilled_hits_of(lints),
+    )
+}
+
+# What `lints` report for the program `src` parses to, filled in for the imports `src` has.
+pub fn lint_lints_filled_messages(src: str, lints: Lint[]) -> str[]!ParseFailure {
+    let program = aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees();
+    ok(program.functions().unfilled_hits_of(lints).filled(program.items)$message)
+}
 
 # `hits` less those that advise the builtin `self` is itself: a function written to be `any` holds
 # the longhand that `any` replaces, and advising it to call `any` would have it call itself.
@@ -391,36 +550,6 @@ pub fn shown(self: LintHit[]) -> str[] {
 }.test({
     assert([unfilled(Len, "use ", "()", 1..2)].shown() == ["use Builtin(Len)()"]);
 })
-
-# What the lint `lint`, which also reads the file's items, says of the program `src` parses to: the
-# [`LintHit`]s as [`lint_function_unfilled`] gives them.
-pub fn lint_in_unfilled(src: str, lint: (Function, Item[]) -> LintHit*) -> LintHit[]!ParseFailure {
-    let program = aipl_parse_surface_file(src)?.program
-        .hoist_test_fns()
-        .resolve_with_every_builtin();
-    ok(program.functions().unfilled_hits(|function| lint(function, program.items)))
-}
-
-# What the lint `lint`, which also reads the file's items, reports for the program `src` parses to,
-# filled in for the imports `src` has.
-pub fn lint_in_unfilled_hits(
-    src: str,
-    lint: (Function, Item[]) -> LintHit*,
-) -> FilledHit[]!ParseFailure {
-    let program = aipl_parse_surface_file(src)?.program.hoist_test_fns().resolve_callees();
-    ok(
-        program
-            .functions()
-            .unfilled_hits(|function| lint(function, program.items))
-            .filled(program.items),
-    )
-}
-
-# [`lint_in_unfilled_hits`], keeping only the messages.
-pub fn lint_in_unfilled_messages(
-    src: str,
-    lint: (Function, Item[]) -> LintHit*,
-) -> str[]!ParseFailure { ok(lint_in_unfilled_hits(src, lint)?$message) }
 
 # `self` as backquoted names, read as a sentence: `a`, `a` and `b`, or `a`, `b` and `c`.
 fn quoted_list(self: str[]) -> str {

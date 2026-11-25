@@ -12,18 +12,16 @@
 # The hit points at the literal.
 
 import {
-    collect_ok,
     equal as ==,
     is_case,
     is_empty,
     logical_and as &&,
     logical_not as !,
-    map,
     starts_with,
 } from builtins;
-import { Char, Expr, Interpolation, Str, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
-import { LintHit, hit_at, lint_function_messages, lint_message } from "./lint_hit.aipl";
+import { Char, Expr, Interpolation, Str } from "../expr.aipl";
+import { lint_with_messages } from "./lint.aipl";
+import { LintHit, lint_message } from "./lint_hit.aipl";
 
 # The hit for the interpolation `self`, when its whole value is a string or char literal.
 pub fn interp_literal(self: Interpolation(Expr { source, kind })) -> LintHit? {
@@ -39,29 +37,28 @@ pub fn interp_literal(self: Interpolation(Expr { source, kind })) -> LintHit? {
     };
     some(lint_message(message(what)))
 }.test({
-    // The hits for each function's interpolations.
-    fn flagged(Function { body }) -> LintHit[] {
-        body
-            .descendants_of_kind::<Interpolation>()
-            .map(|node: Expr<Interpolation>| { node.hit_at(node.kind.interp_literal()) })
-            .collect_ok()
-    }
-
-    assert(lint_function_messages("fn f() -> str { `a: {'a'}` }", flagged)? == [message("char")]);
-    assert(lint_function_messages("""fn f() -> str { `a: {"aa"}` }""", flagged)? == [
+    assert(lint_with_messages("fn f() -> str { `a: {'a'}` }", "interp_literal")? == [
+        message("char"),
+    ]);
+    assert(lint_with_messages("""fn f() -> str { `a: {"aa"}` }""", "interp_literal")? == [
         message("string"),
     ]);
 
     // A literal that is only part of the interpolation computes something, a
     // `"""` literal is raw text a template cannot say, and a name is not a literal.
-    assert(lint_function_messages("""fn f(s: str) -> str { `{"a" == s}` }""", flagged)?.is_empty());
     assert(
-        lint_function_messages(
-            "fn f() -> str { `{\"\"\"back\\slash\"\"\"}` }",
-            flagged,
+        lint_with_messages(
+            """fn f(s: str) -> str { `{"a" == s}` }""",
+            "interp_literal",
         )?.is_empty(),
     );
-    assert(lint_function_messages("fn f(c: char) -> str { `{c}` }", flagged)?.is_empty());
+    assert(
+        lint_with_messages(
+            "fn f() -> str { `{\"\"\"back\\slash\"\"\"}` }",
+            "interp_literal",
+        )?.is_empty(),
+    );
+    assert(lint_with_messages("fn f(c: char) -> str { `{c}` }", "interp_literal")?.is_empty());
     // Shapes the lint must leave alone.
 })
 

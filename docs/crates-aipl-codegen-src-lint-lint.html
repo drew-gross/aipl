@@ -14,12 +14,68 @@
 
       <h1><code>crates/aipl-codegen/src/lint/lint.aipl</code></h1>
 
-      <div class="module-doc"><p>The lints, run over a parsed file.</p><p><code>squelch</code> is applied to what these return: it drops the hits an <code>#[allow]</code> marker covers and says how to keep the rest. A lint is added by giving it its own file and a line in <code>lint</code>; the hits come back in the order the lints are listed.</p></div>
+      <div class="module-doc"><p>The lints, run over a parsed file.</p><p><code>squelch</code> is applied to what these return: it drops the hits an <code>#[allow]</code> marker covers and says how to keep the rest. A lint is added by giving it its own file and an entry in <code>all_lints</code>; the hits come back in the order the lints are listed.</p></div>
 
 
 
       <section class="group">
         <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-all_lints">
+          <h3>
+            <a class="anchor" href="#item-all_lints">all_lints</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn all_lints() -&#62; Lint[]</code></pre>
+
+          <div class="doc"><p>Every lint of one function, under the name of its file, in the order its hits are reported. A lint of one kind of node is run over each node of that kind in a function's body; one that finds at most one hit is written <code>[..hit]</code> to say so.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_with_unfilled">
+          <h3>
+            <a class="anchor" href="#item-lint_with_unfilled">lint_with_unfilled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_with_unfilled(src: str, names: str[]) -&#62; LintHit[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the lints named <code>names</code> say of the program <code>src</code> parses to, as they say it, before any file's imports decide how they are written. Every builtin counts as imported, so a lint's own tests are about the shape it finds and nothing about imports, or about any other lint.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_with_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_with_messages">lint_with_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_with_messages(src: str, names: str[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>[<code>lint_with_unfilled</code>], shown as messages.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lint_with_filled_messages">
+          <h3>
+            <a class="anchor" href="#item-lint_with_filled_messages">lint_with_filled_messages</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lint_with_filled_messages(src: str, names: str[]) -&#62; str[]!ParseFailure</code></pre>
+
+          <div class="doc"><p>What the lints named <code>names</code> report for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-lint">
@@ -29,7 +85,7 @@
           </h3>
           <pre class="signature"><code>pub fn lint(program: ResolvedProgram) -&#62; FilledHit[]</code></pre>
 
-          <div class="doc"><p>Every hit the ported lints find in <code>program</code>.</p><p>A lint is either a function of the whole program or of one function. The program's functions are listed once, and each function lint is run over them: every body that is code. One that also needs the file's imports takes the program's <code>items</code> beside the function.</p></div>
+          <div class="doc"><p>Every hit the ported lints find in <code>program</code>.</p><p>A lint is either a function of the whole program or of one function. The program's functions are listed once, and each function lint is run over them: every body that is code.</p></div>
 
 
         </section>
@@ -57,182 +113,28 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-match_hits">
+        <section class="item" id="item-lints_named">
           <h3>
-            <a class="anchor" href="#item-match_hits">match_hits</a>
+            <a class="anchor" href="#item-lints_named">lints_named</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_hits(__spat$6437: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn lints_named(names: str[]) -&#62; Lint[]!ParseFailure</code></pre>
 
-          <div class="doc"><p>The lints over the <code>match</code>es of <code>function</code> that are not about what they say.</p></div>
+          <div class="doc"><p>The lints named <code>names</code>, or the first name no lint has.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-set_lints">
+        <section class="item" id="item-not_at">
           <h3>
-            <a class="anchor" href="#item-set_lints">set_lints</a>
+            <a class="anchor" href="#item-not_at">not_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn set_lints(__spat$6639: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>fn not_at(self: FilledHit[], others: FilledHit[]) -&#62; FilledHit[]</code></pre>
 
-          <div class="doc"><p>The lints over the set literals of <code>function</code>, which are found once for all of them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-interp_lints">
-          <h3>
-            <a class="anchor" href="#item-interp_lints">interp_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn interp_lints(__spat$6863: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the template interpolations of <code>function</code>, which are found once for all of them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-slice_lints">
-          <h3>
-            <a class="anchor" href="#item-slice_lints">slice_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn slice_lints(__spat$7336: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the slices of <code>function</code>, which are found once for all of them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-construct_lints">
-          <h3>
-            <a class="anchor" href="#item-construct_lints">construct_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn construct_lints(__spat$7564: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the struct literals of <code>function</code>, which are found once for all of them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-call_lints">
-          <h3>
-            <a class="anchor" href="#item-call_lints">call_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn call_lints(__spat$7807: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the calls of <code>function</code>, which are found once for all of them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-call_advice">
-          <h3>
-            <a class="anchor" href="#item-call_advice">call_advice</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn call_advice(__spat$7999: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the calls of <code>function</code> that advise a builtin.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-match_lints">
-          <h3>
-            <a class="anchor" href="#item-match_lints">match_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn match_lints(function: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the <code>match</code>es of <code>function</code>, which are found once for all of them. One that is about the function it is in takes it as well.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-let_mut_lints">
-          <h3>
-            <a class="anchor" href="#item-let_mut_lints">let_mut_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn let_mut_lints(__spat$9467: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the <code>mut</code> bindings of <code>function</code>, which are found once for all of them: each is about an array or set seeded and then filled by the loop that follows.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-assign_lints">
-          <h3>
-            <a class="anchor" href="#item-assign_lints">assign_lints</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn assign_lints(__spat$9745: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the assignments of <code>function</code>, which are found once for all of them.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-assign_advice">
-          <h3>
-            <a class="anchor" href="#item-assign_advice">assign_advice</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn assign_advice(__spat$9947: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The lints over the assignments of <code>function</code> that advise a builtin.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-step_hits">
-          <h3>
-            <a class="anchor" href="#item-step_hits">step_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn step_hits(__spat$10199: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The step lint's hits for the assignments of <code>function</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-compound_hits">
-          <h3>
-            <a class="anchor" href="#item-compound_hits">compound_hits</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn compound_hits(__spat$10469: Function) -&#62; LintHit[]</code></pre>
-
-          <div class="doc"><p>The compound lint's hits for the assignments of <code>function</code>.</p></div>
+          <div class="doc"><p><code>self</code> less the hits at a place <code>others</code> has a hit at.</p></div>
 
 
         </section>

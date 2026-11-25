@@ -22,7 +22,6 @@ import {
     Span,
     all,
     as_case,
-    collect_ok,
     contains,
     equal as ==,
     filter,
@@ -32,10 +31,10 @@ import {
     logical_or as ||,
 } from builtins;
 import { IsCase } from "../builtin_table.aipl";
-import { Bool, Match, MatchArm, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { Bool, Match, MatchArm } from "../expr.aipl";
 import { Ctor, is_binder_name } from "../pat.aipl";
-import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, shown, unfilled } from "./lint_hit.aipl";
 
 # The hit for the `match` `self`, when it only asks which case a value is.
 pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
@@ -47,45 +46,42 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
     if (case.is_binder_name() || ["some", "none", "ok", "err"].contains(case)) { return none; };
     some(advice(case, span))
 }.test({
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<Match>()$kind$match_bool_is_case().collect_ok()
-    }
     // One case is `true`, the rest `false`.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(s: Shape) -> bool { match (s) { Circle(..) => true, Square(..) => false } }",
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Circle — write "<value>.Builtin(IsCase)::<Circle>()" and drop the match`,
     ]);
 
     // A catch-all `false` does as well, and the payload may be bound.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(s: Shape) -> bool { match (s) { Circle(r) => true, _ => false } }",
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Circle — write "<value>.Builtin(IsCase)::<Circle>()" and drop the match`,
     ]);
 
     // A nullary case.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Dot — write "<value>.Builtin(IsCase)::<Dot>()" and drop the match`,
     ]);
 
     // The name the file imports it under is the advice's.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "import { is_case as isa } from builtins; fn f(s: Shape) -> bool { match (s) { Dot => true, _ => false } }",
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Dot — write "<value>.Builtin(IsCase)::<Dot>()" and drop the match`,
     ]);
 
     // A `.test` block is held to it too.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f() { }.test({ assert(match (s) { Dot => true, _ => false }); })",
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Dot — write "<value>.Builtin(IsCase)::<Dot>()" and drop the match`,
     ]);
@@ -93,46 +89,46 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
     // Two cases answering `true`, an arm that is not a bool, `false` for the case
     // named (the opposite question), an optional and a result are left alone.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(s: Shape) -> bool { match (s) { A | B => true, _ => false } }",
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(s: Shape) -> bool { match (s) { A(..) => true, B(r) => r, _ => false } }",
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(s: Shape) -> bool { match (s) { A(..) => false, _ => true } }",
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(s: i64?) -> bool { match (s) { some(..) => true, none => false } }",
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(s: i64!str) -> bool { match (s) { ok(..) => true, err(..) => false } }",
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(n: i64) -> bool { match (n) { other => true, _ => false } }",
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
     // Two cases answer `true`: `is_case` asks about one.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn round_or_square(shape: Shape) -> bool {
                     match (shape) {
@@ -141,12 +137,12 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     // The case answering `true` is the catch-all: the question is "is it not a Dot".
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn not_dot(shape: Shape) -> bool {
                     match (shape) {
@@ -155,12 +151,12 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     // An arm that is not a literal does work of its own.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn is_big(shape: Shape) -> bool {
                     match (shape) {
@@ -169,12 +165,12 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
     // An optional is not a variant case, and has `is_some`.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn has(value: i64?) -> bool {
                     match (value) {
@@ -183,13 +179,13 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                     }
                 }
             """,
-            flagged,
+            "match_bool_is_case",
         )?.is_empty(),
     );
 
     // Shapes the lint flags, and what it says of them.
     // The other cases spelled out.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn is_circle(shape: Shape) -> bool {
                 match (shape) {
@@ -199,12 +195,12 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                 }
             }
         """,
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Circle — write "<value>.Builtin(IsCase)::<Circle>()" and drop the match`,
     ]);
     // A catch-all `false`, with the payload bound and ignored.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn is_square(shape: Shape) -> bool {
                 match (shape) {
@@ -213,12 +209,12 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                 }
             }
         """,
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Square — write "<value>.Builtin(IsCase)::<Square>()" and drop the match`,
     ]);
     // A nullary case, and the `false` arm first.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn is_dot(shape: Shape) -> bool {
                 match (shape) {
@@ -227,7 +223,7 @@ pub fn match_bool_is_case(self: Match(_, arms)) -> LintHit? {
                 }
             }
         """,
-        flagged,
+        "match_bool_is_case",
     )?.shown() == [
         `this match only asks whether the value is Dot — write "<value>.Builtin(IsCase)::<Dot>()" and drop the match`,
     ]);

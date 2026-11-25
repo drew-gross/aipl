@@ -11,12 +11,12 @@
 #
 # The hit points at the `to_str` call.
 
-import { collect_ok, equal as ==, is_empty, map } from builtins;
+import { equal as ==, is_empty } from builtins;
 import { ToStr } from "../builtin_table.aipl";
-import { Call, Expr, Interpolation, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { Call, Expr, Interpolation } from "../expr.aipl";
 import { expr_text } from "./expr_text.aipl";
-import { LintHit, hit_at, lint_function_messages, lint_message } from "./lint_hit.aipl";
+import { lint_with_messages } from "./lint.aipl";
+import { LintHit, lint_message } from "./lint_hit.aipl";
 
 # The hit for the interpolation `self`, when its whole value is a `to_str` call.
 pub fn interp_to_str(self: Interpolation(Expr { kind })) -> LintHit? {
@@ -24,58 +24,52 @@ pub fn interp_to_str(self: Interpolation(Expr { kind })) -> LintHit? {
 
     some(lint_message(message(to_str, `write "\{{argument.expr_text()}}"`)))
 }.test({
-    // The hits for each function's interpolations.
-    fn flagged(Function { body }) -> LintHit[] {
-        body
-            .descendants_of_kind::<Interpolation>()
-            .map(|node: Expr<Interpolation>| { node.hit_at(node.kind.interp_to_str()) })
-            .collect_ok()
-    }
-
     // The function and the method spelling are the same call.
-    assert(lint_function_messages(
+    assert(lint_with_messages(
         "import { to_str } from builtins; fn f(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }",
-        flagged,
+        "interp_to_str",
     )? == [message("to_str", "write \"{n}\""), message("to_str", "write \"{n}\"")]);
 
     // The name the file imports it under is the one quoted.
-    assert(lint_function_messages(
+    assert(lint_with_messages(
         "import { to_str as show } from builtins; fn f(n: i64) -> str { `{show(n)}` }",
-        flagged,
+        "interp_to_str",
     )? == [message("show", "write \"{n}\"")]);
 
     // A field path and a call are written out whole.
-    assert(lint_function_messages(
+    assert(lint_with_messages(
         "import { to_str } from builtins; fn f(p: P) -> str { `{to_str(p.x)}` }",
-        flagged,
+        "interp_to_str",
     )? == [message("to_str", "write \"{p.x}\"")]);
-    assert(lint_function_messages(
+    assert(lint_with_messages(
         "import { to_str } from builtins; fn f(n: i64) -> str { `{to_str(g(n))}` }",
-        flagged,
+        "interp_to_str",
     )? == [message("to_str", "write \"{g(n)}\"")]);
 
     // A value with no text to write is described.
-    assert(lint_function_messages(
+    assert(lint_with_messages(
         "import { to_str } from builtins; fn f(c: bool) -> str { `{to_str(if (c) { 1 } else { 2 })}` }",
-        flagged,
+        "interp_to_str",
     )? == [message("to_str", "write \"{if (c) { 1 } else { 2 }}\"")]);
 
     // Not the shape: outside a template, one operand of the interpolated expression,
     // a function of the file's own, and a file that does not import the builtin.
     assert(
-        lint_function_messages(
+        lint_with_messages(
             "import { to_str } from builtins; fn f(n: i64) -> str { to_str(n) }",
-            flagged,
+            "interp_to_str",
         )?.is_empty(),
     );
     assert(
-        lint_function_messages(
+        lint_with_messages(
             """import { equal as ==, to_str } from builtins; fn f(n: i64) -> str { `{to_str(n) == "5"}` }""",
-            flagged,
+            "interp_to_str",
         )?.is_empty(),
     );
     // Shapes the lint must leave alone.
-    assert(lint_function_messages("fn shown(n: i64) -> str { to_str(n) }", flagged)?.is_empty());
+    assert(
+        lint_with_messages("fn shown(n: i64) -> str { to_str(n) }", "interp_to_str")?.is_empty(),
+    );
 })
 
 # What is said of an interpolated `to_str` that the file spells `to_str`, with

@@ -10,13 +10,15 @@ registered in `lint/lint.aipl`, listed in `DOGFOOD_SOURCE_FILES`
 (`crates/aipl-codegen/src/lib.rs`), run on the program after hoisting (every body is a
 function, the `.test` and `.benchmark` blocks included) and before desugaring (so
 the source forms are still there), returning hits. Most lints are a function of one
-`Function`, run over the program's functions (`lint()` lists them once) by `unfilled_hits`; every lint
+`Function` or of one kind of node, registered in `all_lints()` in `lint.aipl` under the name of its
+file as a `Lint { name, run }`, where `run` says what it reads: `OfFunction` (once per function), or
+`OfCall`, `OfMatch`, `OfAssign`, ... (each node of that kind in the body; `OfMatchNode`/`OfSetLitNode`
+when the lint needs the node itself, `OfMatchIn` when it needs the function too). `run_lints` runs them.
+A lint that finds at most one hit is wrapped `|call| [..lint(call)]` in the registry. Every lint
 returns `LintHit`s, and a hit that names no builtin is `lint_message(message)` (or
 `lint_message(message, span=..)`), which is a `LintHit` with nothing named; a hit with no span of its
-own points at the node the lint was run over (`hit_at`), or at the function's name, so `lint()` fills them all in at the end; one that needs
-the file's imports (to find a call by the name it was written under) takes the program's `items`
-beside the function, as `push_loop_pipeline` does. A lint of the whole program
-(`unused_imports`) takes the `Program`. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
+own points at the node the lint was run over, or at the function's name, so `lint()` fills them all in at the end. A lint of the whole program
+(`unused_imports`) takes the `Program` and is called from `lint()` directly. Read a neighbour first: `match_value_or.aipl` (a lint over shared matching
 helpers), `case_of_equal_is_case.aipl` (a lint that names a builtin). The
 one-line hit span and `#[allow]` squelching are in the "Authoring a lint" section of
 CLAUDE.md and in the add-builtin skill's step 4.
@@ -26,8 +28,9 @@ CLAUDE.md and in the add-builtin skill's step 4.
 DRY is critical here. Before writing a helper, search for it:
 
 - `lint/lint_hit.aipl` — `lint_message`, `LintHit`, `functions`,
-  `unfilled_hits`, the `lint_*` test drivers (`lint_function_messages` and `lint_function_unfilled`;
-  `lint_in_unfilled` and `lint_in_unfilled_messages` for a lint that takes `items`).
+  `unfilled_hits`, and the `lint_function_*` drivers for a lint written as a function of `Function`. A
+  lint in the registry is tested with `lint.aipl`'s `lint_with_messages`, `lint_with_unfilled` and
+  `lint_with_filled_messages`, which take the lint's registered name.
 - `lint/field_uses.aipl`, `lint/slice_bounds.aipl` (reading a bound), `lint/option_match.aipl`,
   `lint/constant_default.aipl`, `lint/accumulation.aipl` (the seeded-empty-then-filled-by-a-loop
   shape and its pipeline advice). Template interpolations are `Interpolation` nodes (`interp_lints` in `lint.aipl`).
@@ -86,14 +89,14 @@ parser cannot express in one body). When you do that:
 ## 4. Tests belong in the lint, not in fixtures
 
 **A lint's tests are `.test` assertions in its own file.** Each assertion runs the lint's driver
-(`lint_function_messages`, `lint_function_unfilled_messages`, `lint_messages`, ...) on one small source
-string and checks the messages, so the flagged shape, the near-miss and the message text sit beside the
+(`lint_with_messages(src, "name")`, `lint_with_unfilled`, `lint_with_filled_messages`, ...) on one small source
+string, running only the registered lint of that name, and checks the messages, so the flagged shape, the near-miss and the message text sit beside the
 code that produces them and run in-process with the file's other tests. A lint over one kind of expression (a function of one node, run by a helper in `lint.aipl`) is tested with `lint_str(src)` from `lint.aipl`, which runs every lint and returns the messages, so its snippets must be ones no other lint objects to. The three kinds:
 
 - **Flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [message(..)])`, what the lint says of the shape.
-  For a lint that returns `LintHit`s, the driver is `lint_function_unfilled(src, lint)`, which
-  resolves every builtin as if imported and returns the hits as the lint made them; `.shown()`
-  writes each builtin as its own name with no import named. A lint's tests are about the shape it
+  The driver is `lint_with_unfilled(src, "name")`, which resolves every builtin as if imported and
+  returns the hits as the lint made them; `lint_with_messages` writes each builtin as its own name
+  with no import named. A lint's tests are about the shape it
   finds, never about the file's imports (aliasing and the import hint are the framework's, tested in
   `lint_hit.aipl` and `spelling.aipl`), so a test needs no `import` line. See `zip_with_pair_zip.aipl`.
 - **Not flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [])` for every near-miss, each with a comment

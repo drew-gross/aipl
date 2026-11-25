@@ -9,7 +9,7 @@
 # This is the mirror of `len_gt_zero`, which sends the opposite comparison to `is_nonempty`. Between
 # them, a length is never compared against zero.
 #
-# `!= 0` is deliberately not flagged: it is the *non*-empty test spelled with a comparison, so its
+# `!= 0` is deliberately not "is_empty_longhand": it is the *non*-empty test spelled with a comparison, so its
 # rewrite is `is_nonempty` rather than `is_empty`, and that belongs to the sibling lint if anywhere.
 # Nor is `x.len() < 1` — true of the same values, but not an idiom anyone reaches for, and flagging
 # it would mean guessing at what an unusual spelling meant.
@@ -22,21 +22,12 @@
 # The receiver is quoted only where the rewrite is a literal splice: a call's span stops before its
 # closing paren, so splicing `len(f(x))`'s receiver would produce advice that does not parse.
 
-import {
-    as_case,
-    collect_ok,
-    equal as ==,
-    is_empty,
-    len,
-    logical_or as ||,
-    map,
-    not_equal as !=,
-} from builtins;
+import { as_case, equal as ==, is_empty, len, logical_or as ||, not_equal as != } from builtins;
 import { Callee, Equal, IsEmpty, IsNonempty, Len, LogicalNot } from "../builtin_table.aipl";
-import { Call, Expr, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { Call, Expr } from "../expr.aipl";
 import { operand_text } from "./expr_text.aipl";
-import { LintHit, advice, hit_at, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, advice, shown } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
 # The advice for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
@@ -49,31 +40,23 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     };
     some(advice(IsEmpty, `emptiness asked the long way — use "{receiver.operand_text()}.`, `()"`))
 }.test({
-    // The hits for each function's calls.
-    fn flagged(Function { body }) -> LintHit[] {
-        body
-            .descendants_of_kind::<Call>()
-            .map(|call: Expr<Call>| { call.hit_at(call.kind.is_empty_longhand()) })
-            .collect_ok()
-    }
-
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: i64[]) -> bool { x.len() == 0 && x.is_empty() }",
-        flagged,
+        "is_empty_longhand",
     )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: i64[]) -> bool { 0 == x.len() && x.is_empty() }",
-        flagged,
+        "is_empty_longhand",
     )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
 
     // A call as the receiver is written out, a form with no text is a placeholder, and a missing import is named.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: i64[]) -> bool { f(x).len() == 0 && x.is_empty() }",
-        flagged,
+        "is_empty_longhand",
     )?.shown() == [`emptiness asked the long way — use "f(x).Builtin(IsEmpty)()"`]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(a: i64[], b: i64[], c: bool) -> bool { (if (c) { a } else { b }).len() == 0 && a.is_empty() }",
-        flagged,
+        "is_empty_longhand",
     )?.shown() == [
         "emptiness asked the long way — use \"(if (c) { a } else { b }).Builtin(IsEmpty)()\"",
     ]);
@@ -81,39 +64,40 @@ pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     // `!= 0`, another number, an operator that is not the builtin one, and a `len` of the
     // file's own are not this.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(x: i64[]) -> bool { x.len() != 0 && x.len() == 1 && x.is_empty() }",
-            flagged,
+            "is_empty_longhand",
         )?.is_empty(),
     );
 
     // The free-call spelling of `len` is the same AST, so it is the same hit.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: i64[]) -> bool { len(x) == 0 && x.is_empty() }",
-        flagged,
+        "is_empty_longhand",
     )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
 
     // A `len` of the file's own is a different function answering a different question, and
     // `is_empty` does not even accept what it takes, so advising it would advise code that does not
     // compile. (A file cannot both define `len` and import the builtin one.)
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 import { equal as == } from builtins;
                 variant List = Nil | Cons(i64)
                 fn len(self: List) -> i64 { match (self) { Nil => 0, Cons(..) => 1 } }
                 fn is_nil(xs: List) -> bool { xs.len() == 0 }
             """,
-            flagged,
+            "is_empty_longhand",
         )?.is_empty(),
     );
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: i64[]) -> bool { !x.is_nonempty() && x.is_empty() }",
-        flagged,
+        "is_empty_longhand",
     )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
-    assert(lint_function_unfilled("fn f(x: i64[]) -> bool { x.len() == 0 }", flagged)?.shown() == [
-        `emptiness asked the long way — use "x.Builtin(IsEmpty)()"`,
-    ]);
+    assert(lint_with_unfilled(
+        "fn f(x: i64[]) -> bool { x.len() == 0 }",
+        "is_empty_longhand",
+    )?.shown() == [`emptiness asked the long way — use "x.Builtin(IsEmpty)()"`]);
 })
 
 # The receiver of the test the one argument `self` negates, when `callee` is `!` and it is

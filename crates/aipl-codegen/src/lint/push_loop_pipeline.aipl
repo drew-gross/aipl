@@ -27,10 +27,9 @@
 #
 # The hit points at the seed.
 
-import { collect_ok, equal as ==, is_empty, logical_not as ! } from builtins;
+import { equal as ==, is_empty, logical_not as ! } from builtins;
 import { Push } from "../builtin_table.aipl";
-import { LetMut, descendants_of_kind } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { LetMut } from "../expr.aipl";
 import {
     accumulation,
     element_stages,
@@ -38,7 +37,8 @@ import {
     is_advisable,
     plain_seeded_loop,
 } from "./accumulation.aipl";
-import { LintHit, lint_function_unfilled, shown } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, shown } from "./lint_hit.aipl";
 
 # The hit for the array the binding `self` seeds, when it seeds it empty and a loop of `push`es
 # fills it.
@@ -47,33 +47,28 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     if (!filling.is_advisable()) { return none; };
     some(filling.filled_hit(filling.element_stages()))
 }.test({
-    // The messages for a function `f` whose body is `body`, in a file that imports `imports`.
-    fn flagged(Function { body }) -> LintHit[] {
-        body.descendants_of_kind::<LetMut>()$kind$push_loop_pipeline().collect_ok()
-    }
-
     // Both halves, the guard only, the push only, and neither.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (x > 0) { set out.push(x * 2); }; } out }",
-        flagged,
+        "push_loop_pipeline",
     )?.shown() == [
         `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Filter)(|x| ..).Builtin(Map)(|x| ..);" and drop the loop`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { if (x > 0) { set out.push(x); }; } out }",
-        flagged,
+        "push_loop_pipeline",
     )?.shown() == [
         `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Filter)(|x| ..);" and drop the loop`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { set out.push(x * 2); } out }",
-        flagged,
+        "push_loop_pipeline",
     )?.shown() == [
         `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Map)(|x| ..);" and drop the loop`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : xs) { set out.push(x); } out }",
-        flagged,
+        "push_loop_pipeline",
     )?.shown() == [
         `"out" is seeded empty and filled by this loop and nothing else — it is "xs" already — assign that and drop the loop`,
     ]);
@@ -81,15 +76,15 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // An import the file lacks is named; an alias is followed.
 
     // An iterable that cannot be quoted is a placeholder, and a range needs `map`.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : g(xs)) { set out.push(x * 2); } out }",
-        flagged,
+        "push_loop_pipeline",
     )?.shown() == [
         `"out" is seeded empty and filled by this loop and nothing else — write "mut out = <iterable>.Builtin(Map)(|x| ..);" and drop the loop`,
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : 0..3) { set out.push(x * 2); } out }",
-        flagged,
+        "push_loop_pipeline",
     )?.shown() == [
         `"out" is seeded empty and filled by this loop and nothing else — write "mut out = (<range>).Builtin(Map)(|x| ..);" and drop the loop`,
     ]);
@@ -97,34 +92,34 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // A range has no `filter`, and pushing its own elements has no spelling; a `push` the
     // file never imported is some other function.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : 0..3) { if (x > 0) { set out.push(x); }; } out }",
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64[] { mut out = []; for (let x : 0..3) { set out.push(x); } out }",
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """fn show(xs: i64[]) -> str { xs$to_str().join(sep=",") }""",
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """fn show_u(xs: u64[]) -> str { xs$to_str().join(sep=",") }""",
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
     // The loop does something else as well. A pipeline has nowhere to put it.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn logged(xs: i64[]) !prints -> i64[] {
                     mut out: i64[] = [];
@@ -135,7 +130,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
@@ -144,7 +139,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // else is not one. Recognizing it would mean a second rule with a different
     // rewrite, so it is left alone rather than mis-advised.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn signs(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -158,7 +153,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
@@ -166,7 +161,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // already done — a "take the first two" loop, which no `filter` predicate can
     // express.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn first_two(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -176,14 +171,14 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
     // So does the pushed element: the running length is the index this element
     // lands at, which a `map` lambda cannot see.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn indexed(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -193,12 +188,12 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
     // The seed already holds something, so the array is not just the loop's output.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn with_head(xs: i64[]) -> i64[] {
                     mut out = [0];
@@ -208,7 +203,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
@@ -217,7 +212,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // to be the very next statement rather than reasoning about what a statement
     // there might do.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn offset(xs: u64[]) -> u64[] {
                     mut out: u64[] = [];
@@ -228,14 +223,14 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
     // Two pushes per element. The loop emits more elements than it consumes, which
     // is an `extend`, not a `map`.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn doubled_up(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -246,7 +241,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
@@ -255,7 +250,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // pushes somewhere else. The seed and the push have to name the same array,
     // and the loop has to be the seed's very next statement.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn nested_targets(xs: i64[]) -> i64[] {
                     mut out: i64[] = [];
@@ -266,14 +261,14 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     [..out, ..tmp]
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
     // A `while` loop. Its condition is not an iteration, so there is nothing to
     // build a pipeline over.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn counted(n: i64) -> i64[] {
                     mut out: i64[] = [];
@@ -285,14 +280,14 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
     // A range with a guard. Only `map` takes a range, so there is no `filter` to
     // write.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn even_below(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -302,14 +297,14 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
     // A range pushed whole: the array of its values, which has no spelling the lint
     // could advise.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn upto(n: u64) -> u64[] {
                     mut out: u64[] = [];
@@ -319,7 +314,7 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
                     out
                 }
             """,
-            flagged,
+            "push_loop_pipeline",
         )?.is_empty(),
     );
 
@@ -329,13 +324,18 @@ pub fn push_loop_pipeline(self: LetMut) -> LintHit? {
     // No guard — every element is pushed, transformed. That is a `map` alone.
 
     // The element pushed unchanged — a `filter` alone. The longhand
-    // `set out = out.push(x);` is the same statement written out, so it is flagged
+    // `set out = out.push(x);` is the same statement written out, so it is "push_loop_pipeline"
     // the same way.
 
     // Neither: the loop copies the array one element at a time, so the array itself
     // is the answer and there is no pipeline to build.
 
-    assert(lint_function_unfilled("fn evens(n: i64) -> i64[] { [n, n * 2] }", flagged)?.is_empty());
+    assert(
+        lint_with_unfilled(
+            "fn evens(n: i64) -> i64[] { [n, n * 2] }",
+            "push_loop_pipeline",
+        )?.is_empty(),
+    );
 
     // A call-shaped iterable can't be quoted back into the advice — its span stops
     // before its parens — so the message names neither it nor a receiver, and the
