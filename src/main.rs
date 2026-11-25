@@ -698,8 +698,7 @@ fn leak_gate(
     Ok(leaks)
 }
 
-/// A file's trailing sections, parsed. An unreadable file has none: loading it
-/// reports that with the diagnostic worth reading.
+/// A file's trailing sections, parsed. An unreadable file is an error naming it.
 ///
 /// A malformed section (an unknown name, a non-integer `exit code`, a companion
 /// path that cannot be staged) is the file's error to report. Skipping it would
@@ -708,10 +707,15 @@ fn leak_gate(
 /// `label` is the path as the user gave it (or discovery found it), which is what
 /// the error names.
 fn read_spec(file: &Path, label: &str) -> Result<SpecFields, String> {
-    match std::fs::read_to_string(file) {
-        Ok(src) => aipl::parse_spec(&src).map_err(|e| format!("{label}: {e}")),
-        Err(_) => Ok(SpecFields::default()),
-    }
+    spec_of(
+        &std::fs::read_to_string(file).map_err(|e| format!("{label}: {e}"))?,
+        label,
+    )
+}
+
+/// [`read_spec`] for a source already read.
+fn spec_of(src: &str, label: &str) -> Result<SpecFields, String> {
+    aipl::parse_spec(src).map_err(|e| format!("{label}: {e}"))
 }
 
 /// The path a `check --compile` section names `file` by: relative to the directory
@@ -898,7 +902,8 @@ fn apply_fixes(path: &Path, checked: &mut Checked) {
     checked.sections = rest;
 }
 
-/// Check `file` against the canonical format, rewriting it first when `fix` is set.
+/// Check `file`, whose text is `src`, against the canonical format, rewriting it first when `fix`
+/// is set. Alongside the verdict comes the text now in the file, when it was rewritten.
 ///
 /// Done before anything else is checked, because formatting moves line numbers and
 /// a `check --compile` or `report` section records them: fixing those first would record
@@ -912,19 +917,16 @@ fn apply_fixes(path: &Path, checked: &mut Checked) {
 /// "needs formatting" stacked on top of it is noise. A source that parses and that the
 /// formatter still refuses is the formatter's bug, and is reported as a failure: the file
 /// cannot be brought to canonical format, and saying nothing would pass it.
-fn check_format(file: &Path, fix: bool) -> Formatting {
-    let Ok(src) = std::fs::read_to_string(file) else {
-        return Formatting::Clean;
-    };
-    let answer = aipl::codegen::format_source(&src, aipl::codegen::FORMAT_WIDTH)
+fn check_format(file: &Path, src: &str, fix: bool) -> (Formatting, Option<String>) {
+    let answer = aipl::codegen::format_source(src, aipl::codegen::FORMAT_WIDTH)
         .map_err(|refusal| refusal.message);
-    match check::format_verdict(&src, answer, || aipl::parse(&src).is_ok()) {
-        check::FormatVerdict::Clean => Formatting::Clean,
-        check::FormatVerdict::Refused(why) => Formatting::RewriteFailed(why),
-        check::FormatVerdict::Rewrite(_) if !fix => Formatting::Needs,
+    match check::format_verdict(src, answer, || aipl::parse(src).is_ok()) {
+        check::FormatVerdict::Clean => (Formatting::Clean, None),
+        check::FormatVerdict::Refused(why) => (Formatting::RewriteFailed(why), None),
+        check::FormatVerdict::Rewrite(_) if !fix => (Formatting::Needs, None),
         check::FormatVerdict::Rewrite(formatted) => match std::fs::write(file, &formatted) {
-            Ok(()) => Formatting::Rewritten,
-            Err(e) => Formatting::RewriteFailed(e.to_string()),
+            Ok(()) => (Formatting::Rewritten, Some(formatted)),
+            Err(e) => (Formatting::RewriteFailed(e.to_string()), None),
         },
     }
 }
@@ -946,7 +948,20 @@ fn check_path(
 ) -> CheckResult {
     // The parts the file's own `check` sections pin are run for the sections (see
     // `check_resolved`), not here: a section that records a failing run must not fail the file.
-    let mut spec = parts.loads().then(|| read_spec(path, label));
+    // Read once: the sections and the format are both read from this text, and a rewrite
+    // replaces it with what it wrote.
+    let mut src = match std::fs::read_to_string(path) {
+        Ok(src) => src,
+        Err(e) => {
+            return CheckResult {
+                label: label.to_string(),
+                formatting: Formatting::Clean,
+                run: TestRun::default(),
+                outcome: Err(format!("error: could not read {label}: {e}")),
+            };
+        }
+    };
+    let mut spec = parts.loads().then(|| spec_of(&src, label));
     let pinned = match &spec {
         Some(Ok(spec)) if sections => sections::pinned_parts(spec),
         _ => Parts {
@@ -963,7 +978,11 @@ fn check_path(
     // Reported before the tests run, and either way: the point is to end the
     // invocation knowing about every problem, not just the first kind.
     let formatting = if format {
-        check_format(path, fix)
+        let (formatting, rewritten) = check_format(path, &src, fix);
+        if let Some(rewritten) = rewritten {
+            src = rewritten;
+        }
+        formatting
     } else {
         Formatting::Clean
     };
@@ -972,7 +991,7 @@ fn check_path(
     }
     // Formatting moved the lines a recorded diagnostic names, so what follows reads the new text.
     if formatting == Formatting::Rewritten && spec.is_some() {
-        spec = Some(read_spec(path, label));
+        spec = Some(spec_of(&src, label));
     }
     let mut run = TestRun::default();
     let outcome = if let Some(spec) = spec {

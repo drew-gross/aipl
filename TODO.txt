@@ -897,6 +897,10 @@ flamegraph:
   collapse recursive functions
   profile other things than run e.g. formatting, running tests, etc.
 
+gui:
+  more advanced stuff (like buttons!)
+  screenshot testing
+
 check:
   check on a folder so we can e.g. check all the lints at oncez
   check should print it's runtime

@@ -461,6 +461,29 @@ fn a_missing_path_is_reported() {
     assert_eq!(code, 1);
 }
 
+/// A file that cannot be read is an error that names it, not a file that quietly has nothing in it.
+#[test]
+fn a_file_that_cannot_be_read_is_an_error_naming_it() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("check_tree")
+        .join("unreadable");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create temp dir");
+    // Not UTF-8, so it cannot be read as source.
+    fs::write(dir.join("a.aipl"), [0xff, 0xfe]).expect("write temp source");
+    let out = Command::new(env!("CARGO_BIN_EXE_aipl"))
+        .arg("check")
+        .arg("a.aipl")
+        .current_dir(&dir)
+        .output()
+        .expect("run aipl check");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "error: could not read ./a.aipl: stream did not contain valid UTF-8\n"
+    );
+    assert_eq!(out.status.code(), Some(1));
+}
+
 #[test]
 fn all_tests_pass_is_silent_and_exit_zero() {
     let (stdout, _stderr, code) = check(
