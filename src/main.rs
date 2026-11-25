@@ -1179,39 +1179,16 @@ fn check_cmd(args: &[String]) -> ExitCode {
         })
         .collect();
 
-    if single {
-        let (path, label) = &resolved[0];
-        // The summary is printed here, once both kinds of test have run, rather
-        // than by the JIT runner when its own tests finish.
-        aipl::codegen::set_quiet_summary(true);
-        let result = check_path(
-            path,
-            label,
-            &project_root,
-            validate_sections,
-            fix,
-            baseline.as_ref(),
-            parts,
-            dbg,
-        );
-        print!("{}", result.render());
-        if result.outcome.is_ok() {
-            print!("{}", check::render_failures(&result.run.failure_report));
-            if let Some(summary) = result.render_summary() {
-                println!("{summary}");
-            }
-        }
-        return if result.passed() {
-            ExitCode::SUCCESS
-        } else {
-            ExitCode::FAILURE
-        };
-    }
-
+    // The summary is printed here, once both kinds of test have run, rather than by the JIT
+    // runner when its own tests finish.
     aipl::codegen::set_quiet_summary(true);
     let mut totals = BatchTotals::default();
+    let mut passed = true;
     for (path, label) in &resolved {
-        aipl::codegen::set_test_file(Some(label));
+        // A single file keeps its own report, which names no file: its failures are bare.
+        if !single {
+            aipl::codegen::set_test_file(Some(label));
+        }
         let result = check_path(
             path,
             label,
@@ -1223,12 +1200,22 @@ fn check_cmd(args: &[String]) -> ExitCode {
             dbg,
         );
         totals.add(&result);
+        passed = result.passed();
         print!("{}", result.render());
+        if single && result.outcome.is_ok() {
+            print!("{}", check::render_failures(&result.run.failure_report));
+            if let Some(summary) = result.render_summary() {
+                println!("{summary}");
+            }
+        }
     }
     aipl::codegen::set_test_file(None);
 
-    print!("{}", totals.render());
-    if totals.passed_all() {
+    if !single {
+        print!("{}", totals.render());
+        passed = totals.passed_all();
+    }
+    if passed {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
