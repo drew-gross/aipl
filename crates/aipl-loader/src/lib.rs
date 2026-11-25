@@ -1603,7 +1603,7 @@ fn rewrite_item(
                             default: p
                                 .default
                                 .as_ref()
-                                .map(|d| rewrite_expr(d, view, sc, &earlier)),
+                                .map(|d| rewrite_root(d, view, sc, &earlier)),
                             implicit_some: p.implicit_some,
                         });
                         earlier.insert(p.name.clone());
@@ -1619,7 +1619,7 @@ fn rewrite_item(
             },
             // Parameters are locals — they shadow any global of the same name,
             // so an ident referring to a parameter is never rewritten.
-            body: rewrite_expr(
+            body: rewrite_root(
                 &f.body,
                 view,
                 sc,
@@ -1652,7 +1652,7 @@ fn rewrite_item(
                     default: fd
                         .default
                         .as_ref()
-                        .map(|d| rewrite_expr(d, view, sc, &HashSet::new())),
+                        .map(|d| rewrite_root(d, view, sc, &HashSet::new())),
                 })
                 .collect(),
         }),
@@ -1688,7 +1688,7 @@ fn rewrite_item(
                                 default: slot
                                     .default
                                     .as_ref()
-                                    .map(|d| rewrite_expr(d, view, sc, &earlier)),
+                                    .map(|d| rewrite_root(d, view, sc, &earlier)),
                                 implicit_some: slot.implicit_some,
                                 doc: slot.doc.clone(),
                                 name_span: slot.name_span.clone(),
@@ -1726,7 +1726,7 @@ fn rewrite_item(
                     .unwrap_or_else(|| c.name.text.clone()),
             ),
             ty: c.ty.as_ref().map(|t| rewrite_type(t, view, &[])),
-            value: rewrite_expr(&c.value, view, sc, &std::collections::HashSet::new()),
+            value: rewrite_root(&c.value, view, sc, &std::collections::HashSet::new()),
             ..c.clone()
         }),
         Item::Import(_) => unreachable!("imports stripped during load"),
@@ -1842,6 +1842,37 @@ fn is_builtin_type(s: &str) -> bool {
 /// resolving `V.A` paths.
 struct Scope<'a> {
     ctor_cases: &'a HashMap<String, Vec<String>>,
+}
+
+/// [`rewrite_expr`] for the root of a function body, a default or a constant. Once the whole of
+/// it is rewritten, an arm that stands for several alternatives (`A | B => body`) and so holds a
+/// copy of another arm's body is given binders of its own, named against everything the root
+/// holds.
+fn rewrite_root(
+    e: &Expr,
+    view: &HashMap<String, String>,
+    sc: &Scope,
+    locals: &HashSet<String>,
+) -> Expr {
+    let mut out = rewrite_expr(e, view, sc, locals);
+    let mut names = aipl_syntax::Names::of_expr(&out);
+    separate_alternatives(&mut out, &mut names);
+    out
+}
+
+/// Give each arm of every `match` in `e` that holds the same body as an earlier arm binders of
+/// its own, innermost matches first.
+fn separate_alternatives(e: &mut Expr, names: &mut aipl_syntax::Names) {
+    for child in e.children_mut() {
+        separate_alternatives(child, names);
+    }
+    if let ExprKind::Match(_, arms) = &mut e.kind {
+        for i in 1..arms.len() {
+            if arms[..i].iter().any(|a| a.body == arms[i].body) {
+                arms[i].body = aipl_syntax::distinct_binders(&arms[i].body, names);
+            }
+        }
+    }
 }
 
 fn rewrite_expr(
@@ -2011,14 +2042,6 @@ fn rewrite_expr(
                     }
                 })
                 .collect::<Vec<MatchArm>>();
-            // `A | B => body` is one arm per alternative, each with a copy of the
-            // body, and a copy gets binders of its own.
-            let mut new_arms = new_arms;
-            for i in 1..new_arms.len() {
-                if new_arms[..i].iter().any(|a| a.body == new_arms[i].body) {
-                    new_arms[i].body = aipl_syntax::distinct_binders(&new_arms[i].body);
-                }
-            }
             ExprKind::Match(
                 Box::new(rewrite_expr(scrutinee, view, sc, locals)),
                 new_arms,

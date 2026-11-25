@@ -7,6 +7,7 @@ use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, Primitive};
 use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern, TProgram, Ty};
+use aipl_syntax::Names;
 
 use crate::passes::Scope;
 use crate::sink::can_defer_typed;
@@ -21,34 +22,30 @@ pub fn fold_lengths_pinned(
     scope: &Scope,
 ) -> TProgram {
     let blocked = crate::sink::undeferrable_fns_pinned(program, effectful);
-    crate::typed_util::map_pinned_bodies(
+    crate::typed_util::map_pinned_bodies_named(
         program,
         |name| scope.covers(name),
-        |_, body| *body = fold_expr(body, &blocked),
+        |_, body, names| *body = fold_in(body, &mut Vec::new(), &blocked, names),
     )
 }
 
-pub(crate) fn fold_expr(e: &P, blocked: &HashSet<String>) -> P {
-    fold_in(e, &mut Vec::new(), blocked)
-}
-
-fn fold_in(e: &P, empty: &mut Vec<String>, blocked: &HashSet<String>) -> P {
+fn fold_in(e: &P, empty: &mut Vec<String>, blocked: &HashSet<String>, names: &mut Names) -> P {
     if let TExprKind::Call { callee, args, .. } = &e.kind {
         if let (Some(ask), [arg]) = (Ask::of(callee), args.as_slice()) {
-            if let Some(folded) = fold_length(e, arg, empty, blocked, ask) {
-                return fold_in(&folded, empty, blocked);
+            if let Some(folded) = fold_length(e, arg, empty, blocked, ask, names) {
+                return fold_in(&folded, empty, blocked, names);
             }
         }
     }
     if let TExprKind::Index(operand, index) = &e.kind {
         if let Some(folded) = fold_index(e, operand, index, blocked) {
-            return fold_in(&folded, empty, blocked);
+            return fold_in(&folded, empty, blocked, names);
         }
     }
     if let TExprKind::Let(name, value, body) = &e.kind {
-        let value = fold_in(value, empty, blocked);
+        let value = fold_in(value, empty, blocked, names);
         let noted = note_empty(name, &value, empty);
-        let body = fold_in(body, empty, blocked);
+        let body = fold_in(body, empty, blocked, names);
         empty.truncate(empty.len() - noted as usize);
         let mut out = TExpr::rebuilt(
             TExprKind::Let(name.clone(), Box::new(value), Box::new(body)),
@@ -60,7 +57,7 @@ fn fold_in(e: &P, empty: &mut Vec<String>, blocked: &HashSet<String>) -> P {
     }
     let mut out = e.clone();
     each_child_mut(&mut out, &mut |child| {
-        *child = fold_in(child, empty, blocked)
+        *child = fold_in(child, empty, blocked, names)
     });
     out
 }
@@ -75,7 +72,7 @@ fn note_empty(name: &str, value: &P, empty: &mut Vec<String>) -> bool {
 }
 
 pub(crate) fn folds_anything(e: &P, blocked: &HashSet<String>) -> bool {
-    fold_expr(e, blocked) != *e
+    fold_in(e, &mut Vec::new(), blocked, &mut Names::of_typed(e)) != *e
 }
 
 fn can_drop(e: &P, blocked: &HashSet<String>) -> bool {
@@ -110,7 +107,7 @@ fn apply(func: &P, arg: P) -> Option<P> {
                 return None;
             };
             let map = std::collections::HashMap::from([(param.name.clone(), arg_name.clone())]);
-            Some(crate::typed_util::rename_scoped(body, &map, false))
+            Some(crate::typed_util::rename_scoped(body, &map, None))
         }
         TExprKind::Ident(g) => {
             let Ty::Fn(_, result) = &func.ty else {
@@ -173,6 +170,7 @@ fn fold_length(
     outer: &[String],
     blocked: &HashSet<String>,
     ask: Ask,
+    names: &mut Names,
 ) -> Option<P> {
     let (bindings, inner) = through_bindings(arg);
     let counted = {
@@ -180,7 +178,7 @@ fn fold_length(
         for b in &bindings {
             note_empty(b.name, b.value, &mut empty);
         }
-        count_of(whole, inner, &empty, blocked, ask)?
+        count_of(whole, inner, &empty, blocked, ask, names)?
     };
     Some(under_bindings(bindings, whole, counted))
 }
@@ -220,7 +218,14 @@ impl Ask {
     }
 }
 
-fn count_of(whole: &P, e: &P, empty: &[String], blocked: &HashSet<String>, ask: Ask) -> Option<P> {
+fn count_of(
+    whole: &P,
+    e: &P,
+    empty: &[String],
+    blocked: &HashSet<String>,
+    ask: Ask,
+    names: &mut Names,
+) -> Option<P> {
     let span = || whole.span.clone();
     let measure = |x: &P| {
         TExpr::new(
@@ -302,8 +307,8 @@ fn count_of(whole: &P, e: &P, empty: &[String], blocked: &HashSet<String>, ask: 
                     method_style: *method_style,
                 }))
             }
-            Callee::MapJoin => sum_of_parts(whole, args, empty, blocked),
-            Callee::ValueOr => optional_count(whole, args, empty, blocked),
+            Callee::MapJoin => sum_of_parts(whole, args, empty, blocked, names),
+            Callee::ValueOr => optional_count(whole, args, empty, blocked, names),
             _ if callee.preserves_length() && *callee != Callee::Map => {
                 let [xs, fns @ ..] = args.as_slice() else {
                     return None;
@@ -440,7 +445,13 @@ fn add(a: P, b: P, whole: &P) -> P {
     }
 }
 
-fn sum_of_parts(whole: &P, args: &[P], empty: &[String], blocked: &HashSet<String>) -> Option<P> {
+fn sum_of_parts(
+    whole: &P,
+    args: &[P],
+    empty: &[String],
+    blocked: &HashSet<String>,
+    names: &mut Names,
+) -> Option<P> {
     let [xs, f, seps @ ..] = args else {
         return None;
     };
@@ -450,14 +461,14 @@ fn sum_of_parts(whole: &P, args: &[P], empty: &[String], blocked: &HashSet<Strin
     if !is_pure(f, blocked) {
         return None;
     }
-    let id = aipl_syntax::fresh_id();
+    let group = names.group("len");
     let u64_ty = Ty::Primitive(Primitive::U64);
     let element = match &xs.ty {
         Ty::Array(e) => (**e).clone(),
         _ => return None,
     };
     let span = || whole.span.clone();
-    let (total, elem) = (format!("$len{id}_n"), format!("$len{id}_x"));
+    let (total, elem) = (format!("{group}_n"), format!("{group}_x"));
     let at = |n: &str, ty: &Ty| TExpr::new(TExprKind::Ident(n.to_string()), ty.clone(), span());
     let unit = || TExpr::new(TExprKind::Unit, Ty::Unit, span());
     let piece = TExpr::new(
@@ -514,7 +525,13 @@ fn sum_of_parts(whole: &P, args: &[P], empty: &[String], blocked: &HashSet<Strin
     Some(out)
 }
 
-fn optional_count(whole: &P, args: &[P], empty: &[String], blocked: &HashSet<String>) -> Option<P> {
+fn optional_count(
+    whole: &P,
+    args: &[P],
+    empty: &[String],
+    blocked: &HashSet<String>,
+    names: &mut Names,
+) -> Option<P> {
     let [mapped, default] = args else {
         return None;
     };
@@ -540,7 +557,7 @@ fn optional_count(whole: &P, args: &[P], empty: &[String], blocked: &HashSet<Str
     };
     let span = || whole.span.clone();
     let u64_ty = Ty::Primitive(Primitive::U64);
-    let bound = format!("$len{}_v", aipl_syntax::fresh_id());
+    let bound = names.fresh("len", "v");
     let some = TMatchArm {
         pattern: TPattern::Ctor {
             name: "some".to_string(),

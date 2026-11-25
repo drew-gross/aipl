@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 use aipl_syntax::ast::{Callee, ConcreteType, Type};
 use aipl_syntax::typed::{ConcreteTy, TExpr, TExprKind, TMatchArm, TPattern, Ty, TyRepr};
+use aipl_syntax::Names;
 
 use crate::{ArgShape, Mono, Param, ParamSpec};
 
@@ -603,6 +604,7 @@ impl Mono<'_> {
             .collect();
         // A function synthesized from typed code carries its tree.
         if let Some(body) = synthesized {
+            self.names = Names::of_typed(body);
             self.scope_names = params.iter().map(|p| p.name.clone()).collect();
             let body = self.mark_owned_parameters(params, specs, body.clone());
             return Some(self.lower(body));
@@ -614,6 +616,10 @@ impl Mono<'_> {
             None => (template, type_args),
         };
         let source = *self.typed_fns.get(source_name)?;
+        self.names = Names::of_typed(&source.body);
+        for p in params {
+            self.names.reserve(&p.name);
+        }
         // The pinner names an anonymous `any` differently from monomorphization; the type variables
         // correspond by position.
         let type_args: HashMap<String, Type> = {
@@ -837,7 +843,7 @@ impl Mono<'_> {
 
     /// `recv.f(rest..)` used as a value, where `f` updates its receiver: `{ mut $copy = recv; set
     /// $copy.f(rest..); $copy }`.
-    fn desugar_mutating_call(&self, e: TExpr<ConcreteType>) -> TExpr<ConcreteType> {
+    fn desugar_mutating_call(&mut self, e: TExpr<ConcreteType>) -> TExpr<ConcreteType> {
         let TExpr {
             kind:
                 TExprKind::Call {
@@ -853,7 +859,7 @@ impl Mono<'_> {
         else {
             unreachable!("desugar_mutating_call is given a call");
         };
-        let tmp = aipl_syntax::fresh_temp("mut_copy");
+        let tmp = self.names.temp("mut_copy");
         let receiver = args.remove(0);
         let receiver_ty = receiver.ty.clone();
         let at = || {
@@ -903,7 +909,7 @@ impl Mono<'_> {
     /// `(a, b).to_array()` as `[a, b]`; any other tuple is bound once and its fields are the
     /// elements. `grid.with_or_self((r, c), v)` as the grid's `grid_try_set` of the two cells.
     /// `None` for a call that is neither.
-    fn rewrite_expanded_call(&self, e: &TExpr<ConcreteType>) -> Option<TExpr<ConcreteType>> {
+    fn rewrite_expanded_call(&mut self, e: &TExpr<ConcreteType>) -> Option<TExpr<ConcreteType>> {
         // `grid[(row, column)]` is the grid's `grid_get` of the two cells.
         if let TExprKind::Index(grid, pair) = &e.kind {
             return self.grid_call(Callee::GridGet, grid, pair, Vec::new(), e);
@@ -944,7 +950,7 @@ impl Mono<'_> {
                     ConcreteType::Named(n) => crate::tuple_instance_arity(n)?,
                     _ => return None,
                 };
-                let tmp = aipl_syntax::fresh_temp("tuple_array");
+                let tmp = self.names.temp("tuple_array");
                 let elems = (0..arity).map(|i| field(&tmp, &tuple.ty, i)).collect();
                 let array = TExpr::new(TExprKind::ArrayLit(elems), e.ty.clone(), span.clone());
                 Some(TExpr::new(
@@ -1009,7 +1015,7 @@ impl Mono<'_> {
     /// addresses a cell of `grid`. A pair written out is its two cells already; a bound one is read
     /// by its fields, and any other is bound first so it is evaluated once.
     fn grid_call(
-        &self,
+        &mut self,
         callee: Callee,
         grid: &TExpr<ConcreteType>,
         pair: &TExpr<ConcreteType>,
@@ -1046,7 +1052,7 @@ impl Mono<'_> {
             TExprKind::TupleLit(cells) => (cells.clone(), None),
             TExprKind::Ident(name) => (vec![field(name, 0), field(name, 1)], None),
             _ => {
-                let tmp = aipl_syntax::fresh_temp("cell");
+                let tmp = self.names.temp("cell");
                 (vec![field(&tmp, 0), field(&tmp, 1)], Some(tmp))
             }
         };
@@ -1204,7 +1210,7 @@ impl Mono<'_> {
                     })
                     .and_then(|t| t.to_concrete())
                     .expect("a function field is concrete");
-                let tmp = aipl_syntax::fresh_temp("fldcall");
+                let tmp = self.names.temp("fldcall");
                 let span = e.span.clone();
                 let field = TExpr::new(
                     TExprKind::Field(Box::new(receiver), name.clone()),
@@ -1496,7 +1502,7 @@ impl Mono<'_> {
                     Some(shape @ (crate::VShape::Elem | crate::VShape::Opt)) => {
                         let source = args.pop().expect("extend has a source");
                         let span = source.span.clone();
-                        let given = aipl_syntax::fresh_temp("extend");
+                        let given = self.names.temp("extend");
                         let (sequence, convert) = variadic_sequence(
                             &given,
                             &ConcreteType::Primitive(aipl_syntax::ast::Primitive::Char),
@@ -1599,7 +1605,7 @@ impl Mono<'_> {
                         bindings: vec!["_".to_string(); payload.len()],
                         ignore_payload: false,
                     },
-                    body: crate::typed_util::distinct_binders(&otherwise),
+                    body: crate::typed_util::distinct_binders(&otherwise, &mut self.names),
                     span: else_span.clone(),
                 })
                 .collect()

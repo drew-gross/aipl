@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{BinOp, Callee, Item, Primitive, SeqShape};
 use aipl_syntax::typed::{TExpr, TExprKind, TLambdaParam, TMatchArm, TPattern, TProgram, Ty};
+use aipl_syntax::Names;
 
 use crate::passes::Scope;
 use crate::typed_util::{any_child, assigned_names, each_child_mut, read_names};
@@ -25,10 +26,10 @@ pub fn fuse_operations_pinned(
         effectful,
         blocked: &blocked,
     };
-    crate::typed_util::map_pinned_bodies(
+    crate::typed_util::map_pinned_bodies_named(
         program,
         |name| scope.covers(name),
-        |_, body| fuse_expr(body, None, &guards),
+        |_, body, names| fuse_expr(body, None, &guards, names),
     )
 }
 
@@ -37,39 +38,39 @@ struct Guards<'a> {
     blocked: &'a HashSet<String>,
 }
 
-fn fuse_expr(e: &mut P, outer: Option<Callee>, guards: &Guards) {
+fn fuse_expr(e: &mut P, outer: Option<Callee>, guards: &Guards, names: &mut Names) {
     match &mut e.kind {
         TExprKind::Call { callee, args, .. } => {
             let name = callee.clone();
             for (i, arg) in args.iter_mut().enumerate() {
-                fuse_expr(arg, (i == 0).then(|| name.clone()), guards);
+                fuse_expr(arg, (i == 0).then(|| name.clone()), guards, names);
             }
         }
         TExprKind::Let(_, value, body) => {
-            fuse_expr(value, None, guards);
-            fuse_expr(body, outer.clone(), guards);
+            fuse_expr(value, None, guards, names);
+            fuse_expr(body, outer.clone(), guards, names);
         }
-        _ => each_child_mut(e, &mut |c| fuse_expr(c, None, guards)),
+        _ => each_child_mut(e, &mut |c| fuse_expr(c, None, guards, names)),
     }
-    if let Some(fused) = try_fuse(e, outer.as_ref(), guards) {
+    if let Some(fused) = try_fuse(e, outer.as_ref(), guards, names) {
         *e = fused;
     }
 }
 
-fn try_fuse(e: &P, outer: Option<&Callee>, guards: &Guards) -> Option<P> {
+fn try_fuse(e: &P, outer: Option<&Callee>, guards: &Guards, names: &mut Names) -> Option<P> {
     let fused = match &e.kind {
         TExprKind::Call { callee, args, .. } => {
             match (aipl_syntax::binop_for_builtin(callee), args.as_slice()) {
                 (Some(op), [l, r]) => comparison(l, op, r, e),
-                _ => compose(e, guards.blocked)
-                    .or_else(|| predicate(e, guards.blocked))
+                _ => compose(e, guards.blocked, names)
+                    .or_else(|| predicate(e, guards.blocked, names))
                     .or_else(|| predicate_end(e, guards.blocked))
                     .or_else(|| predicate_emptiness(e, guards.blocked))
                     .or_else(|| slice(e))
                     .or_else(|| chain(e, outer)),
             }
         }
-        TExprKind::For(..) => return loops(e, guards.blocked),
+        TExprKind::For(..) => return loops(e, guards.blocked, names),
         TExprKind::Index(..) => return index(e, guards.blocked),
         _ => None,
     }?;
@@ -188,7 +189,7 @@ fn apply(func: &P, arg: P) -> Option<P> {
                 return None;
             };
             let map = HashMap::from([(param.name.clone(), arg_name.clone())]);
-            Some(crate::typed_util::rename_scoped(body, &map, false))
+            Some(crate::typed_util::rename_scoped(body, &map, None))
         }
         TExprKind::Ident(g) => {
             let result = fn_result(func)?;
@@ -359,7 +360,7 @@ fn index(whole: &P, blocked: &HashSet<String>) -> Option<P> {
 
 // ---- compose ----
 
-fn compose(whole: &P, blocked: &HashSet<String>) -> Option<P> {
+fn compose(whole: &P, blocked: &HashSet<String>, names: &mut Names) -> Option<P> {
     let TExprKind::Call {
         callee: Callee::Map,
         type_args,
@@ -395,8 +396,8 @@ fn compose(whole: &P, blocked: &HashSet<String>) -> Option<P> {
     {
         return None;
     }
-    let id = aipl_syntax::fresh_id();
-    let (x, y) = (format!("$compose{id}_x"), format!("$compose{id}_y"));
+    let group = names.group("compose");
+    let (x, y) = (format!("{group}_x"), format!("{group}_y"));
     let x_ty = fn_param(f)?;
     let y_ty = fn_result(f)?;
     let f_of_x = apply(f, ident(&x, x_ty.clone(), whole))?;
@@ -642,7 +643,7 @@ fn predicate_emptiness(whole: &P, blocked: &HashSet<String>) -> Option<P> {
     Some(under_bindings(bindings, whole, answer))
 }
 
-fn predicate(whole: &P, blocked: &HashSet<String>) -> Option<P> {
+fn predicate(whole: &P, blocked: &HashSet<String>, names: &mut Names) -> Option<P> {
     let TExprKind::Call {
         callee: consumer,
         type_args,
@@ -678,8 +679,8 @@ fn predicate(whole: &P, blocked: &HashSet<String>) -> Option<P> {
     {
         return None;
     }
-    let id = aipl_syntax::fresh_id();
-    let (x, y) = (format!("$predicate{id}_x"), format!("$predicate{id}_y"));
+    let group = names.group("predicate");
+    let (x, y) = (format!("{group}_x"), format!("{group}_y"));
     let x_ty = fn_param(stage.first_function())?;
     let mapped_then_g = |f: &P| {
         let f_of_x = apply(f, ident(&x, x_ty.clone(), whole))?;
@@ -852,7 +853,7 @@ fn chain(whole: &P, outer: Option<&Callee>) -> Option<P> {
 
 // ---- loops ----
 
-fn loops(whole: &P, blocked: &HashSet<String>) -> Option<P> {
+fn loops(whole: &P, blocked: &HashSet<String>, names: &mut Names) -> Option<P> {
     let TExprKind::For(var, index, iterable, body) = &whole.kind else {
         return None;
     };
@@ -881,7 +882,7 @@ fn loops(whole: &P, blocked: &HashSet<String>) -> Option<P> {
         let [recv] = args.as_slice() else {
             return None;
         };
-        let fused = windows(whole, var, index, recv, iterable, body)?;
+        let fused = windows(whole, var, index, recv, iterable, body, names)?;
         return Some(rebuild(fused));
     }
     if *name == Callee::Split {
@@ -927,7 +928,7 @@ fn loops(whole: &P, blocked: &HashSet<String>) -> Option<P> {
         if index.is_some() {
             return None;
         }
-        let fused = product(whole, var, recv, other, iterable, body)?;
+        let fused = product(whole, var, recv, other, iterable, body, names)?;
         return Some(rebuild(fused));
     }
     if index.is_some() {
@@ -959,7 +960,7 @@ fn loops(whole: &P, blocked: &HashSet<String>) -> Option<P> {
         }
     }
     let element = element_of(&recv.ty)?;
-    let elem = format!("$fuse{}_{}", aipl_syntax::fresh_id(), var);
+    let elem = names.fresh("fuse", var);
     let elem_ref = || {
         TExpr::new(
             TExprKind::Ident(elem.clone()),
@@ -1006,14 +1007,15 @@ fn windows(
     recv: &P,
     iterable: &P,
     body: &P,
+    names: &mut Names,
 ) -> Option<P> {
-    let id = aipl_syntax::fresh_id();
+    let group = names.group("fuse");
     let element = element_of(&recv.ty)?;
     let pair_ty = element_of(&iterable.ty)?;
     let bool_ty = Ty::Primitive(Primitive::Bool);
     let u64_ty = Ty::Primitive(Primitive::U64);
     let sp = || recv.span.clone();
-    let name = |what: &str| format!("$fuse{id}_{what}");
+    let name = |what: &str| format!("{group}_{what}");
     let at = |n: &str, ty: &Ty| TExpr::new(TExprKind::Ident(n.to_string()), ty.clone(), sp());
     let unit = || TExpr::new(TExprKind::Unit, Ty::Unit, sp());
     let node = |kind: TExprKind<Ty>, ty: Ty| TExpr::new(kind, ty, sp());
@@ -1164,13 +1166,21 @@ fn windows(
     ))
 }
 
-fn product(whole: &P, var: &str, recv: &P, other: &P, iterable: &P, body: &P) -> Option<P> {
-    let id = aipl_syntax::fresh_id();
+fn product(
+    whole: &P,
+    var: &str,
+    recv: &P,
+    other: &P,
+    iterable: &P,
+    body: &P,
+    names: &mut Names,
+) -> Option<P> {
+    let group = names.group("fuse");
     let left_ty = element_of(&recv.ty)?;
     let right_ty = element_of(&other.ty)?;
     let pair_ty = element_of(&iterable.ty)?;
     let sp = || recv.span.clone();
-    let name = |what: &str| format!("$fuse{id}_{what}");
+    let name = |what: &str| format!("{group}_{what}");
     let at = |n: &str, ty: &Ty| TExpr::new(TExprKind::Ident(n.to_string()), ty.clone(), sp());
     let node = |kind: TExprKind<Ty>, ty: Ty| TExpr::new(kind, ty, sp());
     let (left, right, a, b) = (name("left"), name("right"), name("a"), name("b"));

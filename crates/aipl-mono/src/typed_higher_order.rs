@@ -453,7 +453,7 @@ impl Mono<'_> {
         body: Typed,
         owned: &[usize],
     ) -> Typed {
-        let body = crate::typed_util::distinct_binders(&body);
+        let body = crate::typed_util::distinct_binders(&body, &mut self.names);
         let name = self.synth_name(kind);
         self.concrete.insert(
             name.clone(),
@@ -539,8 +539,8 @@ impl Mono<'_> {
             // The compiler's own position never escapes the loop.
             (ConcreteType::Dict(key, value), index) => {
                 let (key, value) = ((**key).clone(), (**value).clone());
-                let dict = aipl_syntax::fresh_temp("dict");
-                let counter = aipl_syntax::fresh_temp("dict_i");
+                let dict = self.names.temp("dict");
+                let counter = self.names.temp("dict_i");
                 let dict_ty = iterable.ty.clone();
                 let at = |callee: Callee, ty: &ConcreteType| {
                     call(
@@ -581,7 +581,7 @@ impl Mono<'_> {
             // starts it afresh; `index` is re-bound each iteration, so the body cannot move the
             // counter.
             (_, Some(position)) => {
-                let counter = aipl_syntax::fresh_temp("idx");
+                let counter = self.names.temp("idx");
                 let counted = seq(*body, bump(&counter, &u64_ty, &span), &span);
                 let bound = wrap_let(&position, counter_at(&counter), counted);
                 let plain = node(
@@ -597,8 +597,8 @@ impl Mono<'_> {
             }
             // A range is the counted loop from its start to its end.
             (_, None) => {
-                let range = aipl_syntax::fresh_temp("range");
-                let counter = aipl_syntax::fresh_temp("range_i");
+                let range = self.names.temp("range");
+                let counter = self.names.temp("range_i");
                 let range_ty = iterable.ty.clone();
                 let field = |f: &str| {
                     node(

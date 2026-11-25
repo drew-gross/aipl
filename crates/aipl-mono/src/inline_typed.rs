@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use aipl_syntax::ast::ConcreteType;
 use aipl_syntax::typed::{TExpr, TExprKind};
+use aipl_syntax::Names;
 
 use crate::early_exit::without_early_exits_typed;
 use crate::typed_adapter::concrete;
@@ -54,7 +55,21 @@ pub(crate) fn expand_calls_in(
         return false;
     }
     let mut replaced = false;
-    replace_call(&mut g.body, &f.name, fparams, &f.body, &mut replaced, sites);
+    // The binders each expansion introduces are named against everything `g` holds, the
+    // expansions already made included.
+    let mut names = Names::of_typed(&g.body);
+    for p in &g.params {
+        names.reserve(&p.name);
+    }
+    replace_call(
+        &mut g.body,
+        &f.name,
+        fparams,
+        &f.body,
+        &mut replaced,
+        sites,
+        &mut names,
+    );
     replaced
 }
 
@@ -68,6 +83,7 @@ fn replace_call(
     fbody: &Typed,
     replaced: &mut bool,
     sites: Sites,
+    names: &mut Names,
 ) {
     if *replaced && sites == Sites::First {
         return;
@@ -75,12 +91,12 @@ fn replace_call(
     if let TExprKind::Call { callee, args, .. } = &e.kind {
         if callee.name() == fname && args.len() == fparams.len() {
             *replaced = true;
-            *e = build_inlined(fparams, fbody, args, e);
+            *e = build_inlined(fparams, fbody, args, e, names);
             return;
         }
     }
     each_child_mut(e, &mut |child| {
-        replace_call(child, fname, fparams, fbody, replaced, sites);
+        replace_call(child, fname, fparams, fbody, replaced, sites, names);
     });
 }
 
@@ -93,19 +109,25 @@ fn made(kind: TExprKind<ConcreteType>, ty: ConcreteType, like: &Typed) -> Typed 
 
 /// The expansion of `at`, a call whose arguments are `args`: each (freshly renamed) parameter bound
 /// to its argument by a `let` of the parameter's declared type, around `fbody`.
-fn build_inlined(fparams: &[InlineParam], fbody: &Typed, args: &[Typed], at: &Typed) -> Typed {
+fn build_inlined(
+    fparams: &[InlineParam],
+    fbody: &Typed,
+    args: &[Typed],
+    at: &Typed,
+    names: &mut Names,
+) -> Typed {
     let fbody = &without_early_exits_typed(fbody)
         .expect("the inline gate accepted a body whose early exits cannot be rewritten");
     let mut map: HashMap<String, String> = HashMap::new();
     let fresh: Vec<String> = fparams
         .iter()
         .map(|p| {
-            let nm = format!("$inl{}_{}", aipl_syntax::fresh_id(), p.name);
+            let nm = names.fresh("inl", &p.name);
             map.insert(p.name.clone(), nm.clone());
             nm
         })
         .collect();
-    let mut expr = rename_scoped(fbody, &map, true);
+    let mut expr = rename_scoped(fbody, &map, Some(names));
     let declared = |p: &InlineParam| -> ConcreteType {
         concrete(&p.ty).expect("a parameter's declared type is concrete")
     };

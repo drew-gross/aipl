@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{Callee, ConcreteType};
 use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
+use aipl_syntax::Names;
 
 /// The tree everything after monomorphization reads.
 pub type Typed = TExpr<ConcreteType>;
@@ -44,6 +45,55 @@ pub(crate) fn map_pinned_bodies(
         if let aipl_syntax::typed::TItem::Fn(f) = item {
             if covers(&f.name.text) {
                 rewrite(&f.name.text, &mut f.body);
+            }
+        }
+    }
+    out
+}
+
+/// [`map_bodies`] for a rewrite that names new binders: it is given the supply of names for the
+/// function, which already holds everything the function does.
+pub(crate) fn map_bodies_named(
+    program: &crate::MonoProgram,
+    covers: impl Fn(&str) -> bool,
+    rewrite: impl Fn(&str, &mut Typed, &mut Names),
+) -> crate::MonoProgram {
+    crate::MonoProgram {
+        fns: program
+            .fns
+            .iter()
+            .map(|f| {
+                if !covers(&f.name) {
+                    return f.clone();
+                }
+                let mut body = f.body.clone();
+                let mut names = Names::of_typed(&body);
+                for p in &f.params {
+                    names.reserve(&p.name);
+                }
+                rewrite(&f.name, &mut body, &mut names);
+                crate::ConcreteFn { body, ..f.clone() }
+            })
+            .collect(),
+        ..program.clone()
+    }
+}
+
+/// [`map_pinned_bodies`] for a rewrite that names new binders; see [`map_bodies_named`].
+pub(crate) fn map_pinned_bodies_named(
+    program: &aipl_syntax::typed::TProgram,
+    covers: impl Fn(&str) -> bool,
+    rewrite: impl Fn(&str, &mut TExpr<aipl_syntax::typed::Ty>, &mut Names),
+) -> aipl_syntax::typed::TProgram {
+    let mut out = program.clone();
+    for item in &mut out.items {
+        if let aipl_syntax::typed::TItem::Fn(f) = item {
+            if covers(&f.name.text) {
+                let mut names = Names::of_typed(&f.body);
+                for p in &f.sig.params {
+                    names.reserve(&p.name);
+                }
+                rewrite(&f.name.text, &mut f.body, &mut names);
             }
         }
     }
@@ -215,123 +265,148 @@ pub fn body_size<T: TyRepr>(e: &TExpr<T>) -> usize {
 
 /// `e` with every binder it introduces renamed, for a copy of code that already has another copy in
 /// the same function.
-pub(crate) fn distinct_binders<T: TyRepr>(e: &TExpr<T>) -> TExpr<T> {
-    rename_scoped(e, &HashMap::new(), true)
+pub(crate) fn distinct_binders<T: TyRepr>(e: &TExpr<T>, names: &mut Names) -> TExpr<T> {
+    rename_scoped(e, &HashMap::new(), Some(names))
 }
 
-/// [`aipl_syntax::rename_scoped`] over the typed tree.
+/// [`aipl_syntax::rename_params`] over the typed tree, and given a supply of `names` also every
+/// binder `e` introduces, as [`aipl_syntax::distinct_binders`] does.
 pub(crate) fn rename_scoped<T: TyRepr>(
     e: &TExpr<T>,
     map: &HashMap<String, String>,
-    fresh: bool,
+    names: Option<&mut Names>,
 ) -> TExpr<T> {
-    let sub = |n: &String| map.get(n).cloned().unwrap_or_else(|| n.clone());
-    let scope = |names: &[String]| -> (HashMap<String, String>, HashMap<String, String>) {
+    Renamer { names }.go(e, map)
+}
+
+struct Renamer<'n> {
+    names: Option<&'n mut Names>,
+}
+
+impl Renamer<'_> {
+    /// The map inside a scope that binds `names`, and what each is known as there.
+    fn scope(
+        &mut self,
+        map: &HashMap<String, String>,
+        names: &[String],
+    ) -> (HashMap<String, String>, HashMap<String, String>) {
         let mut inner = map.clone();
         let mut renamed = HashMap::new();
         for n in names {
             inner.remove(n);
-            if fresh && n != "_" {
-                let nm = match n.strip_prefix(aipl_syntax::SHIM_CLOSURE_PREFIX) {
-                    Some(rest) => format!(
-                        "{}$inl{}_{rest}",
-                        aipl_syntax::SHIM_CLOSURE_PREFIX,
-                        aipl_syntax::fresh_id()
-                    ),
-                    None => format!("$inl{}_{}", aipl_syntax::fresh_id(), n),
-                };
+            if let (Some(supply), true) = (self.names.as_deref_mut(), n != "_") {
+                let nm = supply.fresh_binder("inl", n);
                 inner.insert(n.clone(), nm.clone());
                 renamed.insert(n.clone(), nm);
             }
         }
         (inner, renamed)
-    };
-    let known_as = |renamed: &HashMap<String, String>, n: &String| {
-        renamed.get(n).cloned().unwrap_or_else(|| n.clone())
-    };
-    let boxed = |x: &TExpr<T>, m: &HashMap<String, String>| Box::new(rename_scoped(x, m, fresh));
-    let arm = |a: &TMatchArm<T>| {
-        let (inner, renamed) = scope(&a.pattern.bindings());
+    }
+
+    fn boxed<T: TyRepr>(&mut self, x: &TExpr<T>, m: &HashMap<String, String>) -> Box<TExpr<T>> {
+        Box::new(self.go(x, m))
+    }
+
+    fn arm<T: TyRepr>(&mut self, a: &TMatchArm<T>, map: &HashMap<String, String>) -> TMatchArm<T> {
+        let (inner, renamed) = self.scope(map, &a.pattern.bindings());
         TMatchArm {
             pattern: a
                 .pattern
                 .rename_bindings(&mut |n| renamed.get(n).cloned().unwrap_or_else(|| n.to_string())),
-            body: rename_scoped(&a.body, &inner, fresh),
+            body: self.go(&a.body, &inner),
             span: a.span.clone(),
         }
-    };
-    let kind = match &e.kind {
-        TExprKind::Shim(effect, bindings, body) => TExprKind::Shim(
-            effect.clone(),
-            bindings
-                .iter()
-                .map(|(op, f)| (op.clone(), sub(f)))
-                .collect(),
-            boxed(body, map),
-        ),
-        TExprKind::Ident(n) => TExprKind::Ident(sub(n)),
-        TExprKind::Call {
-            callee,
-            type_args,
-            args,
-            method_style,
-        } => TExprKind::Call {
-            callee: match callee {
-                Callee::Local(n) => Callee::Local(sub(n)),
-                known => known.clone(),
+    }
+
+    fn go<T: TyRepr>(&mut self, e: &TExpr<T>, map: &HashMap<String, String>) -> TExpr<T> {
+        let sub = |n: &String| map.get(n).cloned().unwrap_or_else(|| n.clone());
+        let known_as = |renamed: &HashMap<String, String>, n: &String| {
+            renamed.get(n).cloned().unwrap_or_else(|| n.clone())
+        };
+        let kind = match &e.kind {
+            TExprKind::Shim(effect, bindings, body) => TExprKind::Shim(
+                effect.clone(),
+                bindings
+                    .iter()
+                    .map(|(op, f)| (op.clone(), sub(f)))
+                    .collect(),
+                self.boxed(body, map),
+            ),
+            TExprKind::Ident(n) => TExprKind::Ident(sub(n)),
+            TExprKind::Call {
+                callee,
+                type_args,
+                args,
+                method_style,
+            } => TExprKind::Call {
+                callee: match callee {
+                    Callee::Local(n) => Callee::Local(sub(n)),
+                    known => known.clone(),
+                },
+                type_args: type_args.clone(),
+                args: args.iter().map(|a| self.go(a, map)).collect(),
+                method_style: *method_style,
             },
-            type_args: type_args.clone(),
-            args: args.iter().map(|a| rename_scoped(a, map, fresh)).collect(),
-            method_style: *method_style,
-        },
-        TExprKind::Assign(lhs, a, b) => {
-            TExprKind::Assign(boxed(lhs, map), boxed(a, map), boxed(b, map))
-        }
-        TExprKind::Let(n, a, b) => {
-            let (inner, renamed) = scope(std::slice::from_ref(n));
-            TExprKind::Let(known_as(&renamed, n), boxed(a, map), boxed(b, &inner))
-        }
-        TExprKind::LetMut(n, a, b) => {
-            let (inner, renamed) = scope(std::slice::from_ref(n));
-            TExprKind::LetMut(known_as(&renamed, n), boxed(a, map), boxed(b, &inner))
-        }
-        TExprKind::For(v, index, iter, b) => {
-            let (inner, renamed) = scope(&aipl_syntax::loop_binders(v, index));
-            TExprKind::For(
-                known_as(&renamed, v),
-                index.as_ref().map(|i| known_as(&renamed, i)),
-                boxed(iter, map),
-                boxed(b, &inner),
-            )
-        }
-        TExprKind::Match(s, arms) => {
-            TExprKind::Match(boxed(s, map), arms.iter().map(arm).collect())
-        }
-        TExprKind::IfLet(a, s, else_b) => {
-            TExprKind::IfLet(Box::new(arm(a)), boxed(s, map), boxed(else_b, map))
-        }
-        TExprKind::Lambda(ps, b) => {
-            let names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
-            let (inner, renamed) = scope(&names);
-            let ps = ps
-                .iter()
-                .map(|p| aipl_syntax::typed::TLambdaParam {
-                    name: known_as(&renamed, &p.name),
-                    ..p.clone()
-                })
-                .collect();
-            TExprKind::Lambda(ps, boxed(b, &inner))
-        }
-        _ => {
-            // Nothing here binds or names: the sub-expressions are renamed as they stand.
-            let mut out = e.clone();
-            each_child_mut(&mut out, &mut |c| *c = rename_scoped(c, map, fresh));
-            return out;
-        }
-    };
-    let mut out = TExpr::rebuilt(kind, e.ty.clone(), e);
-    out.annotation = e.annotation.clone();
-    out
+            TExprKind::Assign(lhs, a, b) => {
+                TExprKind::Assign(self.boxed(lhs, map), self.boxed(a, map), self.boxed(b, map))
+            }
+            TExprKind::Let(n, a, b) => {
+                let (inner, renamed) = self.scope(map, std::slice::from_ref(n));
+                TExprKind::Let(
+                    known_as(&renamed, n),
+                    self.boxed(a, map),
+                    self.boxed(b, &inner),
+                )
+            }
+            TExprKind::LetMut(n, a, b) => {
+                let (inner, renamed) = self.scope(map, std::slice::from_ref(n));
+                TExprKind::LetMut(
+                    known_as(&renamed, n),
+                    self.boxed(a, map),
+                    self.boxed(b, &inner),
+                )
+            }
+            TExprKind::For(v, index, iter, b) => {
+                let (inner, renamed) = self.scope(map, &aipl_syntax::loop_binders(v, index));
+                TExprKind::For(
+                    known_as(&renamed, v),
+                    index.as_ref().map(|i| known_as(&renamed, i)),
+                    self.boxed(iter, map),
+                    self.boxed(b, &inner),
+                )
+            }
+            TExprKind::Match(s, arms) => TExprKind::Match(
+                self.boxed(s, map),
+                arms.iter().map(|a| self.arm(a, map)).collect(),
+            ),
+            TExprKind::IfLet(a, s, else_b) => TExprKind::IfLet(
+                Box::new(self.arm(a, map)),
+                self.boxed(s, map),
+                self.boxed(else_b, map),
+            ),
+            TExprKind::Lambda(ps, b) => {
+                let names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
+                let (inner, renamed) = self.scope(map, &names);
+                let ps = ps
+                    .iter()
+                    .map(|p| aipl_syntax::typed::TLambdaParam {
+                        name: known_as(&renamed, &p.name),
+                        ..p.clone()
+                    })
+                    .collect();
+                TExprKind::Lambda(ps, self.boxed(b, &inner))
+            }
+            _ => {
+                // Nothing here binds or names: the sub-expressions are renamed as they stand.
+                let mut out = e.clone();
+                each_child_mut(&mut out, &mut |c| *c = self.go(c, map));
+                return out;
+            }
+        };
+        let mut out = TExpr::rebuilt(kind, e.ty.clone(), e);
+        out.annotation = e.annotation.clone();
+        out
+    }
 }
 
 /// Count each global name's uses in `e`: a mention, a call, or a shim binding of a name not in

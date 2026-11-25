@@ -130,6 +130,7 @@ pub(crate) fn expand_keyword_args(program: &Program, root_index: u32) -> Result<
         struct_fields,
         struct_spreads: 0,
         kw_tmps: 0,
+        names: aipl_syntax::Names::new(),
         current_fn: String::new(),
         keyword_uses: Vec::new(),
     };
@@ -160,6 +161,11 @@ pub(crate) fn expand_keyword_args(program: &Program, root_index: u32) -> Result<
                 return Ok(item.clone());
             };
             cx.current_fn = f.name.text.clone();
+            // What the function holds, so the names expansion makes are unlike all of it.
+            cx.names = aipl_syntax::Names::of_expr(&f.body);
+            for p in &f.sig.params {
+                cx.names.reserve(&p.name);
+            }
             // Parameters are the body's locals: a function-typed parameter
             // named like a global function must not have that global's
             // keyword machinery applied to calls through it.
@@ -442,6 +448,9 @@ struct Expander {
     /// Serial number for the bindings `expand_call_args` hoists arguments into
     /// when a keyword parameter's default reads them.
     kw_tmps: usize,
+    /// The supply of names for the bindings a default's reads are given, for the function being
+    /// expanded.
+    names: aipl_syntax::Names,
 }
 
 /// Whether `e` can be written into the call more than once for free: a name or
@@ -1343,6 +1352,9 @@ impl Expander {
                     None => {
                         let d = &defaults[i - npos];
                         let free = aipl_syntax::free_idents(d);
+                        // The default is copied in as it is written, so what it holds is not
+                        // free for the names made below.
+                        self.names.reserve_expr(d);
                         // Each earlier parameter the default reads is bound to a
                         // name of its own, so neither the binding nor an argument
                         // a later binding evaluates can meet a caller's variable
@@ -1351,7 +1363,7 @@ impl Expander {
                             .iter()
                             .filter_map(|(n, ty)| {
                                 let a = arg_of.get(n.as_str()).filter(|_| free.contains(n))?;
-                                Some((n, ty, a, aipl_syntax::fresh_local("kw", n)))
+                                Some((n, ty, a, self.names.fresh("kw", n)))
                             })
                             .collect();
                         let renames = read

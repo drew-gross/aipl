@@ -34,6 +34,7 @@
 //! same spelling the fusion pass uses for the step it passes.
 
 use aipl_syntax::ast::Callee;
+use aipl_syntax::Names;
 
 /// [`lower_reductions`] on the pinned program: the same rewrite, the nodes it builds typed from
 /// what they stand for — the step combines two elements of the sequence being reduced.
@@ -45,12 +46,16 @@ pub fn lower_reductions_pinned(
     for item in &mut out.items {
         match item {
             TItem::Fn(f) => {
-                lower_pinned(&mut f.body);
+                let mut names = Names::of_typed(&f.body);
+                for p in &f.sig.params {
+                    names.reserve(&p.name);
+                }
+                lower_pinned(&mut f.body, &mut names);
             }
             TItem::Struct(s) => {
                 for field in &mut s.fields {
                     if let Some(d) = field.default.as_mut() {
-                        lower_pinned(d);
+                        lower_pinned(d, &mut Names::of_typed(d));
                     }
                 }
             }
@@ -80,9 +85,9 @@ fn step_ident(
     ))
 }
 
-fn lower_pinned(e: &mut aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>) {
+fn lower_pinned(e: &mut aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>, names: &mut Names) {
     use aipl_syntax::typed::{TExpr, TExprKind, TLambdaParam, Ty};
-    crate::typed_util::each_child_mut(e, &mut lower_pinned);
+    crate::typed_util::each_child_mut(e, &mut |child| lower_pinned(child, names));
     if let TExprKind::Ident(name) = &e.kind {
         let Some(step) = Callee::from_canonical(name).and_then(|c| c.reduction_step()) else {
             return;
@@ -96,7 +101,7 @@ fn lower_pinned(e: &mut aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>) {
         let Some(step_ref) = step_ident(&step, sequence, &e.span) else {
             return;
         };
-        let param = format!("$reduce{}_xs", aipl_syntax::fresh_id());
+        let param = names.fresh("reduce", "xs");
         let operand = TExpr::new(
             TExprKind::Ident(param.clone()),
             sequence.clone(),

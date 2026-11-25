@@ -33,6 +33,66 @@ fn compile(src: &str) -> Compilation {
     Compilation::new(&program, DebugOptions::OFF, &entries).unwrap()
 }
 
+/// The IR of the source at `path`, or `None` for one that does not compile (an error fixture).
+fn ir_of_file(path: &std::path::Path) -> Option<String> {
+    aipl::install_parser_hooks();
+    let text = std::fs::read_to_string(path).expect("read a case");
+    let src = aipl::strip_test_sections(&text);
+    let program =
+        aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF).ok()?;
+    let entries = if aipl::codegen::all_functions(&program).contains(&"main") {
+        Vec::new()
+    } else {
+        aipl::codegen::all_functions(&program)
+    };
+    let compilation = Compilation::new(&program, DebugOptions::OFF, &entries).ok()?;
+    Some(compilation.ir().to_string())
+}
+
+/// What the compiler writes depends on the program alone: the same files compiled by several
+/// threads at once, each in a different order, give the IR one thread gives. The optimizations
+/// name the binders they introduce, and nothing about those names may follow the schedule.
+#[test]
+fn concurrent_compiles_write_the_same_ir_as_a_lone_one() {
+    let mut files: Vec<std::path::PathBuf> = std::fs::read_dir(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases/optimizations"),
+    )
+    .expect("list the optimization cases")
+    .map(|entry| entry.expect("a directory entry").path())
+    .filter(|path| path.extension().is_some_and(|ext| ext == "aipl"))
+    .collect();
+    files.sort();
+    files.truncate(16);
+    let alone: Vec<Option<String>> = files.iter().map(|f| ir_of_file(f)).collect();
+    assert!(alone.iter().any(Option::is_some), "no case compiled");
+
+    const THREADS: usize = 4;
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..THREADS)
+            .map(|offset| {
+                let (files, alone) = (&files, &alone);
+                std::thread::Builder::new()
+                    .stack_size(256 * 1024 * 1024)
+                    .spawn_scoped(scope, move || {
+                        for step in 0..files.len() {
+                            let at = (step + offset * 5) % files.len();
+                            assert_eq!(
+                                ir_of_file(&files[at]),
+                                alone[at],
+                                "{} compiled differently beside other compiles",
+                                files[at].display()
+                            );
+                        }
+                    })
+                    .expect("spawn a compiling thread")
+            })
+            .collect();
+        for handle in handles {
+            handle.join().expect("a compiling thread panicked");
+        }
+    });
+}
+
 #[test]
 fn empty_program_compiles() {
     // Empty source has no main; cases harness requires one, so this

@@ -118,7 +118,7 @@ struct Tree<'m, 'a> {
 impl Tree<'_, '_> {
     /// A fresh temporary of type `ty`. `$` keeps it out of any user's namespace.
     fn column(&mut self, ty: ConcreteType) -> (String, ConcreteType) {
-        let var = aipl_syntax::fresh_temp("mt");
+        let var = self.mono.names.temp("mt");
         self.known.insert(var.clone(), ty.clone());
         (var, ty)
     }
@@ -389,8 +389,9 @@ impl Tree<'_, '_> {
     }
 
     /// The arm `row` reaches: its body under the binders the row collected.
-    fn leaf(&self, row: &Row) -> Typed {
-        let mut out = crate::typed_util::distinct_binders(&self.bodies[row.arm]);
+    fn leaf(&mut self, row: &Row) -> Typed {
+        let mut out =
+            crate::typed_util::distinct_binders(&self.bodies[row.arm], &mut self.mono.names);
         for (name, var) in row.binds.iter().rev() {
             let value = self.ident(var, &self.known[var]);
             let body_ty = out.ty.clone();

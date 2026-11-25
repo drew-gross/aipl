@@ -105,6 +105,7 @@ use std::collections::HashSet;
 
 use aipl_syntax::ast::ConcreteType;
 use aipl_syntax::typed::{TExpr, TExprKind, TFieldInit, TMatchArm, TPattern};
+use aipl_syntax::Names;
 
 use crate::typed_util::Typed;
 
@@ -138,10 +139,10 @@ pub fn eliminate_known_constructors_post_mono(
         max_duplicated,
         blocked: undeferrable_fns_post_mono(program, builtin_effects),
     };
-    crate::typed_util::map_bodies(
+    crate::typed_util::map_bodies_named(
         program,
         |name| scope.covers(name),
-        |_, body| *body = rewrite(body, &limits),
+        |_, body, names| *body = rewrite(body, &limits, names),
     )
 }
 
@@ -174,19 +175,21 @@ fn declared(e: &Typed) -> Option<&ConcreteType> {
 /// Bottom-up, so an eliminator whose operand only took the shape by an inner
 /// rewrite (an `ok(..)?` inside an arm, a projection of a projection) is
 /// pushed too.
-fn rewrite(e: &Typed, limits: &Limits) -> Typed {
+fn rewrite(e: &Typed, limits: &Limits, names: &mut Names) -> Typed {
     let mut out = e.clone();
-    each_child_mut(&mut out, &mut |child| *child = rewrite(child, limits));
+    each_child_mut(&mut out, &mut |child| {
+        *child = rewrite(child, limits, names)
+    });
     match &out.kind {
         TExprKind::Try(inner) if ends_in(inner, is_optional_or_result) => push_try(inner, &out),
         TExprKind::Match(scrutinee, arms)
             if ends_in(scrutinee, is_matchable)
                 && match_can_move(scrutinee, arms, limits, false) =>
         {
-            push_match(scrutinee, arms, &out, &|_| None)
+            push_match(scrutinee, arms, &out, &|_| None, names)
         }
         TExprKind::Let(name, value, body) if ends_in(value, is_matchable) => {
-            match_through_binding(name, declared(&out), value, body, limits).unwrap_or(out)
+            match_through_binding(name, declared(&out), value, body, limits, names).unwrap_or(out)
         }
         TExprKind::Field(base, field)
             if ends_in(base, is_struct) && field_can_move(base, field, limits) =>
@@ -207,10 +210,17 @@ fn rewrite(e: &Typed, limits: &Limits) -> Typed {
                 (Some(k), None) => (&args[1], k),
                 _ => return out,
             };
-            let unwrapped = unwrap_equality(*op == Callee::Equal, other, constructor, &out, limits);
+            let unwrapped = unwrap_equality(
+                *op == Callee::Equal,
+                other,
+                constructor,
+                &out,
+                limits,
+                names,
+            );
             // The `match` this built is an eliminator in its own right: give it
             // the same chance the walk gives one the program wrote.
-            rewrite(&unwrapped, limits)
+            rewrite(&unwrapped, limits, names)
         }
         _ => out,
     }
@@ -230,8 +240,9 @@ fn unwrap_equality(
     constructor: Known<'_>,
     at: &Typed,
     limits: &Limits,
+    names: &mut Names,
 ) -> Typed {
-    let id = aipl_syntax::fresh_id();
+    let (payload_group, binder_group) = (names.group("ceq"), names.group("ceqv"));
     // Everything built here is a `bool` but the payload names.
     let boolean = at.ty.clone();
     let rebuilt = |kind: TExprKind<ConcreteType>| node(kind, boolean.clone(), at);
@@ -245,7 +256,7 @@ fn unwrap_equality(
             if can_defer(p, &limits.blocked) {
                 ((*p).clone(), None)
             } else {
-                let name = format!("$ceq{id}_{i}");
+                let name = format!("{payload_group}_{i}");
                 (
                     node(TExprKind::Ident(name), p.ty.clone(), p),
                     Some((*p).clone()),
@@ -254,7 +265,7 @@ fn unwrap_equality(
         })
         .collect();
     let binders: Vec<String> = (0..payloads.len())
-        .map(|i| format!("$ceqv{id}_{i}"))
+        .map(|i| format!("{binder_group}_{i}"))
         .collect();
     // `v0 == p0 && v1 == p1 && ..` — or, for `!=`, `v0 != p0 || v1 != p1 || ..`.
     let (compare, join) = if equal {
@@ -660,6 +671,7 @@ fn match_through_binding(
     value: &Typed,
     body: &Typed,
     limits: &Limits,
+    names: &mut Names,
 ) -> Option<Typed> {
     let uses = uses_of(body, name);
     if uses.count != 1 || uses.repeated || !can_defer(value, &limits.blocked) {
@@ -677,7 +689,15 @@ fn match_through_binding(
         }
     }
     let annotate = |case: &str| payload_annotation(annotation, case);
-    push_into_scrutinee(name, value, body, limits, annotation.is_some(), &annotate)
+    push_into_scrutinee(
+        name,
+        value,
+        body,
+        limits,
+        annotation.is_some(),
+        &annotate,
+        names,
+    )
 }
 
 /// `body` with its one `match (name)` — reached through `let`/`mut`/`set`/`;`
@@ -690,16 +710,18 @@ fn push_into_scrutinee(
     limits: &Limits,
     annotated: bool,
     annotate: &dyn Fn(&str) -> Option<ConcreteType>,
+    names: &mut Names,
 ) -> Option<Typed> {
-    let again =
-        |inner: &Typed| push_into_scrutinee(name, value, inner, limits, annotated, annotate);
+    let again = |inner: &Typed, names: &mut Names| {
+        push_into_scrutinee(name, value, inner, limits, annotated, annotate, names)
+    };
     let kind = match &body.kind {
         TExprKind::Match(scrutinee, arms) if matches!(&scrutinee.kind, TExprKind::Ident(n) if n == name) =>
         {
             if !match_can_move(value, arms, limits, annotated) {
                 return None;
             }
-            return Some(push_match(value, arms, body, annotate));
+            return Some(push_match(value, arms, body, annotate, names));
         }
         // `let alias = name; ..` — the one read is an alias, itself read once
         // as the scrutinee further down (the shape two inlined calls leave, the
@@ -718,6 +740,7 @@ fn push_into_scrutinee(
                 limits,
                 annotated || alias_ty.is_some(),
                 &|case| annotate(case).or_else(|| payload_annotation(alias_ty.as_ref(), case)),
+                names,
             );
         }
         // A binding of the same name below would shadow it; the read this is
@@ -726,7 +749,7 @@ fn push_into_scrutinee(
         TExprKind::Let(n, v, rest) | TExprKind::LetMut(n, v, rest)
             if n != name && !reads(value, n) =>
         {
-            let inner = Box::new(again(rest)?);
+            let inner = Box::new(again(rest, names)?);
             if matches!(&body.kind, TExprKind::Let(..)) {
                 TExprKind::Let(n.clone(), v.clone(), inner)
             } else {
@@ -734,9 +757,9 @@ fn push_into_scrutinee(
             }
         }
         TExprKind::Assign(lhs, v, rest) => {
-            TExprKind::Assign(lhs.clone(), v.clone(), Box::new(again(rest)?))
+            TExprKind::Assign(lhs.clone(), v.clone(), Box::new(again(rest, names)?))
         }
-        TExprKind::Seq(first, rest) => TExprKind::Seq(first.clone(), Box::new(again(rest)?)),
+        TExprKind::Seq(first, rest) => TExprKind::Seq(first.clone(), Box::new(again(rest, names)?)),
         _ => return None,
     };
     let mut out = node(kind, body.ty.clone(), body);
@@ -775,6 +798,7 @@ fn push_match(
     arms: &[Arm],
     match_at: &Typed,
     annotate: &dyn Fn(&str) -> Option<ConcreteType>,
+    names: &mut Names,
 ) -> Typed {
     push(scrutinee, match_at, &mut |leaf, kind| {
         let arm = arm_for(arms, kind.case_name()).expect("checked by `match_can_move`");
@@ -815,8 +839,8 @@ fn push_match(
             // payloads' own evaluation order is preserved the same way. The body
             // is copied to every leaf, so each copy binds names of its own.
             Pattern::Ctor { bindings, .. } => {
-                let renames = fresh_binders(bindings);
-                let body = rename_scoped(&arm.body, &renames, true);
+                let renames = fresh_binders(bindings, names);
+                let body = rename_scoped(&arm.body, &renames, Some(names));
                 bindings
                     .iter()
                     .zip(payloads)
@@ -829,14 +853,14 @@ fn push_match(
             // A catch-all binder names the whole constructed value, which is
             // therefore still built.
             Pattern::Bind(name) => {
-                let renames = fresh_binders(std::slice::from_ref(name));
-                let body = rename_scoped(&arm.body, &renames, true);
+                let renames = fresh_binders(std::slice::from_ref(name), names);
+                let body = rename_scoped(&arm.body, &renames, Some(names));
                 bind(renames[name].clone(), leaf.clone(), body)
             }
             _ => payloads
                 .iter()
                 .rev()
-                .fold(distinct_binders(&arm.body), |body, payload| {
+                .fold(distinct_binders(&arm.body, names), |body, payload| {
                     evaluate((*payload).clone(), body)
                 }),
         }
@@ -844,11 +868,14 @@ fn push_match(
 }
 
 /// A new name for each of `binders` that binds something (`_` binds nothing).
-fn fresh_binders(binders: &[String]) -> std::collections::HashMap<String, String> {
+fn fresh_binders(
+    binders: &[String],
+    names: &mut Names,
+) -> std::collections::HashMap<String, String> {
     binders
         .iter()
         .filter(|b| *b != "_")
-        .map(|b| (b.clone(), aipl_syntax::fresh_local("ceq", b)))
+        .map(|b| (b.clone(), names.fresh("ceq", b)))
         .collect()
 }
 
@@ -978,7 +1005,11 @@ mod tests {
                 arm("none", &[], call(Callee::Err, vec![id("e")])),
             ],
         ));
-        let out = rewrite(&e(TExprKind::Try(Box::new(inlined))), &limits(8));
+        let out = rewrite(
+            &e(TExprKind::Try(Box::new(inlined))),
+            &limits(8),
+            &mut Names::new(),
+        );
         let TExprKind::Match(_, arms) = &out.kind else {
             panic!("the `?` should have been pushed into the match, got {out:?}");
         };
@@ -992,7 +1023,11 @@ mod tests {
     #[test]
     fn try_on_optional_branches_unwraps_some_and_keeps_none() {
         let optional = branch(call(Callee::Some, vec![id("x")]), e(TExprKind::None));
-        let out = rewrite(&e(TExprKind::Try(Box::new(optional))), &limits(8));
+        let out = rewrite(
+            &e(TExprKind::Try(Box::new(optional))),
+            &limits(8),
+            &mut Names::new(),
+        );
         let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the `?` inside the `if`, got {out:?}");
         };
@@ -1009,7 +1044,11 @@ mod tests {
                 arm("none", &[], user("fallback", vec![])),
             ],
         ));
-        let out = rewrite(&e(TExprKind::Try(Box::new(mixed))), &limits(8));
+        let out = rewrite(
+            &e(TExprKind::Try(Box::new(mixed))),
+            &limits(8),
+            &mut Names::new(),
+        );
         assert!(matches!(out.kind, TExprKind::Try(_)));
     }
 
@@ -1020,7 +1059,11 @@ mod tests {
             Box::new(id("msg")),
             Box::new(call(Callee::Ok, vec![])),
         ));
-        let out = rewrite(&e(TExprKind::Try(Box::new(inner))), &limits(8));
+        let out = rewrite(
+            &e(TExprKind::Try(Box::new(inner))),
+            &limits(8),
+            &mut Names::new(),
+        );
         let TExprKind::Let(_, _, body) = &out.kind else {
             panic!("expected the let to survive, got {out:?}");
         };
@@ -1035,7 +1078,7 @@ mod tests {
             Box::new(scrutinee),
             vec![arm("some", &["v"], id("v")), arm("none", &[], id("d"))],
         ));
-        let out = rewrite(&matched, &limits(8));
+        let out = rewrite(&matched, &limits(8), &mut Names::new());
         let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
@@ -1073,7 +1116,7 @@ mod tests {
         bound.annotation = Some(ConcreteType::Optional(Box::new(ConcreteType::Primitive(
             aipl_syntax::ast::Primitive::I64,
         ))));
-        let out = rewrite(&bound, &limits(8));
+        let out = rewrite(&bound, &limits(8), &mut Names::new());
         let TExprKind::Let(d, _, rest) = &out.kind else {
             panic!("expected the `d` binding to survive, got {out:?}");
         };
@@ -1102,11 +1145,11 @@ mod tests {
         ));
         // Two `some` leaves select the same two-operation arm: one copy of it.
         assert!(matches!(
-            rewrite(&matched, &limits(1)).kind,
+            rewrite(&matched, &limits(1), &mut Names::new()).kind,
             TExprKind::Match(..)
         ));
         assert!(matches!(
-            rewrite(&matched, &limits(2)).kind,
+            rewrite(&matched, &limits(2), &mut Names::new()).kind,
             TExprKind::If(..)
         ));
     }
@@ -1126,7 +1169,7 @@ mod tests {
             vec![arm("some", &["v"], id("v")), arm("none", &[], id("d"))],
         ));
         assert!(matches!(
-            rewrite(&matched, &limits(8)).kind,
+            rewrite(&matched, &limits(8), &mut Names::new()).kind,
             TExprKind::Match(..)
         ));
     }
@@ -1141,7 +1184,7 @@ mod tests {
                 arm("Nil@V", &[], id("d")),
             ],
         ));
-        let out = rewrite(&matched, &limits(8));
+        let out = rewrite(&matched, &limits(8), &mut Names::new());
         let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
@@ -1168,7 +1211,7 @@ mod tests {
             vec![arm("Pair@V", &["x", "y"], id("y"))],
         ));
         assert!(matches!(
-            rewrite(&matched, &limits(8)).kind,
+            rewrite(&matched, &limits(8), &mut Names::new()).kind,
             TExprKind::Match(..)
         ));
     }
@@ -1180,7 +1223,7 @@ mod tests {
             Callee::Equal,
             vec![id("x"), call(Callee::Some, vec![id("y")])],
         );
-        let out = rewrite(&compared, &limits(8));
+        let out = rewrite(&compared, &limits(8), &mut Names::new());
         let TExprKind::Match(scrutinee, arms) = &out.kind else {
             panic!("expected a match on `x`, got {out:?}");
         };
@@ -1208,7 +1251,7 @@ mod tests {
             Callee::NotEqual,
             vec![call(Callee::Err, vec![user("loud", vec![])]), id("r")],
         );
-        let out = rewrite(&compared, &limits(8));
+        let out = rewrite(&compared, &limits(8), &mut Names::new());
         let TExprKind::Let(bound, value, body) = &out.kind else {
             panic!("expected the payload bound ahead of the match, got {out:?}");
         };
@@ -1232,7 +1275,7 @@ mod tests {
             Callee::Equal,
             vec![id("x"), user("Pair@V", vec![id("a"), id("b")])],
         );
-        let out = rewrite(&compared, &limits(8));
+        let out = rewrite(&compared, &limits(8), &mut Names::new());
         let TExprKind::Match(_, arms) = &out.kind else {
             panic!("expected a match on `x`, got {out:?}");
         };
@@ -1247,7 +1290,8 @@ mod tests {
         assert!(matches!(arms[1].pattern, Pattern::Wildcard));
         // A nullary case needs no payload comparison at all.
         let nullary = call(Callee::Equal, vec![id("Nil@V"), id("x")]);
-        let TExprKind::Match(_, arms) = &rewrite(&nullary, &limits(8)).kind else {
+        let TExprKind::Match(_, arms) = &rewrite(&nullary, &limits(8), &mut Names::new()).kind
+        else {
             panic!("expected a match");
         };
         assert!(matches!(arms[0].body.kind, TExprKind::Bool(true)));
@@ -1262,7 +1306,7 @@ mod tests {
             Callee::Equal,
             vec![id("a"), user("Cons@L", vec![id("one"), inner])],
         );
-        let out = rewrite(&compared, &limits(8));
+        let out = rewrite(&compared, &limits(8), &mut Names::new());
         let TExprKind::Match(_, arms) = &out.kind else {
             panic!("expected a match on `a` with no binding ahead, got {out:?}");
         };
@@ -1287,7 +1331,7 @@ mod tests {
             ],
         );
         assert!(matches!(
-            rewrite(&compared, &limits(8)).kind,
+            rewrite(&compared, &limits(8), &mut Names::new()).kind,
             TExprKind::Call {
                 callee: Callee::Equal,
                 ..
@@ -1305,7 +1349,7 @@ mod tests {
                 call(Callee::Some, vec![id("y")]),
             ],
         );
-        let out = rewrite(&compared, &limits(8));
+        let out = rewrite(&compared, &limits(8), &mut Names::new());
         let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
@@ -1323,7 +1367,7 @@ mod tests {
             )),
             "a".into(),
         ));
-        let out = rewrite(&projected, &limits(8));
+        let out = rewrite(&projected, &limits(8), &mut Names::new());
         let TExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the projection pushed into the `if`, got {out:?}");
         };
@@ -1337,7 +1381,7 @@ mod tests {
             Box::new(construct(&[("a", id("x")), ("b", user("loud", vec![]))])),
             "a".into(),
         ));
-        let out = rewrite(&projected, &limits(8));
+        let out = rewrite(&projected, &limits(8), &mut Names::new());
         assert!(matches!(&out.kind, TExprKind::Seq(first, rest)
             if matches!(&first.kind, TExprKind::Call { callee: Callee::User(n), args: _, .. } if n == "loud")
                 && matches!(&rest.kind, TExprKind::Ident(x) if x == "x")));
@@ -1353,7 +1397,7 @@ mod tests {
             "a".into(),
         ));
         assert!(matches!(
-            rewrite(&projected, &limits(8)).kind,
+            rewrite(&projected, &limits(8), &mut Names::new()).kind,
             TExprKind::Field(..)
         ));
     }

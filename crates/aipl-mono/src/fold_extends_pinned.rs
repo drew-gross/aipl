@@ -3,6 +3,7 @@
 
 use aipl_syntax::ast::Callee;
 use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TParam, TPattern, TProgram, Ty};
+use aipl_syntax::Names;
 
 use crate::fold_lengths_pinned::spread_accumulator;
 use crate::passes::Scope;
@@ -17,23 +18,33 @@ pub fn fold_extends_pinned(program: &TProgram, scope: &Scope) -> TProgram {
     for item in &mut out.items {
         if let TItem::Fn(f) = item {
             if scope.covers(&f.name.text) {
-                f.body = fold_expr(&f.body, &mut ArrayReceivers::from_params(&f.sig.params));
+                f.body = fold_expr(
+                    &f.body,
+                    &mut ArrayReceivers::from_params(&f.sig.params, &f.body),
+                );
             }
         }
     }
     out
 }
 
-/// What is known, while walking a body, about the names an `extend` may write back to.
+/// What is known, while walking a body, about the names an `extend` may write back to, and the
+/// supply of names for the binders the rewrite introduces.
 #[derive(Default)]
 pub(crate) struct ArrayReceivers {
     receivers: Vec<(String, bool)>,
     empty: Vec<String>,
+    names: Names,
 }
 
 impl ArrayReceivers {
-    fn from_params(params: &[TParam<Ty>]) -> ArrayReceivers {
+    fn from_params(params: &[TParam<Ty>], body: &P) -> ArrayReceivers {
+        let mut names = Names::of_typed(body);
+        for p in params {
+            names.reserve(&p.name);
+        }
         ArrayReceivers {
+            names,
             receivers: params
                 .iter()
                 .filter(|p| p.mutable)
@@ -134,7 +145,7 @@ fn fold_expr(e: &P, arrays: &mut ArrayReceivers) -> P {
 }
 
 pub(crate) fn folds_anything(e: &P) -> bool {
-    fold_expr(e, &mut ArrayReceivers::from_params(&[])) != *e
+    fold_expr(e, &mut ArrayReceivers::from_params(&[], e)) != *e
 }
 
 struct ExtendStatement<'a> {
@@ -192,7 +203,7 @@ fn extend_statement(e: &P) -> Option<ExtendStatement<'_>> {
     })
 }
 
-fn appended(stmt: ExtendStatement<'_>, arrays: &ArrayReceivers) -> Option<P> {
+fn appended(stmt: ExtendStatement<'_>, arrays: &mut ArrayReceivers) -> Option<P> {
     if mentions_free(stmt.source, stmt.receiver) {
         return None;
     }
@@ -229,7 +240,7 @@ fn writeback(v: &str, receiver_ty: &Ty, callee: Callee, type_args: Vec<Ty>, arg:
     )
 }
 
-fn appends(v: &str, receiver_ty: &Ty, src: &P, arrays: &ArrayReceivers) -> Option<P> {
+fn appends(v: &str, receiver_ty: &Ty, src: &P, arrays: &mut ArrayReceivers) -> Option<P> {
     let span = || src.span.clone();
     let unit = || TExpr::new(TExprKind::Unit, Ty::Unit, span());
     let seq = |a: P, b: P| TExpr::new(TExprKind::Seq(Box::new(a), Box::new(b)), Ty::Unit, span());
@@ -278,7 +289,7 @@ fn appends(v: &str, receiver_ty: &Ty, src: &P, arrays: &ArrayReceivers) -> Optio
             let Ty::Array(element_ty) = &xs.ty else {
                 return None;
             };
-            let elem = format!("$ext{}_x", aipl_syntax::fresh_id());
+            let elem = arrays.names.fresh("ext", "x");
             let element = TExpr::new(
                 TExprKind::Ident(elem.clone()),
                 (**element_ty).clone(),
@@ -358,7 +369,7 @@ fn appends(v: &str, receiver_ty: &Ty, src: &P, arrays: &ArrayReceivers) -> Optio
             let Ty::Optional(payload) = &opt.ty else {
                 return None;
             };
-            let bound = format!("$ext{}_v", aipl_syntax::fresh_id());
+            let bound = arrays.names.fresh("ext", "v");
             let piece = apply(
                 f,
                 TExpr::new(TExprKind::Ident(bound.clone()), (**payload).clone(), span()),
@@ -439,7 +450,7 @@ fn apply(func: &P, arg: P) -> Option<P> {
                 return None;
             };
             let map = std::collections::HashMap::from([(param.name.clone(), arg_name.clone())]);
-            Some(crate::typed_util::rename_scoped(body, &map, false))
+            Some(crate::typed_util::rename_scoped(body, &map, None))
         }
         TExprKind::Ident(g) => {
             let Ty::Fn(_, result) = &func.ty else {

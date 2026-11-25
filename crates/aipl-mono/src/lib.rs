@@ -1622,6 +1622,7 @@ pub fn monomorphize(
         cur_fn: String::new(),
         cur_receiver: None,
         synth: 0,
+        names: aipl_syntax::Names::new(),
         cur_effects: Vec::new(),
         shim_cells: Vec::new(),
         cur_lenv: HashMap::new(),
@@ -2376,6 +2377,9 @@ struct Mono<'a> {
     /// a lambda renumbered all the ones discovered after it — hundreds of
     /// baseline-row moves and a `.clif` diff for a one-line change.
     synth: usize,
+    /// The names the body of the instance being processed holds, which what is built in it
+    /// (a desugaring temporary, a loop's counter, a match's column) is named against.
+    names: aipl_syntax::Names,
     /// Declared effects of the function currently being processed. A lambda's
     /// synthesized function and the lambda-specialized callee inherit these:
     /// the checker guarantees the enclosing function's effects cover the

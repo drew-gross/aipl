@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::Callee;
 use aipl_syntax::typed::{TExpr, TExprKind, TFunction, TItem, TProgram, Ty, TyRepr};
+use aipl_syntax::Names;
 
 use crate::early_exit::without_early_exits_typed;
 use crate::mentions_abstract_type;
@@ -28,6 +29,15 @@ struct Param {
     name: String,
     ty: Ty,
     mutable: bool,
+}
+
+/// The names `g` holds, so the binders an expansion introduces are named against all of them.
+fn names_of(g: &TFunction) -> Names {
+    let mut names = Names::of_typed(&g.body);
+    for p in &g.sig.params {
+        names.reserve(&p.name);
+    }
+    names
 }
 
 fn params_of(f: &TFunction) -> Vec<Param> {
@@ -144,6 +154,7 @@ pub fn inline_single_use_pinned(program: &TProgram, entries: &HashSet<String>) -
         for item in &mut program.items {
             if let TItem::Fn(g) = item {
                 if references_name(&g.body, &f.name.text) {
+                    let mut names = names_of(g);
                     replace_call(
                         &mut g.body,
                         &f.name.text,
@@ -151,6 +162,7 @@ pub fn inline_single_use_pinned(program: &TProgram, entries: &HashSet<String>) -
                         &f.body,
                         &mut replaced,
                         Sites::First,
+                        &mut names,
                     );
                 }
             }
@@ -197,6 +209,7 @@ fn expand_everywhere(program: &mut TProgram, f: &TFunction, sites: Sites) {
                 continue;
             }
             if references_name(&g.body, &f.name.text) {
+                let mut names = names_of(g);
                 replace_call(
                     &mut g.body,
                     &f.name.text,
@@ -204,6 +217,7 @@ fn expand_everywhere(program: &mut TProgram, f: &TFunction, sites: Sites) {
                     &f.body,
                     &mut replaced,
                     sites,
+                    &mut names,
                 );
             }
         }
@@ -287,6 +301,7 @@ fn replace_inspected_call(
     fparams: &[Param],
     fbody: &P,
     replaced: &mut bool,
+    names: &mut Names,
 ) -> Option<P> {
     let call = inspected_call(e, fname, fparams.len())?;
     let TExprKind::Call {
@@ -295,14 +310,22 @@ fn replace_inspected_call(
     else {
         return None;
     };
-    let rc = |x: &P, replaced: &mut bool| {
+    let rc = |x: &P, replaced: &mut bool, names: &mut Names| {
         let mut x = x.clone();
-        replace_call(&mut x, fname, fparams, fbody, replaced, Sites::Inspected);
+        replace_call(
+            &mut x,
+            fname,
+            fparams,
+            fbody,
+            replaced,
+            Sites::Inspected,
+            names,
+        );
         x
     };
-    let call_args: Vec<P> = call_args.iter().map(|a| rc(a, replaced)).collect();
+    let call_args: Vec<P> = call_args.iter().map(|a| rc(a, replaced, names)).collect();
     *replaced = true;
-    let inlined = build_inlined(fparams, fbody, &call_args, call);
+    let inlined = build_inlined(fparams, fbody, &call_args, call, names);
     let kind = match &e.kind {
         TExprKind::Call {
             callee,
@@ -316,7 +339,7 @@ fn replace_inspected_call(
             method_style: *method_style,
         },
         TExprKind::Index(_, index) => {
-            TExprKind::Index(Box::new(inlined), Box::new(rc(index, replaced)))
+            TExprKind::Index(Box::new(inlined), Box::new(rc(index, replaced, names)))
         }
         _ => return None,
     };
@@ -330,13 +353,14 @@ fn replace_call(
     fbody: &P,
     replaced: &mut bool,
     sites: Sites,
+    names: &mut Names,
 ) {
     // One site is all `First` rewrites, so once it is done nothing below needs a look.
     if sites == Sites::First && *replaced {
         return;
     }
     if sites == Sites::Inspected {
-        if let Some(inlined) = replace_inspected_call(e, fname, fparams, fbody, replaced) {
+        if let Some(inlined) = replace_inspected_call(e, fname, fparams, fbody, replaced, names) {
             *e = inlined;
             return;
         }
@@ -345,31 +369,31 @@ fn replace_call(
         if let TExprKind::Call { callee, args, .. } = &e.kind {
             if callee.name() == fname && args.len() == fparams.len() {
                 *replaced = true;
-                *e = build_inlined(fparams, fbody, args, e);
+                *e = build_inlined(fparams, fbody, args, e, names);
                 return;
             }
         }
     }
     each_child_mut(e, &mut |child| {
-        replace_call(child, fname, fparams, fbody, replaced, sites);
+        replace_call(child, fname, fparams, fbody, replaced, sites, names);
     });
 }
 
 /// The expansion of `at`, a call whose arguments are `args`: each (freshly renamed) parameter bound
 /// to its argument around `fbody`.
-fn build_inlined(fparams: &[Param], fbody: &P, args: &[P], at: &P) -> P {
+fn build_inlined(fparams: &[Param], fbody: &P, args: &[P], at: &P, names: &mut Names) -> P {
     let fbody = &without_early_exits_typed(fbody)
         .expect("the inline gate accepted a body whose early exits cannot be rewritten");
     let mut map: HashMap<String, String> = HashMap::new();
     let fresh: Vec<String> = fparams
         .iter()
         .map(|p| {
-            let nm = format!("$inl{}_{}", aipl_syntax::fresh_id(), p.name);
+            let nm = names.fresh("inl", &p.name);
             map.insert(p.name.clone(), nm.clone());
             nm
         })
         .collect();
-    let mut expr = rename_scoped(fbody, &map, true);
+    let mut expr = rename_scoped(fbody, &map, Some(names));
     let made = |kind: TExprKind<Ty>, ty: Ty| TExpr::new(kind, ty, at.span.clone());
     // A mutating method yields its receiver: the body ends having assigned to the binding.
     if fparams.first().is_some_and(|p| p.mutable) {
