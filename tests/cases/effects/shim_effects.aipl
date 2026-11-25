@@ -25,6 +25,7 @@ import {
     to_str,
     write_string_to_file,
 } from builtins;
+import { show_window } from gui;
 import { HttpResponse, http_get } from network;
 
 // ---- prints: the shim swallows the output. (A shim that printed would reach
@@ -140,6 +141,21 @@ fn shimmed_fetch() -> str {
     }
 }
 
+// ---- gui
+fn announce(title: str, text: str) !gui { show_window(title, text) }
+
+fn shimmed_window() -> str {
+    mut shown = "";
+    shim gui {
+        show_window = |title, text| {
+            set shown = `{title}: {text}`;
+        },
+    } {
+        announce("Greeting", "Hello, World!");
+    };
+    shown
+}
+
 test({
     mut out = "";
     shim prints {
@@ -160,6 +176,7 @@ test({
         print(shimmed_terminal());
         print(shimmed_run());
         print(shimmed_fetch());
+        print(shimmed_window());
         greet();
     };
     assert(out == """
@@ -172,6 +189,7 @@ test({
         enter, move to 2,5, clear, leave
         ran tool exit=3
         204 http://example.test/
+        Greeting: Hello, World!
         hello
 
     """);

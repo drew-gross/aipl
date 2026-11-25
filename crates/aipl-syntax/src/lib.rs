@@ -3454,6 +3454,10 @@ fn __builtin_http_get(self: str, timeout_seconds: u64 = 30) !http_get -> __built
     ok(__builtin_HttpResponse { status: 0, headers: [], body: "" })
 }
 
+# Open a window titled `title` that shows `text`, and wait until it is closed. The program stops
+# at the call for as long as the window is open, and carries on once the person has closed it.
+fn __builtin_show_window(title: str, text: str) !gui {}
+
 # The text of a value, exactly what `` `{v}` `` interpolates: a `char` or `str` renders bare,
 # and one nested in an array, struct or optional keeps its literal form.
 fn __builtin_to_str<T: any>(self: T) -> str { "" }
@@ -4231,6 +4235,7 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("http_get", &["http_get"]),
+    ("gui", &["show_window"]),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -4248,6 +4253,7 @@ pub const SHIM_ONLY_EFFECTS: &[&str] = &["random"];
 /// `write_files` = writes to the filesystem;
 /// `list_files` = enumerates the filesystem (directory listing);
 /// `http_get` = makes an HTTP GET request over the network;
+/// `gui` = puts a window on the screen;
 /// `execute_program` = spawns a child process; `clock` = reads the wall clock
 /// (so a function's result depends on when it ran); `random` = draws random
 /// numbers, which only a `shim` can supply ([`SHIM_ONLY_EFFECTS`]). `measure` is internal:
@@ -4263,6 +4269,7 @@ pub const KNOWN_EFFECTS: &[&str] = &[
     "list_files",
     "execute_program",
     "http_get",
+    "gui",
     "clock",
     "random",
     "measure",
@@ -4298,7 +4305,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 16;
+pub const SHIM_SLOT_COUNT: usize = 17;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

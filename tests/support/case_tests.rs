@@ -364,6 +364,7 @@ case_tests! {
     cases_grids_err_ragged_literal = "cases/grids/err_ragged_literal",
     cases_grids_in_bounds = "cases/grids/in_bounds",
     cases_grids_tuple_index = "cases/grids/tuple_index",
+    cases_gui_shim_show_window = "cases/gui/shim_show_window",
     cases_hashing_basic = "cases/hashing/basic",
     cases_higher_order_in_test = "cases/higher-order-in-test",
     cases_if_let_basic = "cases/if_let/basic",

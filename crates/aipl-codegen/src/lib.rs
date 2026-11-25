@@ -47,6 +47,7 @@ mod arr24;
 // runtime for the same reason.
 mod array_ops;
 mod buffer;
+mod gui_cocoa;
 mod http_curl;
 mod http_response;
 mod object_cache;
@@ -517,6 +518,24 @@ extern "C" fn aipl_http_get(out: *mut u8, url: *const str24::Str, timeout_second
     let mut scratch = [0u8; str24::INLINE_CAP];
     let bytes = unsafe { (*url).bytes(&mut scratch) };
     http_curl::get(out, bytes, timeout_seconds);
+}
+
+/// `show_window(title, text)`: open a window and wait for it to be closed. Borrows both
+/// strings; the window itself is `gui_cocoa`'s, shared with the AOT runtime.
+#[no_mangle]
+extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24::Str) {
+    let mut title_scratch = [0u8; str24::INLINE_CAP];
+    let mut text_scratch = [0u8; str24::INLINE_CAP];
+    let (title, text) = unsafe {
+        (
+            (*title).bytes(&mut title_scratch),
+            (*text).bytes(&mut text_scratch),
+        )
+    };
+    if !gui_cocoa::show_window(title, text) {
+        eprintln!("error: could not open a window");
+        std::process::exit(1);
+    }
 }
 
 /// Spawn `program` with `args` and collect its output. `None` if it could not be
@@ -3931,6 +3950,7 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_random_unshimmed", aipl_random_unshimmed as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_http_get", aipl_http_get as *const u8);
+    jit_builder.symbol("aipl_show_window", aipl_show_window as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
         "aipl_str_split_iter_init",
@@ -7600,6 +7620,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_assert"
         | "aipl_shim_set"
         | "aipl_move_to"
+        | "aipl_show_window"
         | "aipl_str_iter_init"
         | "aipl_str_grew"
         | "aipl_str_push_byte"
@@ -7903,6 +7924,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::MonotonicNow, "aipl_monotonic_now"),
         (Callee::ExecuteProgram, "aipl_execute_program"),
         (Callee::HttpGet, "aipl_http_get"),
+        (Callee::ShowWindow, "aipl_show_window"),
         (Callee::Trim, "aipl_trim"),
         // The `*_str` family — each one entry point, so there is no custom
         // codegen arm: the ordinary-call path reads the signature registered

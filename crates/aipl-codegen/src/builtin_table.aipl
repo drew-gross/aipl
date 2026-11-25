@@ -167,6 +167,7 @@ variant Callee =
     | MonotonicNow
     | ExecuteProgram
     | HttpGet
+    | ShowWindow
     | Union
     | UnionAll
     | SetMap
@@ -878,6 +879,12 @@ pub fn builtin_table() -> BuiltinEntry[] {
             callee: "__builtin_http_get",
             definition: Declared,
             library: "network",
+        },
+        BuiltinEntry {
+            arm: ShowWindow,
+            callee: "__builtin_show_window",
+            definition: Declared,
+            library: "gui",
         },
         BuiltinEntry {
             arm: Union,

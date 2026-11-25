@@ -108,6 +108,9 @@ pub const SETS_LIBRARY: &str = "sets";
 /// The library of the network operations: `import { http_get, HttpResponse } from network;`.
 pub const NETWORK_LIBRARY: &str = "network";
 
+/// The library of the window operations: `import { show_window } from gui;`.
+pub const GUI_LIBRARY: &str = "gui";
+
 /// The directory the AIPL sources live in, `aipl-mono/src/`: resolved at
 /// compile time but *read at run time*. `include_str!` would make every edit to
 /// one of these files a source change to this crate, rebuilding it, everything

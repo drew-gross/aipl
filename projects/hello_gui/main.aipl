@@ -1,0 +1,4 @@
+import { show_window } from gui;
+
+# Opens a window that says "Hello, World!" and waits for it to be closed.
+fn main() !gui { show_window("Hello", "Hello, World!") }

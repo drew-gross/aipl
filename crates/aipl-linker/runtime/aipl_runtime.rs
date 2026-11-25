@@ -1117,8 +1117,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 16] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 16];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 17] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 17];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
@@ -1298,6 +1298,37 @@ pub extern "C" fn aipl_http_get(out: *mut u8, url: *const str24::Str, timeout_se
 #[allow(dead_code)]
 mod http_response {
     include!("../../aipl-codegen/src/http_response.rs");
+}
+
+/// `show_window(title, text)`: open a window and wait for it to be closed. Borrows both
+/// strings; the window is `gui_cocoa`'s, shared with the JIT.
+#[no_mangle]
+pub extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24::Str) {
+    let mut title_scratch = [0u8; str24::INLINE_CAP];
+    let mut text_scratch = [0u8; str24::INLINE_CAP];
+    let (title, text) = unsafe {
+        (
+            (*title).bytes(&mut title_scratch),
+            (*text).bytes(&mut text_scratch),
+        )
+    };
+    if !gui_cocoa::show_window(title, text) {
+        let message = b"error: could not open a window\n";
+        extern "C" {
+            fn exit(code: c_int) -> !;
+        }
+        unsafe {
+            write(2, message.as_ptr() as *const c_void, message.len());
+            exit(1);
+        }
+    }
+}
+
+// The window behind `show_window`: AppKit, reached through the Objective-C runtime and loaded on
+// first use, shared with the JIT.
+#[allow(dead_code)]
+mod gui_cocoa {
+    include!("../../aipl-codegen/src/gui_cocoa.rs");
 }
 
 // The transport behind `http_get`: the system libcurl, shared with the JIT.

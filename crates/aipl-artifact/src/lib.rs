@@ -378,7 +378,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         // function that releases the cache at exit.
         "aipl_const_slot" => sig(2, true),
         "aipl_const_on_exit" => sig(1, false),
-        "aipl_shim_set" | "aipl_move_to" => sig(2, false),
+        "aipl_shim_set" | "aipl_move_to" | "aipl_show_window" => sig(2, false),
         "aipl_arr_drop_warr"
         | "aipl_arr_retain_warr"
         | "aipl_arr_drop_opt_warr"
