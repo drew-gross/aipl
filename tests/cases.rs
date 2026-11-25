@@ -563,7 +563,7 @@ fn run_baseline() {
 }
 
 /// Collect every `.aipl` case (sorted within each group for run-to-run-stable
-/// shard assignment). Three groups, each tagged with how it's run:
+/// queue order). Three groups, each tagged with how it's run:
 ///   - `tests/cases/**` — self-contained fixtures, staged to a temp dir.
 ///   - `examples/` (top level) — user programs, loaded in place so their
 ///     `import`s resolve.

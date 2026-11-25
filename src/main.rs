@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use aipl::binary;
-use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting, Parts, Shard};
+use aipl::check::{self, BatchTotals, CheckResult, Checked, Formatting, Parts};
 use aipl::codegen::{Compilation, ObjectCompilation, TestRun};
 use aipl::loader;
 use aipl::{sections, DebugOptions, Error, SpecFields};
@@ -104,7 +104,7 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--shard i/n] [--jobs n]
+  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--jobs n]
                                             run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
@@ -137,13 +137,9 @@ refusal) without running anything. `--tests` and `--benchmarks` also run the `.t
 a part leaves the file's recorded sections and `--baseline` out, since they describe
 runs of `main` and of the whole file. The exit status is non-zero exactly when a chosen
 part reports a failure.
-`--jobs n` sets how many files are checked at once: every core by default, one under `--shard`
-(the shards are the parallelism there).
-`--shard i/n` checks only the i-th of n slices of the sorted file list, so n processes started
-with the same paths cover every file once between them. Given `--baseline`, the slices are
-balanced by what checking each file costs, its code bytes in the table (a file without a row by
-its size); without it, position k is in shard k % n + 1. It is a batch even for one file, and a
-slice with no files passes.
+`--jobs n` sets how many files are checked at once: one per core by default. The files are
+taken costliest first (by the code bytes of the file's row in the `--baseline` table, else by
+size), and reported in the order they were given.
 `--baseline <table.md>` also holds each file's run to its row in that table (the five
 counts `report` prints, exactly; the row is named by the file's path from where `check`
 was started, without `.aipl`), and a file with no row fails. It reports every failure rather than stopping at the first, and exits 0 only if all
@@ -1124,17 +1120,6 @@ fn check_cmd(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let (args, shard) = match take_value_flag(args, "--shard").and_then(|(rest, text)| {
-        text.map(|text| Shard::parse(&text))
-            .transpose()
-            .map(|shard| (rest, shard))
-    }) {
-        Ok(taken) => taken,
-        Err(msg) => {
-            eprintln!("{msg}");
-            return ExitCode::FAILURE;
-        }
-    };
     let baseline = match baseline_path.map(|path| read_baseline_table(&path)) {
         Some(Ok(table)) => Some(table),
         Some(Err(msg)) => {
@@ -1152,7 +1137,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
     // and the runtime's own summary line. Anything else — no argument, a
     // directory, or several paths — is a batch, which prefixes failures with
     // their file and prints one aggregate.
-    let single = args.len() == 1 && Path::new(&args[0]).is_file() && shard.is_none();
+    let single = args.len() == 1 && Path::new(&args[0]).is_file();
 
     let mut files = Vec::new();
     if args.is_empty() {
@@ -1175,19 +1160,7 @@ fn check_cmd(args: &[String]) -> ExitCode {
     }
     files.sort();
     files.dedup();
-    // Chosen after the list is complete and in order, so every shard sees the same one. A slice
-    // with nothing in it is a pass; an empty tree is not.
-    let empty_tree = files.is_empty();
-    if let Some(shard) = shard {
-        files = match &baseline {
-            Some(table) => {
-                let costs = compile_costs(&files, table);
-                shard.take_by_cost(files.into_iter().zip(costs).collect())
-            }
-            None => shard.take(files),
-        };
-    }
-    if empty_tree {
+    if files.is_empty() {
         // Checking nothing and reporting success would quietly disarm a handoff
         // that runs a bare `aipl check`, so an empty tree is a failure.
         let where_ = if args.is_empty() {
@@ -1227,13 +1200,15 @@ fn check_cmd(args: &[String]) -> ExitCode {
     // The files are checked by a pool of workers drawing from one queue, and reported in the order
     // they were given, as each result is ready, whichever worker finished it. A file's own
     // tests run on one thread: the runtime keeps what they did per thread.
-    let jobs = match jobs {
-        Some(jobs) => jobs,
-        // A shard is already one of several processes splitting the corpus between them.
-        None if shard.is_some() => 1,
-        None => std::thread::available_parallelism().map_or(1, usize::from),
-    }
-    .clamp(1, resolved.len().max(1));
+    let jobs = jobs
+        .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, usize::from))
+        .clamp(1, resolved.len());
+    // The queue is costliest first, so the file that takes longest is not left for last.
+    let costs = match &baseline {
+        Some(table) => compile_costs(&files, table),
+        None => file_sizes(&files),
+    };
+    let queue = check::costliest_first(&costs);
     let next = std::sync::atomic::AtomicUsize::new(0);
     let finished: std::sync::Mutex<Vec<Option<CheckResult>>> =
         std::sync::Mutex::new((0..resolved.len()).map(|_| None).collect());
@@ -1251,25 +1226,47 @@ fn check_cmd(args: &[String]) -> ExitCode {
                     // by the JIT runner when its own tests finish.
                     aipl::codegen::set_quiet_summary(true);
                     loop {
-                        let at = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        let Some((path, label)) = resolved.get(at) else {
+                        let turn = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(&at) = queue.get(turn) else {
                             break;
                         };
+                        let (path, label) = &resolved[at];
                         // A single file keeps its own report, which names no file: its failures
                         // are bare.
                         if !single {
                             aipl::codegen::set_test_file(Some(label));
                         }
-                        let result = check_path(
-                            path,
-                            label,
-                            &project_root,
-                            validate_sections,
-                            fix,
-                            baseline.as_ref(),
-                            parts,
-                            dbg,
-                        );
+                        // A panic is this file's failure, not a result that never comes: the
+                        // report is waiting on it, and would wait for ever.
+                        let checked =
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                check_path(
+                                    path,
+                                    label,
+                                    &project_root,
+                                    validate_sections,
+                                    fix,
+                                    baseline.as_ref(),
+                                    parts,
+                                    dbg,
+                                )
+                            }));
+                        let result = checked.unwrap_or_else(|panic| {
+                            // Whatever the tests had recorded before it died is not the next
+                            // file's.
+                            aipl::codegen::take_test_run();
+                            let why = panic
+                                .downcast_ref::<&str>()
+                                .map(|s| s.to_string())
+                                .or_else(|| panic.downcast_ref::<String>().cloned())
+                                .unwrap_or_else(|| "no message".to_string());
+                            CheckResult {
+                                label: label.clone(),
+                                formatting: Formatting::Clean,
+                                run: TestRun::default(),
+                                outcome: Err(format!("error: checking {label} panicked: {why}")),
+                            }
+                        });
                         finished.lock().unwrap_or_else(|e| e.into_inner())[at] = Some(result);
                         ready.notify_all();
                     }
@@ -1692,17 +1689,22 @@ fn take_value_flag(args: Vec<String>, flag: &str) -> Result<(Vec<String>, Option
     Ok((rest, value))
 }
 
-/// What checking each of `files` costs, as a number to balance shards by: the code bytes of its row
-/// in the baseline table. What a check spends is compiling the program, twice (to run its tests
-/// and to measure it), and that follows the size of the code, not how long the program then runs:
-/// across the twelve shards of a corpus run the sum of code bytes predicted a shard's CPU time at
-/// r = 0.99, and the sum of instructions at r = 0.26. A file with no row (a library a case
-/// imports) costs what its source size says at the median bytes of code per byte of source.
-fn compile_costs(files: &[PathBuf], table: &sections::Baseline) -> Vec<u64> {
-    let sizes: Vec<u64> = files
+/// How big each of `files` is, in bytes: what checking it costs when nothing better is known.
+fn file_sizes(files: &[PathBuf]) -> Vec<u64> {
+    files
         .iter()
         .map(|file| std::fs::metadata(file).map_or(0, |meta| meta.len()))
-        .collect();
+        .collect()
+}
+
+/// What checking each of `files` costs, as a number to order the queue by: the code bytes of its
+/// row in the baseline table. What a check spends is compiling the program, twice (to run its
+/// tests and to measure it), and that follows the size of the code, not how long the program then
+/// runs: across the twelve slices of a corpus run the sum of code bytes predicted a slice's CPU
+/// time at r = 0.99, and the sum of instructions at r = 0.26. A file with no row (a library a case
+/// imports) costs what its source size says at the median bytes of code per byte of source.
+fn compile_costs(files: &[PathBuf], table: &sections::Baseline) -> Vec<u64> {
+    let sizes = file_sizes(files);
     let rows: Vec<Option<u64>> = files
         .iter()
         .map(|file| {

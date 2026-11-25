@@ -102,7 +102,7 @@ use cranelift::{
         InstBuilder, IntCC, MemFlagsData, StackSlotData, StackSlotKind, Value, Variable,
     },
 };
-use cranelift_jit::{JITBuilder, JITModule};
+use cranelift_jit::{ArenaMemoryProvider, JITBuilder, JITModule};
 use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
@@ -3826,6 +3826,17 @@ fn host_isa(frame_pointers: bool) -> Result<std::sync::Arc<dyn TargetIsa>, Error
 fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     let isa = host_isa(frame_pointers)?;
     let mut jit_builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+    // One contiguous region for all of the module's code and data. Code reaches its data with
+    // a pc-relative address that spans at most 2GB, and the default provider maps each
+    // allocation wherever the system puts it: alone in a process that is next door, but
+    // when several threads are compiling at once their mappings interleave and a program's
+    // data can land too far from its code to be addressed ("PosOverflow" in a relocation).
+    // The region is address space only until it is used, and leaves room for the largest
+    // program the compiler's own sources make.
+    const JIT_REGION_BYTES: usize = 1 << 30;
+    let region = ArenaMemoryProvider::new_with_size(JIT_REGION_BYTES)
+        .map_err(|e| Error::msg(format!("could not reserve memory for the JIT: {e}")))?;
+    jit_builder.memory_provider(Box::new(region));
     // Expose builtins to the JIT linker.
     // The wide ABI: 24-byte `str` values passed by pointer. Registered alongside
     // the 8-byte originals, which an artifact may still name — that is what let

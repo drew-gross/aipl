@@ -35,7 +35,7 @@
 //!    run: the discovery run below becomes the corpus validation that step 5
 //!    would otherwise have run separately.
 //! 2. Discovery run: the suite's non-case tests under nextest, and the corpus as
-//!    `aipl check --shard` processes, one per core, each file held to its sections and its
+//!    `aipl check` (a thread per core), each file held to its sections and its
 //!    baseline row ([`corpus_run`]). Three outcomes:
 //!    - green → done.
 //!    - only fillable staleness (a section mismatch, a drifted per-case
@@ -210,7 +210,7 @@ const STAGED_IR_SKIP: &str =
 /// Every test that is not a per-case test: everything outside the `cases` binary, plus the few
 /// in it that are not named for a case (`every_case_has_a_test`, the leak-gate test, the
 /// harness's own unit tests). The per-case tests are what the
-/// sharded `aipl check` runs ([`corpus_run`]) do instead, so this is the rest of the suite.
+/// `aipl check` run over the corpus ([`corpus_run`]) does instead, so this is the rest of the suite.
 ///
 /// Phrased as an exclusion of the `cases` binary, so a newly added non-case test, or one this gate
 /// has never heard of, is run by default — the direction a gate has to fail in.
@@ -278,22 +278,10 @@ fn final_scope(plan: &discovery::Plan) -> Option<Vec<String>> {
     )
 }
 
-/// How many shards to split a check of `files` paths into: one per core, and no more than there
-/// are files when they are named one by one.
-fn shard_count(paths: &[String]) -> usize {
-    let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
-    if paths.iter().any(|p| !p.ends_with(".aipl")) {
-        cores
-    } else {
-        cores.min(paths.len()).max(1)
-    }
-}
-
-/// `aipl check` over `paths` as `shards` parallel processes, each one slice of the sorted file
-/// list, every file held to its sections and its row in the baseline table. Each shard's output
-/// goes to a file of its own so concurrent writers cannot interleave a `handoff-fill:` line, and
-/// they are printed one after another when all have finished.
-fn check_shards(paths: &[String], shards: usize) -> Cmd {
+/// `aipl check` over `paths`: one process, a thread for each core drawing files from a queue,
+/// every file held to its sections and its row in the baseline table. Its stderr is folded into
+/// the output the gate reads, as the diagnostics it prints there are part of what it says.
+fn check_corpus(paths: &[String]) -> Cmd {
     let aipl = format!(
         "{}/debug/aipl",
         std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string())
@@ -301,19 +289,10 @@ fn check_shards(paths: &[String], shards: usize) -> Cmd {
     Cmd::new("sh")
         .args([
             "-c",
-            r#"aipl=$1; n=$2; shift 2
-dir=$(mktemp -d)
-i=1
-while [ $i -le $n ]; do
-  "$aipl" check --baseline tests/performance_baseline.md --shard $i/$n "$@" > $dir/$i.out 2>&1 &
-  i=$((i+1))
-done
-wait
-cat $dir/*.out
-rm -rf $dir"#,
+            r#"aipl=$1; shift
+exec "$aipl" check --baseline tests/performance_baseline.md "$@" 2>&1"#,
             "sh",
             &aipl,
-            &shards.to_string(),
         ])
         .args(paths)
         .data_stdout()
@@ -322,7 +301,7 @@ rm -rf $dir"#,
 /// One run of the corpus and of every other test, returning whether both were clean and what
 /// they said as one [`discovery::Run`].
 ///
-/// The non-case tests are one nextest run; the corpus is the sharded `aipl check`, which
+/// The non-case tests are one nextest run; the corpus is one `aipl check`, which
 /// validates every section and the baseline row of every file with the one implementation users
 /// have. `exclude` is a nextest filterset for the first (the staged-IR run skips two tests) and
 /// `dogfood_ir` points both at a candidate artifact. With no `paths` only the first half runs.
@@ -342,19 +321,15 @@ fn corpus_run(
     let mut run = discovery::Run::parse(&tests_out);
     let mut log = tests_out.merged;
     if !paths.is_empty() {
-        let shards = shard_count(paths);
-        let mut check = check_shards(paths, shards);
+        let mut check = check_corpus(paths);
         if let Some(ir) = dogfood_ir {
             check = check.env("AIPL_DOGFOOD_IR", ir);
         }
         r.step(
-            &format!(
-                "aipl check ({label} — {shards} shards over {} path(s))",
-                paths.len()
-            ),
+            &format!("aipl check ({label} — {} path(s))", paths.len()),
             check,
         );
-        run = run.with_check(&r.out.stdout, shards);
+        run = run.with_check(&r.out.stdout);
         log.push_str(&r.out.merged);
     }
     r.out.merged = log;

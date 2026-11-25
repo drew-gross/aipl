@@ -141,16 +141,15 @@ impl Run {
         }
     }
 
-    /// This run, plus what sharded `aipl check` runs over the corpus said (the output of every
-    /// shard, one after another).
+    /// This run, plus what `aipl check` over the corpus said.
     ///
     /// The `handoff-fill:` lines become one failure asking for those refills, with each case
     /// named the way the per-case harness names it (`cases/x/y.aipl`, not the `tests/cases/x/y.aipl`
     /// `check` prints), which is what `AIPL_CASE` matches. Anything a refill cannot answer becomes
     /// a failure that asks for nothing, so the gate stops on it: a file that did not compile, was
-    /// not formatted, still traces, failed a test or leaked; a shard that died; and a file with
+    /// not formatted, still traces, failed a test or leaked; a check that died; and a file with
     /// mismatched sections that no marker accounts for.
-    pub fn with_check(mut self, out: &str, shards: usize) -> Run {
+    pub fn with_check(mut self, out: &str) -> Run {
         let mut asked: Vec<String> = Vec::new();
         let mut cases: BTreeSet<String> = BTreeSet::new();
         for line in out.lines() {
@@ -188,7 +187,7 @@ impl Run {
             ));
         }
 
-        // What no refill answers. Read off the per-shard totals `check` prints.
+        // What no refill answers. Read off the totals `check` prints.
         let mut problems: Vec<String> = Vec::new();
         let mut totals = 0;
         let mut mismatched = 0;
@@ -213,10 +212,8 @@ impl Run {
                 problems.push(line.trim().to_string());
             }
         }
-        if totals != shards {
-            problems.push(format!(
-                "{totals} of {shards} shards finished their report: one died part-way"
-            ));
+        if totals != 1 {
+            problems.push("the check never finished its report: it died part-way".to_string());
         }
         if mismatched > cases.len() {
             problems.push(format!(
@@ -226,12 +223,11 @@ impl Run {
             ));
         }
         if !problems.is_empty() {
-            problems
-                .push("(the full text of each shard's run is in the step's saved log)".to_string());
+            problems.push("(the full text of the run is in the step's saved log)".to_string());
             self.failures
                 .push(Failure::new("aipl check", problems.join("\n")));
         }
-        // The shards' own events are not JSON, so the stream the run was parsed from still
+        // The check's own output is not JSON, so the stream the run was parsed from still
         // says whether the machine-readable interface is alive.
         self
     }
@@ -924,7 +920,7 @@ mod tests {
         run(&[])
     }
 
-    const CLEAN_SHARD: &str = "2 files, 5 tests: 5 passed, 0 failed\n";
+    const CLEAN_REPORT: &str = "2 files, 5 tests: 5 passed, 0 failed\n";
 
     #[test]
     fn a_stale_section_in_the_check_output_asks_for_its_case_by_the_harness_name() {
@@ -934,9 +930,9 @@ mod tests {
         }
         .marker();
         let out = format!(
-            "./tests/cases/x/y.aipl: `stdout` mismatch\n{marker}\n1 file has mismatched sections\n{CLEAN_SHARD}"
+            "./tests/cases/x/y.aipl: `stdout` mismatch\n{marker}\n1 file has mismatched sections\n{CLEAN_REPORT}"
         );
-        let run = empty_run().with_check(&out, 1);
+        let run = empty_run().with_check(&out);
         assert!(
             run.fillable().stuck.is_empty(),
             "{:?}",
@@ -959,9 +955,9 @@ mod tests {
         }
         .marker();
         let out = format!(
-            "./examples/hello.aipl: moved\n{marker}\n1 file has mismatched sections\n{CLEAN_SHARD}"
+            "./examples/hello.aipl: moved\n{marker}\n1 file has mismatched sections\n{CLEAN_REPORT}"
         );
-        let run = empty_run().with_check(&out, 1);
+        let run = empty_run().with_check(&out);
         // `run` here has no events, so only the baseline question is asked of it.
         assert_eq!(run.baseline().moved.len(), 1);
         assert!(run.baseline().moved.contains_key("examples/hello.aipl"));
@@ -992,7 +988,7 @@ mod tests {
                 "1 file has mismatched sections\n1 file, 0 tests: 0 passed, 0 failed\n",
             ),
         ] {
-            let run = empty_run().with_check(out, 1);
+            let run = empty_run().with_check(out);
             assert!(
                 !run.fillable().stuck.is_empty(),
                 "{what} should stop the gate"
@@ -1001,15 +997,15 @@ mod tests {
     }
 
     #[test]
-    fn a_shard_that_never_reported_its_totals_stops_the_gate() {
-        // Two shards were started; one died before it printed its summary.
-        let run = empty_run().with_check(CLEAN_SHARD, 2);
-        assert!(run.fillable().stuck[0].contains("1 of 2 shards"));
+    fn a_check_that_never_reported_its_totals_stops_the_gate() {
+        // The check died before it printed its summary.
+        let run = empty_run().with_check("./tests/cases/x/y.aipl:\n");
+        assert!(run.fillable().stuck[0].contains("died part-way"));
     }
 
     #[test]
-    fn clean_shards_are_not_a_failure() {
-        let run = empty_run().with_check(&format!("{CLEAN_SHARD}{CLEAN_SHARD}"), 2);
+    fn a_clean_check_is_not_a_failure() {
+        let run = empty_run().with_check(CLEAN_REPORT);
         assert!(run.failures().is_empty());
     }
 }

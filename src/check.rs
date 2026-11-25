@@ -79,68 +79,14 @@ impl Parts {
     }
 }
 
-/// One of `count` slices of a sorted file list, as `--shard index/count` names it.
-///
-/// Without costs, a file belongs to the shard its position in the list says: position `k` is in
-/// shard `k % count + 1`. With them ([`Shard::take_by_cost`]), the costliest file goes first, each
-/// to the shard that has the least so far. Either way the list is sorted and de-duplicated before
-/// the choice, so the same tree split the same way gives every process the same slice, the slices
-/// together are the whole list and none overlaps another.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Shard {
-    /// Which slice, from 1.
-    pub index: usize,
-    pub count: usize,
-}
-
-impl Shard {
-    /// The shard a `--shard` value names: `i/n` with `1 <= i <= n`.
-    pub fn parse(text: &str) -> Result<Shard, String> {
-        let bad =
-            || format!("--shard wants `i/n` with 1 <= i <= n (for example `2/4`), not `{text}`");
-        let (index, count) = text.split_once('/').ok_or_else(bad)?;
-        let index: usize = index.parse().map_err(|_| bad())?;
-        let count: usize = count.parse().map_err(|_| bad())?;
-        if index == 0 || index > count {
-            return Err(bad());
-        }
-        Ok(Shard { index, count })
-    }
-
-    /// The members of `files` (already in the order every process sees) that fall in this shard,
-    /// when each is given the cost of checking it: every file goes, costliest first, to the shard
-    /// with the least cost so far (ties go to the lower shard, and equal costs to the earlier
-    /// file), so no shard is far from the mean, which is what the slowest shard's time is
-    /// otherwise a poor estimate of.
-    pub fn take_by_cost<T>(&self, files: Vec<(T, u64)>) -> Vec<T> {
-        let mut order: Vec<usize> = (0..files.len()).collect();
-        order.sort_by(|&a, &b| files[b].1.cmp(&files[a].1).then(a.cmp(&b)));
-        let mut load = vec![0u64; self.count];
-        let mut owner = vec![0usize; files.len()];
-        for k in order {
-            let lightest = (0..self.count)
-                .min_by_key(|&shard| (load[shard], shard))
-                .expect("a shard count is at least one");
-            owner[k] = lightest;
-            load[lightest] += files[k].1;
-        }
-        files
-            .into_iter()
-            .enumerate()
-            .filter(|(position, _)| owner[*position] + 1 == self.index)
-            .map(|(_, (file, _))| file)
-            .collect()
-    }
-
-    /// The members of `files` (already in the order every process sees) that fall in this shard.
-    pub fn take<T>(&self, files: Vec<T>) -> Vec<T> {
-        files
-            .into_iter()
-            .enumerate()
-            .filter(|(position, _)| position % self.count + 1 == self.index)
-            .map(|(_, file)| file)
-            .collect()
-    }
+/// The order to take files from the queue in, given what each costs: the costliest first, so the
+/// one that takes longest is not left for last, when everything else is done and only one worker
+/// has anything to do. Ties keep the order the files were given in, so the order is the same on
+/// every run.
+pub fn costliest_first(costs: &[u64]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..costs.len()).collect();
+    order.sort_by(|&a, &b| costs[b].cmp(&costs[a]).then(a.cmp(&b)));
+    order
 }
 
 /// Whether a file is in canonical format, and what `--fix` did about it.
@@ -511,51 +457,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn costed_shards_partition_the_list_and_even_out_the_cost() {
-        let costs: Vec<u64> = vec![90, 1, 1, 1, 50, 40, 40, 30, 5, 5, 5, 5, 20, 10];
-        let files: Vec<(usize, u64)> = costs.iter().copied().enumerate().collect();
-        let mut seen = Vec::new();
-        let mut loads = Vec::new();
-        for index in 1..=3 {
-            let taken = Shard { index, count: 3 }.take_by_cost(files.clone());
-            loads.push(taken.iter().map(|&k| costs[k]).sum::<u64>());
-            seen.extend(taken);
-        }
-        // Every file in exactly one shard, in the order it was given.
-        seen.sort();
-        assert_eq!(seen, (0..costs.len()).collect::<Vec<_>>());
-        // No shard is far above the mean of 101.
-        assert_eq!(loads.iter().sum::<u64>(), 303);
-        assert!(loads.iter().all(|&load| load <= 110), "{loads:?}");
-        // Every process chooses the same split, and a shard keeps its files in list order.
-        let again = Shard { index: 2, count: 3 }.take_by_cost(files.clone());
-        assert_eq!(again, Shard { index: 2, count: 3 }.take_by_cost(files));
-        assert!(again.windows(2).all(|w| w[0] < w[1]));
-    }
-
-    #[test]
-    fn a_shard_is_written_index_over_count() {
-        assert_eq!(Shard::parse("2/4"), Ok(Shard { index: 2, count: 4 }));
-        assert_eq!(Shard::parse("1/1"), Ok(Shard { index: 1, count: 1 }));
-        for text in ["", "2", "0/4", "5/4", "a/4", "2/b", "2/4/6", "-1/4", "2/0"] {
-            let error = Shard::parse(text).expect_err(text);
-            assert!(
-                error.contains("`i/n`") && error.contains(text),
-                "{text}: {error}"
-            );
-        }
-    }
-
-    #[test]
-    fn shards_partition_the_list_and_neighbours_are_split() {
-        let files: Vec<u32> = (0..7).collect();
-        let slices: Vec<Vec<u32>> = (1..=3)
-            .map(|index| Shard { index, count: 3 }.take(files.clone()))
-            .collect();
-        assert_eq!(slices, [vec![0, 3, 6], vec![1, 4], vec![2, 5]]);
-        // More shards than files leaves the later ones empty.
-        assert!(Shard { index: 9, count: 9 }.take(vec![1, 2]).is_empty());
-        assert_eq!(Shard { index: 1, count: 1 }.take(vec![1, 2]), vec![1, 2]);
+    fn the_costliest_file_is_taken_first_and_ties_keep_their_order() {
+        assert_eq!(costliest_first(&[5, 90, 5, 40, 90]), [1, 4, 3, 0, 2]);
+        assert_eq!(costliest_first(&[]), Vec::<usize>::new());
+        assert_eq!(costliest_first(&[7, 7, 7]), [0, 1, 2]);
     }
 
     fn record(name: &str, passed: u64, failed: u64, test_failed: bool) -> TestRecord {
