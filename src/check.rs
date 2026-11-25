@@ -286,9 +286,8 @@ impl CheckResult {
     /// `trace(..)` refusal, the section findings). All of it is for stdout; stderr is for
     /// usage and I/O errors. Every line ends in a newline.
     ///
-    /// The formatting line is separate because it is reported before the file runs, so it
-    /// precedes anything the run prints. The failing tests' text and the pass/fail counts
-    /// follow the last file, as an aggregate.
+    /// The formatting line is separate: [`CheckResult::render_report`] puts it ahead of this. The
+    /// failing tests' text and the pass/fail counts follow the last file, as an aggregate.
     pub fn render(&self) -> String {
         let mut out = self.render_rows();
         match &self.outcome {
@@ -303,6 +302,17 @@ impl CheckResult {
                 out.push_str(&self.render_findings());
             }
         }
+        out
+    }
+
+    /// The whole of what the file reports, in the order every mode prints it: the formatting
+    /// line, then [`CheckResult::render`].
+    pub fn render_report(&self) -> String {
+        let mut out = self
+            .formatting
+            .line(&self.label)
+            .map_or_else(String::new, |l| l + "\n");
+        out.push_str(&self.render());
         out
     }
 

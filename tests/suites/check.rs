@@ -484,6 +484,36 @@ fn a_file_that_cannot_be_read_is_an_error_naming_it() {
     assert_eq!(out.status.code(), Some(1));
 }
 
+/// How many files are checked at once changes how long a batch takes and nothing it says: the
+/// report is in file order, whichever worker was quicker.
+#[test]
+fn the_report_does_not_depend_on_how_many_files_are_checked_at_once() {
+    let files: Vec<(String, &str)> = (0..12)
+        .map(|n| {
+            let src = match n % 4 {
+                0 => FAILS,
+                1 => BROKEN,
+                _ => PASSES,
+            };
+            (format!("f{n:02}.aipl"), src)
+        })
+        .collect();
+    let tree: Vec<(&str, &str)> = files.iter().map(|(n, s)| (n.as_str(), *s)).collect();
+    let alone = check_tree("jobs_one", &tree, &["--jobs", "1"]);
+    let together = check_tree("jobs_many", &tree, &["--jobs", "4"]);
+    assert_eq!(together, alone);
+    assert_eq!(alone.2, 1);
+    let default = check_tree("jobs_default", &tree, &[]);
+    assert_eq!(default, alone);
+}
+
+#[test]
+fn a_job_count_must_be_a_positive_number() {
+    let (_stdout, stderr, code) = check_tree("jobs_zero", &[("a.aipl", PASSES)], &["--jobs", "0"]);
+    assert_eq!(stderr, "--jobs needs a positive number, not \"0\"\n");
+    assert_eq!(code, 1);
+}
+
 #[test]
 fn all_tests_pass_is_silent_and_exit_zero() {
     let (stdout, _stderr, code) = check(

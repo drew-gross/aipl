@@ -104,7 +104,7 @@ fn usage(prog: &str) -> String {
   {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
-  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--shard i/n]
+  {prog} check [path...] [--format] [--compile] [--tests] [--benchmarks] [--fix] [--ignore-sections] [--baseline <table.md>] [--shard i/n] [--jobs n]
                                             run the tests, and check formatting and each file's sections
   {prog} report <file.aipl> [--machine] [-- args...]  count what a run of the file costs
   {prog} lsp                                serve the Language Server Protocol on stdin/stdout
@@ -116,7 +116,8 @@ path it documents the working directory, into `./docs` unless `-o` says
 otherwise.
 
 `check` with no path checks every `.aipl` file under the working directory (one
-process, so the engine links once); pass a file to check just that one, or a
+process, with a thread for each core drawing files from one queue, and the report in file
+order); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
 canonical format, runs a function's `.benchmark({{ .. }})` block too (in an
 instrumented build, which needs the linker `build` does), and validates the
@@ -136,6 +137,8 @@ refusal) without running anything. `--tests` and `--benchmarks` also run the `.t
 a part leaves the file's recorded sections and `--baseline` out, since they describe
 runs of `main` and of the whole file. The exit status is non-zero exactly when a chosen
 part reports a failure.
+`--jobs n` sets how many files are checked at once: every core by default, one under `--shard`
+(the shards are the parallelism there).
 `--shard i/n` checks only the i-th of n slices of the sorted file list, so n processes started
 with the same paths cover every file once between them. Given `--baseline`, the slices are
 balanced by what checking each file costs, its code bytes in the table (a file without a row by
@@ -961,10 +964,9 @@ fn check_format(file: &Path, src: &str, fix: bool) -> (Formatting, Option<String
 }
 
 /// Check one file end to end: its format, then (loading, compiling, running its
-/// tests and validating its sections), then `--fix`'s repairs. Nothing is
-/// printed except the formatting line, which comes first so it precedes anything
-/// the run prints; the rest is in the returned [`CheckResult`] for the caller to
-/// render in the order its mode wants.
+/// tests and validating its sections), then `--fix`'s repairs. Nothing is printed: it is all in
+/// the returned [`CheckResult`], for the caller to render in the order its mode wants. Several
+/// files are checked at once, each on its own thread.
 fn check_path(
     path: &Path,
     label: &str,
@@ -1015,9 +1017,6 @@ fn check_path(
     } else {
         Formatting::Clean
     };
-    if let Some(line) = formatting.line(label) {
-        println!("{line}");
-    }
     // Formatting moved the lines a recorded diagnostic names, so what follows reads the new text.
     if formatting == Formatting::Rewritten && spec.is_some() {
         spec = Some(spec_of(&src, label));
@@ -1074,7 +1073,10 @@ fn check_path(
 /// Checking many files in one process is the point: each file still becomes its
 /// own program — a file's tests are its own, since the loader drops imported
 /// functions' `.test` bodies — but the ~0.2s dogfood-engine link is a lazy
-/// per-thread `thread_local!`, so a batch pays it once instead of once per file.
+/// per-thread `thread_local!`, so a batch pays it once per worker thread instead of once per
+/// file. The workers draw files from one queue (`--jobs`, every core by default), and the results
+/// are reported in the order the files were given, so the output does not depend on which worker
+/// was quicker.
 ///
 /// Each file is also checked against the canonical format, since a project running
 /// `aipl check` as its handoff gate wants one command to say whether the tree is
@@ -1102,6 +1104,20 @@ fn check_cmd(args: &[String]) -> ExitCode {
     let validate_sections = selected.is_none() && !args.iter().any(|a| a == "--ignore-sections");
     let fix = args.iter().any(|a| a == "--fix");
     let (args, baseline_path) = match take_value_flag(args, "--baseline") {
+        Ok(taken) => taken,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let (args, jobs) = match take_value_flag(args, "--jobs").and_then(|(rest, text)| {
+        text.map(|text| match text.parse::<usize>() {
+            Ok(n) if n > 0 => Ok(n),
+            _ => Err(format!("--jobs needs a positive number, not {text:?}")),
+        })
+        .transpose()
+        .map(|jobs| (rest, jobs))
+    }) {
         Ok(taken) => taken,
         Err(msg) => {
             eprintln!("{msg}");
@@ -1208,37 +1224,79 @@ fn check_cmd(args: &[String]) -> ExitCode {
         })
         .collect();
 
-    // The summary is printed here, once both kinds of test have run, rather than by the JIT
-    // runner when its own tests finish.
-    aipl::codegen::set_quiet_summary(true);
+    // The files are checked by a pool of workers drawing from one queue, and reported in the order
+    // they were given, as each result is ready, whichever worker finished it. A file's own
+    // tests run on one thread: the runtime keeps what they did per thread.
+    let jobs = match jobs {
+        Some(jobs) => jobs,
+        // A shard is already one of several processes splitting the corpus between them.
+        None if shard.is_some() => 1,
+        None => std::thread::available_parallelism().map_or(1, usize::from),
+    }
+    .clamp(1, resolved.len().max(1));
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let finished: std::sync::Mutex<Vec<Option<CheckResult>>> =
+        std::sync::Mutex::new((0..resolved.len()).map(|_| None).collect());
+    let ready = std::sync::Condvar::new();
+
     let mut totals = BatchTotals::default();
     let mut passed = true;
-    for (path, label) in &resolved {
-        // A single file keeps its own report, which names no file: its failures are bare.
-        if !single {
-            aipl::codegen::set_test_file(Some(label));
+    std::thread::scope(|scope| {
+        for _ in 0..jobs {
+            std::thread::Builder::new()
+                // As `main`'s worker has: debug codegen recurses per AST node.
+                .stack_size(256 * 1024 * 1024)
+                .spawn_scoped(scope, || {
+                    // The summary is printed here, once both kinds of test have run, rather than
+                    // by the JIT runner when its own tests finish.
+                    aipl::codegen::set_quiet_summary(true);
+                    loop {
+                        let at = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some((path, label)) = resolved.get(at) else {
+                            break;
+                        };
+                        // A single file keeps its own report, which names no file: its failures
+                        // are bare.
+                        if !single {
+                            aipl::codegen::set_test_file(Some(label));
+                        }
+                        let result = check_path(
+                            path,
+                            label,
+                            &project_root,
+                            validate_sections,
+                            fix,
+                            baseline.as_ref(),
+                            parts,
+                            dbg,
+                        );
+                        finished.lock().unwrap_or_else(|e| e.into_inner())[at] = Some(result);
+                        ready.notify_all();
+                    }
+                })
+                .expect("spawn a checking thread");
         }
-        let result = check_path(
-            path,
-            label,
-            &project_root,
-            validate_sections,
-            fix,
-            baseline.as_ref(),
-            parts,
-            dbg,
-        );
-        totals.add(&result);
-        passed = result.passed();
-        print!("{}", result.render());
-        if single && result.outcome.is_ok() {
-            print!("{}", check::render_failures(&result.run.failure_report));
-            if let Some(summary) = result.render_summary() {
-                println!("{summary}");
+        for at in 0..resolved.len() {
+            let result = {
+                let mut done = finished.lock().unwrap_or_else(|e| e.into_inner());
+                loop {
+                    if let Some(result) = done[at].take() {
+                        break result;
+                    }
+                    done = ready.wait(done).unwrap_or_else(|e| e.into_inner());
+                }
+            };
+            totals.add(&result);
+            passed = result.passed();
+            print!("{}", result.render_report());
+            if single && result.outcome.is_ok() {
+                print!("{}", check::render_failures(&result.run.failure_report));
+                if let Some(summary) = result.render_summary() {
+                    println!("{summary}");
+                }
             }
         }
-    }
-    aipl::codegen::set_test_file(None);
+    });
 
     if !single {
         print!("{}", totals.render());

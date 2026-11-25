@@ -315,6 +315,7 @@ lsp:
   go-to-def should work on files that don't typecheck
 
 bugs:
+  check --fix could format one file while another is reading. Need to make formatting single-threaded or somehing maybe?
   (A) -> T* and ((A) -> T)* meaning the same thing is crazy, thats not how brackets should work
   import wrapping_add as ++ should work
   improve error message for unshimmed effects in tests
@@ -1004,7 +1005,8 @@ indent.aipl:
 
 debugging:
   expression debugger that assert can use when they fail to show an expression at every substep
-  trace()/dbg_expr() function
+  trace should work in case of tests and/or tests should do capturing or something and/or multithreading should be disabled if traces are present
+  dbg_expr() function
   make a debugger
   line numbers on test assertion failures, err/none propagations, etc.
   tools for debugging infinite loops
