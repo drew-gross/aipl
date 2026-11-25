@@ -93,6 +93,77 @@ fn concurrent_compiles_write_the_same_ir_as_a_lone_one() {
     });
 }
 
+/// Run `src`'s `.test` blocks the way `check` does, on this thread, and hand back what they did.
+fn run_tests(src: &str) -> aipl::codegen::TestRun {
+    aipl::install_parser_hooks();
+    let program = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
+        .expect("load");
+    let driver = aipl::codegen::binary_entry_program(&aipl::perf::test_driver_as_main(&program))
+        .expect("the test driver");
+    let comp = Compilation::new(&driver, DebugOptions::OFF, &[]).expect("compile");
+    aipl::codegen::set_quiet_summary(true);
+    comp.run_cli("main", &[]).expect("run the tests");
+    aipl::codegen::take_test_run()
+}
+
+/// What a thread's tests did is that thread's own: one running passing tests and another running a
+/// failing one, at the same time, each get back their own counts and report.
+#[test]
+fn threads_running_tests_at_once_keep_their_results_apart() {
+    const PASSING: &str = "import { equal as == } from builtins;
+        fn a() -> i64 { 1 }.test({ assert(a() == 1); })
+        fn b() -> i64 { 2 }.test({ assert(b() == 2); })
+        fn c() -> i64 { 3 }.test({ assert(c() == 3); })";
+    const FAILING: &str = "import { equal as == } from builtins;
+        fn d() -> i64 { 4 }.test({ assert(d() == 5); })
+        fn e() -> i64 { 5 }.test({ assert(e() == 5); })";
+    let on_thread = |src: &'static str| {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024 * 1024)
+            .spawn(move || (0..10).map(|_| run_tests(src)).collect::<Vec<_>>())
+            .expect("spawn a testing thread")
+    };
+    let (passing, failing) = (on_thread(PASSING), on_thread(FAILING));
+    for run in passing.join().expect("the passing thread") {
+        assert_eq!((run.total, run.passed, run.failed), (3, 3, 0));
+        assert_eq!(run.failure_report, "");
+    }
+    for run in failing.join().expect("the failing thread") {
+        assert_eq!((run.total, run.passed, run.failed), (2, 1, 1));
+        assert!(
+            run.failure_report
+                .starts_with("test d ... FAIL\n  assert failed at "),
+            "{}",
+            run.failure_report
+        );
+    }
+}
+
+/// A shim installed by one thread's program is not in force for another's.
+#[test]
+fn a_shim_on_one_thread_does_not_reach_a_program_on_another() {
+    const SHIMMED: &str = "import { equal as ==, print } from builtins;
+        fn shout() !prints { print(\"x\") }.test({
+            mut said: str[] = [];
+            shim prints { print = |text| { set said = [text]; }, put = |text| { set said = [text]; } } {
+                shout();
+            };
+            assert(said == [\"x\"]);
+        })";
+    let on_thread = || {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024 * 1024)
+            .spawn(|| (0..10).map(|_| run_tests(SHIMMED)).collect::<Vec<_>>())
+            .expect("spawn a testing thread")
+    };
+    let threads: Vec<_> = (0..3).map(|_| on_thread()).collect();
+    for thread in threads {
+        for run in thread.join().expect("a thread") {
+            assert_eq!((run.total, run.failed), (1, 0), "{}", run.failure_report);
+        }
+    }
+}
+
 #[test]
 fn empty_program_compiles() {
     // Empty source has no main; cases harness requires one, so this

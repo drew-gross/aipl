@@ -310,27 +310,30 @@ fn monotonic_nanos() -> i64 {
 // mechanism; nothing here names a particular effect. Save/restore is the
 // caller's job (codegen emits it), which is what makes shims nest.
 
-/// Installed shim addresses, one slot per shimmable operation. 0 means "no shim
-/// installed" — the state every slot starts in and returns to. Mirrors
-/// `SHIM_SLOTS` in the linker runtime.
-static SHIM_SLOTS: [std::sync::atomic::AtomicI64; aipl_syntax::SHIM_SLOT_COUNT] =
-    [const { std::sync::atomic::AtomicI64::new(0) }; aipl_syntax::SHIM_SLOT_COUNT];
+thread_local! {
+    /// Installed shim addresses, one slot per shimmable operation. 0 means "no shim
+    /// installed" — the state every slot starts in and returns to. Mirrors
+    /// `SHIM_SLOTS` in the linker runtime. Per thread: a shim stands in for an effect in the
+    /// program the thread is running, not in one another thread is running.
+    static SHIM_SLOTS: [std::cell::Cell<i64>; aipl_syntax::SHIM_SLOT_COUNT] =
+        const { [const { std::cell::Cell::new(0) }; aipl_syntax::SHIM_SLOT_COUNT] };
+}
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
 #[no_mangle]
 extern "C" fn aipl_shim_get(idx: i64) -> i64 {
-    SHIM_SLOTS
-        .get(idx as usize)
-        .map_or(0, |s| s.load(std::sync::atomic::Ordering::Relaxed))
+    SHIM_SLOTS.with(|slots| slots.get(idx as usize).map_or(0, std::cell::Cell::get))
 }
 
 /// Install `ptr` (0 to clear) as the shim for slot `idx`.
 #[no_mangle]
 extern "C" fn aipl_shim_set(idx: i64, ptr: i64) {
-    if let Some(slot) = SHIM_SLOTS.get(idx as usize) {
-        slot.store(ptr, std::sync::atomic::Ordering::Relaxed);
-    }
+    SHIM_SLOTS.with(|slots| {
+        if let Some(slot) = slots.get(idx as usize) {
+            slot.set(ptr);
+        }
+    });
 }
 
 // ---------- Cached constants ----------
@@ -411,18 +414,21 @@ extern "C" fn aipl_const_on_exit(_teardown: i64) {}
 // generator around its body — and the linker runtime carries the same algorithm,
 // so a seed gives the same sequence under the JIT and in a built binary.
 
-/// splitmix64's state, which is also the whole generator. Mirrors `RANDOM_STATE`
-/// in the linker runtime.
-static RANDOM_STATE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+thread_local! {
+    /// splitmix64's state, which is also the whole generator. Mirrors `RANDOM_STATE`
+    /// in the linker runtime. Per thread, like the shim that seeds it.
+    static RANDOM_STATE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
 
 /// The next number of the sequence: advance the state by the golden-ratio
 /// increment, then scramble it.
 #[no_mangle]
 extern "C" fn aipl_random_next() -> i64 {
-    use std::sync::atomic::Ordering::Relaxed;
-    let state = RANDOM_STATE
-        .fetch_add(0x9E37_79B9_7F4A_7C15, Relaxed)
-        .wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let state = RANDOM_STATE.with(|cell| {
+        let next = cell.get().wrapping_add(0x9E37_79B9_7F4A_7C15);
+        cell.set(next);
+        next
+    });
     let a = (state ^ (state >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     let b = (a ^ (a >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     (b ^ (b >> 31)) as i64
@@ -431,13 +437,13 @@ extern "C" fn aipl_random_next() -> i64 {
 /// Start the sequence at `seed`. Also how a shim puts back the state it saved.
 #[no_mangle]
 extern "C" fn aipl_random_seed(seed: i64) {
-    RANDOM_STATE.store(seed as u64, std::sync::atomic::Ordering::Relaxed);
+    RANDOM_STATE.with(|cell| cell.set(seed as u64));
 }
 
 /// The generator's state, for a shim to save.
 #[no_mangle]
 extern "C" fn aipl_random_state() -> i64 {
-    RANDOM_STATE.load(std::sync::atomic::Ordering::Relaxed) as i64
+    RANDOM_STATE.with(std::cell::Cell::get) as i64
 }
 
 /// `random_u64` called with no `shim random` installed. The checker makes this
@@ -1094,8 +1100,8 @@ extern "C" fn aipl_count_call(_name: i64) {}
 // function with a `.test({ .. })` body it emits `__test_begin(name)` /
 // `__test$<fn>()` / `__test_end()`, then `__test_summary()` as the driver's
 // (exit-code) result. `__assert(cond, loc)` records and reports each failure.
-// State is process-global (the driver runs single-threaded in-process). Only
-// failures print: a failing test gets one `test <name> ... FAIL` header line
+// What it records is per thread (see [`TestState`]): the driver runs on the thread that called
+// it. Only failures print: a failing test gets one `test <name> ... FAIL` header line
 // followed by an indented line per failed assertion; passing tests are silent.
 //
 // `check`'s batch mode runs one such driver per file in a single process. What a
@@ -1104,57 +1110,82 @@ extern "C" fn aipl_count_call(_name: i64) {}
 // caller adds them up: [`set_test_file`] adds the file to each FAIL header and
 // [`set_quiet_summary`] suppresses the per-file summary line.
 
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering as TestOrd};
-use std::sync::Mutex;
+/// What the tests running on this thread have done so far. The runtime's calls arrive on the
+/// thread that runs the program, so each thread has a tally of its own: two threads checking two
+/// files at once cannot mix their results.
+#[derive(Default)]
+struct TestState {
+    cur_failed: bool,
+    header_printed: bool,
+    /// The running test's name, held as *text* rather than as a pointer to the `str` the caller
+    /// passed: that argument points at the caller's 24-byte stack slot, and outliving the call is
+    /// exactly what a stack slot does not promise. So the name is materialized at `test_begin`
+    /// instead of read back at report time.
+    cur_name: Option<String>,
+    /// The running test's assertion tallies, reset at `test_begin`.
+    cur_asserts_passed: u64,
+    cur_asserts_failed: u64,
+    /// One record per finished test and the counts, kept until [`take_test_run`] hands them over,
+    /// with everything the failing tests said, in the order they said it. Held rather than printed
+    /// so the caller can put it after the lines about the tests that passed, where nobody has to
+    /// scroll past them to find it.
+    run: TestRun,
+    /// Set by `check`'s batch mode (see [`set_test_file`]); `None` in single-file mode, where the
+    /// file is already obvious from the command line.
+    cur_file: Option<String>,
+    /// Set by `check`'s batch mode (see [`set_quiet_summary`]).
+    quiet_summary: bool,
+}
 
-static TEST_CUR_FAILED: AtomicBool = AtomicBool::new(false);
-static TEST_HEADER_PRINTED: AtomicBool = AtomicBool::new(false);
-/// The running test's name, held as *text* rather than as a pointer to the
-/// `str` the caller passed: that argument points at the caller's 24-byte stack
-/// slot, and outliving the call is exactly what a stack slot does not promise.
-/// So the name is materialized at `test_begin` instead of read back at report
-/// time.
-static TEST_CUR_NAME: Mutex<Option<String>> = Mutex::new(None);
-/// The running test's assertion tallies, reset at `test_begin`.
-static TEST_CUR_ASSERTS_PASSED: AtomicI64 = AtomicI64::new(0);
-static TEST_CUR_ASSERTS_FAILED: AtomicI64 = AtomicI64::new(0);
-/// One record per finished test, kept until [`take_test_run`] hands them over.
-static TEST_RECORDS: Mutex<Vec<TestRecord>> = Mutex::new(Vec::new());
-/// Everything the failing tests said, in the order they said it. Held rather than
-/// printed so the caller can put it after the lines about the tests that passed,
-/// where nobody has to scroll past them to find it.
-static TEST_FAILURE_REPORT: Mutex<String> = Mutex::new(String::new());
-static TEST_TOTAL: AtomicI64 = AtomicI64::new(0);
-static TEST_PASSED: AtomicI64 = AtomicI64::new(0);
-static TEST_FAILED: AtomicI64 = AtomicI64::new(0);
-/// Set by `check`'s batch mode (see [`set_test_file`]); `None` in single-file
-/// mode, where the file is already obvious from the command line.
-static TEST_CUR_FILE: Mutex<Option<String>> = Mutex::new(None);
-/// Set by `check`'s batch mode (see [`set_quiet_summary`]).
-static TEST_QUIET_SUMMARY: AtomicBool = AtomicBool::new(false);
+thread_local! {
+    static TESTS: std::cell::RefCell<TestState> = std::cell::RefCell::new(TestState::default());
+}
+
+fn with_tests<R>(f: impl FnOnce(&mut TestState) -> R) -> R {
+    TESTS.with(|tests| f(&mut tests.borrow_mut()))
+}
+
+impl TestState {
+    /// One line of the failure report.
+    fn report_line(&mut self, line: &str) {
+        self.run.failure_report.push_str(line);
+        self.run.failure_report.push('\n');
+    }
+
+    /// Print the `test <name> ... FAIL` header once per failing test, qualified by the current
+    /// file in batch mode. Shared by every failure path below so the header appears exactly once
+    /// no matter which of them reports first.
+    fn print_fail_header(&mut self) {
+        if std::mem::replace(&mut self.header_printed, true) {
+            return;
+        }
+        let name = self.cur_name.as_deref().unwrap_or("<unknown>");
+        let header = match &self.cur_file {
+            Some(file) => format!("test {file}::{name} ... FAIL"),
+            None => format!("test {name} ... FAIL"),
+        };
+        self.report_line(&header);
+    }
+}
 
 /// Name the file whose tests are running now, so a failure in a many-file run
 /// says which file it came from (`test <file>::<name> ... FAIL`). Passing `None`
 /// restores the bare `test <name> ... FAIL` used when checking a single file.
 pub fn set_test_file(file: Option<&str>) {
-    let mut cur = TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner());
-    *cur = file.map(str::to_string);
+    with_tests(|tests| tests.cur_file = file.map(str::to_string));
 }
 
 /// Silence the per-program summary line that [`aipl_test_summary`] otherwise
 /// prints. Batch mode runs one program per file and prints its own aggregate,
 /// so the per-file lines would just be a running total repeated N times.
 pub fn set_quiet_summary(quiet: bool) {
-    TEST_QUIET_SUMMARY.store(quiet, TestOrd::Relaxed);
+    with_tests(|tests| tests.quiet_summary = quiet);
 }
 
 /// The file whose tests are running now — what [`set_test_file`] last set, or
 /// `None` in single-file mode.
 pub fn test_file() -> Option<String> {
-    TEST_CUR_FILE
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone()
+    with_tests(|tests| tests.cur_file.clone())
 }
 
 /// What running one test came to: how many of its assertions held and how many
@@ -1227,41 +1258,7 @@ impl TestRun {
 /// Hand over what every test that has run since the last call did, and start counting again
 /// from zero.
 pub fn take_test_run() -> TestRun {
-    TestRun {
-        records: std::mem::take(&mut *TEST_RECORDS.lock().unwrap_or_else(|e| e.into_inner())),
-        failure_report: std::mem::take(
-            &mut *TEST_FAILURE_REPORT
-                .lock()
-                .unwrap_or_else(|e| e.into_inner()),
-        ),
-        total: TEST_TOTAL.swap(0, TestOrd::Relaxed),
-        passed: TEST_PASSED.swap(0, TestOrd::Relaxed),
-        failed: TEST_FAILED.swap(0, TestOrd::Relaxed),
-    }
-}
-
-/// One line of the failure report.
-fn report_line(line: &str) {
-    let mut report = TEST_FAILURE_REPORT
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    report.push_str(line);
-    report.push('\n');
-}
-
-/// Print the `test <name> ... FAIL` header once per failing test, qualified by
-/// the current file in batch mode. Shared by every failure path below so the
-/// header appears exactly once no matter which of them reports first.
-fn print_fail_header() {
-    if TEST_HEADER_PRINTED.swap(true, TestOrd::Relaxed) {
-        return;
-    }
-    let held = TEST_CUR_NAME.lock().unwrap_or_else(|e| e.into_inner());
-    let name = held.as_deref().unwrap_or("<unknown>");
-    match &*TEST_CUR_FILE.lock().unwrap_or_else(|e| e.into_inner()) {
-        Some(file) => report_line(&format!("test {file}::{name} ... FAIL")),
-        None => report_line(&format!("test {name} ... FAIL")),
-    }
+    with_tests(|tests| std::mem::take(&mut tests.run))
 }
 
 // `?` used inside a `.test` body, applied to a `none`: the optional analog of
@@ -1269,14 +1266,16 @@ fn print_fail_header() {
 // so the report just names what happened. Same failure bookkeeping.
 #[no_mangle]
 extern "C" fn aipl_test_fail_none() {
-    print_fail_header();
-    report_line("  `?` propagated a `none`");
-    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+    with_tests(|tests| {
+        tests.print_fail_header();
+        tests.report_line("  `?` propagated a `none`");
+        tests.cur_failed = true;
+    });
 }
 
 /// Read a wide `str` argument as an owned `String` for the report. Materializes
 /// rather than borrowing, since the caller's slot is not guaranteed to outlive
-/// the report — see [`TEST_CUR_NAME`].
+/// the report — see [`TestState::cur_name`].
 fn wide_text(s: *const str24::Str) -> String {
     let mut scratch = [0u8; str24::INLINE_CAP];
     let v = unsafe { *s };
@@ -1286,68 +1285,70 @@ fn wide_text(s: *const str24::Str) -> String {
 /// [`aipl_test_begin`] under the wide ABI.
 #[no_mangle]
 extern "C" fn aipl_test_begin(name: *const str24::Str) {
-    *TEST_CUR_NAME.lock().unwrap_or_else(|e| e.into_inner()) = Some(wide_text(name));
-    TEST_CUR_FAILED.store(false, TestOrd::Relaxed);
-    TEST_HEADER_PRINTED.store(false, TestOrd::Relaxed);
-    TEST_CUR_ASSERTS_PASSED.store(0, TestOrd::Relaxed);
-    TEST_CUR_ASSERTS_FAILED.store(0, TestOrd::Relaxed);
+    let name = wide_text(name);
+    with_tests(|tests| {
+        tests.cur_name = Some(name);
+        tests.cur_failed = false;
+        tests.header_printed = false;
+        tests.cur_asserts_passed = 0;
+        tests.cur_asserts_failed = 0;
+    });
 }
 
 /// [`aipl_assert`] under the wide ABI.
 #[no_mangle]
 extern "C" fn aipl_assert(cond: i64, loc: *const str24::Str) {
     if cond == 0 {
-        print_fail_header();
-        report_line(&format!("  assert failed at {}", wide_text(loc)));
-        TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
-        TEST_CUR_ASSERTS_FAILED.fetch_add(1, TestOrd::Relaxed);
+        let line = format!("  assert failed at {}", wide_text(loc));
+        with_tests(|tests| {
+            tests.print_fail_header();
+            tests.report_line(&line);
+            tests.cur_failed = true;
+            tests.cur_asserts_failed += 1;
+        });
     } else {
-        TEST_CUR_ASSERTS_PASSED.fetch_add(1, TestOrd::Relaxed);
+        with_tests(|tests| tests.cur_asserts_passed += 1);
     }
 }
 
 /// [`aipl_test_fail`] under the wide ABI.
 #[no_mangle]
 extern "C" fn aipl_test_fail(msg: *const str24::Str) {
-    print_fail_header();
-    report_line(&format!("  `?` propagated an error: {}", wide_text(msg)));
-    TEST_CUR_FAILED.store(true, TestOrd::Relaxed);
+    let line = format!("  `?` propagated an error: {}", wide_text(msg));
+    with_tests(|tests| {
+        tests.print_fail_header();
+        tests.report_line(&line);
+        tests.cur_failed = true;
+    });
 }
 
 #[no_mangle]
 extern "C" fn aipl_test_end() {
-    TEST_TOTAL.fetch_add(1, TestOrd::Relaxed);
-    let failed = TEST_CUR_FAILED.load(TestOrd::Relaxed);
-    TEST_RECORDS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .push(TestRecord {
-            file: TEST_CUR_FILE
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .clone(),
-            name: TEST_CUR_NAME
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .clone()
-                .unwrap_or_default(),
-            assertions_passed: TEST_CUR_ASSERTS_PASSED.load(TestOrd::Relaxed) as u64,
-            assertions_failed: TEST_CUR_ASSERTS_FAILED.load(TestOrd::Relaxed) as u64,
-            failed,
-        });
-    if failed {
-        TEST_FAILED.fetch_add(1, TestOrd::Relaxed);
-    } else {
-        TEST_PASSED.fetch_add(1, TestOrd::Relaxed);
-    }
+    with_tests(|tests| {
+        let record = TestRecord {
+            file: tests.cur_file.clone(),
+            name: tests.cur_name.clone().unwrap_or_default(),
+            assertions_passed: tests.cur_asserts_passed,
+            assertions_failed: tests.cur_asserts_failed,
+            failed: tests.cur_failed,
+        };
+        tests.run.total += 1;
+        if record.failed {
+            tests.run.failed += 1;
+        } else {
+            tests.run.passed += 1;
+        }
+        tests.run.records.push(record);
+    });
 }
 
 #[no_mangle]
 extern "C" fn aipl_test_summary() -> i64 {
-    let total = TEST_TOTAL.load(TestOrd::Relaxed);
-    let passed = TEST_PASSED.load(TestOrd::Relaxed);
-    let failed = TEST_FAILED.load(TestOrd::Relaxed);
-    if !TEST_QUIET_SUMMARY.load(TestOrd::Relaxed) {
+    let (total, passed, failed, quiet) = with_tests(|tests| {
+        let run = &tests.run;
+        (run.total, run.passed, run.failed, tests.quiet_summary)
+    });
+    if !quiet {
         println!("{total} tests: {passed} passed, {failed} failed");
     }
     i64::from(failed > 0)
