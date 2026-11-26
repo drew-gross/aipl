@@ -169,6 +169,7 @@ variant Callee =
     | ExecuteProgram
     | HttpGet
     | ShowWindow
+    | ShowView
     | Union
     | UnionAll
     | SetMap
@@ -889,6 +890,12 @@ pub fn builtin_table() -> BuiltinEntry[] {
         BuiltinEntry {
             arm: ShowWindow,
             callee: "__builtin_show_window",
+            definition: Declared,
+            library: "gui",
+        },
+        BuiltinEntry {
+            arm: ShowView,
+            callee: "__builtin_show_view",
             definition: Declared,
             library: "gui",
         },

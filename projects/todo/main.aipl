@@ -2,8 +2,9 @@
 #
 # The list is the lines of `todos.txt`, each `[ ] text` for an item still to do and `[x] text` for
 # one done. `todo` on its own shows the list in a window; `todo add <text>`, `done <n>`, `undo <n>`,
-# `remove <n>` and `clear-done` change it, save it and print it. The window only displays for now:
-# GUI_TODO_APP.md plans the rest.
+# `remove <n>` and `clear-done` change it, save it and print it; `todo gallery` shows every element
+# the window can draw, from constants. The window only displays for now: GUI_TODO_APP.md plans the
+# rest.
 
 import {
     drop_first,
@@ -28,16 +29,27 @@ import {
     wrapping_add as +,
     write_string_to_file,
 } from builtins;
-import { show_window } from gui;
+import {
+    Button,
+    Checkbox,
+    Column,
+    Element,
+    Field,
+    Label,
+    Row,
+    Separator,
+    to_text,
+} from "./elements.aipl";
+import { show_view } from gui;
 
 # One thing to do.
 struct Todo { text: str, done: bool }
 
 # What the command line asks for. A number names an item as the listing numbers it, from 1.
-variant Command = Show | Add(str) | Done(u64) | Undo(u64) | Remove(u64) | ClearDone
+variant Command = Show | Gallery | Add(str) | Done(u64) | Undo(u64) | Remove(u64) | ClearDone
 
-# What a run came to: a listing to put in the window, or a list that changed, to save and print.
-variant Outcome = Window(str) | Changed(str, str)
+# What a run came to: a window to show, with its title, or a list that changed, to save and print.
+variant Outcome = Window(str, Element) | Changed(str, str)
 
 # `self` as a line of the file: `[ ] text`, or `[x] text` once done.
 fn line(self: Todo) -> str {
@@ -111,6 +123,93 @@ fn render(self: Todo[]) -> str {
     );
 })
 
+# `self` as a row of the window: a checkbox for whether it is done, and its text, struck through
+# and muted once it is.
+fn row(self: Todo) -> Element {
+    Row([Checkbox("", checked=self.done), Label(self.text, muted=self.done, strike=self.done)])
+}.test({
+    assert(Todo { text: "a", done: false }.row() == Row([Checkbox(""), Label("a")]));
+    assert(Todo { text: "a", done: true }.row() == Row([
+        Checkbox("", checked=true),
+        Label("a", muted=true, strike=true),
+    ]));
+})
+
+# `self` as the window: a title, a row for each item and how many are left.
+fn view(self: Todo[]) -> Element {
+    let rows = if (self.is_empty()) { [Label("Nothing to do.", muted=true)] } else { self$row() };
+    let left = self.filter(|todo| !todo.done).len();
+    Column(
+        [
+            Label("Todo", size=24, bold=true),
+            Separator(),
+            ..rows,
+            Separator(),
+            Label(`{left} left`, muted=true),
+        ],
+        padding=16,
+    )
+}.test({
+    assert([].view() == Column(
+        [
+            Label("Todo", size=24, bold=true),
+            Separator(),
+            Label("Nothing to do.", muted=true),
+            Separator(),
+            Label("0 left", muted=true),
+        ],
+        padding=16,
+    ));
+    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: true }];
+    assert(
+        list.view().to_text() == """
+            column spacing=8 padding=16
+              label "Todo" size=24 bold
+              separator
+              row spacing=8
+                checkbox ""
+                label "a"
+              row spacing=8
+                checkbox "" checked
+                label "b" muted strike
+              separator
+              label "1 left" muted
+
+        """,
+    );
+})
+
+# One of each element, with the options each takes, from constants: what to look at while the
+# elements are drawn.
+fn gallery() -> Element {
+    Column(
+        [
+            Label("Elements", size=24, bold=true),
+            Separator(),
+            Label("A label"),
+            Label("A large label", size=20),
+            Label("A bold label", bold=true),
+            Label("A muted label", muted=true),
+            Label("A struck label", strike=true),
+            Separator(),
+            Row([Button("A button"), Button("Another")]),
+            Row([Checkbox("Unchecked"), Checkbox("Checked", checked=true)]),
+            Field(placeholder="A text field", width=240),
+            Field(value="A field with text", width=240),
+            Separator(),
+            Row([Label("A row", muted=true), Label("of labels"), Label("spaced out")], spacing=24),
+            Column([Label("A column"), Label("inside a column")], padding=12, spacing=2),
+        ],
+        padding=16,
+    )
+}.test({
+    assert(
+        gallery()
+            .to_text()
+            .starts_with(`column spacing=8 padding=16\n  label "Elements" size=24 bold\n`),
+    );
+})
+
 # Where item `number` is in a list of `size`, counting from 0, or why there is no such item.
 fn position(number: u64, size: u64) -> u64!str {
     if (number == 0 || number > size) { err(`no item {number}`) } else { ok(number - 1) }
@@ -159,7 +258,7 @@ fn removed(self: Todo[], number: u64) -> Todo[]!str {
 # `self` as `command` changes it.
 fn apply(self: Todo[], command: Command) -> Todo[]!str {
     match (command) {
-        Show => ok(self),
+        Show | Gallery => ok(self),
         Add(text) => ok([..self, Todo { text, done: false }]),
         Done(number) => self.marked(number, true),
         Undo(number) => self.marked(number, false),
@@ -199,6 +298,7 @@ fn parse_command(args: str[]) -> Command!str {
     let rest = args.drop_first();
     match (verb) {
         "show" => ok(Show),
+        "gallery" => ok(Gallery),
         "add" => if (rest.is_empty()) {
             err("add needs the text of the item")
         } else {
@@ -213,6 +313,7 @@ fn parse_command(args: str[]) -> Command!str {
 }.test({
     assert(parse_command([]) == ok(Show));
     assert(parse_command(["show"]) == ok(Show));
+    assert(parse_command(["gallery"]) == ok(Gallery));
     assert(parse_command(["add", "buy", "milk"]) == ok(Add("buy milk")));
     assert(parse_command(["add"]) == err("add needs the text of the item"));
     assert(parse_command(["done", "2"]) == ok(Done(2)));
@@ -228,13 +329,16 @@ fn run(args: str[], saved: str) -> Outcome!str {
     let command = parse_command(args)?;
     let todos = parse_todos(saved)?.apply(command)?;
     match (command) {
-        Show => ok(Window(todos.render())),
+        Show => ok(Window("Todo", todos.view())),
+        Gallery => ok(Window("Gallery", gallery())),
         _ => ok(Changed(todos.serialize(), todos.render())),
     }
 }.test({
     // Showing changes nothing and has no file to write.
-    assert(run([], "[ ] a\n") == ok(Window("1. [ ] a\n\n1 left")));
-    assert(run([], "") == ok(Window("Nothing to do.")));
+    assert(run([], "[ ] a\n") == ok(Window("Todo", [Todo { text: "a", done: false }].view())));
+    assert(run([], "") == ok(Window("Todo", [].view())));
+    // The gallery is the same whatever the list is.
+    assert(run(["gallery"], "[ ] a\n") == ok(Window("Gallery", gallery())));
     // A change gives the new file and the listing.
     assert(run(["add", "b"], "[ ] a\n") == ok(Changed(
         "[ ] a\n[ ] b\n",
@@ -259,12 +363,12 @@ fn main(args: str[]) !prints !read_files !write_files !gui -> i64 {
         err(reason) => {
             print(`todo: {reason}`);
             print(
-                "usage: todo [show | add <text> | done <n> | undo <n> | remove <n> | clear-done]",
+                "usage: todo [show | gallery | add <text> | done <n> | undo <n> | remove <n> | clear-done]",
             );
             1
         },
-        ok(Window(listing)) => {
-            show_window("Todo", listing);
+        ok(Window(title, view)) => {
+            show_view(title, view.to_text());
             0
         },
         ok(Changed(file, listing)) => match (write_string_to_file(path, file)) {

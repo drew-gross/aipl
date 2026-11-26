@@ -581,6 +581,31 @@ extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24::Str
     }
 }
 
+/// `show_view(title, view)`: open a window showing `view` and wait for it to be closed. Borrows
+/// both strings; the window itself is `gui_cocoa`'s, shared with the AOT runtime.
+#[no_mangle]
+extern "C" fn aipl_show_view(title: *const str24::Str, view: *const str24::Str) {
+    let mut title_scratch = [0u8; str24::INLINE_CAP];
+    let mut view_scratch = [0u8; str24::INLINE_CAP];
+    let (title, view) = unsafe {
+        (
+            (*title).bytes(&mut title_scratch),
+            (*view).bytes(&mut view_scratch),
+        )
+    };
+    match gui_cocoa::show_view(title, view) {
+        gui_cocoa::Shown::Closed => {}
+        gui_cocoa::Shown::Unavailable => {
+            eprintln!("error: could not open a window");
+            std::process::exit(1);
+        }
+        gui_cocoa::Shown::Refused { line, why } => {
+            eprintln!("error: the view's line {line}: {why}");
+            std::process::exit(1);
+        }
+    }
+}
+
 /// Spawn `program` with `args` and collect its output. `None` if it could not be
 /// launched, or if either stream holds a NUL byte (which a NUL-terminated `str`
 /// cannot represent — the same constraint `read_file_to_string` has).
@@ -4004,6 +4029,7 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_http_get", aipl_http_get as *const u8);
     jit_builder.symbol("aipl_show_window", aipl_show_window as *const u8);
+    jit_builder.symbol("aipl_show_view", aipl_show_view as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
         "aipl_str_split_iter_init",
@@ -7674,6 +7700,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_shim_set"
         | "aipl_move_to"
         | "aipl_show_window"
+        | "aipl_show_view"
         | "aipl_str_iter_init"
         | "aipl_str_grew"
         | "aipl_str_push_byte"
@@ -7978,6 +8005,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::ExecuteProgram, "aipl_execute_program"),
         (Callee::HttpGet, "aipl_http_get"),
         (Callee::ShowWindow, "aipl_show_window"),
+        (Callee::ShowView, "aipl_show_view"),
         (Callee::Trim, "aipl_trim"),
         // The `*_str` family — each one entry point, so there is no custom
         // codegen arm: the ordinary-call path reads the signature registered

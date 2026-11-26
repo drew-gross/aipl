@@ -25,7 +25,7 @@ import {
     to_str,
     write_string_to_file,
 } from builtins;
-import { show_window } from gui;
+import { show_view, show_window } from gui;
 import { HttpResponse, http_get } from network;
 
 // ---- prints: the shim swallows the output. (A shim that printed would reach
@@ -150,6 +150,7 @@ fn shimmed_window() -> str {
         show_window = |title, text| {
             set shown = `{title}: {text}`;
         },
+        show_view = |title, view| {},
     } {
         announce("Greeting", "Hello, World!");
     };

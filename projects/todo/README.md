@@ -13,20 +13,23 @@ $ ./main done 1
 1. [x] buy milk
 
 0 left
-$ ./main            # opens a window listing the items
+$ ./main            # opens a window with the items drawn as elements
+$ ./main gallery    # opens a window with one of every element, from constants
 ```
 
-The window only displays the list for now. [GUI_TODO_APP.md](../../GUI_TODO_APP.md) plans the app
-it is meant to become, with items added, ticked and removed in the window itself.
+The window only displays for now: its checkboxes, buttons and fields are drawn and do nothing.
+[GUI_TODO_APP.md](../../GUI_TODO_APP.md) plans the app it is meant to become, with items added,
+ticked and removed in the window itself. `elements.aipl` is the `Element` type and the text form the
+window is given them in.
 
 ## Usage
 
 ```
-todo [show | add <text> | done <n> | undo <n> | remove <n> | clear-done]
+todo [show | gallery | add <text> | done <n> | undo <n> | remove <n> | clear-done]
 ```
 
 With no command (or `show`) the list opens in a window, and the program ends when the window is
-closed. The others change the list, save it and print it. An item is numbered as the listing
+closed; `gallery` opens a window of every element instead. The others change the list, save it and print it. An item is numbered as the listing
 numbers it, from 1.
 
 The list is the file `todos.txt` in the directory the program runs in: a line `[ ] text` for each

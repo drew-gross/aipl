@@ -903,6 +903,10 @@ flamegraph:
 gui:
   more advanced stuff (like buttons!)
   screenshot testing
+  2026-11-25 22:45:46.326 main[97759:120934980] NSKeyBindingManager: Bad key binding selector for '^@' = 'noop'
+
+todo app:
+  add todos
 
 check:
   make a flag to not print runtime (for sections and machines) then put runtime back into stdout (not stderr)

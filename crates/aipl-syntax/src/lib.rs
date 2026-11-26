@@ -3458,6 +3458,11 @@ fn __builtin_http_get(self: str, timeout_seconds: u64 = 30) !http_get -> __built
 # at the call for as long as the window is open, and carries on once the person has closed it.
 fn __builtin_show_window(title: str, text: str) !gui {}
 
+# Open a window titled `title` that shows `view`, written in the text form of a view (an element a
+# line, a child indented two spaces under its parent, described in `gui_cocoa.rs`), and wait until
+# it is closed. A view the window cannot make sense of stops the program, saying which line and why.
+fn __builtin_show_view(title: str, view: str) !gui {}
+
 # The text of a value, exactly what `` `{v}` `` interpolates: a `char` or `str` renders bare,
 # and one nested in an array, struct or optional keeps its literal form.
 fn __builtin_to_str<T: any>(self: T) -> str { "" }
@@ -4235,7 +4240,7 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("http_get", &["http_get"]),
-    ("gui", &["show_window"]),
+    ("gui", &["show_window", "show_view"]),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -4305,7 +4310,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 17;
+pub const SHIM_SLOT_COUNT: usize = 18;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

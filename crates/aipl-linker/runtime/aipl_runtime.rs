@@ -1117,8 +1117,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 17] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 17];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 18] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 18];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
@@ -1324,7 +1324,44 @@ pub extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24:
     }
 }
 
-// The window behind `show_window`: AppKit, reached through the Objective-C runtime and loaded on
+/// `show_view(title, view)`: open a window showing `view` and wait for it to be closed. Borrows
+/// both strings; the window is `gui_cocoa`'s, shared with the JIT.
+#[no_mangle]
+pub extern "C" fn aipl_show_view(title: *const str24::Str, view: *const str24::Str) {
+    let mut title_scratch = [0u8; str24::INLINE_CAP];
+    let mut view_scratch = [0u8; str24::INLINE_CAP];
+    let (title, view) = unsafe {
+        (
+            (*title).bytes(&mut title_scratch),
+            (*view).bytes(&mut view_scratch),
+        )
+    };
+    extern "C" {
+        fn exit(code: c_int) -> !;
+    }
+    let say = |text: &[u8]| unsafe {
+        write(2, text.as_ptr() as *const c_void, text.len());
+    };
+    match gui_cocoa::show_view(title, view) {
+        gui_cocoa::Shown::Closed => {}
+        gui_cocoa::Shown::Unavailable => {
+            say(b"error: could not open a window\n");
+            unsafe { exit(1) }
+        }
+        gui_cocoa::Shown::Refused { line, why } => {
+            let mut digits = [0u8; 20];
+            let start = fmt_i64(&mut digits, line as i64);
+            say(b"error: the view's line ");
+            say(&digits[start..]);
+            say(b": ");
+            say(why.as_bytes());
+            say(b"\n");
+            unsafe { exit(1) }
+        }
+    }
+}
+
+// The windows behind `show_window` and `show_view`: AppKit, reached through the Objective-C runtime and loaded on
 // first use, shared with the JIT.
 #[allow(dead_code)]
 mod gui_cocoa {

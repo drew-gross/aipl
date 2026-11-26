@@ -1,0 +1,28 @@
+# `show_view` opens a window showing a view, written in the text form of a view (one element a line,
+# a child indented two spaces under its parent), and waits until it is closed. A test shims it, so no
+# window opens and the program under test hands over the text it would have drawn.
+
+import { equal as ==, push } from builtins;
+import { show_view, show_window } from gui;
+
+# Shows `name` as a title over a line of text.
+fn greet(name: str) !gui {
+    show_view("Greeting", `column spacing=8 padding=16\n  label "Hello, {name}!" size=24 bold\n`)
+}.test({
+    mut shown: str[] = [];
+    shim gui {
+        show_window = |title, text| {},
+        show_view = |title, view| {
+            set shown.push(`{title}|{view}`);
+        },
+    } {
+        greet("World");
+    };
+    assert(shown == [
+        """
+            Greeting|column spacing=8 padding=16
+              label "Hello, World!" size=24 bold
+
+        """,
+    ]);
+})

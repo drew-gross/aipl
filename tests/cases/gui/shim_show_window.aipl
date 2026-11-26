@@ -1,9 +1,10 @@
-# `show_window` is the `gui` effect's one operation: it opens a window and waits until it is
-# closed. A test shims it, so the window is never opened and the program under test learns what
-# it would have shown.
+# `show_window` opens a window with some text and waits until it is closed. It is one of the `gui`
+# effect's two operations (`show_view`, the other, has its own case), and a shim binds both. A test
+# shims them, so the window is never opened and the program under test learns what it would have
+# shown.
 
 import { equal as ==, push } from builtins;
-import { show_window } from gui;
+import { show_view, show_window } from gui;
 
 # Greets the person in a window.
 fn greet(name: str) !gui { show_window("Greeting", `Hello, {name}!`) }.test({
@@ -12,6 +13,7 @@ fn greet(name: str) !gui { show_window("Greeting", `Hello, {name}!`) }.test({
         show_window = |title, text| {
             set shown.push(`{title}|{text}`);
         },
+        show_view = |title, view| {},
     } {
         greet("World");
         greet("again");

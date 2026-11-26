@@ -1,0 +1,171 @@
+# The elements a window is made of, and the text form `show_view` is given them in.
+#
+# An element is a case of `Element`, built like any variant, with what it leaves out at its default:
+# `Label("Todo", size=24, bold=true)`, `Column([..], padding=16)`. A `Column` or `Row` holds
+# elements, which is how a view is composed; every element takes a `key`, which is not yet used.
+# `to_text` writes a view as the lines the runtime reads, one element a line with its children
+# indented two spaces under it. The runtime's reader (`gui_cocoa.rs`) says what each element means.
+
+import {
+    equal as ==,
+    greater_than as >,
+    is_empty,
+    join,
+    repeat,
+    split,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+variant Element =
+    | Column(children: Element[], spacing: u64 = 8, padding: u64 = 0, width: u64 = 0, key: str = "")
+    | Row(children: Element[], spacing: u64 = 8, padding: u64 = 0, width: u64 = 0, key: str = "")
+    | Label(
+        text: str,
+        size: u64 = 0,
+        bold: bool = false,
+        muted: bool = false,
+        strike: bool = false,
+        key: str = ""
+    )
+    | Button(text: str, key: str = "")
+    | Checkbox(text: str, checked: bool = false, key: str = "")
+    | Field(value: str = "", placeholder: str = "", width: u64 = 0, key: str = "")
+    | Separator(key: str = "")
+
+# `text` in double quotes, with a backslash, a quote, a newline and a tab written as the runtime
+# reads them.
+fn quoted(self: str) -> str {
+    let slashes = self.split("""\""").join(sep="""\\""");
+    let quotes = slashes.split(`"`).join(sep=`\\"`);
+    let newlines = quotes.split("\n").join(sep="""\n""");
+    let tabs = newlines.split("\t").join(sep="""\t""");
+    `"{tabs}"`
+}.test({
+    assert("plain".quoted() == `"plain"`);
+    assert("".quoted() == `""`);
+    assert(`say "hi"`.quoted() == `"say \\"hi\\""`);
+    assert("""a\b""".quoted() == `"a\\\\b"`);
+    assert("two\nlines\tand a tab".quoted() == `"two\\nlines\\tand a tab"`);
+})
+
+# `name=value`, or nothing when the value is the default 0.
+fn number(name: str, value: u64) -> str[] {
+    if (value > 0) { [`{name}={value}`] } else { [] }
+}.test({
+    assert(number("size", 24) == ["size=24"]);
+    assert(number("size", 0).is_empty());
+})
+
+# `name`, when `on`.
+fn flag(name: str, on: bool) -> str[] { if (on) { [name] } else { [] } }.test({
+    assert(flag("bold", true) == ["bold"]);
+    assert(flag("bold", false).is_empty());
+})
+
+# `name="value"`, or nothing when the value is empty.
+fn text_attribute(name: str, value: str) -> str[] {
+    if (value.is_empty()) { [] } else { [`{name}={value.quoted()}`] }
+}.test({
+    assert(text_attribute("key", "row 1") == [`key="row 1"`]);
+    assert(text_attribute("key", "").is_empty());
+})
+
+# The line for an element made of `parts`, indented `depth` levels.
+fn line(self: str[], depth: u64) -> str { `{" ".repeat(depth * 2)}{self.join(sep=" ")}` }.test({
+    assert(["label", `"x"`].line(0) == `label "x"`);
+    assert(["label", `"x"`].line(2) == `    label "x"`);
+})
+
+# The lines of a container: its own, then those of its children one level in.
+fn container(name: str, children: Element[], attributes: str[], depth: u64) -> str[] {
+    [[name, ..attributes].line(depth), ..children$lines(depth + 1).join()]
+}
+
+# `self` as lines of the text form, indented `depth` levels.
+fn lines(self: Element, depth: u64) -> str[] {
+    match (self) {
+        Column(children, spacing, padding, width, key) => container(
+            "column",
+            children,
+            [
+                `spacing={spacing}`,
+                ..number("padding", padding),
+                ..number("width", width),
+                ..text_attribute("key", key),
+            ],
+            depth,
+        ),
+        Row(children, spacing, padding, width, key) => container(
+            "row",
+            children,
+            [
+                `spacing={spacing}`,
+                ..number("padding", padding),
+                ..number("width", width),
+                ..text_attribute("key", key),
+            ],
+            depth,
+        ),
+        Label(text, size, bold, muted, strike, key) => [
+            [
+                "label",
+                text.quoted(),
+                ..number("size", size),
+                ..flag("bold", bold),
+                ..flag("muted", muted),
+                ..flag("strike", strike),
+                ..text_attribute("key", key),
+            ].line(depth),
+        ],
+        Button(text, key) => [["button", text.quoted(), ..text_attribute("key", key)].line(depth)],
+        Checkbox(text, checked, key) => [
+            [
+                "checkbox",
+                text.quoted(),
+                ..flag("checked", checked),
+                ..text_attribute("key", key),
+            ].line(depth),
+        ],
+        Field(value, placeholder, width, key) => [
+            [
+                "field",
+                ..text_attribute("value", value),
+                ..text_attribute("placeholder", placeholder),
+                ..number("width", width),
+                ..text_attribute("key", key),
+            ].line(depth),
+        ],
+        Separator(key) => [["separator", ..text_attribute("key", key)].line(depth)],
+    }
+}.test({
+    assert(Label("Todo").lines(0) == [`label "Todo"`]);
+    assert(Label("Todo", size=24, bold=true).lines(1) == [`  label "Todo" size=24 bold`]);
+    assert(Label("x", muted=true, strike=true, key="k").lines(0) == [
+        `label "x" muted strike key="k"`,
+    ]);
+    assert(Button("Add").lines(0) == [`button "Add"`]);
+    assert(Checkbox("Milk", checked=true).lines(0) == [`checkbox "Milk" checked`]);
+    assert(Checkbox("Milk").lines(0) == [`checkbox "Milk"`]);
+    assert(Field(placeholder="Name", width=220).lines(0) == [`field placeholder="Name" width=220`]);
+    assert(Field(value="x").lines(0) == [`field value="x"`]);
+    assert(Separator().lines(0) == ["separator"]);
+    // A container is its own line and then its children, a level in.
+    assert(Column([Label("a"), Row([Button("b")], spacing=4)], padding=16).lines(0) == [
+        "column spacing=8 padding=16",
+        `  label "a"`,
+        "  row spacing=4",
+        `    button "b"`,
+    ]);
+    assert(Column([]).lines(0) == ["column spacing=8"]);
+})
+
+# `self` in the text form `show_view` is given.
+pub fn to_text(self: Element) -> str { `{self.lines(0).join(sep="\n")}\n` }.test({
+    assert(
+        Column([
+            Label("a"),
+            Separator(),
+        ]).to_text() == `column spacing=8\n  label "a"\n  separator\n`,
+    );
+})
