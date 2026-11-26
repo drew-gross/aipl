@@ -57,6 +57,8 @@ error messages (regressions when the pinner replaced the checker's reporting; th
   `grid_get` literal without a grid: was "cannot infer a type for T in __builtin_grid_get", now names `grid_get` which the user didn't write
 
 effects / shims:
+  gui: GUI_TODO_APP.md plans a todo app on the gui effect (events, text input, layout); projects/todo is its project
+  read_file_to_string's err carries no kind, so projects/todo reads an unreadable file as an empty list and its next save overwrites it; an error kind (missing / unreadable) would let it refuse
   http_get: request headers (`headers = [..]`); needs the runtimes to read an array of structs they are handed
   http_get: other verbs (post, put, delete); decide `HttpHeader[]` vs a dict for request headers when they land
   http_get is missing from the instrumented AOT runtime's per-builtin call counts (`aipl report` breakdown)
@@ -69,22 +71,19 @@ check:
   `aipl doc` unchecked against the placeholder function behind a top-level `test`/`benchmark` (private fns aren't listed, so probably fine)
   a file that runs tests and also measures `main` is built more than once (Phase 4 note)
 
-handoff / check speed (corpus now runs as `aipl check --baseline --shard` processes; handoff 675s -> 444s):
+handoff / check speed (corpus now runs as one `aipl check --baseline --batch` process with a thread per core; the 12-shard form took 224-242s of handoff's check step, the queue ~310-330s on a busy machine, so not measurably faster):
   the compile cache (object_cache.rs) covers object builds only; the JIT build (Compilation::jit, ~37% of a check's CPU) still compiles every function, because JITModule::define_function also records code_ranges that define_function_bytes skips: cache it by recording the range ourselves (needs the blob's ptr/size back from the module)
-  shards are uneven (171-293s in one run): hand out the heavy files (crates/, ~7s each; lint files ~17s) first, or from a shared queue, instead of round-robin by sorted position
   the 200 compiler-source files under crates/ are ~90% of the corpus cost; the other 874 cases are ~0.13s each
   optimizer: pre-mono passes ~15% of a lint file's check (`inline_single_use_pinned` alone ~5%: it recomputes use counts and binders every round, as the post-mono pass did before `SingleUseTally`)
   optimizer: `is_single_use_candidate` (inline_pinned.rs) still excludes `is_pub` functions; with explicit entries the roots are known, so a `pub` function that is not an entry could be inlined and elided
   Cranelift verifier is on (5% of a check): turn it off outside debug builds, if it isn't deliberate
-  run the non-case nextest (~75s) at the same time as the shards instead of after them (they would slow each other)
   skip the baseline AOT build for a file whose sources, imports and compiler fingerprint are unchanged (cache the measurement; needs a trustworthy compiler fingerprint)
   parse cache across files (parse+lint was 11.7% of a check) and a function-level code cache (Cranelift was 26%, 21% without the verifier): only worth it after the above; both need a correct invalidation key or handoff goes green on a broken compiler
   `aipl_codegen::lowered` (keeps the last two lowered programs) has no test of its own; evidence is timing and unmoved baseline rows
   a file with a `main` is compiled twice in `check` (the shared test driver has no `main`, so its body is compiled from the original test program for diagnostics only); find which refusals need a compile and run only that stage
-  `check --shard` progress line naming the file in flight, so a crash says where it died
-  audit the process-global state a batch leans on: shim slots, test tallies, `set_current_dir`; add a shuffled-order test (results identical to sorted order)
+  `check` progress line naming the files in flight, so a crash says where it died
   a bare `--- check ---` (all parts) has no end-to-end CLI test, only the parser asserts and a unit test in sections.rs (it would have failed discovery on the old artifact); add one
-  `Compilation` JIT memory: check that it frees its code on drop (long shards)
+  `Compilation` JIT memory: check that it frees its code on drop; each one now reserves a 1GiB ArenaMemoryProvider region (address space only) and never calls free_memory
   `check` has no `--sections`-only mode (validate recorded sections, skip format/lint/tests)
 
 finishing the per-case harness out (handoff no longer runs the per-case #[test]s):
@@ -92,7 +91,7 @@ finishing the per-case harness out (handoff no longer runs the per-case #[test]s
   handoff: Plan.need_case_tests, fill_case_tests and the rebuild after it, and the `cases_*` name mapping are dead once the list goes
   CLAUDE.md Handoff and Test cadence sections still describe per-case nextest discovery and a scoped per-case final run
   `cargo test --test cases -- cases_x` becomes `aipl check tests/cases/x` in the docs and skills
-  one handoff that needs a refill, to show the `handoff-fill:` path through the shards end to end (only clean runs so far)
+  one handoff that needs a refill, to show the `handoff-fill:` path through the corpus check end to end (only clean runs so far)
   `refresh_perfmon` needs a production exe five times for wall-clock/RSS and stays a separate process-based command; settle_baseline could use the instrumented run's five asserted columns
   linking a shard's instrumented objects into one executable and forking per case: measured as ~7% of the corpus at best (linking and running was ~0.3% of a heavy file, ~0.1s of a 0.13s case), so not worth it on this machine; the Phase 0 launchd-session measurement was never taken
   `aipl report` "binary size": object vs linked exe was never checked

@@ -1,0 +1,281 @@
+# A todo list kept in a file, and shown in a window.
+#
+# The list is the lines of `todos.txt`, each `[ ] text` for an item still to do and `[x] text` for
+# one done. `todo` on its own shows the list in a window; `todo add <text>`, `done <n>`, `undo <n>`,
+# `remove <n>` and `clear-done` change it, save it and print it. The window only displays for now:
+# GUI_TODO_APP.md plans the rest.
+
+import {
+    drop_first,
+    equal as ==,
+    filter,
+    first,
+    greater_than as >,
+    int_parse,
+    is_empty,
+    is_nonempty,
+    join,
+    len,
+    logical_not as !,
+    logical_or as ||,
+    print,
+    push,
+    read_file_to_string,
+    saturating_sub as -,
+    split,
+    starts_with,
+    value_or_err,
+    wrapping_add as +,
+    write_string_to_file,
+} from builtins;
+import { show_window } from gui;
+
+# One thing to do.
+struct Todo { text: str, done: bool }
+
+# What the command line asks for. A number names an item as the listing numbers it, from 1.
+variant Command = Show | Add(str) | Done(u64) | Undo(u64) | Remove(u64) | ClearDone
+
+# What a run came to: a listing to put in the window, or a list that changed, to save and print.
+variant Outcome = Window(str) | Changed(str, str)
+
+# `self` as a line of the file: `[ ] text`, or `[x] text` once done.
+fn line(self: Todo) -> str {
+    let mark = if (self.done) { "[x]" } else { "[ ]" };
+    `{mark} {self.text}`
+}.test({
+    assert(Todo { text: "buy milk", done: false }.line() == "[ ] buy milk");
+    assert(Todo { text: "buy milk", done: true }.line() == "[x] buy milk");
+})
+
+# The items in the text of a file, or the first line that is not one.
+fn parse_todos(text: str) -> Todo[]!str {
+    mut todos: Todo[] = [];
+    for (let at, line : text.split("\n")) {
+        if (line.starts_with("[ ] ")) {
+            set todos.push(Todo { text: line[4..], done: false });
+        } else if (line.starts_with("[x] ")) {
+            set todos.push(Todo { text: line[4..], done: true });
+        } else if (line.is_nonempty()) {
+            return err(`line {at + 1} of the file is not an item: {line}`);
+        };
+    }
+    ok(todos)
+}.test({
+    assert(parse_todos("")?.is_empty());
+    assert(parse_todos("[ ] a\n[x] b\n")? == [
+        Todo { text: "a", done: false },
+        Todo { text: "b", done: true },
+    ]);
+    // An item is whatever follows the mark, spaces and all.
+    assert(parse_todos("[ ] two  words ")? == [Todo { text: "two  words ", done: false }]);
+    assert(parse_todos("[ ] a\nnot an item\n") == err(
+        "line 2 of the file is not an item: not an item",
+    ));
+    assert(parse_todos("[x]\n") == err("line 1 of the file is not an item: [x]"));
+})
+
+# `self` as the text of the file.
+fn serialize(self: Todo[]) -> str {
+    if (self.is_empty()) { "" } else { `{self$line().join(sep="\n")}\n` }
+}.test({
+    assert([].serialize() == "");
+    assert(
+        [
+            Todo { text: "a", done: false },
+            Todo { text: "b", done: true },
+        ].serialize() == "[ ] a\n[x] b\n",
+    );
+    let list = [Todo { text: "a", done: true }];
+    assert(parse_todos(list.serialize())? == list);
+})
+
+# `self` as the listing the window and `todo` print: the items numbered from 1, then how many are
+# left to do.
+fn render(self: Todo[]) -> str {
+    if (self.is_empty()) { return "Nothing to do."; };
+    let lines = self$line();
+    mut numbered: str[] = [];
+    for (let at, text : lines) {
+        set numbered.push(`{at + 1}. {text}`);
+    }
+    let left = self.filter(|todo| !todo.done).len();
+    `{numbered.join(sep="\n")}\n\n{left} left`
+}.test({
+    assert([].render() == "Nothing to do.");
+    assert(
+        [
+            Todo { text: "a", done: false },
+            Todo { text: "b", done: true },
+        ].render() == "1. [ ] a\n2. [x] b\n\n1 left",
+    );
+})
+
+# Where item `number` is in a list of `size`, counting from 0, or why there is no such item.
+fn position(number: u64, size: u64) -> u64!str {
+    if (number == 0 || number > size) { err(`no item {number}`) } else { ok(number - 1) }
+}.test({
+    assert(position(1, 3) == ok(0));
+    assert(position(3, 3) == ok(2));
+    assert(position(0, 3) == err("no item 0"));
+    assert(position(4, 3) == err("no item 4"));
+    assert(position(1, 0) == err("no item 1"));
+})
+
+# `self` with item `number` marked done, or not done.
+fn marked(self: Todo[], number: u64, done: bool) -> Todo[]!str {
+    let target = position(number, self.len())?;
+    mut marked: Todo[] = [];
+    for (let at, todo : self) {
+        set marked.push(if (at == target) { Todo { ..todo, done } } else { todo });
+    }
+    ok(marked)
+}.test({
+    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: false }];
+    assert(list.marked(2, true)? == [
+        Todo { text: "a", done: false },
+        Todo { text: "b", done: true },
+    ]);
+    assert(list.marked(2, true)?.marked(2, false)? == list);
+    assert(list.marked(3, true) == err("no item 3"));
+})
+
+# `self` with item `number` taken out.
+fn removed(self: Todo[], number: u64) -> Todo[]!str {
+    let target = position(number, self.len())?;
+    ok([..self[..target], ..self[target + 1..]])
+}.test({
+    let list = [
+        Todo { text: "a", done: false },
+        Todo { text: "b", done: true },
+        Todo { text: "c", done: false },
+    ];
+    assert(list.removed(2)? == [Todo { text: "a", done: false }, Todo { text: "c", done: false }]);
+    assert(list.removed(1)?.len() == 2);
+    assert(list.removed(3)?.removed(1)? == [Todo { text: "b", done: true }]);
+    assert(list.removed(4) == err("no item 4"));
+})
+
+# `self` as `command` changes it.
+fn apply(self: Todo[], command: Command) -> Todo[]!str {
+    match (command) {
+        Show => ok(self),
+        Add(text) => ok([..self, Todo { text, done: false }]),
+        Done(number) => self.marked(number, true),
+        Undo(number) => self.marked(number, false),
+        Remove(number) => self.removed(number),
+        ClearDone => ok(self.filter(|todo| !todo.done)),
+    }
+}.test({
+    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: true }];
+    assert(list.apply(Show)? == list);
+    assert(list.apply(Add("c"))?.len() == 3);
+    assert(list.apply(Done(1))?.apply(ClearDone)?.is_empty());
+    assert(list.apply(Undo(2))?.apply(ClearDone)? == list.apply(Undo(2))?);
+    assert(list.apply(Remove(1))? == [Todo { text: "b", done: true }]);
+    assert(list.apply(ClearDone)? == [Todo { text: "a", done: false }]);
+    assert(list.apply(Done(9)) == err("no item 9"));
+})
+
+# The number `args` is, when it is just one.
+fn item_number(args: str[]) -> u64!str {
+    match (args) {
+        [text] => {
+            let number: u64? = text.int_parse();
+            number.value_or_err(`not an item number: {text}`)
+        },
+        _ => err("expected one item number"),
+    }
+}.test({
+    assert(item_number(["3"]) == ok(3));
+    assert(item_number(["x"]) == err("not an item number: x"));
+    assert(item_number([]) == err("expected one item number"));
+    assert(item_number(["1", "2"]) == err("expected one item number"));
+})
+
+# What the command line `args` asks for.
+fn parse_command(args: str[]) -> Command!str {
+    let some(verb) = args.first() else { return ok(Show); };
+    let rest = args.drop_first();
+    match (verb) {
+        "show" => ok(Show),
+        "add" => if (rest.is_empty()) {
+            err("add needs the text of the item")
+        } else {
+            ok(Add(rest.join(sep=" ")))
+        },
+        "done" => ok(Done(item_number(rest)?)),
+        "undo" => ok(Undo(item_number(rest)?)),
+        "remove" => ok(Remove(item_number(rest)?)),
+        "clear-done" => ok(ClearDone),
+        _ => err(`unknown command {verb}`),
+    }
+}.test({
+    assert(parse_command([]) == ok(Show));
+    assert(parse_command(["show"]) == ok(Show));
+    assert(parse_command(["add", "buy", "milk"]) == ok(Add("buy milk")));
+    assert(parse_command(["add"]) == err("add needs the text of the item"));
+    assert(parse_command(["done", "2"]) == ok(Done(2)));
+    assert(parse_command(["undo", "2"]) == ok(Undo(2)));
+    assert(parse_command(["remove", "2"]) == ok(Remove(2)));
+    assert(parse_command(["clear-done"]) == ok(ClearDone));
+    assert(parse_command(["done", "two"]) == err("not an item number: two"));
+    assert(parse_command(["frobnicate"]) == err("unknown command frobnicate"));
+})
+
+# What running `args` against the saved list `saved` comes to.
+fn run(args: str[], saved: str) -> Outcome!str {
+    let command = parse_command(args)?;
+    let todos = parse_todos(saved)?.apply(command)?;
+    match (command) {
+        Show => ok(Window(todos.render())),
+        _ => ok(Changed(todos.serialize(), todos.render())),
+    }
+}.test({
+    // Showing changes nothing and has no file to write.
+    assert(run([], "[ ] a\n") == ok(Window("1. [ ] a\n\n1 left")));
+    assert(run([], "") == ok(Window("Nothing to do.")));
+    // A change gives the new file and the listing.
+    assert(run(["add", "b"], "[ ] a\n") == ok(Changed(
+        "[ ] a\n[ ] b\n",
+        "1. [ ] a\n2. [ ] b\n\n2 left",
+    )));
+    assert(run(["done", "1"], "[ ] a\n") == ok(Changed("[x] a\n", "1. [x] a\n\n0 left")));
+    // A bad command or a bad file is the reason, with nothing to save.
+    assert(run(["done", "5"], "[ ] a\n") == err("no item 5"));
+    assert(run([], "garbage\n") == err("line 1 of the file is not an item: garbage"));
+})
+
+# Show the list in a window, or change it as the command line says, save it to `todos.txt` and print
+# it. A file that cannot be read is an empty list. Exits 1, after saying why, for a command that
+# makes no sense or a file that is not a list.
+fn main(args: str[]) !prints !read_files !write_files !gui -> i64 {
+    let path = "todos.txt";
+    let saved = match (read_file_to_string(path)) {
+        ok(text) => text,
+        err(..) => "",
+    };
+    match (run(args, saved)) {
+        err(reason) => {
+            print(`todo: {reason}`);
+            print(
+                "usage: todo [show | add <text> | done <n> | undo <n> | remove <n> | clear-done]",
+            );
+            1
+        },
+        ok(Window(listing)) => {
+            show_window("Todo", listing);
+            0
+        },
+        ok(Changed(file, listing)) => match (write_string_to_file(path, file)) {
+            ok => {
+                print(listing);
+                0
+            },
+            err(reason) => {
+                print(`todo: could not save {path}: {reason}`);
+                1
+            },
+        },
+    }
+}
