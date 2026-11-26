@@ -3,8 +3,8 @@
 # The list is the lines of `todos.txt`, each `[ ] text` for an item still to do and `[x] text` for
 # one done. `todo` on its own shows the list in a window; `todo add <text>`, `done <n>`, `undo <n>`,
 # `remove <n>` and `clear-done` change it, save it and print it; `todo gallery` shows every element
-# the window can draw, from constants. In the window, the one button there is so far (to add a first
-# item to an empty list) works; GUI_TODO_APP.md plans the rest.
+# the window can draw, from constants. In the window, the buttons to add an item work; GUI_TODO_APP.md
+# plans the rest.
 
 import {
     drop_first,
@@ -148,12 +148,13 @@ fn row(self: Todo) -> Element {
     ]));
 })
 
-# `self` as the window: a title, a row for each item and how many are left.
+# `self` as the window: a title, a row for each item and a button for another, or a button for the
+# first when there is none, and how many are left.
 fn view(self: Todo[]) -> Element {
     let rows = if (self.is_empty()) {
         [Label("Nothing to do.", muted=true), Button("Add your first todo", "add-first")]
     } else {
-        self$row()
+        [..self$row(), Button("Add a todo", "add")]
     };
     let left = self.filter(|todo| !todo.done).len();
     Column(
@@ -192,6 +193,7 @@ fn view(self: Todo[]) -> Element {
               row spacing=8
                 checkbox "" checked
                 label "b" muted strike
+              button "Add a todo" key="add"
               separator
               label "1 left" muted
 
@@ -347,21 +349,32 @@ fn parse_command(args: str[]) -> Command!str {
     assert(parse_command(["frobnicate"]) == err("unknown command frobnicate"));
 })
 
-# `self` as the button `key` was clicked changes it: the first item is added to an empty list, and a
-# click on a button nothing is made of is not a change. (The item's text is a placeholder until a
-# window can be typed into.)
+# `self` as the button `key` was clicked changes it: the first item is added to an empty list, another
+# to any list, and a click on a button nothing is made of is not a change. (The text of an added item
+# is a placeholder until a window can be typed into.)
 fn clicked(self: Todo[], key: str) -> Todo[] {
     if (key == "add-first" && self.is_empty()) {
         [Todo { text: "My first todo", done: false }]
+    } else if (key == "add") {
+        [..self, Todo { text: `Todo {self.len() + 1}`, done: false }]
     } else {
         self
     }
 }.test({
     assert([].clicked("add-first") == [Todo { text: "My first todo", done: false }]);
-    // The button is only there while the list is empty, so a late click on it adds nothing.
+
+    // The button for the first is only there while the list is empty, so a late click on it adds
+    // nothing.
     let list = [Todo { text: "a", done: false }];
     assert(list.clicked("add-first") == list);
     assert([].clicked("elsewhere").is_empty());
+    // Another goes at the end and is numbered by where it lands.
+    assert(list.clicked("add") == [
+        Todo { text: "a", done: false },
+        Todo { text: "Todo 2", done: false },
+    ]);
+    assert(list.clicked("add").clicked("add").len() == 3);
+    assert(list.clicked("add").clicked("add")[2] == some(Todo { text: "Todo 3", done: false }));
 })
 
 # Show `todos` in a window, and keep the window to date as it is used, saving each change to `path`,
@@ -400,9 +413,16 @@ fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
     }
     if (failed) { 1 } else { 0 }
 }.test({
-    // A click on the button of an empty list adds the first item, saves the list and shows it, and
-    // a second click on it, which the new window no longer offers, changes nothing.
-    mut script = ["clicked add-first", "clicked add-first", "close_requested", "closed"];
+    // A click on the button of an empty list adds the first item, saves the list and shows it; the
+    // new window offers a button for another, and a click on the first one's, which it no longer
+    // offers, changes nothing.
+    mut script = [
+        "clicked add-first",
+        "clicked add",
+        "clicked add-first",
+        "close_requested",
+        "closed",
+    ];
     mut shown: str[] = [];
     mut saved: str[] = [];
     mut closes: u64 = 0;
@@ -431,12 +451,19 @@ fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
             };
         };
     };
-    assert(saved == ["todos.txt: [ ] My first todo\n"]);
+    assert(saved == [
+        "todos.txt: [ ] My first todo\n",
+        "todos.txt: [ ] My first todo\n[ ] Todo 2\n",
+    ]);
     assert(closes == 1);
-    // The empty list's window, then the window with the item in it: two views, one for each state.
+
+    // The empty list's window, then the window with the item in it, then with two: one for each
+    // state the list was in, and none for the click that changed nothing.
+    let first = [Todo { text: "My first todo", done: false }];
     assert(shown == [
         [].view().to_text(),
-        [Todo { text: "My first todo", done: false }].view().to_text(),
+        first.view().to_text(),
+        [..first, Todo { text: "Todo 2", done: false }].view().to_text(),
     ]);
     assert(script.is_empty());
 })

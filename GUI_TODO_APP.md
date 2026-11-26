@@ -28,7 +28,8 @@ as far as the app needs.
   `gallery` command that draws every element from constants, and `events.aipl` has the `Event`
   variant, its parser and `wait_until_closed`, the loop that grants requests to close and quit;
   `main.aipl` has `interact`, the loop the todo window runs in: an event updates the list, which is
-  saved and drawn again. Its one button so far is "Add your first todo" on an empty list.
+  saved and drawn again. Its buttons so far add an item: "Add your first todo" on an empty list, and
+  "Add a todo" under the items of any other, each adding an item with placeholder text.
 - What reaches the program is the window's own requests and button clicks. A button has to have a
   `key` (up to 64 letters, digits and `- _ . : /`), which names it in its `clicked` event; checkboxes
   and fields are drawn and do nothing. A window needs the process's main thread: a

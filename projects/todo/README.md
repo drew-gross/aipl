@@ -17,8 +17,9 @@ $ ./main            # opens a window with the items drawn as elements
 $ ./main gallery    # opens a window with one of every element, from constants
 ```
 
-In the window, a list with nothing in it has an "Add your first todo" button, which adds an item
-(with placeholder text, until a window can be typed into) and saves the list. Its checkboxes and
+In the window, a list with nothing in it has an "Add your first todo" button, and any other list an
+"Add a todo" button under its items: each adds an item (with placeholder text, until a window can be
+typed into) and saves the list. Its checkboxes and
 fields are drawn and do nothing yet. Cmd-W and the close button close the window, and Cmd-Q quits,
 ending the program with exit 0. The window's icon, in the Dock and when you Cmd-Tab, is a white check
 mark on a colored tile (`gallery`'s is a grid).
