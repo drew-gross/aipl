@@ -102,6 +102,13 @@ Watch: the text form is written by AIPL and read by Rust, so a change to it is a
 the grammar at the top of `gui_cocoa.rs`; the parser's tests and `elements.aipl`'s encoder tests each
 hold half.
 
+Watch: AppKit pins a window's width to what its contents want if any view in them has an opinion about
+its own width that is held above the window's priority (500): a separator whose width follows its
+container's did, until its horizontal hugging and compression resistance were both set to the lowest
+(it opened tall and narrow and could not be widened, only heightened). A new element whose size
+follows its container's needs the same. None of this can be tested without a display; look at a window
+opened at its default size, widened and narrowed.
+
 ### 2. Text input and checkboxes
 
 Goal: a text field whose Enter gives an event with its text, and a checkbox whose toggling gives one.

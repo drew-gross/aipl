@@ -452,6 +452,9 @@ const LIMIT_HEIGHT: f64 = 720.0;
 const MINIMUM_WIDTH: f64 = 240.0;
 const MINIMUM_HEIGHT: f64 = 160.0;
 
+// The layout priority of what gives way to a window: below the 500 at which a window holds its size.
+const WINDOW_FOLLOWS: f32 = 250.0;
+
 // `wanted` points, if that is within `least` and `most`, else the nearer of them.
 fn clamped(wanted: f64, least: f64, most: f64) -> f64 {
     if wanted < least {
@@ -536,7 +539,7 @@ impl Builder<'_> {
         send!(*objc, label, "setLineBreakMode:", [i64] -> (), 4);
         send!(
             *objc, label, "setContentCompressionResistancePriority:forOrientation:", [f32, i64] -> (),
-            250.0, 0
+            WINDOW_FOLLOWS, 0
         );
         Ok(label)
     }
@@ -604,6 +607,22 @@ impl Builder<'_> {
                 let line = send!(*objc, line, "autorelease", [] -> Id);
                 // `NSBoxSeparator`.
                 send!(*objc, line, "setBoxType:", [u64] -> (), 2);
+                // Its width follows its container's, which follows the window's, so it has no
+                // wish of its own about its width: any it had, even a weak one, is held against
+                // the window and pins the window's width to what the contents would take.
+                for resistance in [false, true] {
+                    if resistance {
+                        send!(
+                            *objc, line, "setContentCompressionResistancePriority:forOrientation:",
+                            [f32, i64] -> (), 1.0, 0
+                        );
+                    } else {
+                        send!(
+                            *objc, line, "setContentHuggingPriority:forOrientation:",
+                            [f32, i64] -> (), 1.0, 0
+                        );
+                    }
+                }
                 line
             }
         })
