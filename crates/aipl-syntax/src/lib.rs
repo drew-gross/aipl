@@ -3455,13 +3455,23 @@ fn __builtin_http_get(self: str, timeout_seconds: u64 = 30) !http_get -> __built
 }
 
 # Open a window titled `title` that shows `text`, and wait until it is closed. The program stops
-# at the call for as long as the window is open, and carries on once the person has closed it.
+# at the call for as long as the window is open, and carries on once the person has closed it: the
+# window's own requests to close are all granted.
 fn __builtin_show_window(title: str, text: str) !gui {}
 
-# Open a window titled `title` that shows `view`, written in the text form of a view (an element a
-# line, a child indented two spaces under its parent, described in `gui_cocoa.rs`), and wait until
-# it is closed. A view the window cannot make sense of stops the program, saying which line and why.
+# Show `view`, written in the text form of a view (an element a line, a child indented two spaces
+# under its parent, described in `gui_cocoa.rs`), in a window titled `title`, opening the window if
+# there is none, and carry on. A view the window cannot make sense of stops the program, saying which
+# line and why. A window can only be opened on the process's main thread: in a built program, not
+# under `aipl check` or `--jit`.
 fn __builtin_show_view(title: str, view: str) !gui {}
+# Wait for what the window has to tell the program, as text: `close_requested` (its close button or
+# Cmd-W was used), `quit_requested` (Cmd-Q was used) or `closed` (the window is gone, or there never
+# was one). The window stays open until the program closes it, which is how it can decide whether
+# it is time.
+fn __builtin_next_event() !gui -> str { "" }
+# Close the window. The next event is `closed`.
+fn __builtin_close_window() !gui {}
 
 # The text of a value, exactly what `` `{v}` `` interpolates: a `char` or `str` renders bare,
 # and one nested in an array, struct or optional keeps its literal form.
@@ -4240,7 +4250,10 @@ pub const SHIMMABLE_EFFECTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("http_get", &["http_get"]),
-    ("gui", &["show_window", "show_view"]),
+    (
+        "gui",
+        &["show_window", "show_view", "next_event", "close_window"],
+    ),
 ];
 
 /// The effects that have no default implementation: the program must install one
@@ -4310,7 +4323,7 @@ pub fn shim_slot_index(op: &str) -> Option<usize> {
 
 /// How many shim slots the runtimes must reserve. Kept in sync by
 /// `shim_slots_match_runtime` in `tests/shims.rs`.
-pub const SHIM_SLOT_COUNT: usize = 18;
+pub const SHIM_SLOT_COUNT: usize = 20;
 
 /// How many constants computed on first use ([`constant_initializer_name`]) a
 /// program may have. Each owns a cache slot in the runtime, and both runtimes

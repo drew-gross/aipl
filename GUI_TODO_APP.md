@@ -6,20 +6,26 @@ as far as the app needs.
 
 ## Context
 
-- The `gui` effect has two operations, both blocking until the window is closed and both shimmable:
-  `show_window(title, text)` shows some text, and `show_view(title, view)` shows a view given in its
-  text form. The text form is one element a line, children indented two spaces; its grammar and what
+- The `gui` effect has four operations, all shimmable. `show_view(title, view)` shows a view given in
+  its text form in the one window, opening it if need be, and returns. `next_event()` waits for what
+  the window has to tell the program, as text: `close_requested` (the close button or Cmd-W),
+  `quit_requested` (Cmd-Q) or `closed`. `close_window()` closes it. `show_window(title, text)` shows
+  some text and waits until the window is closed, granting every request to close it. The text form is one element a line, children indented two spaces; its grammar and what
   each element becomes are described at the top of `crates/aipl-codegen/src/gui_cocoa.rs`, which
-  also reads it (without allocating) and builds AppKit views: `NSStackView` for `column` and `row`,
+  also reads it (without allocating), makes the one window and the main menu (Quit, Cmd-Q; Close
+  Window, Cmd-W) and a delegate class that turns the window's requests into events, and builds AppKit
+  views: `NSStackView` for `column` and `row`,
   labels as attributed strings, buttons, checkboxes, text fields and separators. The JIT and the AOT
   runtime both include that file; AppKit is loaded with `dlopen` on the first call and driven through
-  `objc_msgSend`, so nothing is linked. The run loop is a hand-written `nextEventMatchingMask` loop
-  that ends when the window is no longer visible.
-- The AIPL side of the text form is `projects/todo/elements.aipl`: the `Element` variant and
-  `to_text`, with a `gallery` command in the project that draws every element from constants.
-- Nothing reaches the program from the window: no events, no input, no custom Objective-C
-  classes (a button needs a target class made at run time), no menu (so Cmd-Q and Cmd-W do nothing).
-  Buttons, checkboxes and fields are drawn and do nothing; a view's `key`s are accepted and unused.
+  `objc_msgSend`, so nothing is linked. `next_event` runs a hand-written `nextEventMatchingMask`
+  loop until the window has an event for the program; the runtime closes nothing of its own accord.
+- The AIPL side is in `projects/todo`: `elements.aipl` has the `Element` variant and `to_text`, with a
+  `gallery` command that draws every element from constants, and `events.aipl` has the `Event`
+  variant, its parser and `wait_until_closed`, the loop that grants requests to close and quit.
+- Only the window's own requests reach the program. Buttons, checkboxes and fields are drawn and do
+  nothing, and a view's `key`s are accepted and unused. A window needs the process's main thread: a
+  built binary has it, `aipl check` and `--jit` do not (a real window there is an error), so the app
+  is tested with the operations shimmed.
 - A window must be made on the process's main thread. A built binary's `main` is on it. `aipl
   check` and `--jit` run programs on worker threads, so a real `gui` operation cannot run there:
   everything about the app has to be testable with the operations shimmed.
@@ -46,9 +52,14 @@ as far as the app needs.
 - **A view crosses as text.** The runtimes read a `str` and nothing else, so a view is written in a
   line-based text form by AIPL and read by the runtime, and an event will come back as text that
   AIPL reads. The typed `Element` and `Event` are AIPL's.
-- **One more operation** in the `gui` effect, to wait for the next event; with `show_view` it is
-  shimmable, so a test supplies a script of events and records the views it was shown, and the whole
-  app runs without a display.
+- **A program is a loop around `next_event`**, the one call that waits, and a test supplies a script
+  of events to it and records the views it was shown, so the whole app runs without a display. This is
+  the shape an `await` on a stream of events takes once the language has async: `show_view` and
+  `close_window` stay as they are and `next_event` becomes the awaited call, so nothing about the
+  operations has to change for it.
+- **The runtime grants nothing.** A request to close or to quit is an event, not an action, so a
+  program with unsaved changes can ask first; `wait_until_closed` is what a program with nothing to
+  ask uses.
 - **Real windows only in a built binary**, on the main thread. The project's README says so.
 - macOS only, like the rest of the project.
 
@@ -84,18 +95,13 @@ Watch: the text form is written by AIPL and read by Rust, so a change to it is a
 the grammar at the top of `gui_cocoa.rs`; the parser's tests and `elements.aipl`'s encoder tests each
 hold half.
 
-### 1. Events from a window
+### 1. Clicks
 
-Goal: a program waits for events from a window it has drawn and gets a click or the window closing.
+Goal: a button the program has drawn tells it when it is clicked.
 
-- [ ] `next_event` listed in `SHIMMABLE_EFFECTS` under `gui`, with `SHIM_SLOT_COUNT` and both
-      runtimes' `SHIM_SLOTS` raised to match; its `Callee` arm, `builtin_table.aipl` entry and
-      `BUILTIN_SIGNATURES` declaration.
-- [ ] `Event` and its decoder in AIPL: `Clicked(key)` and `Closed`.
-- [ ] `gui_cocoa.rs`: each view made keeps its `key`; a target class made with
-      `objc_allocateClassPair` and `class_addMethod` whose action pushes the sender's key on an event
-      queue; `next_event` runs the run loop until the queue holds one, and gives `Closed` when the
-      window closes.
+- [ ] `Clicked(key)` in the event text form and `Event`; each view made keeps its `key`.
+- [ ] `gui_cocoa.rs`: a button's target and action, on the delegate class that already hears the
+      window, push the sender's key on the event queue.
 - [ ] A counter app in a case, driven by shimmed `show_view` and `next_event`.
 - [ ] The counter run by hand in a built binary.
 
@@ -142,10 +148,10 @@ empty and the next save overwrites it; an error kind would let the app refuse in
 
 ### 5. Behaving like an app
 
-- [ ] A main menu with Quit (Cmd-Q) and Close (Cmd-W); closing the window ends `next_event` with
-      `Closed`.
-- [ ] The window comes to the front when launched from a terminal and has the app's name in the
-      menu bar.
+- [ ] An Edit menu (cut, copy, paste, select all), which text fields need to take them.
+- [ ] The Dock's and the system's own requests to quit (logging out) reach the program as
+      `quit_requested`, not as the process ending, through the application's delegate.
+- [ ] A window the program has asked a question of (unsaved changes) does not close until it says.
 
 ### 6. `run_app`
 

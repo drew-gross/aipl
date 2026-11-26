@@ -170,6 +170,8 @@ variant Callee =
     | HttpGet
     | ShowWindow
     | ShowView
+    | NextEvent
+    | CloseWindow
     | Union
     | UnionAll
     | SetMap
@@ -896,6 +898,18 @@ pub fn builtin_table() -> BuiltinEntry[] {
         BuiltinEntry {
             arm: ShowView,
             callee: "__builtin_show_view",
+            definition: Declared,
+            library: "gui",
+        },
+        BuiltinEntry {
+            arm: NextEvent,
+            callee: "__builtin_next_event",
+            definition: Declared,
+            library: "gui",
+        },
+        BuiltinEntry {
+            arm: CloseWindow,
+            callee: "__builtin_close_window",
             definition: Declared,
             library: "gui",
         },

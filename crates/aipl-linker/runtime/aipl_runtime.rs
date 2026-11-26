@@ -1117,8 +1117,8 @@ unsafe fn clock_nanos(id: c_int) -> i64 {
 /// assigns. 0 means "no shim installed" — the state every slot starts in and
 /// returns to. Sized by `aipl_syntax::SHIM_SLOT_COUNT`; `shim_slots_match_runtime`
 /// in `tests/shims.rs` holds the two in sync.
-static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 18] =
-    [const { core::sync::atomic::AtomicI64::new(0) }; 18];
+static SHIM_SLOTS: [core::sync::atomic::AtomicI64; 20] =
+    [const { core::sync::atomic::AtomicI64::new(0) }; 20];
 
 /// The shim installed for slot `idx`, or 0 if none. An out-of-range index reads
 /// as "no shim" rather than trapping (codegen only ever emits valid indices).
@@ -1300,6 +1300,33 @@ mod http_response {
     include!("../../aipl-codegen/src/http_response.rs");
 }
 
+/// Stop the program, saying why, unless a window operation came to `Done`.
+fn window_or_exit(shown: gui_cocoa::Shown) {
+    extern "C" {
+        fn exit(code: c_int) -> !;
+    }
+    let say = |text: &[u8]| unsafe {
+        write(2, text.as_ptr() as *const c_void, text.len());
+    };
+    match shown {
+        gui_cocoa::Shown::Done => return,
+        gui_cocoa::Shown::Unavailable => say(b"error: could not open a window\n"),
+        gui_cocoa::Shown::NotMainThread => say(
+            b"error: a window can only be opened on the main thread; build the program with `aipl build` and run that\n",
+        ),
+        gui_cocoa::Shown::Refused { line, why } => {
+            let mut digits = [0u8; 20];
+            let start = fmt_i64(&mut digits, line as i64);
+            say(b"error: the view's line ");
+            say(&digits[start..]);
+            say(b": ");
+            say(why.as_bytes());
+            say(b"\n");
+        }
+    }
+    unsafe { exit(1) }
+}
+
 /// `show_window(title, text)`: open a window and wait for it to be closed. Borrows both
 /// strings; the window is `gui_cocoa`'s, shared with the JIT.
 #[no_mangle]
@@ -1312,20 +1339,10 @@ pub extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24:
             (*text).bytes(&mut text_scratch),
         )
     };
-    if !gui_cocoa::show_window(title, text) {
-        let message = b"error: could not open a window\n";
-        extern "C" {
-            fn exit(code: c_int) -> !;
-        }
-        unsafe {
-            write(2, message.as_ptr() as *const c_void, message.len());
-            exit(1);
-        }
-    }
+    window_or_exit(gui_cocoa::show_window(title, text));
 }
 
-/// `show_view(title, view)`: open a window showing `view` and wait for it to be closed. Borrows
-/// both strings; the window is `gui_cocoa`'s, shared with the JIT.
+/// `show_view(title, view)`: show `view` in the window and return. Borrows both strings.
 #[no_mangle]
 pub extern "C" fn aipl_show_view(title: *const str24::Str, view: *const str24::Str) {
     let mut title_scratch = [0u8; str24::INLINE_CAP];
@@ -1336,32 +1353,22 @@ pub extern "C" fn aipl_show_view(title: *const str24::Str, view: *const str24::S
             (*view).bytes(&mut view_scratch),
         )
     };
-    extern "C" {
-        fn exit(code: c_int) -> !;
-    }
-    let say = |text: &[u8]| unsafe {
-        write(2, text.as_ptr() as *const c_void, text.len());
-    };
-    match gui_cocoa::show_view(title, view) {
-        gui_cocoa::Shown::Closed => {}
-        gui_cocoa::Shown::Unavailable => {
-            say(b"error: could not open a window\n");
-            unsafe { exit(1) }
-        }
-        gui_cocoa::Shown::Refused { line, why } => {
-            let mut digits = [0u8; 20];
-            let start = fmt_i64(&mut digits, line as i64);
-            say(b"error: the view's line ");
-            say(&digits[start..]);
-            say(b": ");
-            say(why.as_bytes());
-            say(b"\n");
-            unsafe { exit(1) }
-        }
-    }
+    window_or_exit(gui_cocoa::show_view(title, view));
 }
 
-// The windows behind `show_window` and `show_view`: AppKit, reached through the Objective-C runtime and loaded on
+/// `next_event()`: wait for what the window has to tell the program, as its text.
+#[no_mangle]
+pub extern "C" fn aipl_next_event(out: *mut str24::Str) {
+    unsafe { *out = str24::from_bytes(gui_cocoa::next_event().text()) };
+}
+
+/// `close_window()`.
+#[no_mangle]
+pub extern "C" fn aipl_close_window() {
+    gui_cocoa::close_window();
+}
+
+// The window behind the `gui` operations: AppKit, reached through the Objective-C runtime and loaded on
 // first use, shared with the JIT.
 #[allow(dead_code)]
 mod gui_cocoa {

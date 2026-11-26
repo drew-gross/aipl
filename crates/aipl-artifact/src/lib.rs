@@ -363,6 +363,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_clear_terminal"
         | "aipl_enter_alternate_screen"
         | "aipl_leave_alternate_screen"
+        | "aipl_close_window"
         | "aipl_random_unshimmed" => sig(0, false),
         // Takes nothing, returns the reading.
         "aipl_test_summary"
@@ -444,6 +445,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_append"
         | "aipl_str_reserve"
         // ...and the producers of exactly one `str` from none or one:
+        | "aipl_next_event"
         | "aipl_trim"
         | "aipl_str_reverse"
         | "aipl_str_sort"

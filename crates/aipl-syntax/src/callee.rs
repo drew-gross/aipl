@@ -279,6 +279,10 @@ pub enum Callee {
     /// `show_view(title, view)` — open a window showing the view `view` describes and wait for it
     /// to be closed (`!gui`).
     ShowView,
+    /// `next_event() -> str` — wait for what the window has to tell the program (`!gui`).
+    NextEvent,
+    /// `close_window()` — close the window (`!gui`).
+    CloseWindow,
     Union,
     UnionAll,
     /// `set_map(self: #{T}, f: (T) -> U) -> U[]` — `map` for a set, yielding an
@@ -608,6 +612,8 @@ impl Callee {
         Callee::HttpGet,
         Callee::ShowWindow,
         Callee::ShowView,
+        Callee::NextEvent,
+        Callee::CloseWindow,
         Callee::Union,
         Callee::UnionAll,
         Callee::SetMap,
@@ -856,6 +862,8 @@ impl Callee {
             Callee::HttpGet => "__builtin_http_get",
             Callee::ShowWindow => "__builtin_show_window",
             Callee::ShowView => "__builtin_show_view",
+            Callee::NextEvent => "__builtin_next_event",
+            Callee::CloseWindow => "__builtin_close_window",
             Callee::Union => "__builtin_union",
             Callee::UnionAll => "__builtin_union_all",
             Callee::SetMap => "__builtin_set_map",

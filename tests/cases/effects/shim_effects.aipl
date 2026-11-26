@@ -151,6 +151,8 @@ fn shimmed_window() -> str {
             set shown = `{title}: {text}`;
         },
         show_view = |title, view| {},
+        next_event = || "closed",
+        close_window = || {},
     } {
         announce("Greeting", "Hello, World!");
     };

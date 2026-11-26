@@ -12,6 +12,8 @@ fn greet(name: str) !gui {
     mut shown: str[] = [];
     shim gui {
         show_window = |title, text| {},
+        next_event = || "closed",
+        close_window = || {},
         show_view = |title, view| {
             set shown.push(`{title}|{view}`);
         },

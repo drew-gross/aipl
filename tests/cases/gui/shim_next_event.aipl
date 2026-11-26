@@ -1,0 +1,43 @@
+# `next_event` waits for what a window has to tell the program and gives it as text:
+# `close_requested` (its close button or Cmd-W was used), `quit_requested` (Cmd-Q was used) or
+# `closed` (the window is gone). The window stays open until the program calls `close_window`.
+# A test shims the operations, so no window opens and the events are the ones it scripts.
+
+import { drop_first, equal as ==, first, is_empty, push, value_or } from builtins;
+import { close_window, next_event, show_view, show_window } from gui;
+
+# Whether the window was asked to close before it was gone, listening until it is.
+fn asked_to_close() !gui -> bool {
+    mut asked = false;
+    mut open = true;
+    while (open) {
+        let event = next_event();
+        if (event == "close_requested") {
+            set asked = true;
+            close_window();
+        } else if (event == "closed") {
+            set open = false;
+        };
+    }
+    asked
+}.test({
+    mut script = ["quit_requested", "close_requested", "closed"];
+    mut actions: str[] = [];
+    shim gui {
+        show_window = |title, text| {},
+        show_view = |title, view| {},
+        next_event = || {
+            let next = script.first().value_or("closed");
+            set script = script.drop_first();
+            next
+        },
+        close_window = || {
+            set actions.push("close");
+        },
+    } {
+        assert(asked_to_close());
+    };
+    // Quitting was heard and passed over; the close request was granted once.
+    assert(actions == ["close"]);
+    assert(script.is_empty());
+})

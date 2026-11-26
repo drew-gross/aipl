@@ -1,8 +1,8 @@
 // NOTE: plain `//` comments, not `//!` module docs, and no inner attributes:
 // this file is `include!`d by the AOT runtime, which can carry neither.
 //
-// The windows behind `show_window` and `show_view`: AppKit, reached through the Objective-C
-// runtime. Shared by the JIT and the AOT runtime, so the two draw the same window. Nothing is
+// The window behind `show_window`, `show_view`, `next_event` and `close_window`: AppKit, reached
+// through the Objective-C runtime. Shared by the JIT and the AOT runtime, so the two draw the same window. Nothing is
 // linked: AppKit is loaded with `dlopen` on the first call and every Objective-C entry point is
 // found with `dlsym` (loading AppKit brings the Objective-C runtime in with it), so a program that
 // never opens a window starts exactly as fast as one built without this, and the linker needs no
@@ -36,6 +36,20 @@
 //
 // Any element takes `key="text"` and `width=` (points); the key is accepted and not yet used. A
 // line the reader cannot make sense of stops the view, and the error says which line and why.
+//
+// # Events
+//
+// `show_view` shows the view and returns; `next_event` waits for something the program should hear
+// and gives it as text:
+//
+//     close_requested  the window's close button or Cmd-W was used: the window is still open
+//     quit_requested   Cmd-Q was used: the window is still open
+//     closed           the window is gone (the program closed it, or there never was one)
+//
+// The runtime closes nothing of its own accord: a program that hears a request decides whether
+// to `close_window` or to carry on, which is how it can ask about unsaved changes first. The main
+// menu has Quit (Cmd-Q) and Close Window (Cmd-W). AppKit has to be used from the process's main
+// thread, so a program run anywhere else gets an error from `show_view`.
 
 use core::ffi::{c_char, c_int, c_void};
 
@@ -44,6 +58,8 @@ extern "C" {
     fn dlsym(handle: *mut c_void, name: *const c_char) -> *mut c_void;
     fn malloc(size: usize) -> *mut c_void;
     fn free(pointer: *mut c_void);
+    // Whether the calling thread is the process's main thread, which AppKit needs.
+    fn pthread_main_np() -> c_int;
 }
 
 const RTLD_NOW: c_int = 2;
@@ -319,6 +335,11 @@ struct Objc {
     send: *const c_void,
     pool_push: unsafe extern "C" fn() -> *mut c_void,
     pool_pop: unsafe extern "C" fn(*mut c_void),
+    // `objc_allocateClassPair`, `class_addMethod` and `objc_registerClassPair`, which make the
+    // class whose methods hear the window's requests.
+    allocate_class: unsafe extern "C" fn(Id, *const c_char, usize) -> Id,
+    add_method: unsafe extern "C" fn(Id, Selector, *const c_void, *const c_char) -> i8,
+    register_class: unsafe extern "C" fn(Id),
 }
 
 // Send `$selector` to `$receiver`: `[receiver selector:args]`. `[$arg_type, ..] -> $ret` is
@@ -350,7 +371,13 @@ unsafe fn load() -> Option<Objc> {
     let send = symbol(b"objc_msgSend\0");
     let pool_push = symbol(b"objc_autoreleasePoolPush\0");
     let pool_pop = symbol(b"objc_autoreleasePoolPop\0");
+    let allocate_class = symbol(b"objc_allocateClassPair\0");
+    let add_method = symbol(b"class_addMethod\0");
+    let register_class = symbol(b"objc_registerClassPair\0");
     if get_class.is_null()
+        || allocate_class.is_null()
+        || add_method.is_null()
+        || register_class.is_null()
         || register_selector.is_null()
         || send.is_null()
         || pool_push.is_null()
@@ -364,6 +391,9 @@ unsafe fn load() -> Option<Objc> {
         send,
         pool_push: core::mem::transmute(pool_push),
         pool_pop: core::mem::transmute(pool_pop),
+        allocate_class: core::mem::transmute(allocate_class),
+        add_method: core::mem::transmute(add_method),
+        register_class: core::mem::transmute(register_class),
     })
 }
 
@@ -586,154 +616,415 @@ impl Builder<'_> {
     }
 }
 
+// ---------- Events ----------
+
+// What a window tells the program: see the top of this file.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Event {
+    CloseRequested,
+    QuitRequested,
+    Closed,
+}
+
+impl Event {
+    // The event as `next_event` hands it over. Short enough to be an inline `str`.
+    pub fn text(self) -> &'static [u8] {
+        match self {
+            Event::CloseRequested => b"close_requested",
+            Event::QuitRequested => b"quit_requested",
+            Event::Closed => b"closed",
+        }
+    }
+}
+
+// The events the window has told the runtime of and `next_event` has not yet given out, oldest
+// first. A window that is shouted at faster than the program listens loses the later ones.
+struct Queue {
+    items: [Event; 8],
+    length: usize,
+}
+
+impl Queue {
+    fn push(&mut self, event: Event) {
+        if self.length < self.items.len() {
+            self.items[self.length] = event;
+            self.length += 1;
+        }
+    }
+
+    fn pop(&mut self) -> Option<Event> {
+        if self.length == 0 {
+            return None;
+        }
+        let first = self.items[0];
+        self.items.copy_within(1..self.length, 0);
+        self.length -= 1;
+        Some(first)
+    }
+}
+
+// The one queue, filled by the delegate's methods while AppKit runs them on the main thread and
+// emptied by `next_event` on the same.
+static mut QUEUE: Queue = Queue {
+    items: [Event::Closed; 8],
+    length: 0,
+};
+
+unsafe fn queue() -> &'static mut Queue {
+    &mut *core::ptr::addr_of_mut!(QUEUE)
+}
+
+// The window is asked to close (its close button, Cmd-W): it is not closed, the program is told.
+extern "C" fn window_should_close(_this: Id, _selector: Selector, _window: Id) -> i8 {
+    unsafe { queue().push(Event::CloseRequested) };
+    0
+}
+
+// Quit is chosen (Cmd-Q): the program is told.
+extern "C" fn quit_requested(_this: Id, _selector: Selector, _sender: Id) {
+    unsafe { queue().push(Event::QuitRequested) };
+}
+
 // ---------- The window ----------
 
-// What opening a window came to.
+// What showing a window came to.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Shown {
-    // The window was shown, and has been closed.
-    Closed,
+    Done,
     // AppKit is not there to open one.
     Unavailable,
+    // AppKit has to be used from the main thread, and this is not it.
+    NotMainThread,
     // The view's text was not one: the line, and what is wrong with it.
     Refused { line: usize, why: &'static str },
 }
 
-// Open a window titled `title` whose contents `fill` puts in, and run until it is closed.
-unsafe fn open(
-    title: &[u8],
-    fill: &mut dyn FnMut(&Objc, Id) -> Result<(), (usize, &'static str)>,
-) -> Shown {
-    const REGULAR_ACTIVATION_POLICY: i64 = 0;
-    // Titled, closable, miniaturizable and resizable.
-    const WINDOW_STYLE: u64 = 1 | 2 | 4 | 8;
-    const BUFFERED_BACKING: u64 = 2;
-    const EVERY_EVENT: u64 = u64::MAX;
+// AppKit, the one window, and the object that hears what it is told.
+struct Gui {
+    objc: Objc,
+    application: Id,
+    delegate: Id,
+    // `null` before the first view and after the window has been closed.
+    window: Id,
+    // `NSDefaultRunLoopMode`.
+    mode: Id,
+}
 
-    let Some(objc) = load() else {
-        return Shown::Unavailable;
+static mut GUI: Option<Gui> = None;
+
+unsafe fn selector(objc: &Objc, name: &'static [u8]) -> Selector {
+    (objc.register_selector)(name.as_ptr() as *const c_char)
+}
+
+// The object whose methods hear the window's requests, of a class made for it.
+unsafe fn make_delegate(objc: &Objc) -> Option<Id> {
+    let class = (objc.allocate_class)(
+        class(objc, b"NSObject\0"),
+        b"AiplGuiDelegate\0".as_ptr() as *const c_char,
+        0,
+    );
+    if class.is_null() {
+        return None;
+    }
+    (objc.add_method)(
+        class,
+        selector(objc, b"windowShouldClose:\0"),
+        window_should_close as *const c_void,
+        b"c@:@\0".as_ptr() as *const c_char,
+    );
+    (objc.add_method)(
+        class,
+        selector(objc, b"aiplQuit:\0"),
+        quit_requested as *const c_void,
+        b"v@:@\0".as_ptr() as *const c_char,
+    );
+    (objc.register_class)(class);
+    let delegate = send!(*objc, class, "alloc", [] -> Id);
+    Some(send!(*objc, delegate, "init", [] -> Id))
+}
+
+// The main menu: Quit (Cmd-Q), which tells the program, and Close Window (Cmd-W), which asks the
+// key window to close and so reaches the delegate the same way the close button does.
+unsafe fn install_menu(objc: &Objc, application: Id, delegate: Id) {
+    let menu = |title: Id| {
+        let menu = send!(*objc, class(objc, b"NSMenu\0"), "alloc", [] -> Id);
+        send!(*objc, menu, "initWithTitle:", [Id] -> Id, title)
     };
-    let pool = (objc.pool_push)();
+    let item_in = |bar: Id, submenu: Id| {
+        let item = send!(*objc, class(objc, b"NSMenuItem\0"), "alloc", [] -> Id);
+        let item = send!(*objc, item, "init", [] -> Id);
+        send!(*objc, item, "setSubmenu:", [Id] -> (), submenu);
+        send!(*objc, bar, "addItem:", [Id] -> (), item);
+    };
+    let bar = menu(string(objc, b""));
 
+    let name = send!(
+        *objc, send!(*objc, class(objc, b"NSProcessInfo\0"), "processInfo", [] -> Id),
+        "processName", [] -> Id
+    );
+    let quit_title = send!(
+        *objc, string(objc, b"Quit "), "stringByAppendingString:", [Id] -> Id, name
+    );
+    let app_menu = menu(name);
+    let quit = send!(
+        *objc, app_menu, "addItemWithTitle:action:keyEquivalent:", [Id, Selector, Id] -> Id,
+        quit_title, selector(objc, b"aiplQuit:\0"), string(objc, b"q")
+    );
+    send!(*objc, quit, "setTarget:", [Id] -> (), delegate);
+    item_in(bar, app_menu);
+
+    let file_menu = menu(string(objc, b"File"));
+    send!(
+        *objc, file_menu, "addItemWithTitle:action:keyEquivalent:", [Id, Selector, Id] -> Id,
+        string(objc, b"Close Window"), selector(objc, b"performClose:\0"), string(objc, b"w")
+    );
+    item_in(bar, file_menu);
+
+    send!(*objc, application, "setMainMenu:", [Id] -> (), bar);
+}
+
+unsafe fn start() -> Option<Gui> {
+    let objc = load()?;
     let application = send!(objc, class(&objc, b"NSApplication\0"), "sharedApplication", [] -> Id);
     if application.is_null() {
-        (objc.pool_pop)(pool);
-        return Shown::Unavailable;
+        return None;
     }
-    send!(objc, application, "setActivationPolicy:", [i64] -> i8, REGULAR_ACTIVATION_POLICY);
-
-    let window = send!(objc, class(&objc, b"NSWindow\0"), "alloc", [] -> Id);
-    let window = send!(
-        objc, window, "initWithContentRect:styleMask:backing:defer:",
-        [Rect, u64, u64, i8] -> Id,
-        Rect { origin: Point { x: 0.0, y: 0.0 }, size: Size { width: 480.0, height: 240.0 } },
-        WINDOW_STYLE, BUFFERED_BACKING, 0
-    );
-    let window = send!(objc, window, "autorelease", [] -> Id);
-    // The pool releases the window; closing it must not release it a second time.
-    send!(objc, window, "setReleasedWhenClosed:", [i8] -> (), 0);
-    send!(objc, window, "setTitle:", [Id] -> (), string(&objc, title));
-
-    if let Err((line, why)) = fill(&objc, window) {
-        (objc.pool_pop)(pool);
-        return Shown::Refused { line, why };
-    }
-
-    send!(objc, window, "center", [] -> ());
-    send!(objc, window, "makeKeyAndOrderFront:", [Id] -> (), core::ptr::null_mut());
-    send!(objc, application, "activateIgnoringOtherApps:", [i8] -> (), 1);
-    send!(objc, application, "finishLaunching", [] -> ());
-
-    // `NSDefaultRunLoopMode` is a global holding the mode's name.
-    let Some(mode) = constant(b"NSDefaultRunLoopMode\0") else {
-        (objc.pool_pop)(pool);
-        return Shown::Unavailable;
-    };
-    let forever = send!(objc, class(&objc, b"NSDate\0"), "distantFuture", [] -> Id);
-    // A window that is minimized is not visible, but is not closed either.
-    while send!(objc, window, "isVisible", [] -> i8) != 0
-        || send!(objc, window, "isMiniaturized", [] -> i8) != 0
-    {
-        let event = send!(
-            objc, application, "nextEventMatchingMask:untilDate:inMode:dequeue:",
-            [u64, Id, Id, i8] -> Id, EVERY_EVENT, forever, mode, 1
-        );
-        if !event.is_null() {
-            send!(objc, application, "sendEvent:", [Id] -> (), event);
-        }
-    }
-
-    (objc.pool_pop)(pool);
-    Shown::Closed
+    // A regular application, with a Dock icon and a menu bar.
+    send!(objc, application, "setActivationPolicy:", [i64] -> i8, 0);
+    let delegate = make_delegate(&objc)?;
+    install_menu(&objc, application, delegate);
+    let mode = constant(b"NSDefaultRunLoopMode\0")?;
+    Some(Gui {
+        objc,
+        application,
+        delegate,
+        window: core::ptr::null_mut(),
+        mode,
+    })
 }
 
-// Open a window titled `title` showing `text` centered in it, and run until it is closed. `false`
-// when AppKit cannot be had: it is missing, or there is no window server to talk to (a session with
-// no display answers `NSApplication` with an abort that nothing here can intercept, so that case is
-// the caller's to avoid).
-pub fn show_window(title: &[u8], text: &[u8]) -> bool {
-    unsafe {
-        let mut centered = |objc: &Objc, window: Id| -> Result<(), (usize, &'static str)> {
-            let label = send!(
-                *objc, class(objc, b"NSTextField\0"), "labelWithString:", [Id] -> Id,
-                string(objc, text)
-            );
-            let font =
-                send!(*objc, class(objc, b"NSFont\0"), "systemFontOfSize:", [f64] -> Id, 32.0);
-            send!(*objc, label, "setFont:", [Id] -> (), font);
-            send!(*objc, label, "setTranslatesAutoresizingMaskIntoConstraints:", [i8] -> (), 0);
-            let content = send!(*objc, window, "contentView", [] -> Id);
-            send!(*objc, content, "addSubview:", [Id] -> (), label);
-            // Centered by constraints: the label's size is the text's, which a frame would have to
-            // measure.
-            let across = send!(
-                *objc, send!(*objc, label, "centerXAnchor", [] -> Id), "constraintEqualToAnchor:",
-                [Id] -> Id, send!(*objc, content, "centerXAnchor", [] -> Id)
-            );
-            send!(*objc, across, "setActive:", [i8] -> (), 1);
-            let down = send!(
-                *objc, send!(*objc, label, "centerYAnchor", [] -> Id), "constraintEqualToAnchor:",
-                [Id] -> Id, send!(*objc, content, "centerYAnchor", [] -> Id)
-            );
-            send!(*objc, down, "setActive:", [i8] -> (), 1);
-            Ok(())
-        };
-        open(title, &mut centered) != Shown::Unavailable
+// The window state, started on first use. `None` when AppKit is not there.
+unsafe fn gui() -> Option<&'static mut Gui> {
+    let slot = &mut *core::ptr::addr_of_mut!(GUI);
+    if slot.is_none() {
+        *slot = start();
     }
+    slot.as_mut()
 }
 
-// Open a window titled `title` showing the view `view` (its text form, described at the top of this
-// file), and run until it is closed.
-pub fn show_view(title: &[u8], view: &[u8]) -> Shown {
-    unsafe {
+impl Gui {
+    // Show the view `view` in the window titled `title`, opening the window if there is none.
+    unsafe fn show(&mut self, title: &[u8], view: &[u8]) -> Shown {
+        let objc = &self.objc;
         let scratch_length = view.len() + 1;
         let scratch = malloc(scratch_length) as *mut u8;
         if scratch.is_null() {
             return Shown::Unavailable;
         }
-        let mut build = |objc: &Objc, window: Id| -> Result<(), (usize, &'static str)> {
-            let mut builder = Builder {
-                objc,
-                scratch,
-                scratch_length,
-                open: [core::ptr::null_mut(); MAX_DEPTH],
-                padding: [0.0; MAX_DEPTH],
-                count: 0,
-                root: core::ptr::null_mut(),
-            };
-            parse_view(view, &mut |item| builder.add(&item))?;
-            if builder.root.is_null() {
-                return Err((1, "a view is empty: it starts with a column or a row"));
-            }
-            send!(*objc, window, "setContentView:", [Id] -> (), builder.root);
-            // The window opens as big as its contents need.
-            let fitting = send!(*objc, builder.root, "fittingSize", [] -> Size);
-            send!(*objc, window, "setContentSize:", [Size] -> (), fitting);
-            Ok(())
+        let mut builder = Builder {
+            objc,
+            scratch,
+            scratch_length,
+            open: [core::ptr::null_mut(); MAX_DEPTH],
+            padding: [0.0; MAX_DEPTH],
+            count: 0,
+            root: core::ptr::null_mut(),
         };
-        let shown = open(title, &mut build);
+        let built = parse_view(view, &mut |item| builder.add(&item));
+        let root = builder.root;
         free(scratch as *mut c_void);
+        if let Err((line, why)) = built {
+            return Shown::Refused { line, why };
+        }
+        if root.is_null() {
+            return Shown::Refused {
+                line: 1,
+                why: "a view is empty: it starts with a column or a row",
+            };
+        }
+
+        let fresh = self.window.is_null();
+        if fresh {
+            // Titled, closable, miniaturizable and resizable; buffered backing.
+            let window = send!(*objc, class(objc, b"NSWindow\0"), "alloc", [] -> Id);
+            let window = send!(
+                *objc, window, "initWithContentRect:styleMask:backing:defer:",
+                [Rect, u64, u64, i8] -> Id,
+                Rect { origin: Point { x: 0.0, y: 0.0 }, size: Size { width: 480.0, height: 240.0 } },
+                1u64 | 2 | 4 | 8, 2u64, 0
+            );
+            // Closing the window must not release it: it is the program's until it says so.
+            send!(*objc, window, "setReleasedWhenClosed:", [i8] -> (), 0);
+            send!(*objc, window, "setDelegate:", [Id] -> (), self.delegate);
+            self.window = window;
+        }
+        let window = self.window;
+        send!(*objc, window, "setTitle:", [Id] -> (), string(objc, title));
+        send!(*objc, window, "setContentView:", [Id] -> (), root);
+        if fresh {
+            // The window opens as big as its contents need.
+            let fitting = send!(*objc, root, "fittingSize", [] -> Size);
+            send!(*objc, window, "setContentSize:", [Size] -> (), fitting);
+            send!(*objc, window, "center", [] -> ());
+            send!(*objc, window, "makeKeyAndOrderFront:", [Id] -> (), core::ptr::null_mut());
+            send!(*objc, self.application, "activateIgnoringOtherApps:", [i8] -> (), 1);
+            send!(*objc, self.application, "finishLaunching", [] -> ());
+        }
+        Shown::Done
+    }
+
+    // The next thing to tell the program: a request already made, else whatever the window does
+    // until it makes one or is gone.
+    unsafe fn next_event(&mut self) -> Event {
+        loop {
+            let objc = &self.objc;
+            let pool = (objc.pool_push)();
+            let found = if let Some(event) = queue().pop() {
+                Some(event)
+            } else if self.window.is_null() {
+                Some(Event::Closed)
+            } else {
+                let window = self.window;
+                // A window that is minimized is not visible, but is not closed either.
+                let open = send!(*objc, window, "isVisible", [] -> i8) != 0
+                    || send!(*objc, window, "isMiniaturized", [] -> i8) != 0;
+                if open {
+                    let forever = send!(*objc, class(objc, b"NSDate\0"), "distantFuture", [] -> Id);
+                    let event = send!(
+                        *objc, self.application, "nextEventMatchingMask:untilDate:inMode:dequeue:",
+                        [u64, Id, Id, i8] -> Id, u64::MAX, forever, self.mode, 1
+                    );
+                    if !event.is_null() {
+                        send!(*objc, self.application, "sendEvent:", [Id] -> (), event);
+                    }
+                    None
+                } else {
+                    send!(*objc, window, "release", [] -> ());
+                    self.window = core::ptr::null_mut();
+                    Some(Event::Closed)
+                }
+            };
+            (objc.pool_pop)(pool);
+            if let Some(event) = found {
+                return event;
+            }
+        }
+    }
+}
+
+unsafe fn on_main_thread() -> bool {
+    pthread_main_np() != 0
+}
+
+// Show the view `view` (its text form, described at the top of this file) in a window titled
+// `title`, opening it if it is not open, and return.
+pub fn show_view(title: &[u8], view: &[u8]) -> Shown {
+    unsafe {
+        if !on_main_thread() {
+            return Shown::NotMainThread;
+        }
+        let Some(gui) = gui() else {
+            return Shown::Unavailable;
+        };
+        let pool = (gui.objc.pool_push)();
+        let shown = gui.show(title, view);
+        (gui.objc.pool_pop)(pool);
         shown
+    }
+}
+
+// Wait for the next thing the window has to tell the program. `Closed` when there is no window, or
+// this is not the thread to have one on.
+pub fn next_event() -> Event {
+    unsafe {
+        if !on_main_thread() {
+            return Event::Closed;
+        }
+        match (*core::ptr::addr_of_mut!(GUI)).as_mut() {
+            Some(gui) => gui.next_event(),
+            None => Event::Closed,
+        }
+    }
+}
+
+// Close the window, if there is one: the next event is then `Closed`.
+pub fn close_window() {
+    unsafe {
+        if !on_main_thread() {
+            return;
+        }
+        if let Some(gui) = (*core::ptr::addr_of_mut!(GUI)).as_mut() {
+            if !gui.window.is_null() {
+                let pool = (gui.objc.pool_push)();
+                send!(gui.objc, gui.window, "close", [] -> ());
+                (gui.objc.pool_pop)(pool);
+            }
+        }
+    }
+}
+
+// `text` with its escapes written, between `before` and `after`, in a buffer of its own for the
+// caller to `free`: the buffer, and how much of it is written.
+unsafe fn escaped_into_view(before: &[u8], text: &[u8], after: &[u8]) -> Option<(*mut u8, usize)> {
+    let room = before.len() + after.len() + 2 * text.len() + 1;
+    let buffer = malloc(room) as *mut u8;
+    if buffer.is_null() {
+        return None;
+    }
+    let out = core::slice::from_raw_parts_mut(buffer, room);
+    let mut length = 0;
+    let mut put = |byte: u8| {
+        out[length] = byte;
+        length += 1;
+    };
+    before.iter().for_each(|byte| put(*byte));
+    for byte in text {
+        match byte {
+            b'\\' => {
+                put(b'\\');
+                put(b'\\');
+            }
+            b'"' => {
+                put(b'\\');
+                put(b'"');
+            }
+            b'\n' => {
+                put(b'\\');
+                put(b'n');
+            }
+            b'\t' => {
+                put(b'\\');
+                put(b't');
+            }
+            other => put(*other),
+        }
+    }
+    after.iter().for_each(|byte| put(*byte));
+    Some((buffer, length))
+}
+
+// Open a window titled `title` showing `text` in large type, and wait until it is closed: the
+// window's own requests to close it (its close button, Cmd-W, Cmd-Q) are all granted.
+pub fn show_window(title: &[u8], text: &[u8]) -> Shown {
+    unsafe {
+        let Some((view, length)) = escaped_into_view(
+            b"column spacing=0 padding=24\n  label \"",
+            text,
+            b"\" size=32\n",
+        ) else {
+            return Shown::Unavailable;
+        };
+        let shown = show_view(title, core::slice::from_raw_parts(view, length));
+        free(view as *mut c_void);
+        if shown != Shown::Done {
+            return shown;
+        }
+        loop {
+            match next_event() {
+                Event::CloseRequested | Event::QuitRequested => close_window(),
+                Event::Closed => return Shown::Done,
+            }
+        }
     }
 }
 
@@ -848,6 +1139,49 @@ mod tests {
         assert_eq!(&room[..n], b"a \"b\" \\ \n\t");
         assert!(unescape(br"bad \x", &mut room).is_err());
         assert!(unescape(br"trailing \", &mut room).is_err());
+    }
+
+    #[test]
+    fn events_come_out_in_the_order_they_went_in_and_a_full_queue_drops_the_rest() {
+        let mut queue = Queue {
+            items: [Event::Closed; 8],
+            length: 0,
+        };
+        assert_eq!(queue.pop(), None);
+        queue.push(Event::CloseRequested);
+        queue.push(Event::QuitRequested);
+        assert_eq!(queue.pop(), Some(Event::CloseRequested));
+        assert_eq!(queue.pop(), Some(Event::QuitRequested));
+        assert_eq!(queue.pop(), None);
+        for _ in 0..20 {
+            queue.push(Event::QuitRequested);
+        }
+        assert_eq!(queue.length, 8);
+    }
+
+    #[test]
+    fn an_event_is_a_short_text() {
+        assert_eq!(Event::CloseRequested.text(), b"close_requested");
+        assert_eq!(Event::QuitRequested.text(), b"quit_requested");
+        assert_eq!(Event::Closed.text(), b"closed");
+        // Short enough that a `str` holds it inline, with no allocation.
+        for event in [Event::CloseRequested, Event::QuitRequested, Event::Closed] {
+            assert!(event.text().len() <= 22);
+        }
+    }
+
+    #[test]
+    fn a_text_put_in_a_view_is_escaped_so_the_reader_reads_it_back() {
+        unsafe {
+            let (buffer, length) =
+                escaped_into_view(b"label \"", b"say \"hi\"\n\\", b"\"").unwrap();
+            let written = std::slice::from_raw_parts(buffer, length).to_vec();
+            free(buffer as *mut c_void);
+            let item = parse_line(&written).unwrap().unwrap();
+            let mut room = [0u8; 32];
+            let n = unescape(item.text.unwrap(), &mut room).unwrap();
+            assert_eq!(&room[..n], b"say \"hi\"\n\\");
+        }
     }
 
     #[test]

@@ -563,6 +563,22 @@ extern "C" fn aipl_http_get(out: *mut u8, url: *const str24::Str, timeout_second
     http_curl::get(out, bytes, timeout_seconds);
 }
 
+/// Stop the program, saying why, unless a window operation came to `Done`.
+fn window_or_exit(shown: gui_cocoa::Shown) {
+    match shown {
+        gui_cocoa::Shown::Done => return,
+        gui_cocoa::Shown::Unavailable => eprintln!("error: could not open a window"),
+        gui_cocoa::Shown::NotMainThread => eprintln!(
+            "error: a window can only be opened on the main thread; build the program with \
+             `aipl build` and run that"
+        ),
+        gui_cocoa::Shown::Refused { line, why } => {
+            eprintln!("error: the view's line {line}: {why}")
+        }
+    }
+    std::process::exit(1);
+}
+
 /// `show_window(title, text)`: open a window and wait for it to be closed. Borrows both
 /// strings; the window itself is `gui_cocoa`'s, shared with the AOT runtime.
 #[no_mangle]
@@ -575,14 +591,10 @@ extern "C" fn aipl_show_window(title: *const str24::Str, text: *const str24::Str
             (*text).bytes(&mut text_scratch),
         )
     };
-    if !gui_cocoa::show_window(title, text) {
-        eprintln!("error: could not open a window");
-        std::process::exit(1);
-    }
+    window_or_exit(gui_cocoa::show_window(title, text));
 }
 
-/// `show_view(title, view)`: open a window showing `view` and wait for it to be closed. Borrows
-/// both strings; the window itself is `gui_cocoa`'s, shared with the AOT runtime.
+/// `show_view(title, view)`: show `view` in the window and return. Borrows both strings.
 #[no_mangle]
 extern "C" fn aipl_show_view(title: *const str24::Str, view: *const str24::Str) {
     let mut title_scratch = [0u8; str24::INLINE_CAP];
@@ -593,17 +605,19 @@ extern "C" fn aipl_show_view(title: *const str24::Str, view: *const str24::Str) 
             (*view).bytes(&mut view_scratch),
         )
     };
-    match gui_cocoa::show_view(title, view) {
-        gui_cocoa::Shown::Closed => {}
-        gui_cocoa::Shown::Unavailable => {
-            eprintln!("error: could not open a window");
-            std::process::exit(1);
-        }
-        gui_cocoa::Shown::Refused { line, why } => {
-            eprintln!("error: the view's line {line}: {why}");
-            std::process::exit(1);
-        }
-    }
+    window_or_exit(gui_cocoa::show_view(title, view));
+}
+
+/// `next_event()`: wait for what the window has to tell the program, as its text.
+#[no_mangle]
+extern "C" fn aipl_next_event(out: *mut str24::Str) {
+    unsafe { *out = str24::from_bytes(gui_cocoa::next_event().text()) };
+}
+
+/// `close_window()`.
+#[no_mangle]
+extern "C" fn aipl_close_window() {
+    gui_cocoa::close_window();
 }
 
 /// Spawn `program` with `args` and collect its output. `None` if it could not be
@@ -4030,6 +4044,8 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_http_get", aipl_http_get as *const u8);
     jit_builder.symbol("aipl_show_window", aipl_show_window as *const u8);
     jit_builder.symbol("aipl_show_view", aipl_show_view as *const u8);
+    jit_builder.symbol("aipl_next_event", aipl_next_event as *const u8);
+    jit_builder.symbol("aipl_close_window", aipl_close_window as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol(
         "aipl_str_split_iter_init",
@@ -7695,6 +7711,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_clear_terminal"
         | "aipl_enter_alternate_screen"
         | "aipl_leave_alternate_screen"
+        | "aipl_close_window"
         | "aipl_random_unshimmed" => (0, Ret::None),
         "aipl_assert"
         | "aipl_shim_set"
@@ -7806,6 +7823,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_str_join" => (4, Ret::Str),
         "aipl_arr_settle" => (4, Ret::None),
         // ---- a `str` back, through the out pointer ----
+        "aipl_next_event" => (0, Ret::Str),
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
         | "aipl_char_to_str" | "aipl_str_heap" | "aipl_str_pack_inline" => (1, Ret::Str),
         "aipl_concat" | "aipl_str_rope" => (2, Ret::Str),
@@ -8006,6 +8024,8 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
         (Callee::HttpGet, "aipl_http_get"),
         (Callee::ShowWindow, "aipl_show_window"),
         (Callee::ShowView, "aipl_show_view"),
+        (Callee::NextEvent, "aipl_next_event"),
+        (Callee::CloseWindow, "aipl_close_window"),
         (Callee::Trim, "aipl_trim"),
         // The `*_str` family — each one entry point, so there is no custom
         // codegen arm: the ordinary-call path reads the signature registered

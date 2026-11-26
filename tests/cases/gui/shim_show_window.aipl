@@ -14,6 +14,8 @@ fn greet(name: str) !gui { show_window("Greeting", `Hello, {name}!`) }.test({
             set shown.push(`{title}|{text}`);
         },
         show_view = |title, view| {},
+        next_event = || "closed",
+        close_window = || {},
     } {
         greet("World");
         greet("again");

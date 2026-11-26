@@ -40,6 +40,7 @@ import {
     Separator,
     to_text,
 } from "./elements.aipl";
+import { wait_until_closed } from "./events.aipl";
 import { show_view } from gui;
 
 # One thing to do.
@@ -369,6 +370,7 @@ fn main(args: str[]) !prints !read_files !write_files !gui -> i64 {
         },
         ok(Window(title, view)) => {
             show_view(title, view.to_text());
+            wait_until_closed();
             0
         },
         ok(Changed(file, listing)) => match (write_string_to_file(path, file)) {

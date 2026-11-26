@@ -1,0 +1,69 @@
+# What a window tells the program, and the loop that listens.
+#
+# `next_event` is the one call that waits: it returns when the window has something to say, and a
+# program is a loop around it, which is the shape an `await` on a stream of events takes once the
+# language has one. The window does nothing about a request to close or to quit but tell the
+# program, so a program that has something to ask first (unsaved changes) asks it, and closes the
+# window only when it is time.
+
+import { drop_first, equal as ==, first, value_or, wrapping_increment as ++ } from builtins;
+import { close_window, next_event, show_view, show_window } from gui;
+
+# What the window can tell the program.
+variant Event = CloseRequested | QuitRequested | Closed
+
+# `text`, as `next_event` gives it, as the event it names, or what is wrong with it.
+pub fn parse_event(text: str) -> Event!str {
+    match (text) {
+        "close_requested" => ok(CloseRequested),
+        "quit_requested" => ok(QuitRequested),
+        "closed" => ok(Closed),
+        _ => err(`not an event: {text}`),
+    }
+}.test({
+    assert(parse_event("close_requested") == ok(CloseRequested));
+    assert(parse_event("quit_requested") == ok(QuitRequested));
+    assert(parse_event("closed") == ok(Closed));
+    assert(parse_event("clicked") == err("not an event: clicked"));
+})
+
+# Listen to the window until it is gone, closing it when it is asked to close (its close button,
+# Cmd-W) or to quit (Cmd-Q). An event this program does not know is ignored.
+pub fn wait_until_closed() !gui {
+    mut open = true;
+    while (open) {
+        match (parse_event(next_event())) {
+            ok(Closed) => {
+                set open = false;
+            },
+            ok(CloseRequested) | ok(QuitRequested) => {
+                close_window();
+            },
+            err(..) => {},
+        };
+    }
+}.test({
+    // The events a window gives, scripted: a request to close, a request to quit, an event no one
+    // knows, and then the window being gone.
+    mut script = ["close_requested", "quit_requested", "something else", "closed", "closed"];
+    mut closes: u64 = 0;
+    shim gui {
+        show_window = |title, text| {},
+        show_view = |title, view| {},
+        next_event = || {
+            let next = script.first().value_or("closed");
+            set script = script.drop_first();
+            next
+        },
+        close_window = || {
+            set closes++;
+        },
+    } {
+        wait_until_closed();
+    };
+
+    // Each request was granted, the unknown event was passed over, and listening stopped at the
+    // first `closed`, leaving what came after it unheard.
+    assert(closes == 2);
+    assert(script == ["closed"]);
+})
