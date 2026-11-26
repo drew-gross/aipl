@@ -7,7 +7,10 @@ import { show_view, show_window } from gui;
 
 # Shows `name` as a title over a line of text.
 fn greet(name: str) !gui {
-    show_view("Greeting", `column spacing=8 padding=16\n  label "Hello, {name}!" size=24 bold\n`)
+    show_view(
+        "Greeting",
+        `column spacing=8 padding=16\n  label "Hello, {name}!" size=24 bold\n  button "Wave" key="wave"\n`,
+    )
 }.test({
     mut shown: str[] = [];
     shim gui {
@@ -24,6 +27,7 @@ fn greet(name: str) !gui {
         """
             Greeting|column spacing=8 padding=16
               label "Hello, World!" size=24 bold
+              button "Wave" key="wave"
 
         """,
     ]);

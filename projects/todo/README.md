@@ -17,8 +17,10 @@ $ ./main            # opens a window with the items drawn as elements
 $ ./main gallery    # opens a window with one of every element, from constants
 ```
 
-The window only displays for now: its checkboxes, buttons and fields are drawn and do nothing. Cmd-W
-and the close button close it, and Cmd-Q quits, ending the program with exit 0.
+In the window, a list with nothing in it has an "Add your first todo" button, which adds an item
+(with placeholder text, until a window can be typed into) and saves the list. Its checkboxes and
+fields are drawn and do nothing yet. Cmd-W and the close button close the window, and Cmd-Q quits,
+ending the program with exit 0.
 [GUI_TODO_APP.md](../../GUI_TODO_APP.md) plans the app it is meant to become, with items added,
 ticked and removed in the window itself. `elements.aipl` is the `Element` type and the text form the
 window is given them in.

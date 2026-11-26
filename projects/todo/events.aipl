@@ -6,14 +6,27 @@
 # program, so a program that has something to ask first (unsaved changes) asks it, and closes the
 # window only when it is time.
 
-import { drop_first, equal as ==, first, value_or, wrapping_increment as ++ } from builtins;
+import {
+    drop_first,
+    equal as ==,
+    first,
+    is_empty,
+    starts_with,
+    value_or,
+    wrapping_increment as ++,
+} from builtins;
 import { close_window, next_event, show_view, show_window } from gui;
 
-# What the window can tell the program.
-variant Event = CloseRequested | QuitRequested | Closed
+# What the window can tell the program: a request to close it or to quit, that it is gone, or that
+# the button with a key was clicked.
+variant Event = CloseRequested | QuitRequested | Closed | Clicked(str)
 
 # `text`, as `next_event` gives it, as the event it names, or what is wrong with it.
 pub fn parse_event(text: str) -> Event!str {
+    if (text.starts_with("clicked ")) {
+        let key = text[8..];
+        return if (key.is_empty()) { err("a click names no button") } else { ok(Clicked(key)) };
+    };
     match (text) {
         "close_requested" => ok(CloseRequested),
         "quit_requested" => ok(QuitRequested),
@@ -24,11 +37,13 @@ pub fn parse_event(text: str) -> Event!str {
     assert(parse_event("close_requested") == ok(CloseRequested));
     assert(parse_event("quit_requested") == ok(QuitRequested));
     assert(parse_event("closed") == ok(Closed));
+    assert(parse_event("clicked add-first") == ok(Clicked("add-first")));
+    assert(parse_event("clicked ") == err("a click names no button"));
     assert(parse_event("clicked") == err("not an event: clicked"));
 })
 
 # Listen to the window until it is gone, closing it when it is asked to close (its close button,
-# Cmd-W) or to quit (Cmd-Q). An event this program does not know is ignored.
+# Cmd-W) or to quit (Cmd-Q). A click, and an event this program does not know, are ignored.
 pub fn wait_until_closed() !gui {
     mut open = true;
     while (open) {
@@ -39,7 +54,7 @@ pub fn wait_until_closed() !gui {
             ok(CloseRequested) | ok(QuitRequested) => {
                 close_window();
             },
-            err(..) => {},
+            ok(Clicked(..)) | err(..) => {},
         };
     }
 }.test({

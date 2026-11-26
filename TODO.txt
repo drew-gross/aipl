@@ -901,8 +901,8 @@ flamegraph:
   profile other things than run e.g. formatting, running tests, etc.
 
 gui:
-  more advanced stuff (like buttons!)
   screenshot testing
+  react style callbacks and state
   2026-11-25 22:45:46.326 main[97759:120934980] NSKeyBindingManager: Bad key binding selector for '^@' = 'noop'
 
 todo app:
@@ -984,10 +984,6 @@ handoff:
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
   Auto-handle the formatter-grammar bootstrap — Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.
 
-optimize enumerate/reverse/right_fold with streams
-"AIPL-implemented builtin sources are valid AIPL" error should include more info
-make it so functions can call functions defined later in the file
-
 lexer:
   first byte dispatch could probably be a performance improvement for all document sizes if we optimized the storage some and/or precomputed the first sets (even at compile time maybe?)
   we probably don't need Int (and maybe float) since I think we can use CharRun with first or "minus or digit" and cont of "digit"
@@ -1001,11 +997,9 @@ lexer:
   tests/cases/strings/err_unclosed_interpolation_nested.aipl). Needs the note
   threaded across the FFI (marshal_lex, LexedError) and rendered by Error.
 
-check if flat vec is more performant for cons list in doc.aipl (use runtime perf numbers) NOTE: probably should make a perf test to format entire codebase for this
-
 stack traces:
-  errors should contain stack traces
   first we need some actual infra for stack traces
+  errors should contain stack traces
 
 indent.aipl:
   pre-reserve target*lines + self.len() space
@@ -1138,7 +1132,7 @@ I built and measured three fixes, cumulatively:
 └──────────────────────────────────────────────────────────────────────────────┴───────┘
 
 walker.aipl:
-  If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
+  we should be able to have the formatter operator on the ast directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
   replace is_binop with is_operator_name
   check if the w "loops" can be improved using mut self arguments
   SpacedBracesNoTrailing seems like it shouldn't be necessary if the writer knows whether to add trailing or not based on breaks
@@ -1174,9 +1168,3 @@ Reasons doc.aipl uses a cons list:
   go and fits are tail-recursive with the work list as a parameter, where Rust uses while let over a mut local. AIPL does have while (tests/cases/loops/while_loop.aipl), but the functional formulation needs a persistent stack, and WCons gives one where push is a single allocation sharing the existing tail. prepend (doc.aipl:217) is then just a right_fold conses onto that tail, matching Rust's reverse-order push loop.
 
   Work being a self-referential variant is cheap here because recursive types are boxed with refcounts natively, so the sharing is real rather than deep-copied.
-
-signedness:
-    2. An integer literal doesn't flex through a constructor. In a fn returning u64!E,
-      ok(0) types its payload i64 and is rejected, so the three "declined" sites in
-      lexer.aipl bind `let declined: u64 = 0;` first. Literals flex fine into an
-      annotated let, a parameter, or a struct field — just not through ok/err/some.

@@ -29,19 +29,21 @@
 //
 //     column, row      children; `spacing=` between them, `padding=` around them (points)
 //     label "text"     `size=` points; flags `bold`, `muted` (the secondary color), `strike`
-//     button "text"    shown, and not yet answering a click
+//     button "text"    a push button; needs a key, and a click gives `clicked <key>`
 //     checkbox "text"  flag `checked`
 //     field            a text field: `value="text"`, `placeholder="text"`
 //     separator        a thin line across its column
 //
-// Any element takes `key="text"` and `width=` (points); the key is accepted and not yet used. A
-// line the reader cannot make sense of stops the view, and the error says which line and why.
+// Any element takes `width=` (points) and `key="name"`: a key is up to 64 letters, digits and
+// `- _ . : /`, and names the element in the events it causes. A button has to have one. A line the
+// reader cannot make sense of stops the view, and the error says which line and why.
 //
 // # Events
 //
 // `show_view` shows the view and returns; `next_event` waits for something the program should hear
 // and gives it as text:
 //
+//     clicked <key>    the button with that key was clicked
 //     close_requested  the window's close button or Cmd-W was used: the window is still open
 //     quit_requested   Cmd-Q was used: the window is still open
 //     closed           the window is gone (the program closed it, or there never was one)
@@ -132,6 +134,7 @@ struct Item<'a> {
     text: Option<&'a [u8]>,
     value: Option<&'a [u8]>,
     placeholder: Option<&'a [u8]>,
+    key: Option<&'a [u8]>,
     spacing: f64,
     padding: f64,
     size: f64,
@@ -210,6 +213,7 @@ fn parse_line(line: &[u8]) -> Result<Option<Item<'_>>, &'static str> {
         text: None,
         value: None,
         placeholder: None,
+        key: None,
         spacing: 8.0,
         padding: 0.0,
         size: 0.0,
@@ -253,7 +257,12 @@ fn parse_line(line: &[u8]) -> Result<Option<Item<'_>>, &'static str> {
                 let (text, next) = read_string(line, at)?;
                 at = next;
                 match name {
-                    b"key" => {}
+                    b"key" => {
+                        if !is_valid_key(text) {
+                            return Err("a key is up to 64 letters, digits and - _ . : /");
+                        }
+                        item.key = Some(text);
+                    }
                     b"value" if kind == Kind::Field => item.value = Some(text),
                     b"placeholder" if kind == Kind::Field => item.placeholder = Some(text),
                     _ => return Err("this element has no attribute of that name with a text"),
@@ -281,6 +290,9 @@ fn parse_line(line: &[u8]) -> Result<Option<Item<'_>>, &'static str> {
     }
     if kind.has_text() && item.text.is_none() {
         return Err("this element needs its text in quotes");
+    }
+    if kind == Kind::Button && item.key.is_none() {
+        return Err("a button needs a key to name its clicks");
     }
     Ok(Some(item))
 }
@@ -430,6 +442,9 @@ const MAX_DEPTH: usize = 32;
 // Makes the views a view's lines describe, a line at a time.
 struct Builder<'o> {
     objc: &'o Objc,
+    // What a button's clicks are sent to: the delegate, and its method for them.
+    delegate: Id,
+    clicked: Selector,
     // Room for a text with its escapes read.
     scratch: *mut u8,
     scratch_length: usize,
@@ -521,10 +536,14 @@ impl Builder<'_> {
             Kind::Label => self.label(item)?,
             Kind::Button => {
                 let title = self.text(item.text.unwrap_or(b""))?;
-                send!(
+                let button = send!(
                     *objc, class(objc, b"NSButton\0"), "buttonWithTitle:target:action:",
-                    [Id, Id, Selector] -> Id, title, core::ptr::null_mut(), core::ptr::null_mut()
-                )
+                    [Id, Id, Selector] -> Id, title, self.delegate, self.clicked
+                );
+                // The key is how the delegate tells which button was clicked.
+                let key = self.text(item.key.unwrap_or(b""))?;
+                send!(*objc, button, "setIdentifier:", [Id] -> (), key);
+                button
             }
             Kind::Checkbox => {
                 let title = self.text(item.text.unwrap_or(b""))?;
@@ -624,35 +643,100 @@ pub enum Event {
     CloseRequested,
     QuitRequested,
     Closed,
+    // A button was clicked: the `Pending` says which, by its key.
+    Clicked,
 }
 
-impl Event {
-    // The event as `next_event` hands it over. Short enough to be an inline `str`.
-    pub fn text(self) -> &'static [u8] {
-        match self {
+// The most bytes in a key.
+const MAX_KEY: usize = 64;
+
+// Whether `key` is one: up to `MAX_KEY` letters, digits and `-`, `_`, `.`, `:` and `/`. What a key
+// may hold is kept small so that an event can be told as plain words.
+fn is_valid_key(key: &[u8]) -> bool {
+    !key.is_empty()
+        && key.len() <= MAX_KEY
+        && key
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.:/".contains(byte))
+}
+
+// An event, with the key of the element that caused it when there is one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Pending {
+    event: Event,
+    key: [u8; MAX_KEY],
+    key_length: usize,
+}
+
+impl Pending {
+    const fn of(event: Event) -> Pending {
+        Pending {
+            event,
+            key: [0; MAX_KEY],
+            key_length: 0,
+        }
+    }
+
+    fn clicked(key: &[u8]) -> Pending {
+        let mut pending = Pending::of(Event::Clicked);
+        let length = key.len().min(MAX_KEY);
+        pending.key[..length].copy_from_slice(&key[..length]);
+        pending.key_length = length;
+        pending
+    }
+}
+
+// An event as `next_event` hands it over: its text.
+#[derive(Clone, Copy, Debug)]
+pub struct Heard {
+    bytes: [u8; 16 + MAX_KEY],
+    length: usize,
+}
+
+impl Heard {
+    fn of(pending: &Pending) -> Heard {
+        let mut heard = Heard {
+            bytes: [0; 16 + MAX_KEY],
+            length: 0,
+        };
+        let name: &[u8] = match pending.event {
             Event::CloseRequested => b"close_requested",
             Event::QuitRequested => b"quit_requested",
             Event::Closed => b"closed",
+            Event::Clicked => b"clicked ",
+        };
+        heard.bytes[..name.len()].copy_from_slice(name);
+        heard.length = name.len();
+        if pending.event == Event::Clicked {
+            let key = &pending.key[..pending.key_length];
+            heard.bytes[heard.length..heard.length + key.len()].copy_from_slice(key);
+            heard.length += key.len();
         }
+        heard
+    }
+
+    // The words of the event: `closed`, or `clicked save`.
+    pub fn text(&self) -> &[u8] {
+        &self.bytes[..self.length]
     }
 }
 
 // The events the window has told the runtime of and `next_event` has not yet given out, oldest
 // first. A window that is shouted at faster than the program listens loses the later ones.
 struct Queue {
-    items: [Event; 8],
+    items: [Pending; 8],
     length: usize,
 }
 
 impl Queue {
-    fn push(&mut self, event: Event) {
+    fn push(&mut self, pending: Pending) {
         if self.length < self.items.len() {
-            self.items[self.length] = event;
+            self.items[self.length] = pending;
             self.length += 1;
         }
     }
 
-    fn pop(&mut self) -> Option<Event> {
+    fn pop(&mut self) -> Option<Pending> {
         if self.length == 0 {
             return None;
         }
@@ -666,7 +750,7 @@ impl Queue {
 // The one queue, filled by the delegate's methods while AppKit runs them on the main thread and
 // emptied by `next_event` on the same.
 static mut QUEUE: Queue = Queue {
-    items: [Event::Closed; 8],
+    items: [Pending::of(Event::Closed); 8],
     length: 0,
 };
 
@@ -674,15 +758,58 @@ unsafe fn queue() -> &'static mut Queue {
     &mut *core::ptr::addr_of_mut!(QUEUE)
 }
 
+// What the delegate's methods need to read a sender's key, kept apart from the window state they
+// are called from the middle of.
+#[derive(Clone, Copy)]
+struct Reader {
+    send: *const c_void,
+    identifier: Selector,
+    utf8: Selector,
+}
+
+static mut READER: Reader = Reader {
+    send: core::ptr::null(),
+    identifier: core::ptr::null_mut(),
+    utf8: core::ptr::null_mut(),
+};
+
 // The window is asked to close (its close button, Cmd-W): it is not closed, the program is told.
 extern "C" fn window_should_close(_this: Id, _selector: Selector, _window: Id) -> i8 {
-    unsafe { queue().push(Event::CloseRequested) };
+    unsafe { queue().push(Pending::of(Event::CloseRequested)) };
     0
 }
 
 // Quit is chosen (Cmd-Q): the program is told.
 extern "C" fn quit_requested(_this: Id, _selector: Selector, _sender: Id) {
-    unsafe { queue().push(Event::QuitRequested) };
+    unsafe { queue().push(Pending::of(Event::QuitRequested)) };
+}
+
+// A button is clicked: the program is told, with the key the button was made with.
+extern "C" fn clicked(_this: Id, _selector: Selector, sender: Id) {
+    unsafe {
+        let reader = *core::ptr::addr_of!(READER);
+        if reader.send.is_null() {
+            return;
+        }
+        let object: unsafe extern "C" fn(Id, Selector) -> Id = core::mem::transmute(reader.send);
+        let text: unsafe extern "C" fn(Id, Selector) -> *const c_char =
+            core::mem::transmute(reader.send);
+        let identifier = object(sender, reader.identifier);
+        if identifier.is_null() {
+            return;
+        }
+        let chars = text(identifier, reader.utf8) as *const u8;
+        if chars.is_null() {
+            return;
+        }
+        let mut key = [0u8; MAX_KEY];
+        let mut length = 0;
+        while length < MAX_KEY && *chars.add(length) != 0 {
+            key[length] = *chars.add(length);
+            length += 1;
+        }
+        queue().push(Pending::clicked(&key[..length]));
+    }
 }
 
 // ---------- The window ----------
@@ -704,6 +831,8 @@ struct Gui {
     objc: Objc,
     application: Id,
     delegate: Id,
+    // The delegate's method for a button's clicks.
+    clicked: Selector,
     // `null` before the first view and after the window has been closed.
     window: Id,
     // `NSDefaultRunLoopMode`.
@@ -736,6 +865,12 @@ unsafe fn make_delegate(objc: &Objc) -> Option<Id> {
         class,
         selector(objc, b"aiplQuit:\0"),
         quit_requested as *const c_void,
+        b"v@:@\0".as_ptr() as *const c_char,
+    );
+    (objc.add_method)(
+        class,
+        selector(objc, b"aiplClicked:\0"),
+        clicked as *const c_void,
         b"v@:@\0".as_ptr() as *const c_char,
     );
     (objc.register_class)(class);
@@ -794,10 +929,17 @@ unsafe fn start() -> Option<Gui> {
     let delegate = make_delegate(&objc)?;
     install_menu(&objc, application, delegate);
     let mode = constant(b"NSDefaultRunLoopMode\0")?;
+    *core::ptr::addr_of_mut!(READER) = Reader {
+        send: objc.send,
+        identifier: selector(&objc, b"identifier\0"),
+        utf8: selector(&objc, b"UTF8String\0"),
+    };
+    let clicked = selector(&objc, b"aiplClicked:\0");
     Some(Gui {
         objc,
         application,
         delegate,
+        clicked,
         window: core::ptr::null_mut(),
         mode,
     })
@@ -823,6 +965,8 @@ impl Gui {
         }
         let mut builder = Builder {
             objc,
+            delegate: self.delegate,
+            clicked: self.clicked,
             scratch,
             scratch_length,
             open: [core::ptr::null_mut(); MAX_DEPTH],
@@ -875,14 +1019,14 @@ impl Gui {
 
     // The next thing to tell the program: a request already made, else whatever the window does
     // until it makes one or is gone.
-    unsafe fn next_event(&mut self) -> Event {
+    unsafe fn next_event(&mut self) -> Pending {
         loop {
             let objc = &self.objc;
             let pool = (objc.pool_push)();
             let found = if let Some(event) = queue().pop() {
                 Some(event)
             } else if self.window.is_null() {
-                Some(Event::Closed)
+                Some(Pending::of(Event::Closed))
             } else {
                 let window = self.window;
                 // A window that is minimized is not visible, but is not closed either.
@@ -901,7 +1045,7 @@ impl Gui {
                 } else {
                     send!(*objc, window, "release", [] -> ());
                     self.window = core::ptr::null_mut();
-                    Some(Event::Closed)
+                    Some(Pending::of(Event::Closed))
                 }
             };
             (objc.pool_pop)(pool);
@@ -935,16 +1079,21 @@ pub fn show_view(title: &[u8], view: &[u8]) -> Shown {
 
 // Wait for the next thing the window has to tell the program. `Closed` when there is no window, or
 // this is not the thread to have one on.
-pub fn next_event() -> Event {
+fn next_pending() -> Pending {
     unsafe {
         if !on_main_thread() {
-            return Event::Closed;
+            return Pending::of(Event::Closed);
         }
         match (*core::ptr::addr_of_mut!(GUI)).as_mut() {
             Some(gui) => gui.next_event(),
-            None => Event::Closed,
+            None => Pending::of(Event::Closed),
         }
     }
+}
+
+// [`next_pending`], as the text the program is given.
+pub fn next_event() -> Heard {
+    Heard::of(&next_pending())
 }
 
 // Close the window, if there is one: the next event is then `Closed`.
@@ -1020,9 +1169,10 @@ pub fn show_window(title: &[u8], text: &[u8]) -> Shown {
             return shown;
         }
         loop {
-            match next_event() {
+            match next_pending().event {
                 Event::CloseRequested | Event::QuitRequested => close_window(),
                 Event::Closed => return Shown::Done,
+                Event::Clicked => {}
             }
         }
     }
@@ -1076,7 +1226,7 @@ mod tests {
     #[test]
     fn every_element_and_attribute_is_read() {
         let read = items(
-            "column\n  label \"x\" muted strike key=\"k\"\n  button \"b\"\n  field value=\"v\" placeholder=\"p\" width=220\n  separator\n",
+            "column\n  label \"x\" muted strike key=\"k\"\n  button \"b\" key=\"b\"\n  field value=\"v\" placeholder=\"p\" width=220\n  separator\n",
         )
         .unwrap();
         assert!(read[1].muted && read[1].strike);
@@ -1144,30 +1294,65 @@ mod tests {
     #[test]
     fn events_come_out_in_the_order_they_went_in_and_a_full_queue_drops_the_rest() {
         let mut queue = Queue {
-            items: [Event::Closed; 8],
+            items: [Pending::of(Event::Closed); 8],
             length: 0,
         };
         assert_eq!(queue.pop(), None);
-        queue.push(Event::CloseRequested);
-        queue.push(Event::QuitRequested);
-        assert_eq!(queue.pop(), Some(Event::CloseRequested));
-        assert_eq!(queue.pop(), Some(Event::QuitRequested));
+        queue.push(Pending::of(Event::CloseRequested));
+        queue.push(Pending::clicked(b"save"));
+        assert_eq!(queue.pop(), Some(Pending::of(Event::CloseRequested)));
+        assert_eq!(queue.pop(), Some(Pending::clicked(b"save")));
         assert_eq!(queue.pop(), None);
         for _ in 0..20 {
-            queue.push(Event::QuitRequested);
+            queue.push(Pending::of(Event::QuitRequested));
         }
         assert_eq!(queue.length, 8);
     }
 
     #[test]
     fn an_event_is_a_short_text() {
-        assert_eq!(Event::CloseRequested.text(), b"close_requested");
-        assert_eq!(Event::QuitRequested.text(), b"quit_requested");
-        assert_eq!(Event::Closed.text(), b"closed");
-        // Short enough that a `str` holds it inline, with no allocation.
-        for event in [Event::CloseRequested, Event::QuitRequested, Event::Closed] {
-            assert!(event.text().len() <= 22);
-        }
+        let text = |pending: Pending| Heard::of(&pending).text().to_vec();
+        assert_eq!(text(Pending::of(Event::CloseRequested)), b"close_requested");
+        assert_eq!(text(Pending::of(Event::QuitRequested)), b"quit_requested");
+        assert_eq!(text(Pending::of(Event::Closed)), b"closed");
+        assert_eq!(text(Pending::clicked(b"add-first")), b"clicked add-first");
+        // A key of the longest length is told whole.
+        let long = [b'k'; MAX_KEY];
+        assert_eq!(
+            text(Pending::clicked(&long)).len(),
+            "clicked ".len() + MAX_KEY
+        );
+    }
+
+    #[test]
+    fn a_key_is_a_short_word() {
+        assert!(is_valid_key(b"add-first"));
+        assert!(is_valid_key(b"todo:3/done_1.x"));
+        assert!(is_valid_key(&[b'a'; MAX_KEY]));
+        assert!(!is_valid_key(b""));
+        assert!(!is_valid_key(&[b'a'; MAX_KEY + 1]));
+        assert!(!is_valid_key(b"has space"));
+        assert!(!is_valid_key(b"quote\""));
+        assert!(!is_valid_key("é".as_bytes()));
+    }
+
+    #[test]
+    fn a_button_has_to_have_a_key_and_a_key_has_to_be_one() {
+        assert_eq!(
+            why("column\n  button \"b\"").1,
+            "a button needs a key to name its clicks"
+        );
+        let read = items("column\n  button \"b\" key=\"go\"\n").unwrap();
+        assert_eq!(read[1].key, Some(&b"go"[..]));
+        assert_eq!(
+            why("column\n  button \"b\" key=\"two words\"").1,
+            "a key is up to 64 letters, digits and - _ . : /"
+        );
+        // Other elements may name themselves, or not.
+        assert_eq!(
+            items("column\n  label \"x\" key=\"title\"\n").unwrap()[1].key,
+            Some(&b"title"[..])
+        );
     }
 
     #[test]

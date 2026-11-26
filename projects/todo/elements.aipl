@@ -2,7 +2,8 @@
 #
 # An element is a case of `Element`, built like any variant, with what it leaves out at its default:
 # `Label("Todo", size=24, bold=true)`, `Column([..], padding=16)`. A `Column` or `Row` holds
-# elements, which is how a view is composed; every element takes a `key`, which is not yet used.
+# elements, which is how a view is composed; every element takes a `key`, which names it in the
+# events it causes, and a `Button` has to have one.
 # `to_text` writes a view as the lines the runtime reads, one element a line with its children
 # indented two spaces under it. The runtime's reader (`gui_cocoa.rs`) says what each element means.
 
@@ -28,7 +29,7 @@ variant Element =
         strike: bool = false,
         key: str = ""
     )
-    | Button(text: str, key: str = "")
+    | Button(text: str, key: str)
     | Checkbox(text: str, checked: bool = false, key: str = "")
     | Field(value: str = "", placeholder: str = "", width: u64 = 0, key: str = "")
     | Separator(key: str = "")
@@ -144,18 +145,18 @@ fn lines(self: Element, depth: u64) -> str[] {
     assert(Label("x", muted=true, strike=true, key="k").lines(0) == [
         `label "x" muted strike key="k"`,
     ]);
-    assert(Button("Add").lines(0) == [`button "Add"`]);
+    assert(Button("Add", "add").lines(0) == [`button "Add" key="add"`]);
     assert(Checkbox("Milk", checked=true).lines(0) == [`checkbox "Milk" checked`]);
     assert(Checkbox("Milk").lines(0) == [`checkbox "Milk"`]);
     assert(Field(placeholder="Name", width=220).lines(0) == [`field placeholder="Name" width=220`]);
     assert(Field(value="x").lines(0) == [`field value="x"`]);
     assert(Separator().lines(0) == ["separator"]);
     // A container is its own line and then its children, a level in.
-    assert(Column([Label("a"), Row([Button("b")], spacing=4)], padding=16).lines(0) == [
+    assert(Column([Label("a"), Row([Button("b", "go")], spacing=4)], padding=16).lines(0) == [
         "column spacing=8 padding=16",
         `  label "a"`,
         "  row spacing=4",
-        `    button "b"`,
+        `    button "b" key="go"`,
     ]);
     assert(Column([]).lines(0) == ["column spacing=8"]);
 })

@@ -21,7 +21,8 @@ fn asked_to_close() !gui -> bool {
     }
     asked
 }.test({
-    mut script = ["quit_requested", "close_requested", "closed"];
+    // A click is an event like the others, with the key of the button as its words.
+    mut script = ["clicked save", "quit_requested", "close_requested", "closed"];
     mut actions: str[] = [];
     shim gui {
         show_window = |title, text| {},
@@ -37,7 +38,7 @@ fn asked_to_close() !gui -> bool {
     } {
         assert(asked_to_close());
     };
-    // Quitting was heard and passed over; the close request was granted once.
+    // The click and the quit were heard and passed over; the close request was granted once.
     assert(actions == ["close"]);
     assert(script.is_empty());
 })

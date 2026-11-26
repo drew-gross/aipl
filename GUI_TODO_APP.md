@@ -8,8 +8,8 @@ as far as the app needs.
 
 - The `gui` effect has four operations, all shimmable. `show_view(title, view)` shows a view given in
   its text form in the one window, opening it if need be, and returns. `next_event()` waits for what
-  the window has to tell the program, as text: `close_requested` (the close button or Cmd-W),
-  `quit_requested` (Cmd-Q) or `closed`. `close_window()` closes it. `show_window(title, text)` shows
+  the window has to tell the program, as text: `clicked <key>` (a button was clicked),
+  `close_requested` (the close button or Cmd-W), `quit_requested` (Cmd-Q) or `closed`. `close_window()` closes it. `show_window(title, text)` shows
   some text and waits until the window is closed, granting every request to close it. The text form is one element a line, children indented two spaces; its grammar and what
   each element becomes are described at the top of `crates/aipl-codegen/src/gui_cocoa.rs`, which
   also reads it (without allocating), makes the one window and the main menu (Quit, Cmd-Q; Close
@@ -21,9 +21,12 @@ as far as the app needs.
   loop until the window has an event for the program; the runtime closes nothing of its own accord.
 - The AIPL side is in `projects/todo`: `elements.aipl` has the `Element` variant and `to_text`, with a
   `gallery` command that draws every element from constants, and `events.aipl` has the `Event`
-  variant, its parser and `wait_until_closed`, the loop that grants requests to close and quit.
-- Only the window's own requests reach the program. Buttons, checkboxes and fields are drawn and do
-  nothing, and a view's `key`s are accepted and unused. A window needs the process's main thread: a
+  variant, its parser and `wait_until_closed`, the loop that grants requests to close and quit;
+  `main.aipl` has `interact`, the loop the todo window runs in: an event updates the list, which is
+  saved and drawn again. Its one button so far is "Add your first todo" on an empty list.
+- What reaches the program is the window's own requests and button clicks. A button has to have a
+  `key` (up to 64 letters, digits and `- _ . : /`), which names it in its `clicked` event; checkboxes
+  and fields are drawn and do nothing. A window needs the process's main thread: a
   built binary has it, `aipl check` and `--jit` do not (a real window there is an error), so the app
   is tested with the operations shimmed.
 - A window must be made on the process's main thread. A built binary's `main` is on it. `aipl
@@ -32,9 +35,9 @@ as far as the app needs.
 - The runtimes read a `str` a program hands them (`str24`) and no other structured value: an
   array of structs or a variant tree has no reader on the Rust side (the same gap holds back
   `http_get` request headers).
-- `projects/todo` today keeps the list in `todos.txt`, with the item logic (`Todo`, `apply`,
-  `render`, parse and serialize of the file) tested in AIPL, and uses `show_window` to display the
-  list. That logic is what the interactive app is built on.
+- `projects/todo` keeps the list in `todos.txt`, with the item logic (`Todo`, `apply`, `render`,
+  parse and serialize of the file) tested in AIPL, and shows it with `show_view`. That logic is what
+  the interactive app is built on.
 
 ## Decisions
 
@@ -75,8 +78,8 @@ as far as the app needs.
 
 ## Stages
 
-Order: 0 can go on at any time; 1 first of the rest; 2, 3 and 5 are independent of each other after
-it; 4 needs 1–3; 6 needs 1.
+Order: 0 can go on at any time; 2, 3 and 5 are independent of each other; 4 needs 2 and 3; 6 can
+come once `interact` and `wait_until_closed` are the same loop with different updates.
 
 ### 0. The look of the elements
 
@@ -95,26 +98,13 @@ Watch: the text form is written by AIPL and read by Rust, so a change to it is a
 the grammar at the top of `gui_cocoa.rs`; the parser's tests and `elements.aipl`'s encoder tests each
 hold half.
 
-### 1. Clicks
-
-Goal: a button the program has drawn tells it when it is clicked.
-
-- [ ] `Clicked(key)` in the event text form and `Event`; each view made keeps its `key`.
-- [ ] `gui_cocoa.rs`: a button's target and action, on the delegate class that already hears the
-      window, push the sender's key on the event queue.
-- [ ] A counter app in a case, driven by shimmed `show_view` and `next_event`.
-- [ ] The counter run by hand in a built binary.
-
-Watch: the queue and the class belong to the main thread, so they need no locks, but a call off it
-must fail loudly rather than corrupt AppKit. The run loop must block, not spin. `shims::
-every_effect_is_shimmable` and `shim_slots_match_runtime` fail until the slot counts agree.
-
 ### 2. Text input and checkboxes
 
 Goal: a text field whose Enter gives an event with its text, and a checkbox whose toggling gives one.
 
-- [ ] Text field and checkbox in the view's text form, and `Changed(key, text)`, `Submitted(key)`
-      and `Toggled(key, on)` events.
+- [ ] Text field and checkbox in the view's text form carry keys that name them, and give
+      `Changed(key, text)`, `Submitted(key)` and `Toggled(key, on)` events, through the delegate the
+      buttons already use.
 - [ ] Replacing the window's contents reconciles by key and kind, as React does: an element with a
       key and kind already on screen is updated in place, one with a new key is made, one gone is
       removed; so the field keeps its focus and cursor.
@@ -155,8 +145,9 @@ empty and the next save overwrites it; an error kind would let the app refuse in
 
 ### 6. `run_app`
 
-- [ ] The helper in the `gui` library, if the open question is settled yes; the todo app and the
-      counter use it.
+- [ ] The helper in the `gui` library, if the open question is settled yes: `wait_until_closed` and
+      `interact` are both a loop of `next_event`, an update and a redraw, and become one function of
+      a model, an update and a view.
 
 ## Done when
 

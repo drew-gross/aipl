@@ -491,8 +491,8 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/grids/dimensions | 18 | 1198 | 1198 | 2412 | 8304 |
 | tests/cases/grids/in_bounds | 20 | 1287 | 1287 | 3662 | 6792 |
 | tests/cases/grids/tuple_index | 31 | 2020 | 2020 | 5935 | 11196 |
-| tests/cases/gui/shim_next_event | 3 | 216 | 216 | 1904 | 6192 |
-| tests/cases/gui/shim_show_view | 6 | 464 | 464 | 766 | 4136 |
+| tests/cases/gui/shim_next_event | 3 | 240 | 240 | 2298 | 6304 |
+| tests/cases/gui/shim_show_view | 6 | 464 | 464 | 767 | 4116 |
 | tests/cases/gui/shim_show_window | 11 | 920 | 864 | 1234 | 4828 |
 | tests/cases/hashing/basic | 9 | 511 | 320 | 2649 | 9688 |
 | tests/cases/higher-order-in-test | 0 | 0 | 0 | 841 | 1468 |
