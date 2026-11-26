@@ -578,7 +578,6 @@ lint:
   lint let some(foo) = bar else { return none; }; to let foo = bar?;
   lint simple let/else desturcturings to as_case<C>()? (vs else return none)
   make a passes_lint helper (maybe accepts a lint name?) to replace lint_function_unfilled(...)?.is_empty()
-  make an OfTailMatches variant of LintRun so that let_else_as_case and any lint that calls tail_matches can be one-hit lints
   various registry cleanups (do lints really need names? can we do descendants instead of descendents_of_kind()?)
   why are assign_advice and assign_lints different? and etc. (looks like compound_assign isn't using builtin tags and still using items, maybe that's why)
   slots_taken_apart should lint to a filter map

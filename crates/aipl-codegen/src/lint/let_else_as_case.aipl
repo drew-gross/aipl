@@ -21,56 +21,51 @@
 # The hit points at the `return none;` line, a short statement the formatter keeps in
 # place, so `#[allow]` squelches it.
 
-import { collect_ok, equal as ==, is_empty, logical_or as ||, map, not_equal as != } from builtins;
+import { as_case, equal as ==, is_empty, logical_or as ||, not_equal as != } from builtins;
 import { AsCase } from "../builtin_table.aipl";
-import { IfLet, None, Return, Seq, Unit } from "../expr.aipl";
-import { Function } from "../item.aipl";
-import { case_pattern, statement_head, tail_matches } from "./case_match.aipl";
-import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { Expr, IfLet, MatchArm, None, Return, Seq, Unit } from "../expr.aipl";
+import { case_pattern, statement_head } from "./case_match.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, shown, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 
-# A hit for each `let .. else { return none; }` that ends the function and takes a
-# variant value apart.
-pub fn let_else_as_case(Function { body }) -> LintHit[] {
-    body
-        .tail_matches()
-        .map(|tail| {
-            let IfLet(arm, scrutinee, otherwise) = tail.kind else { return none; };
-            let some(pattern) = arm.pattern.case_pattern() else { return none; };
-            // `return none;` and nothing else: the statement, then the block's unit tail.
-            let Seq(leave, rest) = otherwise.kind else { return none; };
-            let Return(value) = leave.kind else { return none; };
-            if (rest.kind != Unit || value.kind != None) { return none; };
-            some(unfilled(
-                AsCase,
-                `this \`else\` only gives up with none — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
-                `::<{pattern.case}>()?;" and drop the block`,
-                leave.span,
-            ))
-        })
-        .collect_ok()
+# The hit for the `let .. else { return none; }` `self`, a tail match of the function, when it
+# takes a variant value apart.
+pub fn let_else_as_case(self: Expr) -> LintHit? {
+    let IfLet(MatchArm { pattern }, scrutinee, otherwise) = self.kind.as_case::<IfLet>()?;
+    let pattern = pattern.case_pattern()?;
+    // `return none;` and nothing else: the statement, then the block's unit tail.
+    let Seq(leave, rest) = otherwise.kind.as_case::<Seq>()?;
+    let Return(value) = leave.kind.as_case::<Return>()?;
+    if (rest.kind != Unit || value.kind != None) { return none; };
+    some(unfilled(
+        AsCase,
+        `this \`else\` only gives up with none — write "{pattern.statement_head()}{scrutinee.receiver_text()}.`,
+        `::<{pattern.case}>()?;" and drop the block`,
+        leave.span,
+    ))
 }.test({
     // The value taken apart, with the payload bound by the `let`, and the hit on the
     // `return`.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: Expr) -> i64? { let Field(base, field) = x else { return none; }; some(base) }",
-        let_else_as_case,
+        "let_else_as_case",
     )?.shown() == [
         """this `else` only gives up with none — write "let Field(base, field) = x.Builtin(AsCase)::<Field>()?;" and drop the block""",
     ]);
 
     // A case with no payload is asked of the value alone.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: Expr) -> i64? { let Empty(..) = x else { return none; }; some(1) }",
-        let_else_as_case,
+        "let_else_as_case",
     )?.shown() == [
         """this `else` only gives up with none — write "x.Builtin(AsCase)::<Empty>()?;" and drop the block""",
     ]);
 
     // A hand-written `if (let ..)` is the same tree.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(x: Expr) -> i64? { if (let Field(b, f) = x) { some(b) } else { return none; } }",
-        let_else_as_case,
+        "let_else_as_case",
     )?.shown() == [
         """this `else` only gives up with none — write "let Field(b, f) = x.Builtin(AsCase)::<Field>()?;" and drop the block""",
     ]);
@@ -78,52 +73,52 @@ pub fn let_else_as_case(Function { body }) -> LintHit[] {
     // Not the shape: another answer, work before it, an optional's `some`, an array
     // pattern, and a `let` that is not the function's tail.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(x: Expr) -> i64? { let Field(b, f) = x else { return some(0); }; some(b) }",
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(x: Expr) -> i64? { let Field(b, f) = x else { g(); return none; }; some(b) }",
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(o: i64?) -> i64? { let some(n) = o else { return none; }; some(n) }",
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64? { let [a, ..] = xs else { return none; }; some(a) }",
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(x: Expr) -> i64? { let w = if (let Field(b, f) = x) { b } else { return none; }; some(w) }",
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
 
     // Shapes the lint must leave alone.
     // The block returns something other than `none`.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn radius(s: Shape) -> i64 {
                     let Circle(r) = s else { return 0; };
                     r
                 }
             """,
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     // The block does something before it returns.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn logged(s: Shape) !prints -> i64? {
                     let Circle(r) = s else {
@@ -133,37 +128,37 @@ pub fn let_else_as_case(Function { body }) -> LintHit[] {
                     some(r)
                 }
             """,
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     // An optional's `some` has no `as_case`, and neither has an array pattern.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn double(o: i64?) -> i64? {
                     let some(n) = o else { return none; };
                     some(n + n)
                 }
             """,
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn second(xs: i64[]) -> i64? {
                     let [_, b, ..] = xs else { return none; };
                     some(b)
                 }
             """,
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
 
     // Not the function's last act: the `?` would leave the function where the `if let`
     // only chose a value for a binding.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """
                 fn width(s: Shape) -> i64? {
                     let w = if (let Rect(a, b) = s) {
@@ -174,28 +169,26 @@ pub fn let_else_as_case(Function { body }) -> LintHit[] {
                     some(w)
                 }
             """,
-            let_else_as_case,
+            "let_else_as_case",
         )?.is_empty(),
     );
-    assert(
-        lint_function_unfilled("fn show(o: i64?) -> str { `{o}` }", let_else_as_case)?.is_empty(),
-    );
+    assert(lint_with_unfilled("fn show(o: i64?) -> str { `{o}` }", "let_else_as_case")?.is_empty());
 
     // Shapes the lint flags, and what it says of them.
     // A payload the `let` takes apart.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn radius(s: Shape) -> i64? {
                 let Circle(r) = s else { return none; };
                 some(r * 2)
             }
         """,
-        let_else_as_case,
+        "let_else_as_case",
     )?.shown() == [
         """this `else` only gives up with none — write "let Circle(r) = s.Builtin(AsCase)::<Circle>()?;" and drop the block""",
     ]);
     // Written as an `if let`, which is the same tree.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn width(s: Shape) -> i64? {
                 if (let Rect(w, h) = s) {
@@ -205,14 +198,14 @@ pub fn let_else_as_case(Function { body }) -> LintHit[] {
                 }
             }
         """,
-        let_else_as_case,
+        "let_else_as_case",
     )?.shown() == [
         """this `else` only gives up with none — write "let Rect(w, h) = s.Builtin(AsCase)::<Rect>()?;" and drop the block""",
     ]);
 
     // A case with no payload to bind has no pattern for a `let`, so it is asked of
     // the value alone.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         """
             fn only_empty(s: Shape, n: i64) -> i64? {
                 if (let Empty = s) {
@@ -222,7 +215,7 @@ pub fn let_else_as_case(Function { body }) -> LintHit[] {
                 }
             }
         """,
-        let_else_as_case,
+        "let_else_as_case",
     )?.shown() == [
         """this `else` only gives up with none — write "s.Builtin(AsCase)::<Empty>()?;" and drop the block""",
     ]);

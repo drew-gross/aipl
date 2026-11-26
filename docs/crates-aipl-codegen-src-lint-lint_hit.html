@@ -239,7 +239,7 @@
           </h3>
           <pre class="signature"><code>variant LintRun</code></pre>
 
-          <div class="doc"><p>A lint of one function, by what it reads: the function (once), or each node of one kind in its body. A lint of the kind reads the kind's payload; one that needs the node itself (its source, or its span) is the <code>Node</code> case. What each says is a list of hits, which a lint that finds at most one writes as <code>[..hit]</code>.</p></div>
+          <div class="doc"><p>A lint of one function, by what it reads: the function (once), or each node of one kind in its body, or each of the <code>match</code> and <code>if let</code> expressions whose value is the function's (<code>tail_matches</code>). A lint of the kind reads the kind's payload; one that needs the node itself (its source, or its span) is the <code>Node</code> case, and a tail match is always the node. What each says is a list of hits, which a lint that finds at most one writes as <code>[..hit]</code>.</p></div>
 
 
           <ul class="cases">
@@ -265,6 +265,11 @@
             </li>
 
             <li id="item-OfMatchNode"><code>OfMatchNode((Expr) -&#62; LintHit[])</code>
+
+
+            </li>
+
+            <li id="item-OfTailMatches"><code>OfTailMatches((Expr) -&#62; LintHit[])</code>
 
 
             </li>

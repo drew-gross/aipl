@@ -19,22 +19,12 @@
 # The hit points at the `none` after `return`, on a line the formatter keeps in place, so
 # `#[allow]` squelches it.
 
-import {
-    as_case,
-    collect_ok,
-    equal as ==,
-    is_empty,
-    logical_or as ||,
-    map,
-    not_equal as !=,
-    only,
-} from builtins;
+import { as_case, equal as ==, is_empty, logical_or as ||, not_equal as !=, only } from builtins;
 import { Only } from "../builtin_table.aipl";
-import { IfLet, None, Return, Seq, Unit } from "../expr.aipl";
-import { Function } from "../item.aipl";
+import { Expr, IfLet, MatchArm, None, Return, Seq, Unit } from "../expr.aipl";
 import { Array, Binder, Pat } from "../pat.aipl";
-import { tail_matches } from "./case_match.aipl";
-import { LintHit, lint_function_unfilled, shown, unfilled } from "./lint_hit.aipl";
+import { lint_with_unfilled } from "./lint.aipl";
+import { LintHit, shown, unfilled } from "./lint_hit.aipl";
 import { receiver_text } from "./option_match.aipl";
 
 # The name `self` binds when it is an array pattern of exactly one plain name (`_` included).
@@ -44,65 +34,60 @@ pub fn single_binder(self: Pat) -> str? {
     some(name)
 }
 
-# A hit for each `let [name] = .. else { return none; }` that ends the function.
-pub fn let_else_only(Function { body }) -> LintHit[] {
-    body
-        .tail_matches()
-        .map(|tail| {
-            let IfLet(arm, scrutinee, otherwise) = tail.kind else { return none; };
-            let some(binder) = arm.pattern.single_binder() else { return none; };
-            // `return none;` and nothing else: the statement, then the block's unit tail.
-            let Seq(leave, rest) = otherwise.kind else { return none; };
-            let Return(value) = leave.kind else { return none; };
-            if (rest.kind != Unit || value.kind != None) { return none; };
-            let statement = if (binder == "_") { "" } else { `let {binder} = ` };
-            some(unfilled(
-                Only,
-                `this \`else\` only gives up with none — write "{statement}{scrutinee.receiver_text()}.`,
-                `()?;" and drop the block`,
-                leave.span,
-            ))
-        })
-        .collect_ok()
+# The hit for the `let [name] = .. else { return none; }` `self`, a tail match of the function.
+pub fn let_else_only(self: Expr) -> LintHit? {
+    let IfLet(MatchArm { pattern }, scrutinee, otherwise) = self.kind.as_case::<IfLet>()?;
+    let binder = pattern.single_binder()?;
+    // `return none;` and nothing else: the statement, then the block's unit tail.
+    let Seq(leave, rest) = otherwise.kind.as_case::<Seq>()?;
+    let Return(value) = leave.kind.as_case::<Return>()?;
+    if (rest.kind != Unit || value.kind != None) { return none; };
+    let statement = if (binder == "_") { "" } else { `let {binder} = ` };
+    some(unfilled(
+        Only,
+        `this \`else\` only gives up with none — write "{statement}{scrutinee.receiver_text()}.`,
+        `()?;" and drop the block`,
+        leave.span,
+    ))
 }.test({
     // The element taken out and named by the `let`, and the hit on the `return`.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64? { let [x] = xs else { return none; }; some(x) }",
-        let_else_only,
+        "let_else_only",
     )?.shown() == [
         """this `else` only gives up with none — write "let x = xs.Builtin(Only)()?;" and drop the block""",
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64? { let [x] = xs else { return none; }; some(x) }",
-        let_else_only,
+        "let_else_only",
     )?$span == [53..57]);
 
     // A name that is not read asks only whether there is one element.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64? { let [_] = xs else { return none; }; some(1) }",
-        let_else_only,
+        "let_else_only",
     )?.shown() == [
         """this `else` only gives up with none — write "xs.Builtin(Only)()?;" and drop the block""",
     ]);
 
     // A hand-written `if let` is the same tree.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(xs: i64[]) -> i64? { if (let [x] = xs) { some(x) } else { return none; } }",
-        let_else_only,
+        "let_else_only",
     )?.shown() == [
         """this `else` only gives up with none — write "let x = xs.Builtin(Only)()?;" and drop the block""",
     ]);
 
     // The value taken apart is quoted as it was written, where a method can follow it.
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(p: P) -> i64? { let [x] = p.xs else { return none; }; some(x) }",
-        let_else_only,
+        "let_else_only",
     )?.shown() == [
         """this `else` only gives up with none — write "let x = p.xs.Builtin(Only)()?;" and drop the block""",
     ]);
-    assert(lint_function_unfilled(
+    assert(lint_with_unfilled(
         "fn f(o: i64[]?) -> i64? { let [x] = o? else { return none; }; some(x) }",
-        let_else_only,
+        "let_else_only",
     )?.shown() == [
         """this `else` only gives up with none — write "let x = o?.Builtin(Only)()?;" and drop the block""",
     ]);
@@ -110,52 +95,52 @@ pub fn let_else_only(Function { body }) -> LintHit[] {
     // Shapes the lint must leave alone.
     // The block returns something other than `none`.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64 { let [x] = xs else { return 0; }; x }",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
     // The block does something before it returns.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             """fn f(xs: i64[]) !prints -> i64? { let [x] = xs else { print("no"); return none; }; some(x) }""",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
 
     // More than one element, a literal, an array of at least one, and an optional's `some`:
     // none of them is "exactly one element".
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64? { let [a, b] = xs else { return none; }; some(a) }",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64? { let [1] = xs else { return none; }; some(1) }",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64? { let [a, ..] = xs else { return none; }; some(a) }",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(o: i64?) -> i64? { let some(n) = o else { return none; }; some(n) }",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
 
     // Not the function's last act: the `?` would leave the function where the `if let` only
     // chose a value for a binding.
     assert(
-        lint_function_unfilled(
+        lint_with_unfilled(
             "fn f(xs: i64[]) -> i64? { let w = if (let [x] = xs) { x } else { return none; }; some(w) }",
-            let_else_only,
+            "let_else_only",
         )?.is_empty(),
     );
 })

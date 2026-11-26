@@ -59,6 +59,7 @@ import {
     resolve_callees,
     resolve_with_every_builtin,
 } from "../resolve_callees.aipl";
+import { tail_matches } from "./case_match.aipl";
 import { Builtin, Need, Request, Spelling, is_builtin_named, spelled } from "./spelling.aipl";
 
 struct FilledHit { message: str, span: Span }
@@ -332,8 +333,9 @@ pub fn functions(self: Program) -> Function[] {
 })
 
 # A lint of one function, by what it reads: the function (once), or each node of one kind in its
-# body. A lint of the kind reads the kind's payload; one that needs the node itself (its source, or
-# its span) is the `Node` case. What each says is a list of hits, which a lint that finds at most one
+# body, or each of the `match` and `if let` expressions whose value is the function's
+# (`tail_matches`). A lint of the kind reads the kind's payload; one that needs the node itself (its
+# source, or its span) is the `Node` case, and a tail match is always the node. What each says is a list of hits, which a lint that finds at most one
 # writes as `[..hit]`.
 variant LintRun =
     | OfFunction((Function) -> LintHit[])
@@ -341,6 +343,7 @@ variant LintRun =
     | OfMatch((Match) -> LintHit[])
     | OfMatchIn((Match, Function) -> LintHit[])
     | OfMatchNode((Expr) -> LintHit[])
+    | OfTailMatches((Expr) -> LintHit[])
     | OfAssign((Assign) -> LintHit[])
     | OfSetLitNode((Expr) -> LintHit[])
     | OfInterpolation((Interpolation) -> LintHit[])
@@ -381,6 +384,11 @@ pub fn run_lints(self: Function, lints: Lint[]) -> LintHit[] {
                     set hits.extend(lint_run(node)$at(node.span));
                 }
             },
+            OfTailMatches(lint_run) => {
+                for (let node : body.tail_matches()) {
+                    set hits.extend(lint_run(node)$at(node.span));
+                }
+            },
             OfAssign(lint_run) => {
                 for (let node : body.descendants_of_kind::<Assign>()) {
                     set hits.extend(lint_run(node.kind)$at(node.span));
@@ -416,6 +424,23 @@ pub fn run_lints(self: Function, lints: Lint[]) -> LintHit[] {
     hits
 }.test({
     fn named(name: str, run: LintRun) -> Lint { name, run }
+
+    // A lint of tail matches is run over the `match` and `if let` expressions the function ends in,
+    // and not over one that only gives a binding its value.
+    assert(lint_function_messages(
+        "fn f(o: i64?) -> i64? { match (o) { some(v) => some(v), none => none } }",
+        |function| function.run_lints([
+            named("tails", OfTailMatches(|tail| [lint_message("tail")])),
+        ]),
+    )? == ["tail"]);
+    assert(
+        lint_function_messages(
+            "fn f(o: i64?) -> i64? { let y = match (o) { some(v) => some(v), none => none }; y }",
+            |function| function.run_lints([
+                named("tails", OfTailMatches(|tail| [lint_message("tail")])),
+            ]),
+        )?.is_empty(),
+    );
 
     // A lint of calls is run over each call, a lint of the function once, and each hit points at the
     // node it was found in unless the lint said where.

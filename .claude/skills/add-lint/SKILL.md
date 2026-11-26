@@ -13,7 +13,9 @@ the source forms are still there), returning hits. Most lints are a function of 
 `Function` or of one kind of node, registered in `all_lints()` in `lint.aipl` under the name of its
 file as a `Lint { name, run }`, where `run` says what it reads: `OfFunction` (once per function), or
 `OfCall`, `OfMatch`, `OfAssign`, ... (each node of that kind in the body; `OfMatchNode`/`OfSetLitNode`
-when the lint needs the node itself, `OfMatchIn` when it needs the function too). `run_lints` runs them.
+when the lint needs the node itself, `OfMatchIn` when it needs the function too; `OfTailMatches` for
+each `match` and `if let` whose value is the function's — where a `?` would leave with the same answer —
+so the lint is a function of one such node, `(Expr) -> LintHit?`). `run_lints` runs them.
 A lint that finds at most one hit is wrapped `|call| [..lint(call)]` in the registry. Every lint
 returns `LintHit`s, and a hit that names no builtin is `lint_message(message)` (or
 `lint_message(message, span=..)`), which is a `LintHit` with nothing named; a hit with no span of its
