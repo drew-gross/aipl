@@ -14,7 +14,10 @@ as far as the app needs.
   each element becomes are described at the top of `crates/aipl-codegen/src/gui_cocoa.rs`, which
   also reads it (without allocating), makes the one window and the main menu (Quit, Cmd-Q; Close
   Window, Cmd-W) and a delegate class that turns the window's requests into events, and builds AppKit
-  views: `NSStackView` for `column` and `row`,
+  views (a window made by `show_view` opens at 480 by 360 points, or as big as its contents need up to
+  960 by 720, and cannot be made smaller than 240 by 160; a label gives way to a narrow window and is
+  cut short with an ellipsis, so long text cannot hold a window wide; `show_window`'s window is as
+  big as its text): `NSStackView` for `column` and `row`,
   labels as attributed strings, buttons, checkboxes, text fields and separators. The JIT and the AOT
   runtime both include that file; AppKit is loaded with `dlopen` on the first call and driven through
   `objc_msgSend`, so nothing is linked. `next_event` runs a hand-written `nextEventMatchingMask`
@@ -86,8 +89,9 @@ come once `interact` and `wait_until_closed` are the same loop with different up
 Goal: the elements `show_view` draws look right, settled by looking at `todo gallery` and changing
 what is wrong.
 
-- [ ] Alignment, spacing, field and button widths, font sizes and the window's size and minimum
-      size, each looked at in the gallery and fixed where it is off.
+- [ ] Alignment, spacing, field and button widths and font sizes, each looked at in the gallery and
+      fixed where it is off; a label squeezed by a narrow window runs about 12 points into its
+      container's padding, and the window's default and minimum sizes are a first guess.
 - [ ] More elements or options the todo app turns out to need (a heading style, a color for an
       overdue item, a bordered box) added to the text form, the runtime's reader, `elements.aipl`
       and the gallery together.
@@ -119,7 +123,10 @@ parent are the program's error and are refused, not guessed at.
 Goal: contents that fit the window and scroll when there are too many.
 
 - [ ] A scrolling container.
-- [ ] The window resizes without clipping, and a field or separator grows with it.
+- [ ] The window resizes without clipping, and a field or separator grows with it; contents that
+      grow after the window is open (a longer list) make it bigger, as far as the opening limit.
+- [ ] A view can say how big its window opens and how small it may be made, for a program whose idea
+      of a usable size is not the default.
 
 ### 4. The todo app
 

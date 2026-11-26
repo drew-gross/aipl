@@ -439,6 +439,30 @@ unsafe fn constant(name: &'static [u8]) -> Option<Id> {
 // The most containers one inside another.
 const MAX_DEPTH: usize = 32;
 
+// How big a window opens, and how small it can be made, in points. A window opens this big, or as
+// big as its contents need if that is more, but never more than the opening limit (a person can
+// make it bigger, and a label that does not fit is cut short); it can be shrunk until the minimum,
+// and no further, whatever its contents: labels give way to the window, as far as truncating, so
+// that a long line of text cannot hold a window wide. The minimum is small enough that few would
+// want smaller, and not so small that a window is a title bar.
+const DEFAULT_WIDTH: f64 = 480.0;
+const DEFAULT_HEIGHT: f64 = 360.0;
+const LIMIT_WIDTH: f64 = 960.0;
+const LIMIT_HEIGHT: f64 = 720.0;
+const MINIMUM_WIDTH: f64 = 240.0;
+const MINIMUM_HEIGHT: f64 = 160.0;
+
+// `wanted` points, if that is within `least` and `most`, else the nearer of them.
+fn clamped(wanted: f64, least: f64, most: f64) -> f64 {
+    if wanted < least {
+        least
+    } else if wanted > most {
+        most
+    } else {
+        wanted
+    }
+}
+
 // Makes the views a view's lines describe, a line at a time.
 struct Builder<'o> {
     objc: &'o Objc,
@@ -507,6 +531,13 @@ impl Builder<'_> {
         let label =
             send!(*objc, class(objc, b"NSTextField\0"), "labelWithString:", [Id] -> Id, empty);
         send!(*objc, label, "setAttributedStringValue:", [Id] -> (), styled);
+        // A label that does not fit is cut short, with an ellipsis, and gives way to the window
+        // when it is made narrow: below the priority at which a window holds its size.
+        send!(*objc, label, "setLineBreakMode:", [i64] -> (), 4);
+        send!(
+            *objc, label, "setContentCompressionResistancePriority:forOrientation:", [f32, i64] -> (),
+            250.0, 0
+        );
         Ok(label)
     }
 
@@ -955,8 +986,11 @@ unsafe fn gui() -> Option<&'static mut Gui> {
 }
 
 impl Gui {
-    // Show the view `view` in the window titled `title`, opening the window if there is none.
-    unsafe fn show(&mut self, title: &[u8], view: &[u8]) -> Shown {
+    // Show the view `view` in the window titled `title`, opening the window if there is none. A new
+    // window opens at least `DEFAULT_WIDTH` by `DEFAULT_HEIGHT` and cannot be made smaller than
+    // `MINIMUM_WIDTH` by `MINIMUM_HEIGHT`, when `sized` is set; otherwise it opens as big as its
+    // contents need.
+    unsafe fn show(&mut self, title: &[u8], view: &[u8], sized: bool) -> Shown {
         let objc = &self.objc;
         let scratch_length = view.len() + 1;
         let scratch = malloc(scratch_length) as *mut u8;
@@ -1006,9 +1040,25 @@ impl Gui {
         send!(*objc, window, "setTitle:", [Id] -> (), string(objc, title));
         send!(*objc, window, "setContentView:", [Id] -> (), root);
         if fresh {
-            // The window opens as big as its contents need.
             let fitting = send!(*objc, root, "fittingSize", [] -> Size);
-            send!(*objc, window, "setContentSize:", [Size] -> (), fitting);
+            let size = if sized {
+                // Its contents are no reason for it to be smaller than a usable window, or to be
+                // bigger than most screens have room for.
+                Size {
+                    width: clamped(fitting.width, DEFAULT_WIDTH, LIMIT_WIDTH),
+                    height: clamped(fitting.height, DEFAULT_HEIGHT, LIMIT_HEIGHT),
+                }
+            } else {
+                fitting
+            };
+            send!(*objc, window, "setContentSize:", [Size] -> (), size);
+            if sized {
+                let least = Size {
+                    width: MINIMUM_WIDTH,
+                    height: MINIMUM_HEIGHT,
+                };
+                send!(*objc, window, "setContentMinSize:", [Size] -> (), least);
+            }
             send!(*objc, window, "center", [] -> ());
             send!(*objc, window, "makeKeyAndOrderFront:", [Id] -> (), core::ptr::null_mut());
             send!(*objc, self.application, "activateIgnoringOtherApps:", [i8] -> (), 1);
@@ -1061,8 +1111,12 @@ unsafe fn on_main_thread() -> bool {
 }
 
 // Show the view `view` (its text form, described at the top of this file) in a window titled
-// `title`, opening it if it is not open, and return.
+// `title`, opening it if it is not open, and return. A new window is a usable size.
 pub fn show_view(title: &[u8], view: &[u8]) -> Shown {
+    show(title, view, true)
+}
+
+fn show(title: &[u8], view: &[u8], sized: bool) -> Shown {
     unsafe {
         if !on_main_thread() {
             return Shown::NotMainThread;
@@ -1071,7 +1125,7 @@ pub fn show_view(title: &[u8], view: &[u8]) -> Shown {
             return Shown::Unavailable;
         };
         let pool = (gui.objc.pool_push)();
-        let shown = gui.show(title, view);
+        let shown = gui.show(title, view, sized);
         (gui.objc.pool_pop)(pool);
         shown
     }
@@ -1163,7 +1217,8 @@ pub fn show_window(title: &[u8], text: &[u8]) -> Shown {
         ) else {
             return Shown::Unavailable;
         };
-        let shown = show_view(title, core::slice::from_raw_parts(view, length));
+        // The window is as big as the text, which is all it has.
+        let shown = show(title, core::slice::from_raw_parts(view, length), false);
         free(view as *mut c_void);
         if shown != Shown::Done {
             return shown;
@@ -1322,6 +1377,17 @@ mod tests {
             text(Pending::clicked(&long)).len(),
             "clicked ".len() + MAX_KEY
         );
+    }
+
+    #[test]
+    fn a_window_opens_between_the_default_and_the_limit() {
+        assert_eq!(clamped(10.0, DEFAULT_WIDTH, LIMIT_WIDTH), DEFAULT_WIDTH);
+        assert_eq!(clamped(600.0, DEFAULT_WIDTH, LIMIT_WIDTH), 600.0);
+        assert_eq!(clamped(5000.0, DEFAULT_WIDTH, LIMIT_WIDTH), LIMIT_WIDTH);
+        // The smallest a window can be made is below the size it opens at, and well above nothing.
+        assert!(MINIMUM_WIDTH < DEFAULT_WIDTH && MINIMUM_HEIGHT < DEFAULT_HEIGHT);
+        assert!(MINIMUM_WIDTH >= 200.0 && MINIMUM_HEIGHT >= 120.0);
+        assert!(DEFAULT_WIDTH <= LIMIT_WIDTH && DEFAULT_HEIGHT <= LIMIT_HEIGHT);
     }
 
     #[test]
