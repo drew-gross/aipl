@@ -58,7 +58,6 @@ error messages (regressions when the pinner replaced the checker's reporting; th
 
 effects / shims:
   gui: GUI_TODO_APP.md plans a todo app on the gui effect (events, text input, layout); projects/todo is its project
-  read_file_to_string's err carries no kind, so projects/todo reads an unreadable file as an empty list and its next save overwrites it; an error kind (missing / unreadable) would let it refuse
   http_get: request headers (`headers = [..]`); needs the runtimes to read an array of structs they are handed
   http_get: other verbs (post, put, delete); decide `HttpHeader[]` vs a dict for request headers when they land
   http_get is missing from the instrumented AOT runtime's per-builtin call counts (`aipl report` breakdown)

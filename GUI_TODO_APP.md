@@ -28,7 +28,7 @@ as far as the app needs.
   `gallery` command that draws every element from constants, and `events.aipl` has the `Event`
   variant, its parser and `wait_until_closed`, the loop that grants requests to close and quit;
   `main.aipl` has `interact`, the loop the todo window runs in: an event updates the list, which is
-  saved and drawn again. Its buttons so far add an item: "Add your first todo" on an empty list, and
+  drawn again; the list lives only as long as the window. Its buttons so far add an item: "Add your first todo" on an empty list, and
   "Add a todo" under the items of any other, each adding an item with placeholder text.
 - What reaches the program is the window's own requests and button clicks. A button has to have a
   `key` (up to 64 letters, digits and `- _ . : /`), which names it in its `clicked` event; checkboxes
@@ -41,9 +41,8 @@ as far as the app needs.
 - The runtimes read a `str` a program hands them (`str24`) and no other structured value: an
   array of structs or a variant tree has no reader on the Rust side (the same gap holds back
   `http_get` request headers).
-- `projects/todo` keeps the list in `todos.txt`, with the item logic (`Todo`, `apply`, `render`,
-  parse and serialize of the file) tested in AIPL, and shows it with `show_view`. That logic is what
-  the interactive app is built on.
+- `projects/todo` is an in-memory list of `Todo`s with a `view` of it and a `clicked` update, shown with
+  `show_view`: the model, the view and the update the interactive app is built on. Nothing is saved.
 
 ## Decisions
 
@@ -142,16 +141,10 @@ Goal: contents that fit the window and scroll when there are too many.
 
 Goal: `projects/todo` is the interactive app.
 
-- [ ] A model, `update` and `view` over `Todo`, `Command` and the file logic already there; the
-      view is a field to add, a row per item (checkbox, text, remove button) and a footer with how
-      many are left, the row a function of one item and keyed by it, as a React list item is.
-- [ ] Every change is saved to `todos.txt`; the file is read when the app starts.
-- [ ] `todo` with no command opens the window; the command-line commands stay or go (settle with
-      the user once the window covers them).
-- [ ] The whole interaction is a test: scripted events in, the views shown and the file written out.
-
-Watch: `read_file_to_string` says nothing about why it failed, so an unreadable file is read as
-empty and the next save overwrites it; an error kind would let the app refuse instead.
+- [ ] The view is a field to add, a row per item (checkbox, text, remove button) and a footer with
+      how many are left, the row a function of one item and keyed by it, as a React list item is;
+      `clicked` becomes an `update` over every event the view can cause.
+- [ ] The whole interaction is a test: scripted events in, the views shown.
 
 ### 5. Behaving like an app
 
@@ -168,9 +161,21 @@ empty and the next save overwrites it; an error kind would let the app refuse in
       `interact` are both a loop of `next_event`, an update and a redraw, and become one function of
       a model, an update and a view.
 
+### 7. Persistence
+
+Not part of the work on the window itself; the list can be kept once the interface is settled.
+
+- [ ] The list is read when the app starts and written after each change.
+- [ ] An item's text cannot hold a newline if the file is a line per item (`[ ] text`, `[x] text`),
+      or the format escapes it: a text with one made the file unreadable.
+- [ ] The save does not leave a half-written file if the program dies partway.
+
+Watch: `read_file_to_string` says nothing about why it failed, so an unreadable file read as an empty
+list would be overwritten by the next save; an error kind (missing or unreadable) would let the app
+refuse instead.
+
 ## Done when
 
 `./main` built from `projects/todo` opens a window where an item is added with a text field and
-Enter, ticked with a checkbox and removed with a button; the list is saved after each change and
-reloaded at the next start; closing the window or Cmd-Q ends the program with exit 0; and the whole
-interaction is covered by `.test` blocks that run with no display.
+Enter, ticked with a checkbox and removed with a button; closing the window or Cmd-Q ends the
+program with exit 0; and the whole interaction is covered by `.test` blocks that run with no display.

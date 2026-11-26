@@ -1,37 +1,23 @@
-# A todo list kept in a file, and shown in a window.
-#
-# The list is the lines of `todos.txt`, each `[ ] text` for an item still to do and `[x] text` for
-# one done. `todo` on its own shows the list in a window; `todo add <text>`, `done <n>`, `undo <n>`,
-# `remove <n>` and `clear-done` change it, save it and print it; `todo gallery` shows every element
-# the window can draw, from constants. In the window, the buttons to add an item work; GUI_TODO_APP.md
-# plans the rest.
+# A todo list, shown in a window. `todo` opens it, with nothing to do and a button to add the first
+# item; `todo gallery` shows every element the window can draw, from constants. The list lives only as
+# long as the window: nothing is saved yet. GUI_TODO_APP.md plans the rest.
 
 import {
     drop_first,
     equal as ==,
     filter,
     first,
-    greater_than as >,
-    int_parse,
     is_empty,
-    is_nonempty,
-    join,
     len,
     logical_and as &&,
     logical_not as !,
-    logical_or as ||,
     not_equal as !=,
     print,
     push,
-    read_file_to_string,
-    saturating_sub as -,
-    split,
     starts_with,
     value_or,
-    value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
-    write_string_to_file,
 } from builtins;
 import {
     Button,
@@ -57,84 +43,11 @@ import { close_window, next_event, show_view } from gui;
 # One thing to do.
 struct Todo { text: str, done: bool }
 
-# What the command line asks for. A number names an item as the listing numbers it, from 1.
-variant Command = Show | Gallery | Add(str) | Done(u64) | Undo(u64) | Remove(u64) | ClearDone
+# What the command line asks for.
+variant Command = Show | Gallery
 
-# What a run came to: a window to show, with its title; a list to use in a window, saving what is
-# done to it; or a list that changed, to save and print.
-variant Outcome = Window(str, Element) | Interact(Todo[]) | Changed(str, str)
-
-# `self` as a line of the file: `[ ] text`, or `[x] text` once done.
-fn line(self: Todo) -> str {
-    let mark = if (self.done) { "[x]" } else { "[ ]" };
-    `{mark} {self.text}`
-}.test({
-    assert(Todo { text: "buy milk", done: false }.line() == "[ ] buy milk");
-    assert(Todo { text: "buy milk", done: true }.line() == "[x] buy milk");
-})
-
-# The items in the text of a file, or the first line that is not one.
-fn parse_todos(text: str) -> Todo[]!str {
-    mut todos: Todo[] = [];
-    for (let at, line : text.split("\n")) {
-        if (line.starts_with("[ ] ")) {
-            set todos.push(Todo { text: line[4..], done: false });
-        } else if (line.starts_with("[x] ")) {
-            set todos.push(Todo { text: line[4..], done: true });
-        } else if (line.is_nonempty()) {
-            return err(`line {at + 1} of the file is not an item: {line}`);
-        };
-    }
-    ok(todos)
-}.test({
-    assert(parse_todos("")?.is_empty());
-    assert(parse_todos("[ ] a\n[x] b\n")? == [
-        Todo { text: "a", done: false },
-        Todo { text: "b", done: true },
-    ]);
-    // An item is whatever follows the mark, spaces and all.
-    assert(parse_todos("[ ] two  words ")? == [Todo { text: "two  words ", done: false }]);
-    assert(parse_todos("[ ] a\nnot an item\n") == err(
-        "line 2 of the file is not an item: not an item",
-    ));
-    assert(parse_todos("[x]\n") == err("line 1 of the file is not an item: [x]"));
-})
-
-# `self` as the text of the file.
-fn serialize(self: Todo[]) -> str {
-    if (self.is_empty()) { "" } else { `{self$line().join(sep="\n")}\n` }
-}.test({
-    assert([].serialize() == "");
-    assert(
-        [
-            Todo { text: "a", done: false },
-            Todo { text: "b", done: true },
-        ].serialize() == "[ ] a\n[x] b\n",
-    );
-    let list = [Todo { text: "a", done: true }];
-    assert(parse_todos(list.serialize())? == list);
-})
-
-# `self` as the listing the window and `todo` print: the items numbered from 1, then how many are
-# left to do.
-fn render(self: Todo[]) -> str {
-    if (self.is_empty()) { return "Nothing to do."; };
-    let lines = self$line();
-    mut numbered: str[] = [];
-    for (let at, text : lines) {
-        set numbered.push(`{at + 1}. {text}`);
-    }
-    let left = self.filter(|todo| !todo.done).len();
-    `{numbered.join(sep="\n")}\n\n{left} left`
-}.test({
-    assert([].render() == "Nothing to do.");
-    assert(
-        [
-            Todo { text: "a", done: false },
-            Todo { text: "b", done: true },
-        ].render() == "1. [ ] a\n2. [x] b\n\n1 left",
-    );
-})
+# What a run came to: a window to show, with its title, or the list to use in a window.
+variant Outcome = Window(str, Element) | Interact
 
 # `self` as a row of the window: a checkbox for whether it is done, and its text, struck through
 # and muted once it is.
@@ -235,120 +148,6 @@ fn gallery() -> Element {
     );
 })
 
-# Where item `number` is in a list of `size`, counting from 0, or why there is no such item.
-fn position(number: u64, size: u64) -> u64!str {
-    if (number == 0 || number > size) { err(`no item {number}`) } else { ok(number - 1) }
-}.test({
-    assert(position(1, 3) == ok(0));
-    assert(position(3, 3) == ok(2));
-    assert(position(0, 3) == err("no item 0"));
-    assert(position(4, 3) == err("no item 4"));
-    assert(position(1, 0) == err("no item 1"));
-})
-
-# `self` with item `number` marked done, or not done.
-fn marked(self: Todo[], number: u64, done: bool) -> Todo[]!str {
-    let target = position(number, self.len())?;
-    mut marked: Todo[] = [];
-    for (let at, todo : self) {
-        set marked.push(if (at == target) { Todo { ..todo, done } } else { todo });
-    }
-    ok(marked)
-}.test({
-    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: false }];
-    assert(list.marked(2, true)? == [
-        Todo { text: "a", done: false },
-        Todo { text: "b", done: true },
-    ]);
-    assert(list.marked(2, true)?.marked(2, false)? == list);
-    assert(list.marked(3, true) == err("no item 3"));
-})
-
-# `self` with item `number` taken out.
-fn removed(self: Todo[], number: u64) -> Todo[]!str {
-    let target = position(number, self.len())?;
-    ok([..self[..target], ..self[target + 1..]])
-}.test({
-    let list = [
-        Todo { text: "a", done: false },
-        Todo { text: "b", done: true },
-        Todo { text: "c", done: false },
-    ];
-    assert(list.removed(2)? == [Todo { text: "a", done: false }, Todo { text: "c", done: false }]);
-    assert(list.removed(1)?.len() == 2);
-    assert(list.removed(3)?.removed(1)? == [Todo { text: "b", done: true }]);
-    assert(list.removed(4) == err("no item 4"));
-})
-
-# `self` as `command` changes it.
-fn apply(self: Todo[], command: Command) -> Todo[]!str {
-    match (command) {
-        Show | Gallery => ok(self),
-        Add(text) => ok([..self, Todo { text, done: false }]),
-        Done(number) => self.marked(number, true),
-        Undo(number) => self.marked(number, false),
-        Remove(number) => self.removed(number),
-        ClearDone => ok(self.filter(|todo| !todo.done)),
-    }
-}.test({
-    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: true }];
-    assert(list.apply(Show)? == list);
-    assert(list.apply(Add("c"))?.len() == 3);
-    assert(list.apply(Done(1))?.apply(ClearDone)?.is_empty());
-    assert(list.apply(Undo(2))?.apply(ClearDone)? == list.apply(Undo(2))?);
-    assert(list.apply(Remove(1))? == [Todo { text: "b", done: true }]);
-    assert(list.apply(ClearDone)? == [Todo { text: "a", done: false }]);
-    assert(list.apply(Done(9)) == err("no item 9"));
-})
-
-# The number `args` is, when it is just one.
-fn item_number(args: str[]) -> u64!str {
-    match (args) {
-        [text] => {
-            let number: u64? = text.int_parse();
-            number.value_or_err(`not an item number: {text}`)
-        },
-        _ => err("expected one item number"),
-    }
-}.test({
-    assert(item_number(["3"]) == ok(3));
-    assert(item_number(["x"]) == err("not an item number: x"));
-    assert(item_number([]) == err("expected one item number"));
-    assert(item_number(["1", "2"]) == err("expected one item number"));
-})
-
-# What the command line `args` asks for.
-fn parse_command(args: str[]) -> Command!str {
-    let some(verb) = args.first() else { return ok(Show); };
-    let rest = args.drop_first();
-    match (verb) {
-        "show" => ok(Show),
-        "gallery" => ok(Gallery),
-        "add" => if (rest.is_empty()) {
-            err("add needs the text of the item")
-        } else {
-            ok(Add(rest.join(sep=" ")))
-        },
-        "done" => ok(Done(item_number(rest)?)),
-        "undo" => ok(Undo(item_number(rest)?)),
-        "remove" => ok(Remove(item_number(rest)?)),
-        "clear-done" => ok(ClearDone),
-        _ => err(`unknown command {verb}`),
-    }
-}.test({
-    assert(parse_command([]) == ok(Show));
-    assert(parse_command(["show"]) == ok(Show));
-    assert(parse_command(["gallery"]) == ok(Gallery));
-    assert(parse_command(["add", "buy", "milk"]) == ok(Add("buy milk")));
-    assert(parse_command(["add"]) == err("add needs the text of the item"));
-    assert(parse_command(["done", "2"]) == ok(Done(2)));
-    assert(parse_command(["undo", "2"]) == ok(Undo(2)));
-    assert(parse_command(["remove", "2"]) == ok(Remove(2)));
-    assert(parse_command(["clear-done"]) == ok(ClearDone));
-    assert(parse_command(["done", "two"]) == err("not an item number: two"));
-    assert(parse_command(["frobnicate"]) == err("unknown command frobnicate"));
-})
-
 # `self` as the button `key` was clicked changes it: the first item is added to an empty list, another
 # to any list, and a click on a button nothing is made of is not a change. (The text of an added item
 # is a placeholder until a window can be typed into.)
@@ -377,12 +176,10 @@ fn clicked(self: Todo[], key: str) -> Todo[] {
     assert(list.clicked("add").clicked("add")[2] == some(Todo { text: "Todo 3", done: false }));
 })
 
-# Show `todos` in a window, and keep the window to date as it is used, saving each change to `path`,
-# until the window is gone: it is closed when asked to close or to quit. 1 when a change could not be
-# saved, after saying so.
-fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
-    mut list = todos;
-    mut failed = false;
+# Show an empty list in a window, and keep the window to date as it is used, until the window is gone:
+# it is closed when asked to close or to quit.
+fn interact() !gui {
+    mut list: Todo[] = [];
     mut open = true;
     show_view("Todo", list.view().to_text());
     while (open) {
@@ -397,25 +194,16 @@ fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
                 let changed = list.clicked(key);
                 if (changed != list) {
                     set list = changed;
-                    match (write_string_to_file(path, list.serialize())) {
-                        ok => {},
-                        err(reason) => {
-                            print(`todo: could not save {path}: {reason}`);
-                            set failed = true;
-                            close_window();
-                        },
-                    };
                     show_view("Todo", list.view().to_text());
                 };
             },
             err(..) => {},
         };
     }
-    if (failed) { 1 } else { 0 }
 }.test({
-    // A click on the button of an empty list adds the first item, saves the list and shows it; the
-    // new window offers a button for another, and a click on the first one's, which it no longer
-    // offers, changes nothing.
+    // A click on the button of an empty list adds the first item and shows it; the new window offers
+    // a button for another, and a click on the first one's, which it no longer offers, changes
+    // nothing.
     mut script = [
         "clicked add-first",
         "clicked add",
@@ -424,7 +212,6 @@ fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
         "closed",
     ];
     mut shown: str[] = [];
-    mut saved: str[] = [];
     mut closes: u64 = 0;
     shim gui {
         show_window = |title, text| {},
@@ -440,21 +227,8 @@ fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
             set closes++;
         },
     } {
-        shim write_files {
-            write_string_to_file = |path, contents| {
-                set saved.push(`{path}: {contents}`);
-                ok()
-            },
-        } {
-            shim prints { print = |text| {}, put = |text| {} } {
-                assert(interact([], "todos.txt") == 0);
-            };
-        };
+        interact();
     };
-    assert(saved == [
-        "todos.txt: [ ] My first todo\n",
-        "todos.txt: [ ] My first todo\n[ ] Todo 2\n",
-    ]);
     assert(closes == 1);
 
     // The empty list's window, then the window with the item in it, then with two: one for each
@@ -468,47 +242,42 @@ fn interact(todos: Todo[], path: str) !prints !write_files !gui -> i64 {
     assert(script.is_empty());
 })
 
-# What running `args` against the saved list `saved` comes to.
-fn run(args: str[], saved: str) -> Outcome!str {
-    let command = parse_command(args)?;
-    let todos = parse_todos(saved)?.apply(command)?;
-    match (command) {
-        Show => ok(Interact(todos)),
-        Gallery => ok(Window("Gallery", gallery())),
-        _ => ok(Changed(todos.serialize(), todos.render())),
+# What the command line `args` asks for.
+fn parse_command(args: str[]) -> Command!str {
+    match (args) {
+        [] => ok(Show),
+        ["show"] => ok(Show),
+        ["gallery"] => ok(Gallery),
+        [verb] => err(`unknown command {verb}`),
+        _ => err("expected at most one command"),
     }
 }.test({
-    // Showing changes nothing and has no file to write.
-    assert(run([], "[ ] a\n") == ok(Interact([Todo { text: "a", done: false }])));
-    assert(run([], "") == ok(Interact([])));
-    // The gallery is the same whatever the list is.
-    assert(run(["gallery"], "[ ] a\n") == ok(Window("Gallery", gallery())));
-    // A change gives the new file and the listing.
-    assert(run(["add", "b"], "[ ] a\n") == ok(Changed(
-        "[ ] a\n[ ] b\n",
-        "1. [ ] a\n2. [ ] b\n\n2 left",
-    )));
-    assert(run(["done", "1"], "[ ] a\n") == ok(Changed("[x] a\n", "1. [x] a\n\n0 left")));
-    // A bad command or a bad file is the reason, with nothing to save.
-    assert(run(["done", "5"], "[ ] a\n") == err("no item 5"));
-    assert(run([], "garbage\n") == err("line 1 of the file is not an item: garbage"));
+    assert(parse_command([]) == ok(Show));
+    assert(parse_command(["show"]) == ok(Show));
+    assert(parse_command(["gallery"]) == ok(Gallery));
+    assert(parse_command(["frobnicate"]) == err("unknown command frobnicate"));
+    assert(parse_command(["show", "gallery"]) == err("expected at most one command"));
 })
 
-# Show the list in a window, or change it as the command line says, save it to `todos.txt` and print
-# it. A file that cannot be read is an empty list. Exits 1, after saying why, for a command that
-# makes no sense or a file that is not a list.
-fn main(args: str[]) !prints !read_files !write_files !gui -> i64 {
-    let path = "todos.txt";
-    let saved = match (read_file_to_string(path)) {
-        ok(text) => text,
-        err(..) => "",
-    };
-    match (run(args, saved)) {
+# What running `args` comes to.
+fn run(args: str[]) -> Outcome!str {
+    match (parse_command(args)?) {
+        Show => ok(Interact),
+        Gallery => ok(Window("Gallery", gallery())),
+    }
+}.test({
+    assert(run([]) == ok(Interact));
+    assert(run(["gallery"]) == ok(Window("Gallery", gallery())));
+    assert(run(["nope"]) == err("unknown command nope"));
+})
+
+# Open the list in a window, or with `gallery` a window of every element. Exits 1, after saying why,
+# for a command that makes no sense.
+fn main(args: str[]) !prints !gui -> i64 {
+    match (run(args)) {
         err(reason) => {
             print(`todo: {reason}`);
-            print(
-                "usage: todo [show | gallery | add <text> | done <n> | undo <n> | remove <n> | clear-done]",
-            );
+            print("usage: todo [show | gallery]");
             1
         },
         ok(Window(title, view)) => {
@@ -516,16 +285,9 @@ fn main(args: str[]) !prints !read_files !write_files !gui -> i64 {
             wait_until_closed();
             0
         },
-        ok(Interact(todos)) => interact(todos, path),
-        ok(Changed(file, listing)) => match (write_string_to_file(path, file)) {
-            ok => {
-                print(listing);
-                0
-            },
-            err(reason) => {
-                print(`todo: could not save {path}: {reason}`);
-                1
-            },
+        ok(Interact) => {
+            interact();
+            0
         },
     }
 }
