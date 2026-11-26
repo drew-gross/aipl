@@ -35,8 +35,11 @@
 //     separator        a thin line across its column
 //
 // Any element takes `width=` (points) and `key="name"`: a key is up to 64 letters, digits and
-// `- _ . : /`, and names the element in the events it causes. A button has to have one. A line the
-// reader cannot make sense of stops the view, and the error says which line and why.
+// `- _ . : /`, and names the element in the events it causes. A button has to have one. The root
+// takes `icon="glyph"`, a glyph (or a short word) drawn white on a colored tile as the application's
+// icon in the Dock and the Cmd-Tab switcher; without one the icon is the first letter of the
+// program's name, on a tile colored from the name. A line the reader cannot make sense of stops the
+// view, and the error says which line and why.
 //
 // # Events
 //
@@ -135,6 +138,7 @@ struct Item<'a> {
     value: Option<&'a [u8]>,
     placeholder: Option<&'a [u8]>,
     key: Option<&'a [u8]>,
+    icon: Option<&'a [u8]>,
     spacing: f64,
     padding: f64,
     size: f64,
@@ -214,6 +218,7 @@ fn parse_line(line: &[u8]) -> Result<Option<Item<'_>>, &'static str> {
         value: None,
         placeholder: None,
         key: None,
+        icon: None,
         spacing: 8.0,
         padding: 0.0,
         size: 0.0,
@@ -262,6 +267,12 @@ fn parse_line(line: &[u8]) -> Result<Option<Item<'_>>, &'static str> {
                             return Err("a key is up to 64 letters, digits and - _ . : /");
                         }
                         item.key = Some(text);
+                    }
+                    b"icon" if kind.is_container() && depth == 0 => {
+                        if text.is_empty() || text.len() > MAX_ICON {
+                            return Err("an icon is a glyph, or a short word, in up to 16 bytes");
+                        }
+                        item.icon = Some(text);
                     }
                     b"value" if kind == Kind::Field => item.value = Some(text),
                     b"placeholder" if kind == Kind::Field => item.placeholder = Some(text),
@@ -481,6 +492,8 @@ struct Builder<'o> {
     padding: [f64; MAX_DEPTH],
     count: usize,
     root: Id,
+    // The glyph the root asks to have as the application's icon, or `null`.
+    icon: Id,
 }
 
 impl Builder<'_> {
@@ -657,6 +670,9 @@ impl Builder<'_> {
         }
         if item.depth == 0 {
             self.root = view;
+            if let Some(glyph) = item.icon {
+                self.icon = self.text(glyph)?;
+            }
         } else {
             let parent = self.open[item.depth - 1];
             send!(*objc, parent, "addArrangedSubview:", [Id] -> (), view);
@@ -699,6 +715,9 @@ pub enum Event {
 
 // The most bytes in a key.
 const MAX_KEY: usize = 64;
+
+// The most bytes in the text of an icon.
+const MAX_ICON: usize = 16;
 
 // Whether `key` is one: up to `MAX_KEY` letters, digits and `-`, `_`, `.`, `:` and `/`. What a key
 // may hold is kept small so that an event can be told as plain words.
@@ -876,6 +895,72 @@ pub enum Shown {
     Refused { line: usize, why: &'static str },
 }
 
+// The application's icon: `glyph` (an `NSString`; the first letter of the program's name when
+// `None`), in white on a rounded tile whose color is taken from the program's name, so that
+// programs differ without being told to.
+unsafe fn set_icon(objc: &Objc, application: Id, glyph: Option<Id>) {
+    const SIDE: f64 = 512.0;
+    let pool = (objc.pool_push)();
+    let name = send!(
+        *objc, send!(*objc, class(objc, b"NSProcessInfo\0"), "processInfo", [] -> Id),
+        "processName", [] -> Id
+    );
+    let glyph = match glyph {
+        Some(glyph) => glyph,
+        None => {
+            let first = send!(*objc, name, "substringToIndex:", [u64] -> Id, 1);
+            send!(*objc, first, "uppercaseString", [] -> Id)
+        }
+    };
+    let hue = (send!(*objc, name, "hash", [] -> u64) % 360) as f64 / 360.0;
+
+    let image = send!(*objc, class(objc, b"NSImage\0"), "alloc", [] -> Id);
+    let image =
+        send!(*objc, image, "initWithSize:", [Size] -> Id, Size { width: SIDE, height: SIDE });
+    send!(*objc, image, "lockFocus", [] -> ());
+
+    // The tile, inset the way application icons are.
+    let tile = send!(
+        *objc, class(objc, b"NSColor\0"), "colorWithCalibratedHue:saturation:brightness:alpha:",
+        [f64, f64, f64, f64] -> Id, hue, 0.6, 0.78, 1.0
+    );
+    send!(*objc, tile, "setFill", [] -> ());
+    let inset = 40.0;
+    let shape = send!(
+        *objc, class(objc, b"NSBezierPath\0"), "bezierPathWithRoundedRect:xRadius:yRadius:",
+        [Rect, f64, f64] -> Id,
+        Rect {
+            origin: Point { x: inset, y: inset },
+            size: Size { width: SIDE - 2.0 * inset, height: SIDE - 2.0 * inset },
+        },
+        96.0, 96.0
+    );
+    send!(*objc, shape, "fill", [] -> ());
+
+    // The glyph, centered.
+    let attributes = send!(*objc, class(objc, b"NSMutableDictionary\0"), "dictionary", [] -> Id);
+    let font = send!(*objc, class(objc, b"NSFont\0"), "boldSystemFontOfSize:", [f64] -> Id, 260.0);
+    if let Some(key) = constant(b"NSFontAttributeName\0") {
+        send!(*objc, attributes, "setObject:forKey:", [Id, Id] -> (), font, key);
+    }
+    if let Some(key) = constant(b"NSForegroundColorAttributeName\0") {
+        let white = send!(*objc, class(objc, b"NSColor\0"), "whiteColor", [] -> Id);
+        send!(*objc, attributes, "setObject:forKey:", [Id, Id] -> (), white, key);
+    }
+    let size = send!(*objc, glyph, "sizeWithAttributes:", [Id] -> Size, attributes);
+    send!(
+        *objc, glyph, "drawAtPoint:withAttributes:", [Point, Id] -> (),
+        Point { x: (SIDE - size.width) / 2.0, y: (SIDE - size.height) / 2.0 },
+        attributes
+    );
+
+    send!(*objc, image, "unlockFocus", [] -> ());
+    send!(*objc, application, "setApplicationIconImage:", [Id] -> (), image);
+    // The application keeps its own reference.
+    send!(*objc, image, "release", [] -> ());
+    (objc.pool_pop)(pool);
+}
+
 // AppKit, the one window, and the object that hears what it is told.
 struct Gui {
     objc: Objc,
@@ -978,6 +1063,7 @@ unsafe fn start() -> Option<Gui> {
     send!(objc, application, "setActivationPolicy:", [i64] -> i8, 0);
     let delegate = make_delegate(&objc)?;
     install_menu(&objc, application, delegate);
+    set_icon(&objc, application, None);
     let mode = constant(b"NSDefaultRunLoopMode\0")?;
     *core::ptr::addr_of_mut!(READER) = Reader {
         send: objc.send,
@@ -1026,9 +1112,11 @@ impl Gui {
             padding: [0.0; MAX_DEPTH],
             count: 0,
             root: core::ptr::null_mut(),
+            icon: core::ptr::null_mut(),
         };
         let built = parse_view(view, &mut |item| builder.add(&item));
         let root = builder.root;
+        let icon = builder.icon;
         free(scratch as *mut c_void);
         if let Err((line, why)) = built {
             return Shown::Refused { line, why };
@@ -1038,6 +1126,10 @@ impl Gui {
                 line: 1,
                 why: "a view is empty: it starts with a column or a row",
             };
+        }
+
+        if !icon.is_null() {
+            set_icon(objc, self.application, Some(icon));
         }
 
         let fresh = self.window.is_null();
@@ -1396,6 +1488,30 @@ mod tests {
             text(Pending::clicked(&long)).len(),
             "clicked ".len() + MAX_KEY
         );
+    }
+
+    #[test]
+    fn the_root_may_choose_an_icon_and_nothing_else_may() {
+        let read = items("column icon=\"✓\"\n  label \"x\"\n").unwrap();
+        assert_eq!(read[0].icon, Some("✓".as_bytes()));
+        assert_eq!(items("row icon=\"T\"\n").unwrap()[0].icon, Some(&b"T"[..]));
+        // Not on a child, and not on a leaf.
+        assert_eq!(
+            why("column\n  column icon=\"x\"").1,
+            "this element has no attribute of that name with a text"
+        );
+        assert_eq!(
+            why("column\n  label \"a\" icon=\"x\"").1,
+            "this element has no attribute of that name with a text"
+        );
+        // A glyph or a short word, not a paragraph and not nothing.
+        assert_eq!(
+            why("column icon=\"\"").1,
+            "an icon is a glyph, or a short word, in up to 16 bytes"
+        );
+        assert!(why("column icon=\"a word far too long for it\"")
+            .1
+            .starts_with("an icon is"));
     }
 
     #[test]

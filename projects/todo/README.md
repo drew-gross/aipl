@@ -20,7 +20,8 @@ $ ./main gallery    # opens a window with one of every element, from constants
 In the window, a list with nothing in it has an "Add your first todo" button, which adds an item
 (with placeholder text, until a window can be typed into) and saves the list. Its checkboxes and
 fields are drawn and do nothing yet. Cmd-W and the close button close the window, and Cmd-Q quits,
-ending the program with exit 0.
+ending the program with exit 0. The window's icon, in the Dock and when you Cmd-Tab, is a white check
+mark on a colored tile (`gallery`'s is a grid).
 [GUI_TODO_APP.md](../../GUI_TODO_APP.md) plans the app it is meant to become, with items added,
 ticked and removed in the window itself. `elements.aipl` is the `Element` type and the text form the
 window is given them in.

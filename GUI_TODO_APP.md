@@ -17,7 +17,9 @@ as far as the app needs.
   views (a window made by `show_view` opens at 480 by 360 points, or as big as its contents need up to
   960 by 720, and cannot be made smaller than 240 by 160; a label gives way to a narrow window and is
   cut short with an ellipsis, so long text cannot hold a window wide; `show_window`'s window is as
-  big as its text): `NSStackView` for `column` and `row`,
+  big as its text; the application's icon, in the Dock and the Cmd-Tab switcher, is drawn at run time:
+  a white glyph on a rounded tile, the glyph the root's `icon="…"` or else the first letter of the
+  program's name, the tile's color taken from the name): `NSStackView` for `column` and `row`,
   labels as attributed strings, buttons, checkboxes, text fields and separators. The JIT and the AOT
   runtime both include that file; AppKit is loaded with `dlopen` on the first call and driven through
   `objc_msgSend`, so nothing is linked. `next_event` runs a hand-written `nextEventMatchingMask`
@@ -153,6 +155,8 @@ empty and the next save overwrites it; an error kind would let the app refuse in
 ### 5. Behaving like an app
 
 - [ ] An Edit menu (cut, copy, paste, select all), which text fields need to take them.
+- [ ] A program can give its icon as a picture, not only a glyph: a `str` cannot carry PNG bytes, so
+      it is a path to an image file or a text encoding of one.
 - [ ] The Dock's and the system's own requests to quit (logging out) reach the program as
       `quit_requested`, not as the process ending, through the application's delegate.
 - [ ] A window the program has asked a question of (unsaved changes) does not close until it says.

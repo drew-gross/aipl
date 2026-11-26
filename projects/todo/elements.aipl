@@ -3,7 +3,8 @@
 # An element is a case of `Element`, built like any variant, with what it leaves out at its default:
 # `Label("Todo", size=24, bold=true)`, `Column([..], padding=16)`. A `Column` or `Row` holds
 # elements, which is how a view is composed; every element takes a `key`, which names it in the
-# events it causes, and a `Button` has to have one.
+# events it causes, and a `Button` has to have one. The root takes an `icon`, a glyph the window
+# draws as the application's icon.
 # `to_text` writes a view as the lines the runtime reads, one element a line with its children
 # indented two spaces under it. The runtime's reader (`gui_cocoa.rs`) says what each element means.
 
@@ -19,8 +20,22 @@ import {
 } from builtins;
 
 variant Element =
-    | Column(children: Element[], spacing: u64 = 8, padding: u64 = 0, width: u64 = 0, key: str = "")
-    | Row(children: Element[], spacing: u64 = 8, padding: u64 = 0, width: u64 = 0, key: str = "")
+    | Column(
+        children: Element[],
+        spacing: u64 = 8,
+        padding: u64 = 0,
+        width: u64 = 0,
+        key: str = "",
+        icon: str = ""
+    )
+    | Row(
+        children: Element[],
+        spacing: u64 = 8,
+        padding: u64 = 0,
+        width: u64 = 0,
+        key: str = "",
+        icon: str = ""
+    )
     | Label(
         text: str,
         size: u64 = 0,
@@ -86,7 +101,7 @@ fn container(name: str, children: Element[], attributes: str[], depth: u64) -> s
 # `self` as lines of the text form, indented `depth` levels.
 fn lines(self: Element, depth: u64) -> str[] {
     match (self) {
-        Column(children, spacing, padding, width, key) => container(
+        Column(children, spacing, padding, width, key, icon) => container(
             "column",
             children,
             [
@@ -94,10 +109,11 @@ fn lines(self: Element, depth: u64) -> str[] {
                 ..number("padding", padding),
                 ..number("width", width),
                 ..text_attribute("key", key),
+                ..text_attribute("icon", icon),
             ],
             depth,
         ),
-        Row(children, spacing, padding, width, key) => container(
+        Row(children, spacing, padding, width, key, icon) => container(
             "row",
             children,
             [
@@ -105,6 +121,7 @@ fn lines(self: Element, depth: u64) -> str[] {
                 ..number("padding", padding),
                 ..number("width", width),
                 ..text_attribute("key", key),
+                ..text_attribute("icon", icon),
             ],
             depth,
         ),
@@ -159,6 +176,9 @@ fn lines(self: Element, depth: u64) -> str[] {
         `    button "b" key="go"`,
     ]);
     assert(Column([]).lines(0) == ["column spacing=8"]);
+    // The root's icon is a text attribute like the key.
+    assert(Column([], icon="✓").lines(0) == [`column spacing=8 icon="✓"`]);
+    assert(Row([], key="r", icon="T").lines(0) == [`row spacing=8 key="r" icon="T"`]);
 })
 
 # `self` in the text form `show_view` is given.

@@ -165,6 +165,7 @@ fn view(self: Todo[]) -> Element {
             Label(`{left} left`, muted=true),
         ],
         padding=16,
+        icon="✓",
     )
 }.test({
     assert([].view() == Column(
@@ -177,11 +178,12 @@ fn view(self: Todo[]) -> Element {
             Label("0 left", muted=true),
         ],
         padding=16,
+        icon="✓",
     ));
     let list = [Todo { text: "a", done: false }, Todo { text: "b", done: true }];
     assert(
         list.view().to_text() == """
-            column spacing=8 padding=16
+            column spacing=8 padding=16 icon="✓"
               label "Todo" size=24 bold
               separator
               row spacing=8
@@ -219,12 +221,15 @@ fn gallery() -> Element {
             Column([Label("A column"), Label("inside a column")], padding=12, spacing=2),
         ],
         padding=16,
+        icon="▦",
     )
 }.test({
     assert(
         gallery()
             .to_text()
-            .starts_with(`column spacing=8 padding=16\n  label "Elements" size=24 bold\n`),
+            .starts_with(
+                `column spacing=8 padding=16 icon="▦"\n  label "Elements" size=24 bold\n`,
+            ),
     );
 })
 
