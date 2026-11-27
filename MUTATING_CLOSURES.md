@@ -50,9 +50,19 @@ which calls it may not elide, sink or defer.
 
 ## Stages
 
-Order: 2, 3 in turn; 4 after 3; 5 any time after 2.
+Order: 3, then 4; 5 any time after 3.
 
-Stage 1 is built. The function type carries `mutating: bool` after its effects in `ast::Type`,
+Stages 1 and 2 are built. Pinner: `[mut x]` takes a `mut` variable of the enclosing function (not a
+loop's from outside the loop) or declares owned state `[mut n = 0]`; the body must `set` each, may
+`set` no other `mut` variable, and returns nothing; the closure's type is `() mut ..`; a plain function
+fits where `mut` is allowed, never the reverse (`agree`); `set f(x);` lowers to `set f = f(x)`, a call
+of a `mut` closure answering the closure, as a mutating method answers its receiver, and `f(x);` alone
+is refused as a lost mutation. A variable taken by `[mut x]` is *moved*: the enclosing code may not use
+it afterwards (`Binding::moved`). That is flow-insensitive: a move in one branch of an `if` or `match`
+is a move for its sibling branches and for what follows. A closure called through a struct field
+is refused, and a mutating function is `mut self` as every mutating function is (`fn drain(mut
+self: () mut -> ())`, called `set f.drain();`). Valid programs stop in monomorphization with "checked
+but not compiled yet" until stage 3. Stage 1 is built: The function type carries `mutating: bool` after its effects in `ast::Type`,
 `ConcreteType`, `Ty`, `ConcreteTy` and `It` (and the AIPL `Ty`), parsed as `(A) mut !prints -> B`;
 `ExprKind::Lambda` carries `Vec<Capture>` (`name`, `init: Option<Expr>`, `span`), parsed from
 `[mut a, mut n = 0]` in front of a lambda and laid out by the formatter. Nothing reads either yet:
@@ -60,16 +70,6 @@ the pinner refuses a lambda with a capture list (`reject_captures_for_now`) and 
 as non-mutating. Two things the syntax needed that were not there: `()` is now the unit type, so a
 function type can return nothing, and a closure with no parameters (`|| { .. }`) can be written in
 value position.
-
-### 2. The pinner
-- [ ] The refusal of a capture list is replaced by the rules below. A listed variable must be a `mut` binding (or an initialized state); the body may `set` it
-      and may not return a value; unlisted sets and unused listings are errors.
-- [ ] A mutating lambda has a `mut` type; subsumption allows a plain function where `mut` is
-      allowed; calling needs `set f(x);` on a `mut` binding.
-- [ ] The lending rule: the enclosing code may not use `x` from the creation of `[mut x]` until
-      the closure's last use; a closure that is returned, stored or captured by another has no
-      last use inside the function, so `x` is gone.
-- [ ] Error cases in `tests/cases/lambdas/`.
 
 ### 3. Closures that own their state
 - [ ] The captured variables of a mutating closure are one synthesized struct; the lifted function

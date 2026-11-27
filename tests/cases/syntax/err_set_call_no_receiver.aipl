@@ -1,5 +1,6 @@
-# `set xs.push(x);` writes a mutating method's result back to its receiver, so
-# the call needs one: a bare `set f(x);` has nothing to store into.
+# `set xs.push(x);` writes a mutating method's result back to its receiver. A bare `set f(x);` calls
+# a closure held in a `mut` variable and writes it back, so what is named has to be that: `print` is
+# a function, not a variable.
 
 import { print } from builtins;
 
@@ -7,8 +8,8 @@ fn subject() !prints {
     set print("x");
 }
 --- check --compile ---
-error: set: a mutating method call needs a receiver to write back to, as in `set xs.push(x);`
- --> ./tests/cases/syntax/err_set_call_no_receiver.aipl:7:9
+error: set: undeclared variable "print"
+ --> ./tests/cases/syntax/err_set_call_no_receiver.aipl:8:9
   |
-7 |     set print("x");
-  |         ^^^^^^
+8 |     set print("x");
+  |         ^^^^^

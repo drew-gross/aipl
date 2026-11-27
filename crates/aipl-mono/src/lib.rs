@@ -2000,6 +2000,16 @@ pub fn monomorphize(
     })
 }
 
+/// Whether an expression has the type of a function that mutates what it captured.
+fn mentions_mutating_function(e: &aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>) -> bool {
+    if matches!(e.ty, aipl_syntax::typed::Ty::Fn(_, _, _, true)) {
+        return true;
+    }
+    let mut found = false;
+    e.for_each_child(&mut |child| found = found || mentions_mutating_function(child));
+    found
+}
+
 /// A type monomorphization has finished with, as a [`ConcreteType`].
 ///
 /// Reaching the `None` case means an abstraction survived instantiation, which
@@ -2512,9 +2522,24 @@ impl Mono<'_> {
         let body = match self.typed_body(template, params, specs, type_args, typed_template) {
             Some(typed) => typed,
             None => {
+                // A closure that mutates what it captures is typed but not compiled yet.
+                let source = self
+                    .specialized_from
+                    .get(template)
+                    .map_or(template, |f| &f.source);
+                if self
+                    .typed_fns
+                    .get(source)
+                    .is_some_and(|f| mentions_mutating_function(&f.body))
+                {
+                    return Err(Error::msg(format!(
+                        "fn {name:?} uses a closure that mutates what it captures, which is \
+                         checked but not compiled yet"
+                    )));
+                }
                 return Err(Error::msg(format!(
                     "internal error: the typed route declined fn {name:?}"
-                )))
+                )));
             }
         };
         Ok(ConcreteFn {

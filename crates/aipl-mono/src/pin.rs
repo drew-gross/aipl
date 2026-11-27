@@ -27,7 +27,7 @@ use crate::typing::{
     undeclared_effect_message, Pos, ValueForm,
 };
 use aipl_syntax::ast::{
-    Callee, Expr, ExprKind, Function, Item, Pattern, Primitive, Program, Signature, Type,
+    Callee, Capture, Expr, ExprKind, Function, Item, Pattern, Primitive, Program, Signature, Type,
 };
 use aipl_syntax::resolution::{Resolution, Target};
 use aipl_syntax::typed::{
@@ -387,7 +387,9 @@ impl Table {
                 self.unify(k1, k2)?;
                 self.unify(v1, v2)
             }
-            (It::Fn(p1, r1, e1, _), It::Fn(p2, r2, e2, _)) if p1.len() == p2.len() && e1 == e2 => {
+            (It::Fn(p1, r1, e1, m1), It::Fn(p2, r2, e2, m2))
+                if p1.len() == p2.len() && e1 == e2 && m1 == m2 =>
+            {
                 for (x, y) in p1.iter().zip(p2) {
                     self.unify(x, y)?;
                 }
@@ -636,6 +638,20 @@ struct Binding {
     mutable: bool,
     /// Where the name was introduced, if it is written anywhere.
     binder: Option<Span>,
+    /// Set once a closure's `[mut name]` has taken the variable: it is the closure's from there on.
+    moved: bool,
+    /// How many loops enclosed the declaration, so a closure made in a loop cannot take a variable
+    /// that was declared outside it.
+    depth: u32,
+}
+
+/// What a lambda's capture list changed in the environment while its body is typed.
+#[derive(Default)]
+struct CaptureScope {
+    /// The variables of the enclosing function it takes.
+    lent: Vec<String>,
+    /// The bindings to put back.
+    saved: Vec<(String, Option<Binding>)>,
 }
 
 struct Pinner<'a> {
@@ -679,6 +695,8 @@ struct Pinner<'a> {
     /// While typing the body of a closure against the function type it was given, where what it
     /// may perform is that type's effects: the effects of the function it is written in.
     closure_outer: Option<Vec<String>>,
+    /// How many loop bodies enclose what is being typed.
+    loops: u32,
     /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
     /// returns nothing, so the operand's shape is the only constraint.
     in_test: bool,
@@ -1091,6 +1109,7 @@ fn pinner_for<'a>(
         effects: effects.to_vec(),
         inferring: None,
         closure_outer: None,
+        loops: 0,
         in_test: false,
         errors: Vec::new(),
         narrows: Vec::new(),
@@ -1124,6 +1143,8 @@ fn pin_slot_default(
                 ty: t,
                 mutable: false,
                 binder: None,
+                moved: false,
+                depth: 0,
             },
         );
     }
@@ -1216,6 +1237,8 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
                 ty,
                 mutable: param.mutable,
                 binder: written(&param.name_span.0),
+                moved: false,
+                depth: 0,
             },
         );
     }
@@ -1257,6 +1280,8 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
                             ty: t.clone(),
                             mutable: false,
                             binder: written(&q.name_span.0),
+                            moved: false,
+                            depth: 0,
                         },
                     )
                 })
@@ -2371,7 +2396,13 @@ impl Pinner<'_> {
                 self.agree(k1, k2)?;
                 self.agree(v1, v2)
             }
-            (It::Fn(p1, r1, given, _), It::Fn(p2, r2, wanted, _)) if p1.len() == p2.len() => {
+            (It::Fn(p1, r1, given, gm), It::Fn(p2, r2, wanted, wm)) if p1.len() == p2.len() => {
+                if *gm && !*wm {
+                    return Err(format!(
+                        "it mutates what it captured, which {} does not allow",
+                        self.table.show(&e)
+                    ));
+                }
                 // A function performing fewer effects is accepted where one performing more is
                 // expected, never the other way.
                 if let Some(extra) = given.iter().find(|e| !wanted.contains(e)) {
@@ -2490,6 +2521,7 @@ impl Pinner<'_> {
             ExprKind::Unit => self.node(K::Unit, It::Unit, e),
             ExprKind::Ident(name) => match self.env.get(name).cloned() {
                 Some(b) => {
+                    self.ensure_not_moved(name, &b, &e.span)?;
                     if let Some(binder) = b.binder {
                         self.resolve(&e.name_span, Target::Local(binder));
                     }
@@ -2550,7 +2582,10 @@ impl Pinner<'_> {
             ExprKind::While(c, body) => {
                 let c = self.expr(c)?;
                 self.coerce_expr(&c, &bool_ty, &c.span, "while condition")?;
-                let body = self.expr_at(body, Pos::Discard)?;
+                self.loops += 1;
+                let body = self.expr_at(body, Pos::Discard);
+                self.loops -= 1;
+                let body = body?;
                 self.node(
                     K::While(Box::new(c), Box::new(body)),
                     It::Prim(Primitive::I64),
@@ -2558,6 +2593,21 @@ impl Pinner<'_> {
                 )
             }
             ExprKind::Seq(first, rest) => {
+                // A closure that mutates what it captured, called for effect, would lose it too.
+                if let ExprKind::Call(Callee::Local(name), _, false) = &first.kind {
+                    if let Some(It::Fn(.., true)) =
+                        self.env.get(name).map(|b| self.table.shallow(&b.ty))
+                    {
+                        self.errors.push(Error::at(
+                            format!(
+                                "the result of the mutating closure \"{name}\" is discarded, \
+                                 losing the mutation; write \"set {name}(..)\" to mutate it in \
+                                 place"
+                            ),
+                            first.span.clone(),
+                        ));
+                    }
+                }
                 // A mutating method called for effect would lose its mutation.
                 if let ExprKind::Call(name, cargs, true) = &first.kind {
                     if self
@@ -2660,6 +2710,8 @@ impl Pinner<'_> {
                         ty,
                         mutable,
                         binder,
+                        moved: false,
+                        depth: self.loops,
                     },
                 );
                 let body = self.expr_at(body_src, pos)?;
@@ -2693,6 +2745,7 @@ impl Pinner<'_> {
                     let Some(b) = self.env.get(root).cloned() else {
                         return reject(format!("set: undeclared variable {root:?}"), &lhs.span);
                     };
+                    self.ensure_not_moved(root, &b, &lhs.span)?;
                     if let Some(binder) = &b.binder {
                         let mut base = &**lhs;
                         while let ExprKind::Field(obj, _) = &base.kind {
@@ -2759,7 +2812,10 @@ impl Pinner<'_> {
                 if let Some(i) = index {
                     scope.push((i.clone(), key, None));
                 }
-                let (saved, body) = self.scoped(scope, |p| p.expr_at(body, Pos::Discard))?;
+                self.loops += 1;
+                let scoped = self.scoped(scope, |p| p.expr_at(body, Pos::Discard));
+                self.loops -= 1;
+                let (saved, body) = scoped?;
                 self.restore(saved);
                 self.node(
                     K::For(var.clone(), index.clone(), Box::new(iter), Box::new(body)),
@@ -3324,7 +3380,6 @@ impl Pinner<'_> {
             }
             // A closure with nothing to take its parameter types from has to write them.
             ExprKind::Lambda(params, body, captures) if params.iter().all(|p| p.ty.is_some()) => {
-                self.reject_captures_for_now(captures, &e.span)?;
                 let mut ptys = Vec::new();
                 let mut scope = Vec::new();
                 let mut typed = Vec::new();
@@ -3339,7 +3394,8 @@ impl Pinner<'_> {
                         span: param.span.clone(),
                     });
                 }
-                self.reject_mutable_captures(params, body, &e.span)?;
+                self.reject_mutable_captures(params, body, captures, &e.span)?;
+                let taken = self.enter_captures(captures, &e.span)?;
                 let saved_test = std::mem::replace(&mut self.in_test, false);
                 // With no function type to take them from, the effects the body performs are
                 // the lambda's.
@@ -3349,18 +3405,26 @@ impl Pinner<'_> {
                 let performed = std::mem::replace(&mut self.inferring, saved_inferring);
                 self.effects = saved_effects;
                 self.in_test = saved_test;
+                self.restore_captures(taken.saved);
                 let (saved, body) = scoped?;
                 self.restore(saved);
+                // A closure that mutates what it captured returns nothing.
+                let returns = if captures.is_empty() {
+                    body.ty.clone()
+                } else {
+                    self.unit_body(&body)?;
+                    self.finish_captures(&taken.lent, captures, &body)?;
+                    It::Unit
+                };
                 let ty = It::Fn(
                     ptys,
-                    Box::new(body.ty.clone()),
+                    Box::new(returns),
                     sorted_effects(&performed.unwrap_or_default()),
-                    false,
+                    !captures.is_empty(),
                 );
                 self.node(K::Lambda(typed, Box::new(body)), ty, e)
             }
-            ExprKind::Lambda(params, _, captures) => {
-                self.reject_captures_for_now(captures, &e.span)?;
+            ExprKind::Lambda(params, _, _) => {
                 let untyped = params.iter().find(|p| p.ty.is_none());
                 let (name, span) = untyped.map_or(("x", &e.span), |p| (p.name.as_str(), &p.span));
                 return reject(
@@ -3410,22 +3474,151 @@ impl Pinner<'_> {
         }
     }
 
-    /// A closure that mutates what it captures is written but not yet typed.
-    fn reject_captures_for_now(
-        &self,
-        captures: &[aipl_syntax::ast::Capture],
-        span: &Span,
-    ) -> Res<()> {
-        match captures.first() {
-            Some(capture) => reject(
+    /// The body of a closure that mutates what it captured: it returns nothing, as a mutating
+    /// method does.
+    fn unit_body(&mut self, body: &TExpr<It>) -> Res<()> {
+        self.agree(&body.ty, &It::Unit).or_else(|_| {
+            reject(
                 format!(
-                    "a closure that mutates what it captures (`[mut {}]`) is not supported yet",
-                    capture.name
+                    "a closure that mutates what it captures returns nothing, but its body is {}",
+                    self.table.show(&body.ty)
+                ),
+                &body.span,
+            )
+        })
+    }
+
+    fn ensure_not_moved(&self, name: &str, binding: &Binding, span: &Span) -> Res<()> {
+        if binding.moved {
+            return reject(
+                format!(
+                    "{name:?} was moved into a closure that mutates it, and is the closure's \
+                     from there on"
                 ),
                 span,
-            ),
-            None => Ok(()),
+            );
         }
+        Ok(())
+    }
+
+    /// What a lambda's capture list does to the code around it while its body is typed: the
+    /// variables it takes are the ones the body may `set`, and no other `mut` variable of the
+    /// enclosing function may be set there. State a capture starts with is a binding of the body.
+    /// Returns what to put back afterwards.
+    fn enter_captures(&mut self, captures: &[Capture], _span: &Span) -> Res<CaptureScope> {
+        let mut scope = CaptureScope::default();
+        let mut owned: Vec<(String, It, Option<Span>)> = Vec::new();
+        for (i, c) in captures.iter().enumerate() {
+            if captures[..i].iter().any(|earlier| earlier.name == c.name) {
+                return reject(format!("{:?} is captured twice", c.name), &c.span);
+            }
+            match &c.init {
+                Some(init) => {
+                    let value = self.expr(init)?;
+                    owned.push((c.name.clone(), value.ty, written(&c.span)));
+                }
+                None => {
+                    let Some(b) = self.env.get(&c.name).cloned() else {
+                        return reject(
+                            format!("`[mut {}]` names no variable here", c.name),
+                            &c.span,
+                        );
+                    };
+                    self.ensure_not_moved(&c.name, &b, &c.span)?;
+                    if !b.mutable {
+                        return reject(
+                            format!(
+                                "`[mut {0}]` takes a variable the closure mutates, and {0:?} is \
+                                 not a `mut` binding",
+                                c.name
+                            ),
+                            &c.span,
+                        );
+                    }
+                    if b.depth < self.loops {
+                        return reject(
+                            format!(
+                                "`[mut {0}]` would take {0:?} on every pass of a loop, and it is \
+                                 declared outside the loop",
+                                c.name
+                            ),
+                            &c.span,
+                        );
+                    }
+                    scope.lent.push(c.name.clone());
+                }
+            }
+        }
+        if captures.is_empty() {
+            return Ok(scope);
+        }
+        let others: Vec<String> = self
+            .env
+            .iter()
+            .filter(|(name, b)| b.mutable && !scope.lent.contains(name))
+            .map(|(name, _)| name.clone())
+            .collect();
+        for name in others {
+            let old = self.env[&name].clone();
+            scope.saved.push((name.clone(), Some(old.clone())));
+            self.env.insert(
+                name,
+                Binding {
+                    mutable: false,
+                    ..old
+                },
+            );
+        }
+        for (name, ty, binder) in owned {
+            let old = self.env.insert(
+                name.clone(),
+                Binding {
+                    ty,
+                    mutable: true,
+                    binder,
+                    moved: false,
+                    depth: self.loops,
+                },
+            );
+            scope.saved.push((name, old));
+        }
+        Ok(scope)
+    }
+
+    /// Puts back what [`Pinner::enter_captures`] changed.
+    fn restore_captures(&mut self, saved: Vec<(String, Option<Binding>)>) {
+        for (name, old) in saved.into_iter().rev() {
+            match old {
+                Some(b) => self.env.insert(name, b),
+                None => self.env.remove(&name),
+            };
+        }
+    }
+
+    /// Once the body is typed: it has to set everything it takes, and the variables it took are the
+    /// closure's from here on.
+    fn finish_captures(
+        &mut self,
+        lent: &[String],
+        captures: &[Capture],
+        body: &TExpr<It>,
+    ) -> Res<()> {
+        let mut assigned = HashSet::new();
+        crate::typed_util::assigned_names(body, &mut assigned);
+        for c in captures {
+            if !assigned.contains(&c.name) {
+                return reject(
+                    format!("`[mut {}]` is never set in the closure's body", c.name),
+                    &c.span,
+                );
+            }
+        }
+        for name in lent {
+            if let Some(b) = self.env.get_mut(name) {
+                b.moved = true;
+            }
+        }
+        Ok(())
     }
 
     /// A function value keeps a copy of what its body reads of the function it was written in, taken
@@ -3435,19 +3628,21 @@ impl Pinner<'_> {
         &self,
         params: &[aipl_syntax::ast::LambdaParam],
         body: &Expr,
+        captures: &[Capture],
         span: &Span,
     ) -> Res<()> {
         let mutable: HashMap<String, Type> = self
             .env
             .iter()
-            .filter(|(_, binding)| binding.mutable)
+            .filter(|(name, binding)| binding.mutable && !captures.iter().any(|c| &c.name == *name))
             .map(|(name, _)| (name.clone(), Type::Unit))
             .collect();
         match crate::free_vars(body, params, &mutable).into_iter().next() {
             Some((captured, _)) => reject(
                 format!(
                     "a lambda used as a value cannot capture the `mut` binding {captured:?}: it \
-                     would keep the value it has now, not the later ones"
+                     would keep the value it has now, not the later ones (write `[mut {captured}]` \
+                     in front of it to let the closure take {captured:?} and change it)"
                 ),
                 span,
             ),
@@ -3467,10 +3662,10 @@ impl Pinner<'_> {
     /// An argument that is stored as a value (a field, a binding, an assigned place), where a
     /// closure is a function value: it performs no effect.
     fn value_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
-        let ExprKind::Lambda(params, body, _) = &arg.kind else {
+        let ExprKind::Lambda(params, body, captures) = &arg.kind else {
             return self.arg(arg, expected);
         };
-        self.reject_mutable_captures(params, body, &arg.span)?;
+        self.reject_mutable_captures(params, body, captures, &arg.span)?;
         self.arg(arg, expected)
     }
 
@@ -4667,6 +4862,8 @@ impl Pinner<'_> {
                         ty,
                         mutable: false,
                         binder,
+                        moved: false,
+                        depth: self.loops,
                     },
                 );
                 (name, old)
@@ -5270,7 +5467,7 @@ impl Pinner<'_> {
             if let Some(binder) = binder {
                 self.resolve(&e.name_span, Target::Local(binder));
             }
-            let It::Fn(ptys, ret, effects, _) = self.table.shallow(&ty) else {
+            let It::Fn(ptys, ret, effects, mutating) = self.table.shallow(&ty) else {
                 return reject(format!("{name:?} is not a function"), &e.span);
             };
             for effect in &effects {
@@ -5288,7 +5485,10 @@ impl Pinner<'_> {
                 self.coerce_expr(&t, pty, &t.span, Site::Argument(display(name), i))?;
                 typed.push(t);
             }
-            return Ok(call(typed, *ret, self));
+            // A call of a closure that mutates what it captured answers the closure as it is
+            // afterwards, as a call of a mutating method answers its receiver: `set f(x);`.
+            let answer = if mutating { ty.clone() } else { *ret };
+            return Ok(call(typed, answer, self));
         }
         if method_style && !args.is_empty() {
             if let Some(s) = self.decls.sigs.get(name).filter(|s| !s.sig.is_method()) {
@@ -5761,7 +5961,16 @@ impl Pinner<'_> {
                 if let It::Named(_) | It::Gen(..) = self.table.shallow(&recv.ty) {
                     let owner = self.table.shallow(&recv.ty);
                     if let Ok(field) = self.field_type(&owner, name, &e.span) {
-                        if let It::Fn(ptys, ret, effects, _) = self.table.shallow(&field) {
+                        if let It::Fn(ptys, ret, effects, mutating) = self.table.shallow(&field) {
+                            if mutating {
+                                return reject(
+                                    format!(
+                                        "field {name:?} holds a closure that mutates what it \
+                                         captured, which cannot be called through a field yet"
+                                    ),
+                                    &e.span,
+                                );
+                            }
                             for effect in &effects {
                                 self.require_effect(display(name), effect, &e.span, true)?;
                             }
@@ -6320,7 +6529,6 @@ impl Pinner<'_> {
             }
         }
         if let ExprKind::Lambda(params, body, captures) = &arg.kind {
-            self.reject_captures_for_now(captures, &arg.span)?;
             let It::Fn(ptys, ret, effects, mutating) = self.table.shallow(expected) else {
                 return reject("a closure where no function is expected", &arg.span);
             };
@@ -6360,6 +6568,8 @@ impl Pinner<'_> {
                             ty: pty.clone(),
                             mutable: false,
                             binder: written(&param.span),
+                            moved: false,
+                            depth: self.loops,
                         },
                     ),
                 ));
@@ -6369,6 +6579,20 @@ impl Pinner<'_> {
                     span: param.span.clone(),
                 });
             }
+            // What the capture list takes is settled before anything else is swapped in, so a
+            // refusal leaves the function's own state as it was (the parameters go back first).
+            let taken = match self.enter_captures(captures, &arg.span) {
+                Ok(taken) => taken,
+                Err(failure) => {
+                    for (name, old) in saved.into_iter().rev() {
+                        match old {
+                            Some(b) => self.env.insert(name, b),
+                            None => self.env.remove(&name),
+                        };
+                    }
+                    return Err(failure);
+                }
+            };
             // A `?` in a closure leaves the closure, so a test's `?` rule is not in force there.
             let saved_test = std::mem::replace(&mut self.in_test, false);
             let saved_ret = std::mem::replace(&mut self.ret, (*ret).clone());
@@ -6378,6 +6602,7 @@ impl Pinner<'_> {
             let saved_closure =
                 std::mem::replace(&mut self.closure_outer, Some(saved_effects.clone()));
             let body = self.expr(body);
+            self.restore_captures(taken.saved);
             self.closure_outer = saved_closure;
             self.inferring = saved_inferring;
             self.effects = saved_effects;
@@ -6390,8 +6615,24 @@ impl Pinner<'_> {
                 };
             }
             let body = body?;
-            self.coerce_expr(&body, &ret, &body.span, Site::Lambda)?;
-            let ty = It::Fn(ptys, ret, effects, mutating);
+            if captures.is_empty() {
+                self.coerce_expr(&body, &ret, &body.span, Site::Lambda)?;
+            } else {
+                // A closure that mutates what it captured returns nothing.
+                self.unit_body(&body)?;
+                self.agree(&It::Unit, &ret).or_else(|m| {
+                    reject(
+                        format!(
+                            "a closure that mutates what it captures returns nothing, but {} \
+                             is expected back ({m})",
+                            self.table.show(&ret)
+                        ),
+                        &arg.span,
+                    )
+                })?;
+                self.finish_captures(&taken.lent, captures, &body)?;
+            }
+            let ty = It::Fn(ptys, ret, effects, mutating || !captures.is_empty());
             return Ok(self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg));
         }
         self.expr(arg)

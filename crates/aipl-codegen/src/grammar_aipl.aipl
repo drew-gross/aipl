@@ -2796,7 +2796,7 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // folds in as `args[0]` and the call is flagged method-style, exactly as it
     // parses in expression position. The enclosing `set` is what writes the
     // mutated result back. The method is the target's last segment, so the
-    // receiver is everything before it — and a bare `set f(x);` has none.
+    // receiver is everything before it; a bare `set f(x);` has none and is a closure call.
     if (op == "(") {
         if (let Field(recv, method) = target.kind) {
             let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
@@ -2807,10 +2807,14 @@ fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
             );
             return ok(AStmt(SAssign(recv, value, span)));
         };
-        return err(ParseError {
-            message: "set: a mutating method call needs a receiver to write back to, as in `set xs.push(x);`",
-            span: join_spans(name_span, op_span),
-        });
+
+        // `set f(x);` calls a closure that mutates what it captured: `set f = f(x)`, the call
+        // answering the closure as the call of a mutating method answers its receiver.
+        let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a closure call")?;
+        let end = args.last()$span.value_or(target.span);
+        let span = join_spans(name_span, end);
+        let value = at(Call(name, args, false, Unresolved), span).named_at(name_span);
+        return ok(AStmt(SAssign(target, value, span)));
     };
     let value = kid_expr(kids, 0, sp)?;
     let span = join_spans(name_span, value.span);
@@ -5276,11 +5280,9 @@ pub fn lower_aipl_block_surface(src: str) -> Expr!ParseError {
             "{ set xs[i] = 1; }",
         ) == "error: an indexed write can miss, because the index may be off the end: say what happens then, as in `set xs[i] = x else { return none; };`, or `else {}` to do nothing",
     );
-    assert(
-        block_dump(
-            "{ set f(1); }",
-        ) == "error: set: a mutating method call needs a receiver to write back to, as in `set xs.push(x);`",
-    );
+    // `set f(x);` calls a closure and writes it back.
+    assert(block_dump("{ set f(1); }") == "Assign(f, f(1), ())");
+    assert(block_dump("{ set f(1, 2); }") == "Assign(f, f(1, 2), ())");
 
     // The statements that produce no binding sit in front of the rest as a
     // `Seq`. A loop body takes no trailing expression, so its own value is a

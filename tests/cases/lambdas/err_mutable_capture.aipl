@@ -26,19 +26,19 @@ fn in_binding() -> i64 {
     g(1)
 }
 --- check --compile ---
-error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones
+error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones (write `[mut n]` in front of it to let the closure take "n" and change it)
   --> ./tests/cases/lambdas/err_mutable_capture.aipl:13:9
    |
 13 |     Run(|x| { x + n })
    |         ^^^^^^^^^^^^^
 
-error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones
+error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones (write `[mut n]` in front of it to let the closure take "n" and change it)
   --> ./tests/cases/lambdas/err_mutable_capture.aipl:19:18
    |
 19 |     Handler { f: |x| { x + n } }
    |                  ^^^^^^^^^^^^^
 
-error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones
+error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones (write `[mut n]` in front of it to let the closure take "n" and change it)
   --> ./tests/cases/lambdas/err_mutable_capture.aipl:25:13
    |
 25 |     let g = |x: i64| { x + n };

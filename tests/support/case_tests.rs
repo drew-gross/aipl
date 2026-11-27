@@ -484,6 +484,7 @@ case_tests! {
     cases_lambdas_err_generic_fn_value_arity = "cases/lambdas/err_generic_fn_value_arity",
     cases_lambdas_err_lambdas = "cases/lambdas/err_lambdas",
     cases_lambdas_err_mutable_capture = "cases/lambdas/err_mutable_capture",
+    cases_lambdas_err_mutating_closure = "cases/lambdas/err_mutating_closure",
     cases_lambdas_err_operator_value_not_imported = "cases/lambdas/err_operator_value_not_imported",
     cases_lambdas_err_value_lambda_inferred = "cases/lambdas/err_value_lambda_inferred",
     cases_lambdas_filter_in_place = "cases/lambdas/filter_in_place",

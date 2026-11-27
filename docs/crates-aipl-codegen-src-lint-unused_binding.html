@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-unused_binding">unused_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unused_binding(__spat$3062: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn unused_binding(__spat$3404: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>let</code> and <code>mut</code> binding in the function whose name is never mentioned after it.</p></div>
 
@@ -64,7 +64,7 @@
           </h3>
           <pre class="signature"><code>fn is_mentioned(self: Expr, name: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether <code>self</code> mentions <code>name</code>: as a value, as the function a call names (<code>f(x)</code> mentions <code>f</code> without an <code>Ident</code>), or as the function a <code>shim</code> binds an operation to.</p></div>
+          <div class="doc"><p>Whether <code>self</code> mentions <code>name</code>: as a value, as the function a call names (<code>f(x)</code> mentions <code>f</code> without an <code>Ident</code>), as the variable a closure takes (<code>[mut name]</code>), or as the function a <code>shim</code> binds an operation to.</p></div>
 
 
         </section>

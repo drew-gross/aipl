@@ -18,6 +18,10 @@ use crate::{ArgShape, Mono, Param, ParamSpec};
 impl Mono<'_> {
     /// Whether a node, and everything under it, is a form that is typed from the pinned tree.
     fn supported(&self, e: &TExpr<Ty>, concrete: &dyn Fn(&Ty) -> Option<ConcreteType>) -> bool {
+        // A function that mutates what it captured is typed but not compiled yet.
+        if matches!(e.ty, Ty::Fn(_, _, _, true)) {
+            return false;
+        }
         // A lambda used as a value becomes a function of its own that captures nothing.
         if let (TExprKind::Lambda(params, body), Ty::Fn(..)) = (&e.kind, &e.ty) {
             return concrete(&e.ty).is_some()

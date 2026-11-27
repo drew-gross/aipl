@@ -3966,11 +3966,11 @@ pub mod concrete {
             ConcreteType::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), type_name(inner)),
             ConcreteType::Dict(k, v) => format!("#{{{}: {}}}", type_name(k), type_name(v)),
             ConcreteType::Result(ok, err) => format!("{}!{}", type_name(ok), type_name(err)),
-            ConcreteType::Fn(params, ret, effects, _) => {
+            ConcreteType::Fn(params, ret, effects, mutating) => {
                 let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
                 format!(
                     "({ps}){} -> {}",
-                    crate::effects_spelling(effects),
+                    crate::effects_spelling(effects, *mutating),
                     type_name(ret)
                 )
             }
@@ -4037,10 +4037,12 @@ fn demangle_elem(s: &str) -> String {
     strip_mangle_prefix(s).to_string()
 }
 
-/// The effects of a function type as written after its parameters: ` !prints !reads_files`,
-/// and nothing for a type that performs none.
-pub fn effects_spelling(effects: &[String]) -> String {
-    effects.iter().map(|e| format!(" !{e}")).collect()
+/// What follows a function type's parameters as written: ` mut !prints !reads_files`, and nothing
+/// for a type that mutates nothing and performs no effect.
+pub fn effects_spelling(effects: &[String], mutating: bool) -> String {
+    let mut text = String::from(if mutating { " mut" } else { "" });
+    text.extend(effects.iter().map(|e| format!(" !{e}")));
+    text
 }
 
 /// A type's name as an *identity*: the mangled spelling, `Named` verbatim. This
@@ -4070,11 +4072,11 @@ pub fn raw_type_name(t: &Type) -> String {
             suffix_operand(err, raw_type_name)
         ),
         Type::Without(base, x) => format!("{} without {}", raw_type_name(base), x.spelling()),
-        Type::Fn(params, ret, effects, _) => {
+        Type::Fn(params, ret, effects, mutating) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!(
                 "({ps}){} -> {}",
-                effects_spelling(effects),
+                effects_spelling(effects, *mutating),
                 raw_type_name(ret)
             )
         }
@@ -4125,9 +4127,13 @@ pub fn type_name(t: &Type) -> String {
             suffix_operand(err, type_name)
         ),
         Type::Without(base, x) => format!("{} without {}", type_name(base), x.spelling()),
-        Type::Fn(params, ret, effects, _) => {
+        Type::Fn(params, ret, effects, mutating) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
-            format!("({ps}){} -> {}", effects_spelling(effects), type_name(ret))
+            format!(
+                "({ps}){} -> {}",
+                effects_spelling(effects, *mutating),
+                type_name(ret)
+            )
         }
         Type::Tuple(elems) => {
             let es = elems.iter().map(type_name).collect::<Vec<_>>().join(", ");
