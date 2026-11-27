@@ -34,7 +34,8 @@ function values:
   function types carry effects (`(A) !prints -> B`; calling a value needs them declared, fewer effects fits more) but there is no type variable for an effect set, so a function that should take pure or effectful functions needs a signature per effect set
   `map`, `filter` and the other fused or specialized builtins take only pure functions; if effectful ones are ever allowed again, the fusion/sink cases deleted for it (tests/cases/optimizations/*_effects.aipl, effects/shim_covers_synthesized_functions) are in git history
   a local called inside a lambda has its function type rebuilt from the call with no effects (`free_locals` in typed_higher_order.rs, the probe in closure_conversion.rs): harmless after the pinner, wrong if anything starts reading them
-  CLOSURES.md plans captures for lambdas stored in data (defunctionalized into a synthesized variant in mono; onClick for projects/todo)
+  projects/todo: `Element` carries `on_click: (Todo[]) -> Todo[]` handlers (generic `Element<M>`) that close over the item, and the loop applies the clicked key's handler; then GUI_TODO_APP.md stage 4 says handlers, not `clicked` by key (closures that capture, return and mutate all work now)
+  `==` on a type holding a closure is refused, so an element tree with handlers cannot be compared in a test (compare `to_text()` or a key list)
   arrays and optionals cannot hold function types, though a variant or struct holding one can be in an array
   a call's result cannot be called directly: `f(1)(2)` is a parse error (`let g = f(1); g(2)` works)
   `==` on a type holding a function value is refused ("equality is not supported for type (i64) -> i64"), so an element tree with handlers cannot be compared in a test
