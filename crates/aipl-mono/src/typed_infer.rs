@@ -1767,6 +1767,9 @@ fn is_expanded(callee: &Callee) -> bool {
             | Callee::Extend
             | Callee::RopeStr
             | Callee::ShimCellGet
+            | Callee::CellNew
+            | Callee::CellGet
+            | Callee::CellSet
     )
 }
 

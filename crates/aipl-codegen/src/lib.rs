@@ -9903,6 +9903,17 @@ fn is_storable_elem(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bo
         || matches!(ty, ConcreteType::Named(n) if structs.contains_key(n))
 }
 
+/// What a cell holding a `ty` is an array of: the type itself, except that a `bool` (an array of
+/// them is bit-packed) and a `char` (an array of them is a `str`) are held as the byte they are.
+fn cell_storage(ty: &ConcreteType, _structs: &HashMap<String, TypeDef>) -> ConcreteType {
+    match ty {
+        ConcreteType::Primitive(Primitive::Bool | Primitive::Char) => {
+            ConcreteType::Primitive(Primitive::U8)
+        }
+        _ => ty.clone(),
+    }
+}
+
 /// Whether `ty` is a *boxed* (recursive) declared type — its values are 8-byte
 /// pointers to a refcounted heap payload. See the "Recursive (boxed) type
 /// runtime" section.
@@ -17618,6 +17629,145 @@ fn compile_call_expr_direct<M: Module>(
             let teardown_ref = module.declare_func_in_func(teardown, builder.func);
             let teardown_addr = builder.ins().func_addr(types::I64, teardown_ref);
             builtins.call_void(module, builder, "aipl_const_on_exit", &[teardown_addr]);
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
+        Callee::CellNew => {
+            // `(value) -> T[]`: a cell, the one-element array block a variable that closures
+            // share lives in. Always a heap block, never the inline form a small array value
+            // may take, since every copy of the handle has to name the same block. A value held
+            // in a word of its own (an integer, a `bool`, a `char`, a float, a pointer to nothing
+            // that needs releasing) is held as an `i64`, which is what its element stride would
+            // be in no other case.
+            let [value] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let before = scope_depth(scopes);
+            let (v, held) = compile_expr(module, builder, cx, scopes, value)?;
+            let owned_temp = owned_temp_since(scopes, before, v);
+            let held = cell_storage(&held, structs);
+            let handle_ty = ConcreteType::Array(Box::new(held.clone()));
+            let len = builder.ins().iconst(types::I64, 1);
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &held);
+            let stride = array_elem_size(&held, structs);
+            let stride_v = builder.ins().iconst(types::I64, stride);
+            let handle = array_value_slot(builder);
+            builtins.call_void(
+                module,
+                builder,
+                "aipl_arr_new",
+                &[handle, len, drop_fn, stride_v],
+            );
+            let base = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), handle, 8);
+            store_elem(builder, base, v, &held, stride, structs);
+            if needs_drop(&held, structs) {
+                if owned_temp {
+                    // The cell inherits the temporary's reference.
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .retain(|t| !matches!(t.owned, Owned::Value(x) if x == v));
+                } else {
+                    emit_retain(builder, module, builtins, structs, v, &held);
+                }
+            }
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(handle, &handle_ty));
+            (handle, handle_ty)
+        }
+        Callee::CellGet => {
+            // `(cell) -> T`: a copy of what the cell holds, retained, as an owned temporary.
+            // The cell keeps its own reference, so what is read can be changed or dropped
+            // without disturbing the cell, and the cell can be set without disturbing it.
+            let [cell] = args else {
+                return Err(arity_bug(name, 1, args.len(), &span));
+            };
+            let (handle, handle_ty) = compile_expr(module, builder, cx, scopes, cell)?;
+            let ConcreteType::Array(held) = &handle_ty else {
+                return Err(Error::at(
+                    format!(
+                        "a cell is read through its handle, not a {}",
+                        type_name(&handle_ty)
+                    ),
+                    span.clone(),
+                ));
+            };
+            let held = (**held).clone();
+            let base = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), handle, 8);
+            let v = if is_str_shaped(&held) {
+                copy_str_value(builder, base)
+            } else if is_composite(&held, structs) {
+                copy_slot_value(builder, base, array_elem_size(&held, structs) as u32)
+            } else {
+                let stride = array_elem_size(&held, structs);
+                load_scalar_elem(builder, base, &held, stride)
+            };
+            // A scalar is read as what the variable is: a `bool` or a `char` is held as a byte.
+            let result_ty = match (
+                &locked,
+                needs_drop(&held, structs) || is_composite(&held, structs),
+            ) {
+                (Some(ty), false) => ty.clone(),
+                _ => held.clone(),
+            };
+            if needs_drop(&held, structs) {
+                emit_retain(builder, module, builtins, structs, v, &held);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(v, &held));
+            }
+            (v, result_ty)
+        }
+        Callee::CellSet => {
+            // `(cell, value)`: the cell takes a reference of its own to `value` and lets go of
+            // what it held, in the block every handle on the cell shares, so every one of them
+            // sees it. The value is computed first: it may read the cell.
+            let [cell, value] = args else {
+                return Err(arity_bug(name, 2, args.len(), &span));
+            };
+            let (handle, handle_ty) = compile_expr(module, builder, cx, scopes, cell)?;
+            let ConcreteType::Array(held) = &handle_ty else {
+                return Err(Error::at(
+                    format!(
+                        "a cell is written through its handle, not a {}",
+                        type_name(&handle_ty)
+                    ),
+                    span.clone(),
+                ));
+            };
+            let held = (**held).clone();
+            let before = scope_depth(scopes);
+            let (v, _) = compile_expr(module, builder, cx, scopes, value)?;
+            let owned_temp = owned_temp_since(scopes, before, v);
+            let base = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), handle, 8);
+            if needs_drop(&held, structs) {
+                let old = if is_composite(&held, structs) {
+                    base
+                } else {
+                    builder
+                        .ins()
+                        .load(types::I64, MemFlagsData::trusted(), base, 0)
+                };
+                emit_drop(builder, module, builtins, structs, old, &held);
+                if owned_temp {
+                    scopes
+                        .last_mut()
+                        .expect("scope")
+                        .retain(|t| !matches!(t.owned, Owned::Value(x) if x == v));
+                } else {
+                    emit_retain(builder, module, builtins, structs, v, &held);
+                }
+            }
+            let stride = array_elem_size(&held, structs);
+            store_elem(builder, base, v, &held, stride, structs);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         Callee::ReadByte => {

@@ -3424,6 +3424,15 @@ fn __builtin_leave_alternate_screen() !terminal {}
 # The result has the type the lowering of the closure shim (`aipl-mono`) recorded
 # for the cell. Only that lowering writes it.
 fn __builtin_shim_cell_get(id: u64) -> u64 { 0 }
+# A cell holding `value`: one heap block that every copy of the handle shares, so what is put in it
+# is seen through all of them. It is where a variable a closure takes with `[mut x]` lives. The
+# handle is typed as the one-element array it is made of. Only the pinner writes it.
+fn __builtin_cell_new<R: any>(value: R) -> R[] { [value] }
+# A copy of what the cell holds, typed by the call: the pinner writes the call with the type of the
+# variable, which this signature cannot say. The other half of `cell_new`.
+fn __builtin_cell_get<R: any>(cell: R[]) -> R[] { cell }
+# Put `value` in the cell, for every handle on it to see, and let go of what it held.
+fn __builtin_cell_set<R: any>(cell: R[], value: R) {}
 # Put `value` in the cell `id`, which takes a reference of its own to it and lets
 # go of what it held. The other half of `shim_cell_get`.
 fn __builtin_shim_cell_set<R: any>(id: u64, value: R) {}
@@ -4213,6 +4222,9 @@ pub fn is_dict_key(t: &Type) -> bool {
 pub const INTERNAL_BUILTINS: &[Callee] = &[
     Callee::ShimCellGet,
     Callee::ShimCellSet,
+    Callee::CellNew,
+    Callee::CellGet,
+    Callee::CellSet,
     Callee::InsertKey,
     Callee::Reserve,
     Callee::AssumeNonempty,

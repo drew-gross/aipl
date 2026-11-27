@@ -161,6 +161,9 @@ variant Callee =
     | LeaveAlternateScreen
     | ShimCellGet
     | ShimCellSet
+    | CellNew
+    | CellGet
+    | CellSet
     | ReadKey
     | ParseJson
     | RandomU64
@@ -861,6 +864,9 @@ pub fn builtin_table() -> BuiltinEntry[] {
         },
         BuiltinEntry { arm: ShimCellGet, callee: "__builtin_shim_cell_get", definition: Declared },
         BuiltinEntry { arm: ShimCellSet, callee: "__builtin_shim_cell_set", definition: Declared },
+        BuiltinEntry { arm: CellNew, callee: "__builtin_cell_new", definition: Declared },
+        BuiltinEntry { arm: CellGet, callee: "__builtin_cell_get", definition: Declared },
+        BuiltinEntry { arm: CellSet, callee: "__builtin_cell_set", definition: Declared },
         BuiltinEntry {
             arm: ReadKey,
             callee: "__builtin_read_key",

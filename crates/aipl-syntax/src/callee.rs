@@ -264,6 +264,13 @@ pub enum Callee {
     ShimCellGet,
     /// `__shim_cell_set(id, value)` — put `value` in the cell `id` (internal).
     ShimCellSet,
+    /// `__cell_new(value) -> T[]` — a cell holding `value`: a heap block shared by every handle on it,
+    /// where a variable a closure captures by `[mut x]` lives (internal: the pinner).
+    CellNew,
+    /// `__cell_get(cell) -> T` — a copy of what the cell holds (internal).
+    CellGet,
+    /// `__cell_set(cell, value)` — put `value` in the cell, for every handle on it to see (internal).
+    CellSet,
     /// `random_u64() -> u64` — the next random number. Has no implementation of its
     /// own: it exists only under a `shim random`, whose provider supplies the
     /// generator (see `SHIM_ONLY_EFFECTS`).
@@ -603,6 +610,9 @@ impl Callee {
         Callee::LeaveAlternateScreen,
         Callee::ShimCellGet,
         Callee::ShimCellSet,
+        Callee::CellNew,
+        Callee::CellGet,
+        Callee::CellSet,
         Callee::ReadKey,
         Callee::ParseJson,
         Callee::RandomU64,
@@ -849,6 +859,9 @@ impl Callee {
             Callee::EnterAlternateScreen => "__builtin_enter_alternate_screen",
             Callee::LeaveAlternateScreen => "__builtin_leave_alternate_screen",
             Callee::ShimCellGet => "__builtin_shim_cell_get",
+            Callee::CellNew => "__builtin_cell_new",
+            Callee::CellGet => "__builtin_cell_get",
+            Callee::CellSet => "__builtin_cell_set",
             Callee::ShimCellSet => "__builtin_shim_cell_set",
             Callee::ReadKey => "__builtin_read_key",
             Callee::ParseJson => "__builtin_parse_json",
