@@ -24,12 +24,18 @@ as far as the app needs.
   runtime both include that file; AppKit is loaded with `dlopen` on the first call and driven through
   `objc_msgSend`, so nothing is linked. `next_event` runs a hand-written `nextEventMatchingMask`
   loop until the window has an event for the program; the runtime closes nothing of its own accord.
-- The AIPL side is in `projects/todo`: `elements.aipl` has the `Element` variant and `to_text`, with a
-  `gallery` command that draws every element from constants, and `events.aipl` has the `Event`
-  variant, its parser and `wait_until_closed`, the loop that grants requests to close and quit;
-  `main.aipl` has `interact`, the loop the todo window runs in: an event updates the list, which is
-  drawn again; the list lives only as long as the window. Its buttons so far add an item: "Add your first todo" on an empty list, and
-  "Add a todo" under the items of any other, each adding an item with placeholder text.
+- The AIPL side is in `projects/todo`: `elements.aipl` has the `Element<M>` variant, `to_text` and
+  `click`, with a `gallery` command that draws every element from constants, and `events.aipl` has
+  the `Event` variant, its parser and `wait_until_closed`, the loop that grants requests to close and
+  quit. An `Element<M>` is a view of a model `M`; a `Button` holds what a click does as a function of
+  the model, `Button("Add", |todos| { .. })`, the way React's `setState(todos => ..)` is given one,
+  and a button is named in events by its `key`, which is where it is in the tree (`b0.2.1`) until one
+  is written. `main.aipl` has `todo_app`, a function of the list that answers the window (a
+  component `item` per row, a handler per button that closes over what it needs), and `interact`,
+  the loop the todo window runs in: an event is looked up in the tree last shown (`click`), which
+  answers the new list, which is drawn again; the list lives only as long as the window. Its buttons
+  add an item ("Add your first todo" on an empty list, "Add a todo" under the items of any other,
+  each with placeholder text) and remove one.
 - What reaches the program is the window's own requests and button clicks. A button has to have a
   `key` (up to 64 letters, digits and `- _ . : /`), which names it in its `clicked` event; checkboxes
   and fields are drawn and do nothing. A window needs the process's main thread: a
@@ -41,19 +47,20 @@ as far as the app needs.
 - The runtimes read a `str` a program hands them (`str24`) and no other structured value: an
   array of structs or a variant tree has no reader on the Rust side (the same gap holds back
   `http_get` request headers).
-- `projects/todo` is an in-memory list of `Todo`s with a `view` of it and a `clicked` update, shown with
-  `show_view`: the model, the view and the update the interactive app is built on. Nothing is saved.
+- `projects/todo` is an in-memory list of `Todo`s, `todo_app` the view of it, shown with `show_view`:
+  the model, the view and the handlers on its buttons that the interactive app is built on. Nothing is
+  saved.
 
 ## Decisions
 
 - **React is the model to design from.** A view is a function of the model: small AIPL functions
   that take props and return elements, composed the way components are. Every element has a `key`,
   and showing a new view reconciles it with the one on screen by key and kind, touching only what
-  differs. Events go up as data naming the element's key, where React would call a handler, and state
-  lives in one place, the model, which the inputs display (controlled). Where AIPL cannot follow yet
-  — closures cannot cross to the runtime, and there are no hooks to give a component state of its
-  own — the model and the loop stand in, and a feature is designed so that the React form can replace
-  them when the language allows.
+  differs. Handlers are closures written on the elements, as in React; what goes up to the program is
+  the element's key, which `click` looks up in the tree last shown to find the handler. State lives in
+  one place, the model, which the inputs display (controlled). Where AIPL cannot follow yet — there
+  are no hooks to give a component state of its own — the model and the loop stand in, and a feature
+  is designed so that the React form can replace them when the language allows.
 - **Data crosses, closures do not.** The program tells the runtime what the window holds, and the
   runtime tells the program what happened. The program owns its loop: it reads an event, updates its
   model and describes the window again. No AIPL function is ever called from the runtime.
@@ -142,9 +149,11 @@ Goal: contents that fit the window and scroll when there are too many.
 Goal: `projects/todo` is the interactive app.
 
 - [ ] The view is a field to add, a row per item (checkbox, text, remove button) and a footer with
-      how many are left, the row a function of one item and keyed by it, as a React list item is;
-      `clicked` becomes an `update` over every event the view can cause.
-- [ ] The whole interaction is a test: scripted events in, the views shown.
+      how many are left, the row a function of one item and keyed by it, as a React list item is.
+      Done but for the field and the checkbox's handler, which need stage 2: the rows, their
+      handlers and the footer.
+- [ ] The whole interaction is a test: scripted events in, the views shown. Done for the buttons
+      there are.
 
 ### 5. Behaving like an app
 

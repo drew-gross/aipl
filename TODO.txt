@@ -903,6 +903,7 @@ flamegraph:
   profile other things than run e.g. formatting, running tests, etc.
 
 gui:
+  make on_click kwonly somehow
   screenshot testing
   react style callbacks and state
   2026-11-25 22:45:46.326 main[97759:120934980] NSKeyBindingManager: Bad key binding selector for '^@' = 'noop'
