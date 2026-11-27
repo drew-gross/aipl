@@ -11,7 +11,6 @@ import {
     less_than_or_equal as <=,
     map,
     measure,
-    print,
     push,
     wrapping_add as +,
 } from builtins;
@@ -43,35 +42,11 @@ fn pushed_rows(xss: i64[][]) -> i64[] {
     out
 }
 
-fn named(n: i64) !prints -> i64 {
-    print(`n{n}`);
-    n
-}
-
-fn noisy(n: i64) !prints -> i64[] {
-    print(`f{n}`);
-    [n, n + 1]
-}
-
 test({
     assert(mapped_joined([1, 2]) == [-1, 1, 2, 2, 3, -2]);
     assert(joined([[1], [], [2, 3]]) == [-1, 1, 2, 3, -2]);
     let empty: i64[] = [];
     assert(mapped_joined(empty) == [-1, -2]);
-    mut out = "";
-    shim prints {
-        print = |text| {
-            set out = `{out}{text} `;
-        },
-        put = |text| {
-            set out = `{out}{text}`;
-        },
-    } {
-        // The leading element, the mapping function once per source element, then the rest.
-        let both = [named(0), ..[1, 2].map(noisy).join(), named(9)];
-        assert(both == [0, 1, 2, 2, 3, 9]);
-    };
-    assert(out == "n0 f1 f2 n9 ");
 })
 
 benchmark({

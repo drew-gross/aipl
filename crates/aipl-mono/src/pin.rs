@@ -675,10 +675,9 @@ struct Pinner<'a> {
     /// While typing a lambda that has no function type to take its effects from, the effects its
     /// body has performed so far: they are what the lambda's type says instead of an error.
     inferring: Option<Vec<String>>,
-    /// Set by [`Pinner::value_arg`] for the one argument it is about to type: a function named
-    /// there is stored, so its type keeps the effects it performs, where one handed to a callee
-    /// that is specialized for it performs them in the caller.
-    stored_value: bool,
+    /// While typing the body of a closure against the function type it was given, where what it
+    /// may perform is that type's effects: the effects of the function it is written in.
+    closure_outer: Option<Vec<String>>,
     /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
     /// returns nothing, so the operand's shape is the only constraint.
     in_test: bool,
@@ -1085,7 +1084,7 @@ fn pinner_for<'a>(
         fn_name: fn_name.to_string(),
         effects: effects.to_vec(),
         inferring: None,
-        stored_value: false,
+        closure_outer: None,
         in_test: false,
         errors: Vec::new(),
         narrows: Vec::new(),
@@ -3441,23 +3440,10 @@ impl Pinner<'_> {
     /// closure is a function value: it performs no effect.
     fn value_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
         let ExprKind::Lambda(params, body) = &arg.kind else {
-            self.stored_value = true;
-            let typed = self.arg(arg, expected);
-            self.stored_value = false;
-            return typed;
+            return self.arg(arg, expected);
         };
         self.reject_mutable_captures(params, body, &arg.span)?;
-        // The closure may perform what the type it is stored as says, and nothing else.
-        let allowed = match self.table.shallow(expected) {
-            It::Fn(_, _, effects) => effects,
-            _ => Vec::new(),
-        };
-        let saved_effects = std::mem::replace(&mut self.effects, allowed);
-        let saved_inferring = self.inferring.take();
-        let typed = self.arg(arg, expected);
-        self.inferring = saved_inferring;
-        self.effects = saved_effects;
-        typed
+        self.arg(arg, expected)
     }
 
     /// Whether a value of this type has fields: a struct, an application of a generic one, or a
@@ -6217,6 +6203,10 @@ impl Pinner<'_> {
                 }
                 Ok(())
             }
+            None if self.closure_outer.is_some() => {
+                let outer = self.closure_outer.clone().unwrap_or_default();
+                reject(slot_effect_message(callee, effect, &outer), span)
+            }
             None => reject(
                 undeclared_effect_message(callee, effect, &self.effects),
                 span,
@@ -6251,7 +6241,6 @@ impl Pinner<'_> {
     }
 
     fn arg_inner(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
-        let stored = std::mem::take(&mut self.stored_value);
         // A named function given where a function is wanted, generic or not.
         if let ExprKind::Ident(name) = &arg.kind {
             if !self.env.contains_key(name)
@@ -6260,37 +6249,20 @@ impl Pinner<'_> {
             {
                 if let Some(sig) = self.decls.sigs.get(name).map(|s| s.sig.clone()) {
                     self.resolve(&arg.name_span, function_target(name));
-                    // Handed to a callee that is specialized for it, the function performs its
-                    // effects where the call is, so the caller declares them; handed to a slot
-                    // whose type says it may perform them, it need not.
+                    // The function keeps its effects in its type, and the type it is handed
+                    // for has to accept them.
                     let allowed = match self.table.shallow(expected) {
                         It::Fn(_, _, allowed) => allowed,
-                        _ => Vec::new(),
+                        _ => sig.effects.clone(),
                     };
-                    // A stored function keeps its effects in its type, and the slot's type
-                    // accepts them or not; one handed to a callee has them accounted for here.
-                    let mut accounted = Vec::new();
-                    if !stored {
-                        for effect in &sig.effects {
-                            if !allowed.contains(effect) {
-                                self.require_effect(display(name), effect, &arg.span)?;
-                            }
-                            accounted.push(effect.clone());
-                        }
+                    if let Some(effect) = sig.effects.iter().find(|e| !allowed.contains(e)) {
+                        return reject(
+                            slot_effect_message(display(name), effect, &self.effects),
+                            &arg.span,
+                        );
                     }
                     let (ptys, ret, _) = self.instantiate(name, &sig, &arg.span)?;
-                    let kept = if stored { &sig.effects } else { &accounted };
-                    let ty = It::Fn(
-                        ptys,
-                        Box::new(ret),
-                        sorted_effects(
-                            &kept
-                                .iter()
-                                .filter(|e| stored || allowed.contains(e))
-                                .cloned()
-                                .collect::<Vec<_>>(),
-                        ),
-                    );
+                    let ty = It::Fn(ptys, Box::new(ret), sorted_effects(&sig.effects));
                     return Ok(self.node(TExprKind::Ident(name.clone()), ty, arg));
                 }
             }
@@ -6347,7 +6319,15 @@ impl Pinner<'_> {
             // A `?` in a closure leaves the closure, so a test's `?` rule is not in force there.
             let saved_test = std::mem::replace(&mut self.in_test, false);
             let saved_ret = std::mem::replace(&mut self.ret, (*ret).clone());
+            // The closure may perform what the type it is given says, and nothing else.
+            let saved_effects = std::mem::replace(&mut self.effects, effects.clone());
+            let saved_inferring = self.inferring.take();
+            let saved_closure =
+                std::mem::replace(&mut self.closure_outer, Some(saved_effects.clone()));
             let body = self.expr(body);
+            self.closure_outer = saved_closure;
+            self.inferring = saved_inferring;
+            self.effects = saved_effects;
             self.ret = saved_ret;
             self.in_test = saved_test;
             for (name, old) in saved.into_iter().rev() {
@@ -6362,6 +6342,20 @@ impl Pinner<'_> {
             return Ok(self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg));
         }
         self.expr(arg)
+    }
+}
+
+/// Why a function that performs `effect` is refused by the function type it is given, which allows
+/// no such effect. `outer` is what the function the code is written in declares: a benchmark
+/// block has its own reason to refuse every effect.
+fn slot_effect_message(callee: &str, effect: &str, outer: &[String]) -> String {
+    if effect == "measure" || outer.iter().any(|e| e == "measure") {
+        undeclared_effect_message(callee, effect, outer)
+    } else {
+        format!(
+            "fn {callee:?} has effect \"!{effect}\" but the function type it is given does not \
+             allow it"
+        )
     }
 }
 

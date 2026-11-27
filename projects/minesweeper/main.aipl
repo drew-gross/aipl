@@ -557,13 +557,15 @@ fn play(self: Session) !prints !random !read_stdin_raw !terminal -> Mark[,] {
         Won | Lost => self.game,
         Playing => {
             self.draw();
-            read_key()
-                .map(|key| match (self.press(key)) {
+            if (let some(key) = read_key()) {
+                match (self.press(key)) {
                     Quit => self.game,
                     Continue(next) => play(next),
                     FirstReveal(first) => play(first.start_mining()),
-                })
-                .value_or(self.game)
+                }
+            } else {
+                self.game
+            }
         },
     }
 }.test({

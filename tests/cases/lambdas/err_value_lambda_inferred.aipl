@@ -42,7 +42,7 @@ error: lambda has 2 parameter(s), but (i64) -> i64 was expected
 16 | fn arity() -> Handler { f: |x, y| { x + y } }
    |                            ^^^^^^^^^^^^^^^^
 
-error: fn "print" has effect "!prints" but the calling function does not declare it
+error: fn "print" has effect "!prints" but the function type it is given does not allow it
   --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:20:9
    |
 20 |         print("hi");

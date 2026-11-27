@@ -20,7 +20,7 @@
 # twice. `ordered` interleaves plain elements with spreads and shows the
 # evaluation following the source left to right.
 
-import { equal as ==, len, map, print, wrapping_add as + } from builtins;
+import { equal as ==, len, print, push, wrapping_add as + } from builtins;
 
 fn a() !prints -> i64[] {
     print("a");
@@ -49,7 +49,16 @@ fn plain(n: i64) !prints -> i64 {
 
 fn each() !prints -> i64[] { [..a(), ..b(), ..c()] }
 
-fn mapped(xs: i64[]) !prints -> i64[] { [0, ..xs.map(loud)] }
+# `map` takes no function that performs an effect, so the loop is written out.
+fn louds(xs: i64[]) !prints -> i64[] {
+    mut out: i64[] = []; #[allow]
+    for (let x : xs) {
+        set out.push(loud(x));
+    }
+    out
+}
+
+fn mapped(xs: i64[]) !prints -> i64[] { [0, ..louds(xs)] }
 
 fn ordered() !prints -> i64[] { [plain(1), ..b(), plain(2), ..c()] }
 

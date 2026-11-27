@@ -4,16 +4,8 @@
 #
 # The interleaving below is the assertion: "computing" appears for both calls,
 # including the one that discards the result.
-#
-# `mapped` is the same rule reached a different way, and the way that used to
-# get it wrong: the effect is not in a *call* the value makes but in a function
-# it passes by **name**. `xs.map(noisy)` mentions `noisy` as a value, so a check
-# that reads only the calls found nothing to stop it, sank the binding into the
-# `true` arm, and the `false` call printed nothing at all. A mention counts now
-# (`reaches_blocked` in `aipl-mono`'s `sink`), which is what the second pair of
-# lines below pins down.
 
-import { equal as ==, len, map, print, to_str } from builtins;
+import { equal as ==, print, to_str } from builtins;
 
 fn noisy(n: i64) !prints -> i64 {
     print(`computing {n}`);
@@ -23,11 +15,6 @@ fn noisy(n: i64) !prints -> i64 {
 fn size(flag: bool, n: i64) !prints -> i64 {
     let v = noisy(n);
     if (flag) { v } else { 0 }
-}
-
-fn mapped(flag: bool, xs: i64[]) !prints -> u64 {
-    let all = xs.map(noisy);
-    if (flag) { all.len() } else { 0 }
 }
 
 test({
@@ -42,18 +29,12 @@ test({
     } {
         print(size(false, 1).to_str());
         print(size(true, 2).to_str());
-        print(mapped(false, [3]).to_str());
-        print(mapped(true, [4]).to_str());
     };
     assert(out == """
         computing 1
         0
         computing 2
         2
-        computing 3
-        0
-        computing 4
-        1
 
     """);
 })

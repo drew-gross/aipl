@@ -53,13 +53,13 @@ error: fn "run" has effect "!prints" but the calling function does not declare i
 21 | fn undeclared_field(l: Logger, x: i64) -> i64 { l.run(x) }
    |                                                 ^^^^^^^^
 
-error: fn "print" has effect "!prints" but the calling function does not declare it
+error: fn "print" has effect "!prints" but the function type it is given does not allow it
   --> ./tests/cases/effects/err_function_value_effects.aipl:26:9
    |
 26 |         print("hi");
    |         ^^^^^^^^^^^
 
-error: struct "Pure" field "run": expected (i64) -> i64, got (i64) !prints -> i64
+error: fn "shout" has effect "!prints" but the function type it is given does not allow it
   --> ./tests/cases/effects/err_function_value_effects.aipl:32:36
    |
 32 | fn pure_slot_name() -> Pure { run: shout }

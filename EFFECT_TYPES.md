@@ -34,6 +34,12 @@ declared by the caller, exactly as calling a named function does.
 - **Calling a function value** requires its effects in the caller, for `f(x)`, `x.f()` and a
   function-typed field alike, with the message a named function gets.
 - **A named function used as a value** has the type of its signature, effects included.
+- **A function that performs an effect goes only where the parameter type says so.** `map`,
+  `filter` and the other builtins that are fused or specialized take pure functions only; a user
+  function's parameter typed `(A) !prints -> B` takes an effectful one. So a function argument is
+  held to the effects of the type it is given, exactly as a stored one is, and the effects of a
+  specialized copy are those of its bound functions' types. (Fusion and specialization of
+  effectful arguments are not worth their cost yet.)
 - **Closures keep working as variants:** the signature a closure variant is made for includes the
   effects, so `apply$n` declares the effects of its type and the calls inside it are well-formed.
 - **Shims** need nothing new: a shim stands in for an operation at run time wherever it is called.
@@ -45,7 +51,7 @@ declared by the caller, exactly as calling a named function does.
 
 ## Stages
 
-Order: 3, 4, then 5.
+Order: 3, then 4.
 
 Stages 1 and 2 are built. Pinner: a lambda stored in a field, constructor or `let` with a function
 type may perform that type's effects (`value_arg`); with none it has the effects its body performs
@@ -61,18 +67,15 @@ declared again). Stage 1 is built: `Fn` carries `effects: Vec<String>` (sorted, 
 `(A) !prints -> B`. Nothing yet produces or checks an effect: lambdas and named functions used as
 values are typed with none, and the pinner's `agree` ignores the list.
 
-### 3. Specialization
-- [ ] `specialization_effects` (the effects of a function specialized for the functions it is
-      handed) takes a bound lambda's effects from its type rather than the enclosing function's.
-
-### 4. Hardening
+### 3. Hardening
 - [ ] A function value typed with effects in a position that is a type variable or an element of a
       generic (`Option<(A) !prints -> B>`-like shapes the checker allows): cases, and the message
       when the effects of two branches differ.
 - [ ] The wording of the error for calling a function value (`fn "f" has effect ...`) names it a
-      function value.
+      function value, and the one for a named function given to a pure parameter says why
+      (`expected (i64) -> _, got (i64) !prints -> i64` does not).
 
-### 5. The todo app and docs
+### 4. The todo app and docs
 - [ ] The docs site and `write-aipl` skill describe the syntax.
 - [ ] `projects/todo` handlers may print or use `gui` in a type that says so.
 

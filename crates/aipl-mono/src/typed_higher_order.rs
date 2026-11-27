@@ -398,11 +398,16 @@ impl Mono<'_> {
     /// looked up in its bindings, or a named function (instantiated for the parameter types its
     /// position gives it).
     pub(crate) fn lifted_argument(&mut self, argument: Typed) -> Lifted {
+        let argument_ty = argument.ty.clone();
         match argument.kind {
             TExprKind::Lambda(params, body) => {
                 let captures = self.typed_lambda_captures(&params, &body);
                 let ret = body.ty.clone();
-                let name = self.lift_lambda(&params, &body, &captures, ret.to_type(), Vec::new());
+                let effects = match &argument_ty {
+                    ConcreteType::Fn(_, _, effects) => effects.clone(),
+                    _ => Vec::new(),
+                };
+                let name = self.lift_lambda(&params, &body, &captures, ret.to_type(), effects);
                 Lifted {
                     name,
                     ret,

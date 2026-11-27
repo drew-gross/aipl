@@ -3,6 +3,7 @@ variant:
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
 
 projects:
+  mtg scorekeeper app
   change readmes to main.aipl top level docs.
   get rid of aipl.build, maybe by checking in the compiler in the main project also? Or use hard links?
   let `aipl run` call non-main functions and take other files (e.g. word_count on a file)

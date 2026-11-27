@@ -1,11 +1,6 @@
-# The two reasons the index fusion stands aside. Fusing `xs.map(f)[i]` into
-# `xs[i].map(f)` *drops* `f`'s calls for every element but the one read, so it
-# is refused whenever that is observable — and the `stdout` here is the proof,
-# since an unfused `map` prints once per element.
-#
-# `f` faces the loop family's bar rather than the whole-expression effect check:
-# no effects and no aborts, closed over the call graph. The receiver and the
-# index are deliberately *not* held to it — both are evaluated exactly once
+# The index fusion on `xs.map(f)[i]`, which `xs[i].map(f)` only stands in for when `f` does nothing
+# observable (a `map` takes no function that performs an effect, so `f` never does here).
+# The receiver and the index may perform effects: both are evaluated exactly once
 # either way, and the only movement is that the index is evaluated ahead of
 # `f`'s calls instead of after them, which a pure `f` cannot observe. So
 # `noisy_source()` and `noisy_index()` below print exactly where the source puts
@@ -28,11 +23,6 @@
 # not depend on an earlier pass happening to run first.
 
 import { equal as ==, len, map, print, value_or, wrapping_mul as * } from builtins;
-
-fn loud(n: i64) !prints -> i64 {
-    print(`f{n}`);
-    n * 2
-}
 
 fn noisy_source() !prints -> i64[] {
     print("source");
@@ -61,12 +51,6 @@ test({
     } {
         let v = [1, 2, 3];
 
-        // An effectful named `f`: not fused, so `loud` runs for every element.
-        print(`{v.map(loud)[1]}`);
-
-        // An effectful lambda: the same bar, reached through the lambda's body.
-        print(`{v.map(|x| { print(`g{x}`); x * 3 })[0]}`);
-
         // An effectful *receiver* is fine — it is evaluated once either way — so
         // this one fuses and "source" prints once with no `f` output at all.
         print(`{noisy_source().map(loud2)[2]}`);
@@ -82,14 +66,6 @@ test({
         print(`{v.len()}`);
     };
     assert(out == """
-        f1
-        f2
-        f3
-        some(4)
-        g1
-        g2
-        g3
-        some(3)
         source
         some(6)
         index

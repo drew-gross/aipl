@@ -88,7 +88,7 @@ error: lambda body returns i64, but bool was expected
 40 |     print(to_str([1, 2, 3].filter(|x| x + 1)));
    |                                       ^^^^^
 
-error: fn "shout" has effect "!prints" but the calling function does not declare it
+error: fn "shout" has effect "!prints" but the function type it is given does not allow it
   --> ./tests/cases/lambdas/err_lambdas.aipl:45:28
    |
 45 |     let ys = [1, 2, 3].map(shout); #[allow]

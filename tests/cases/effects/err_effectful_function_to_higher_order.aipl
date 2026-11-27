@@ -1,0 +1,71 @@
+# A function that performs an effect is not handed to a function that takes a pure one: `map`,
+# `filter` and `any` are specialized and fused for the function they are given, and the effects of a
+# call through them would be lost in that. A parameter that says it performs the effect takes it.
+
+import {
+    any,
+    filter,
+    greater_than as >,
+    map,
+    print,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
+
+fn loud(x: i64) !prints -> i64 {
+    print(`f{x}`);
+    x
+}
+
+fn loud_big(x: i64) !prints -> bool {
+    print(`g{x}`);
+    x > 1
+}
+
+fn map_by_name() !prints -> i64[] { [1, 2].map(loud) }
+
+fn map_a_lambda() !prints -> i64[] {
+    [1, 2].map(|x| {
+        print("h");
+        x
+    })
+}
+
+fn filter_by_name() !prints -> i64[] { [1, 2].filter(loud_big) }
+
+fn any_by_name() !prints -> bool { [1, 2].any(loud_big) }
+
+# A user function whose parameter performs the effect takes both.
+fn each(xs: i64[], f: (i64) !prints -> i64) !prints -> i64 {
+    mut total = 0;
+    for (let x : xs) {
+        set total += f(x);
+    }
+    total
+}
+
+fn accepted() !prints -> i64 { each([1, 2], loud) + each([3], |x| { x }) }
+--- check --compile ---
+error: fn "loud" has effect "!prints" but the function type it is given does not allow it
+  --> ./tests/cases/effects/err_effectful_function_to_higher_order.aipl:25:48
+   |
+25 | fn map_by_name() !prints -> i64[] { [1, 2].map(loud) }
+   |                                                ^^^^
+
+error: fn "print" has effect "!prints" but the function type it is given does not allow it
+  --> ./tests/cases/effects/err_effectful_function_to_higher_order.aipl:29:9
+   |
+29 |         print("h");
+   |         ^^^^^^^^^^
+
+error: fn "loud_big" has effect "!prints" but the function type it is given does not allow it
+  --> ./tests/cases/effects/err_effectful_function_to_higher_order.aipl:34:54
+   |
+34 | fn filter_by_name() !prints -> i64[] { [1, 2].filter(loud_big) }
+   |                                                      ^^^^^^^^
+
+error: fn "loud_big" has effect "!prints" but the function type it is given does not allow it
+  --> ./tests/cases/effects/err_effectful_function_to_higher_order.aipl:36:47
+   |
+36 | fn any_by_name() !prints -> bool { [1, 2].any(loud_big) }
+   |                                               ^^^^^^^^

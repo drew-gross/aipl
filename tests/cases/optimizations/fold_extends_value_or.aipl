@@ -88,14 +88,6 @@ fn plain(o: i64?) -> i64[] {
     v
 }
 
-# Purity is not required of the mapping function — the fold moves where the
-# elements land, not when `f` runs — so a printing `f` prints exactly once per
-# element it would have produced, and not at all on the `none` arm.
-fn loud(n: i64) !prints -> i64[] {
-    print(`f{n}`);
-    [n]
-}
-
 // The mapping the measured functions use. `pair` is `plain`'s alone, and stays
 // so: a second caller would stop it being inlined there, and move the case's own
 // code for no reason that has to do with the fold.
@@ -158,12 +150,6 @@ fn keeping(v: i64[], o: i64?) -> i64[] {
     out
 }
 
-fn effects(o: i64?) !prints -> i64[] {
-    mut v: i64[] = [];
-    set v.extend(o.map(loud).value_or([]));
-    v
-}
-
 test({
     mut out = "";
     shim prints {
@@ -197,9 +183,6 @@ test({
         print(`{gather_two([Many(leaf, some(leaf)), leaf])}`);
 
         print(`{plain(some(3))} {plain(none)}`);
-
-        print(`{effects(some(7))}`);
-        print(`{effects(none)}`);
     };
     assert(out == """
         [2]
@@ -209,9 +192,6 @@ test({
         [1, 2, 2]
         [1, 2, 2, 2]
         [9, 3, 4] [9]
-        f7
-        [7]
-        []
 
     """);
 })
