@@ -28,7 +28,7 @@ variant Shape = Circle(r: i64) | Square(i64) | Empty
 
 ## Types
 `i64 u64 u8 .. bool char str`, floats (`import { IEEE754Float64 as Float } from builtins;`, or `as F32`/`as F64` when a file uses both; never mixed with ints), `T[]`, `T?`, `T!E`, `T[,]` grid, `#{T}` set (`#>{T}` `#<{T}` ordered), `#{K: V}` dict,
-`(A, B)` tuple, `(A) -> B` function, `Case<V>`. `()` unit.
+`(A, B)` tuple, `(A) -> B` function (`(A) !prints -> B` when calling it performs effects, which the caller must declare; a function with fewer effects fits where more are allowed), `Case<V>`. `()` unit.
 
 ## Expressions
 ```

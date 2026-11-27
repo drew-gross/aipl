@@ -1566,6 +1566,8 @@ struct FuncInfo {
     params: Vec<ParamInfo>,
     return_ty: ConcreteType,
     effects: Vec<String>,
+    /// See [`aipl_mono::ConcreteFn::effects_by_type`].
+    effects_by_type: bool,
     /// `true` for a mutating method (`fn f(mut self: T, ...)`): it returns
     /// nothing to the user, mutates its receiver, and must be called as
     /// `v.f(...)`. At the ABI level it returns the mutated `self` (its
@@ -3625,6 +3627,7 @@ fn compile_program<M: Module>(
                 .collect(),
             return_ty: f.abi_return_type(),
             effects: f.effects.clone(),
+            effects_by_type: f.effects_by_type,
             is_mutating: f.is_mutating(),
         };
         funcs.insert(f.name.clone(), info);
@@ -4610,6 +4613,7 @@ fn entry_funcs(
                     params,
                     return_ty: ffi_type_from_tag(&e.ret)?,
                     effects: Vec::new(),
+                    effects_by_type: false,
                     is_mutating: false,
                 },
             ))
@@ -7981,6 +7985,7 @@ fn register_builtins(funcs: &mut HashMap<String, FuncInfo>) -> Builtins {
                 params,
                 return_ty,
                 effects: effects.iter().map(|s| s.to_string()).collect(),
+                effects_by_type: false,
                 is_mutating: false,
             },
         );
@@ -8276,6 +8281,13 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
         (ConcreteType::Result(ao, ae), ConcreteType::Result(bo, be)) => {
             coercible(ao, bo) && coercible(ae, be)
         }
+        // A function value is its code address whatever it performs: the checker has decided
+        // whether the effects of one fit the slot it is in.
+        (ConcreteType::Fn(ap, ar, _), ConcreteType::Fn(bp, br, _)) => {
+            ap.len() == bp.len()
+                && ap.iter().zip(bp).all(|(a, b)| coercible(a, b))
+                && coercible(ar, br)
+        }
         _ => false,
     }
 }
@@ -8334,6 +8346,24 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
             Box::new(merge_types(xo, yo)?),
             Box::new(merge_types(xe, ye)?),
         )),
+        // The branches of an `if` hold functions that perform different effects: the value
+        // may be either, so it performs both.
+        (ConcreteType::Fn(xp, xr, xe), ConcreteType::Fn(yp, yr, ye)) if xp.len() == yp.len() => {
+            let mut effects = xe.clone();
+            effects.extend(ye.iter().cloned());
+            effects.sort();
+            effects.dedup();
+            let params = xp
+                .iter()
+                .zip(yp)
+                .map(|(x, y)| merge_types(x, y))
+                .collect::<Option<Vec<_>>>()?;
+            Some(ConcreteType::Fn(
+                params,
+                Box::new(merge_types(xr, yr)?),
+                effects,
+            ))
+        }
         _ => None,
     }
 }
@@ -16459,8 +16489,8 @@ fn emit_arr_contains_seq<M: Module>(
 /// function value (a `(ptys) -> ret` code address). Mirrors [`compile_call`]'s
 /// ABI — borrow-retain each heap arg, sret a composite result — but dispatches
 /// through `call_indirect` on the loaded address rather than a known callee. No
-/// effect check: only effect-free functions can become values (enforced by the
-/// checker), so an indirect call performs none.
+/// effect check here: the function type says which effects the call performs, and the checker
+/// has required the caller to declare them.
 fn compile_indirect_call<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -16585,8 +16615,9 @@ fn compile_call<M: Module>(
             span.clone(),
         ));
     }
-    // Callee's effects must be a subset of the current function's declared ones.
-    for effect in &info.effects {
+    // Callee's effects must be a subset of the current function's declared ones, unless they are
+    // the ones its callers' function types already settled.
+    for effect in info.effects.iter().filter(|_| !info.effects_by_type) {
         if !current_effects.iter().any(|e| e == effect) {
             return Err(Error::at(
                 format!(
@@ -21849,7 +21880,12 @@ fn compile_expr_inner<M: Module>(
                 let ty = ConcreteType::Fn(
                     info.param_types().cloned().collect(),
                     Box::new(info.return_ty.clone()),
-                    Vec::new(),
+                    {
+                        let mut effects = info.effects.clone();
+                        effects.sort();
+                        effects.dedup();
+                        effects
+                    },
                 );
                 (addr, ty)
             } else {

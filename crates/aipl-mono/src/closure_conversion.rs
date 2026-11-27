@@ -11,6 +11,8 @@
 //! copying and release are the variant's. A function type with no capturing lambda is left as the
 //! code address it has always been.
 
+use std::collections::HashMap;
+
 use aipl_syntax::ast::{Callee, ConcreteType};
 use aipl_syntax::ast::{ConcreteStructDecl, ConcreteVariantCase, ConcreteVariantDecl};
 use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TPattern};
@@ -27,7 +29,6 @@ pub(crate) const MAKE_PREFIX: &str = "__closure$";
 struct Signature {
     params: Vec<ConcreteType>,
     ret: ConcreteType,
-    effects: Vec<String>,
     variant: String,
     apply: String,
     /// The functions that can stand for a value of the type, with what each captures.
@@ -47,8 +48,9 @@ impl Case {
 
 pub(crate) struct Conversion {
     signatures: Vec<Signature>,
-    /// The names of the functions of the program: what an identifier of function type may name.
-    functions: Vec<String>,
+    /// The functions of the program with the effects each performs: what an identifier of
+    /// function type may name.
+    functions: HashMap<String, Vec<String>>,
 }
 
 impl Conversion {
@@ -63,17 +65,20 @@ impl Conversion {
         }
         Some(Conversion {
             signatures,
-            functions: fns.iter().map(|f| f.name.clone()).collect(),
+            functions: fns
+                .iter()
+                .map(|f| (f.name.clone(), f.effects.clone()))
+                .collect(),
         })
     }
 
     fn signature_of(&self, ty: &ConcreteType) -> Option<usize> {
-        let ConcreteType::Fn(params, ret, effects) = ty else {
+        let ConcreteType::Fn(params, ret, _) = ty else {
             return None;
         };
         self.signatures
             .iter()
-            .position(|s| s.params == *params && s.ret == **ret && s.effects == *effects)
+            .position(|s| s.params == *params && s.ret == **ret)
     }
 
     /// `ty` with every converted function type replaced by its variant.
@@ -217,7 +222,7 @@ impl Conversion {
             }
             TExprKind::Ident(name) => {
                 if let Some(signature) = self.signature_of(&original) {
-                    if self.functions.contains(name) {
+                    if self.functions.contains_key(name) {
                         // A function named as a value captures nothing: a lambda that does is
                         // made through `__closure$`.
                         let function = name.clone();
@@ -318,10 +323,19 @@ impl Conversion {
                 }
             })
             .collect();
+        // It performs whatever any of the functions it calls does.
+        let mut effects: Vec<String> = s
+            .cases
+            .iter()
+            .flat_map(|c| self.functions[&c.function].iter().cloned())
+            .collect();
+        effects.sort();
+        effects.dedup();
         ConcreteFn {
             name: s.apply.clone(),
             params,
-            effects: Vec::new(),
+            effects,
+            effects_by_type: true,
             return_ty: Some(ret.clone()),
             body: TExpr::new(
                 TExprKind::Match(
@@ -347,16 +361,15 @@ fn find_makers(e: &Typed, signatures: &mut Vec<Signature>) {
     } = &e.kind
     {
         if name.starts_with(MAKE_PREFIX) {
-            if let ConcreteType::Fn(params, ret, effects) = &e.ty {
+            if let ConcreteType::Fn(params, ret, _) = &e.ty {
                 if !signatures
                     .iter()
-                    .any(|s| s.params == *params && s.ret == **ret && s.effects == *effects)
+                    .any(|s| s.params == *params && s.ret == **ret)
                 {
                     let n = signatures.len();
                     signatures.push(Signature {
                         params: params.clone(),
                         ret: (**ret).clone(),
-                        effects: effects.clone(),
                         variant: format!("Closure${n}"),
                         apply: format!("apply${n}"),
                         cases: Vec::new(),

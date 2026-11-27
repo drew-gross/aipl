@@ -1161,13 +1161,14 @@ impl Mono<'_> {
         }
         if let TExprKind::Lambda(params, body) = &e.kind {
             if matches!(e.ty, ConcreteType::Fn(..)) {
-                let ConcreteType::Fn(_, ret, _) = &e.ty else {
+                let ConcreteType::Fn(_, ret, effects) = &e.ty else {
                     unreachable!()
                 };
                 // What the lambda reads of its surroundings travels with the value:
                 // `closure_conversion` turns this call into the value that holds them.
                 let captures = self.typed_lambda_captures(params, body);
-                let name = self.lift_lambda(params, body, &captures, ret.to_type());
+                let name =
+                    self.lift_lambda(params, body, &captures, ret.to_type(), effects.clone());
                 e.kind = if captures.is_empty() {
                     TExprKind::Ident(name)
                 } else {

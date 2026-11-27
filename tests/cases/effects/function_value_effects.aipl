@@ -1,0 +1,65 @@
+# A function type says which effects calling it performs: `(A) !prints -> B`. A value of the type may
+# perform them, calling one needs them declared, and a function with fewer effects fits where one
+# with more is expected.
+
+import { print, wrapping_add as + } from builtins;
+
+struct Logger { run: (i64) !prints -> i64 }
+
+# A lambda that performs the effect its slot allows.
+fn loud(n: i64) -> Logger {
+    run: |x| {
+        print(`x = {x}`);
+        x + n
+    },
+}
+
+# A pure lambda in the same slot.
+fn quiet() -> Logger { run: |x| { x } }
+
+fn double(x: i64) -> i64 { x + x }
+
+fn shout(x: i64) !prints -> i64 {
+    print(`shout {x}`);
+    x
+}
+
+# A pure function by name, and one that performs the effect by name, in the slot.
+fn named(flag: bool) -> Logger {
+    if (flag) { Logger { run: double } } else { Logger { run: shout } }
+}
+
+fn call_it(l: Logger, v: i64) !prints -> i64 { l.run(v) }
+
+# The function value is a parameter, and a lambda with no function type to take its effects from
+# has the ones its body performs.
+fn apply(f: (i64) !prints -> i64, x: i64) !prints -> i64 { f(x) }
+
+fn inferred(x: i64) !prints -> i64 {
+    let f = |y: i64| {
+        print("inferred");
+        y + 1
+    };
+    f(x)
+}
+
+fn main() !prints {
+    print(`{call_it(loud(10), 1)}`);
+    print(`{call_it(quiet(), 2)}`);
+    print(`{call_it(named(true), 3)}`);
+    print(`{call_it(named(false), 4)}`);
+    print(`{apply(double, 5)}`);
+    print(`{apply(|x| { x + 100 }, 6)}`);
+    print(`{inferred(7)}`);
+}
+--- stdout ---
+x = 1
+11
+2
+6
+shout 4
+4
+10
+106
+inferred
+8

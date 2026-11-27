@@ -45,35 +45,32 @@ declared by the caller, exactly as calling a named function does.
 
 ## Stages
 
-Order: 2 first; 3 and 4 need 2; 5 last.
+Order: 3, 4, then 5.
 
-Stage 1 is built: `Fn` carries `effects: Vec<String>` (sorted, each once, set by the reader in
+Stages 1 and 2 are built. Pinner: a lambda stored in a field, constructor or `let` with a function
+type may perform that type's effects (`value_arg`); with none it has the effects its body performs
+(`inferring`); a call through a local, a field or a method on a function value needs its type's
+effects declared (`require_effect`); `agree` accepts fewer effects where more are allowed, and a
+named function handed to a callee that is specialized for it still performs its effects in the
+caller. After the pinner effects have no run-time meaning: codegen compares function types without
+them, closure conversion makes one variant per parameters and return and its `apply` function
+performs the union of its cases' effects (`ConcreteFn::effects_by_type`, so a call to it is not
+declared again). Stage 1 is built: `Fn` carries `effects: Vec<String>` (sorted, each once, set by the reader in
 `ffi_ast.rs`) in `ast::Type`, `ConcreteType`, `Ty`, `ConcreteTy` and `It`, and the AIPL AST
 (`Fn(Ty[], Ty, str[])` in `ty.aipl`), grammar, formatter and `type_name` read and write
 `(A) !prints -> B`. Nothing yet produces or checks an effect: lambdas and named functions used as
 values are typed with none, and the pinner's `agree` ignores the list.
 
-### 2. The pinner checks and infers
-- [ ] `agree`/unification of two function types compares the lists (today the pinner's patterns
-      ignore them), with subsumption below.
-- [ ] A lambda checked against a function type may perform that type's effects and no others;
-      without an expected type its effects are inferred from its body.
-- [ ] A named function used as a value is typed with its signature's effects (the refusal of an
-      effectful one is lifted).
-- [ ] A call through a local, a field or a method-style call on a function value needs the type's
-      effects in the caller.
-- [ ] `agree`/coercion accept a function type with a subset of the effects.
-- [ ] Error cases in `tests/cases/effects/`: a pure slot given an effectful lambda, an effect not
-      declared by the caller of a function value, a subset accepted.
+### 3. Specialization
+- [ ] `specialization_effects` (the effects of a function specialized for the functions it is
+      handed) takes a bound lambda's effects from its type rather than the enclosing function's.
 
-### 3. Monomorphization and closures
-- [ ] `apply$n` declares its signature's effects (`closure_conversion` already keys a signature by
-      parameters, return and effects).
-- [ ] Specialization effects (`specialization_effects`) agree with the types.
-
-### 4. Codegen
-- [ ] An indirect call performs its type's effects through the shim slots as any call does; the
-      comment on `compile_indirect_call` (no effect check) is updated.
+### 4. Hardening
+- [ ] A function value typed with effects in a position that is a type variable or an element of a
+      generic (`Option<(A) !prints -> B>`-like shapes the checker allows): cases, and the message
+      when the effects of two branches differ.
+- [ ] The wording of the error for calling a function value (`fn "f" has effect ...`) names it a
+      function value.
 
 ### 5. The todo app and docs
 - [ ] The docs site and `write-aipl` skill describe the syntax.

@@ -2114,6 +2114,10 @@ pub struct ConcreteFn<Body = typed_util::Typed> {
     pub name: String,
     pub params: Vec<ConcreteParam>,
     pub effects: Vec<String>,
+    /// Whether the effects above are those of the function types the function is called through,
+    /// which the checker has matched against each caller (the `apply` function of a closure):
+    /// a call to it need not be declared again by the caller.
+    pub effects_by_type: bool,
     pub return_ty: Option<ConcreteType>,
     /// The typed tree, once the instance has left monomorphization; the stamped `Expr` it is
     /// inferred as until then (`typed_adapter::to_typed` is the boundary).
@@ -2499,6 +2503,7 @@ impl Mono<'_> {
                 })
                 .collect(),
             effects: effects.to_vec(),
+            effects_by_type: false,
             return_ty: return_ty
                 .as_ref()
                 .map(|t| settled(t, &format!("fn {name:?} return type"))),

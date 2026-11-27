@@ -387,7 +387,7 @@ impl Table {
                 self.unify(k1, k2)?;
                 self.unify(v1, v2)
             }
-            (It::Fn(p1, r1, _), It::Fn(p2, r2, _)) if p1.len() == p2.len() => {
+            (It::Fn(p1, r1, e1), It::Fn(p2, r2, e2)) if p1.len() == p2.len() && e1 == e2 => {
                 for (x, y) in p1.iter().zip(p2) {
                     self.unify(x, y)?;
                 }
@@ -672,6 +672,13 @@ struct Pinner<'a> {
     /// The effects the code being typed may perform: the function's own, plus those of the
     /// `shim`s around it.
     effects: Vec<String>,
+    /// While typing a lambda that has no function type to take its effects from, the effects its
+    /// body has performed so far: they are what the lambda's type says instead of an error.
+    inferring: Option<Vec<String>>,
+    /// Set by [`Pinner::value_arg`] for the one argument it is about to type: a function named
+    /// there is stored, so its type keeps the effects it performs, where one handed to a callee
+    /// that is specialized for it performs them in the caller.
+    stored_value: bool,
     /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
     /// returns nothing, so the operand's shape is the only constraint.
     in_test: bool,
@@ -1077,6 +1084,8 @@ fn pinner_for<'a>(
         validations: Vec::new(),
         fn_name: fn_name.to_string(),
         effects: effects.to_vec(),
+        inferring: None,
+        stored_value: false,
         in_test: false,
         errors: Vec::new(),
         narrows: Vec::new(),
@@ -2356,7 +2365,15 @@ impl Pinner<'_> {
                 self.agree(k1, k2)?;
                 self.agree(v1, v2)
             }
-            (It::Fn(p1, r1, _), It::Fn(p2, r2, _)) if p1.len() == p2.len() => {
+            (It::Fn(p1, r1, given), It::Fn(p2, r2, wanted)) if p1.len() == p2.len() => {
+                // A function performing fewer effects is accepted where one performing more is
+                // expected, never the other way.
+                if let Some(extra) = given.iter().find(|e| !wanted.contains(e)) {
+                    return Err(format!(
+                        "it performs \"!{extra}\", which {} does not allow",
+                        self.table.show(&e)
+                    ));
+                }
                 for (x, y) in p1.iter().zip(p2) {
                     self.agree(y, x)?;
                 }
@@ -3317,14 +3334,21 @@ impl Pinner<'_> {
                 }
                 self.reject_mutable_captures(params, body, &e.span)?;
                 let saved_test = std::mem::replace(&mut self.in_test, false);
-                // A function value has no effects of its own to perform.
+                // With no function type to take them from, the effects the body performs are
+                // the lambda's.
                 let saved_effects = std::mem::take(&mut self.effects);
+                let saved_inferring = self.inferring.replace(Vec::new());
                 let scoped = self.scoped(scope, |p| p.expr(body));
+                let performed = std::mem::replace(&mut self.inferring, saved_inferring);
                 self.effects = saved_effects;
                 self.in_test = saved_test;
                 let (saved, body) = scoped?;
                 self.restore(saved);
-                let ty = It::Fn(ptys, Box::new(body.ty.clone()), Vec::new());
+                let ty = It::Fn(
+                    ptys,
+                    Box::new(body.ty.clone()),
+                    sorted_effects(&performed.unwrap_or_default()),
+                );
                 self.node(K::Lambda(typed, Box::new(body)), ty, e)
             }
             ExprKind::Lambda(params, _) => {
@@ -3407,8 +3431,8 @@ impl Pinner<'_> {
     /// An argument of a constructor, stored in the value it makes: a lambda there is a function
     /// value and keeps what it captures.
     fn constructor_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
-        if let ExprKind::Lambda(params, body) = &arg.kind {
-            self.reject_mutable_captures(params, body, &arg.span)?;
+        if let ExprKind::Lambda(..) = &arg.kind {
+            return self.value_arg(arg, expected);
         }
         self.arg(arg, expected)
     }
@@ -3417,11 +3441,21 @@ impl Pinner<'_> {
     /// closure is a function value: it performs no effect.
     fn value_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
         let ExprKind::Lambda(params, body) = &arg.kind else {
-            return self.arg(arg, expected);
+            self.stored_value = true;
+            let typed = self.arg(arg, expected);
+            self.stored_value = false;
+            return typed;
         };
         self.reject_mutable_captures(params, body, &arg.span)?;
-        let saved_effects = std::mem::take(&mut self.effects);
+        // The closure may perform what the type it is stored as says, and nothing else.
+        let allowed = match self.table.shallow(expected) {
+            It::Fn(_, _, effects) => effects,
+            _ => Vec::new(),
+        };
+        let saved_effects = std::mem::replace(&mut self.effects, allowed);
+        let saved_inferring = self.inferring.take();
         let typed = self.arg(arg, expected);
+        self.inferring = saved_inferring;
         self.effects = saved_effects;
         typed
     }
@@ -3659,25 +3693,10 @@ impl Pinner<'_> {
                     &e.span,
                 );
             }
-            if !sig.effects.is_empty() {
-                return reject(
-                    format!(
-                        "function {:?} has effects ({}), so it cannot be used as a value \
-                         (its effects couldn't be accounted for at an indirect call)",
-                        display(name),
-                        sig.effects
-                            .iter()
-                            .map(|x| format!("!{x}"))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                    &e.span,
-                );
-            }
             let (ptys, ret, _) = self.instantiate(name, &sig, &e.span)?;
             return Ok(self.node(
                 TExprKind::Ident(name.to_string()),
-                It::Fn(ptys, Box::new(ret), Vec::new()),
+                It::Fn(ptys, Box::new(ret), sorted_effects(&sig.effects)),
                 e,
             ));
         }
@@ -5236,9 +5255,12 @@ impl Pinner<'_> {
             if let Some(binder) = binder {
                 self.resolve(&e.name_span, Target::Local(binder));
             }
-            let It::Fn(ptys, ret, _) = self.table.shallow(&ty) else {
+            let It::Fn(ptys, ret, effects) = self.table.shallow(&ty) else {
                 return reject(format!("{name:?} is not a function"), &e.span);
             };
+            for effect in &effects {
+                self.require_effect(display(name), effect, &e.span)?;
+            }
             if ptys.len() != args.len() {
                 return reject(
                     format!("{name:?} takes {} argument(s)", ptys.len()),
@@ -5724,7 +5746,10 @@ impl Pinner<'_> {
                 if let It::Named(_) | It::Gen(..) = self.table.shallow(&recv.ty) {
                     let owner = self.table.shallow(&recv.ty);
                     if let Ok(field) = self.field_type(&owner, name, &e.span) {
-                        if let It::Fn(ptys, ret, _) = self.table.shallow(&field) {
+                        if let It::Fn(ptys, ret, effects) = self.table.shallow(&field) {
+                            for effect in &effects {
+                                self.require_effect(display(name), effect, &e.span)?;
+                            }
                             if let Some(declaring) = self.declaring_struct(&owner) {
                                 self.resolve(
                                     &e.name_span,
@@ -5823,12 +5848,7 @@ impl Pinner<'_> {
             );
         }
         for effect in &sig.effects {
-            if !self.effects.contains(effect) {
-                return reject(
-                    undeclared_effect_message(display(name), effect, &self.effects),
-                    &e.span,
-                );
-            }
+            self.require_effect(display(name), effect, &e.span)?;
         }
         let (ptys, ret, type_args) = self.instantiate(name, &sig, &e.span)?;
         // Plain arguments first, so a closure is typed knowing what the others pinned.
@@ -6183,6 +6203,27 @@ impl Pinner<'_> {
 
     /// An argument, typed with the parameter type it lands in as its context. A lambda needs the
     /// context to type its own parameters.
+    /// What performing `effect` here needs: the function being typed declares it, or it is
+    /// recorded as performed by the lambda whose effects are being inferred. `callee` names what
+    /// performs it, for the message.
+    fn require_effect(&mut self, callee: &str, effect: &str, span: &Span) -> Res<()> {
+        if self.effects.iter().any(|e| e == effect) {
+            return Ok(());
+        }
+        match &mut self.inferring {
+            Some(performed) => {
+                if !performed.iter().any(|e| e == effect) {
+                    performed.push(effect.to_string());
+                }
+                Ok(())
+            }
+            None => reject(
+                undeclared_effect_message(callee, effect, &self.effects),
+                span,
+            ),
+        }
+    }
+
     fn arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
         let mut typed = self.arg_inner(arg, expected)?;
         // A constructor's name where a `Case<V>` is wanted is that case, not the constructor function.
@@ -6210,6 +6251,7 @@ impl Pinner<'_> {
     }
 
     fn arg_inner(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
+        let stored = std::mem::take(&mut self.stored_value);
         // A named function given where a function is wanted, generic or not.
         if let ExprKind::Ident(name) = &arg.kind {
             if !self.env.contains_key(name)
@@ -6218,22 +6260,43 @@ impl Pinner<'_> {
             {
                 if let Some(sig) = self.decls.sigs.get(name).map(|s| s.sig.clone()) {
                     self.resolve(&arg.name_span, function_target(name));
-                    for effect in &sig.effects {
-                        if !self.effects.contains(effect) {
-                            return reject(
-                                undeclared_effect_message(display(name), effect, &self.effects),
-                                &arg.span,
-                            );
+                    // Handed to a callee that is specialized for it, the function performs its
+                    // effects where the call is, so the caller declares them; handed to a slot
+                    // whose type says it may perform them, it need not.
+                    let allowed = match self.table.shallow(expected) {
+                        It::Fn(_, _, allowed) => allowed,
+                        _ => Vec::new(),
+                    };
+                    // A stored function keeps its effects in its type, and the slot's type
+                    // accepts them or not; one handed to a callee has them accounted for here.
+                    let mut accounted = Vec::new();
+                    if !stored {
+                        for effect in &sig.effects {
+                            if !allowed.contains(effect) {
+                                self.require_effect(display(name), effect, &arg.span)?;
+                            }
+                            accounted.push(effect.clone());
                         }
                     }
                     let (ptys, ret, _) = self.instantiate(name, &sig, &arg.span)?;
-                    let ty = It::Fn(ptys, Box::new(ret), Vec::new());
+                    let kept = if stored { &sig.effects } else { &accounted };
+                    let ty = It::Fn(
+                        ptys,
+                        Box::new(ret),
+                        sorted_effects(
+                            &kept
+                                .iter()
+                                .filter(|e| stored || allowed.contains(e))
+                                .cloned()
+                                .collect::<Vec<_>>(),
+                        ),
+                    );
                     return Ok(self.node(TExprKind::Ident(name.clone()), ty, arg));
                 }
             }
         }
         if let ExprKind::Lambda(params, body) = &arg.kind {
-            let It::Fn(ptys, ret, _) = self.table.shallow(expected) else {
+            let It::Fn(ptys, ret, effects) = self.table.shallow(expected) else {
                 return reject("a closure where no function is expected", &arg.span);
             };
             if ptys.len() != params.len() {
@@ -6295,11 +6358,19 @@ impl Pinner<'_> {
             }
             let body = body?;
             self.coerce_expr(&body, &ret, &body.span, Site::Lambda)?;
-            let ty = It::Fn(ptys, ret, Vec::new());
+            let ty = It::Fn(ptys, ret, effects);
             return Ok(self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg));
         }
         self.expr(arg)
     }
+}
+
+/// The effects of a function type: sorted, each once.
+fn sorted_effects(effects: &[String]) -> Vec<String> {
+    let mut sorted = effects.to_vec();
+    sorted.sort();
+    sorted.dedup();
+    sorted
 }
 
 fn form_name(k: &ExprKind) -> String {

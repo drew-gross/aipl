@@ -353,6 +353,7 @@ impl Mono<'_> {
         body: &Typed,
         captures: &[(String, ConcreteType)],
         return_ty: Type,
+        effects: Vec<String>,
     ) -> String {
         let name = self.synth_name("lambda");
         let mut lifted: Vec<Param> = params
@@ -384,7 +385,7 @@ impl Mono<'_> {
             name.clone(),
             ConcreteTemplate {
                 params: lifted,
-                effects: Vec::new(),
+                effects,
                 return_ty: Some(return_ty),
                 typed: Some(body.clone()),
             },
@@ -401,7 +402,7 @@ impl Mono<'_> {
             TExprKind::Lambda(params, body) => {
                 let captures = self.typed_lambda_captures(&params, &body);
                 let ret = body.ty.clone();
-                let name = self.lift_lambda(&params, &body, &captures, ret.to_type());
+                let name = self.lift_lambda(&params, &body, &captures, ret.to_type(), Vec::new());
                 Lifted {
                     name,
                     ret,

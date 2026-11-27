@@ -1,0 +1,78 @@
+# What a function type says about effects is held to: calling a value needs the effects declared, a
+# slot that performs none takes no function that does, and a function with fewer effects is the one
+# that fits.
+
+import { print } from builtins;
+
+struct Pure { run: (i64) -> i64 }
+
+struct Logger { run: (i64) !prints -> i64 }
+
+fn shout(x: i64) !prints -> i64 {
+    print("shout");
+    x
+}
+
+fn apply_logged(f: (i64) !prints -> i64, x: i64) !prints -> i64 { f(x) }
+
+# The caller of a function value that performs an effect declares it.
+fn undeclared_call(f: (i64) !prints -> i64, x: i64) -> i64 { f(x) }
+
+fn undeclared_field(l: Logger, x: i64) -> i64 { l.run(x) }
+
+# A lambda that performs an effect where the type allows none.
+fn pure_slot_lambda() -> Pure {
+    run: |x| {
+        print("hi");
+        x
+    },
+}
+
+# A function that performs an effect where the type allows none.
+fn pure_slot_name() -> Pure { run: shout }
+
+# A function type with an effect where one without is expected.
+fn wider_than_slot(Logger { run as r }) -> Pure { run: r }
+
+# The other way round fits, and handing one to `apply_logged` from a function that declares it is fine.
+fn narrower_than_slot() -> Logger { run: |x| { x } }
+
+fn declared(x: i64) !prints -> i64 { apply_logged(shout, x) }
+
+fn undeclared_caller(x: i64) -> i64 { apply_logged(shout, x) }
+--- check --compile ---
+error: fn "f" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/effects/err_function_value_effects.aipl:19:62
+   |
+19 | fn undeclared_call(f: (i64) !prints -> i64, x: i64) -> i64 { f(x) }
+   |                                                              ^^^^
+
+error: fn "run" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/effects/err_function_value_effects.aipl:21:49
+   |
+21 | fn undeclared_field(l: Logger, x: i64) -> i64 { l.run(x) }
+   |                                                 ^^^^^^^^
+
+error: fn "print" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/effects/err_function_value_effects.aipl:26:9
+   |
+26 |         print("hi");
+   |         ^^^^^^^^^^^
+
+error: struct "Pure" field "run": expected (i64) -> i64, got (i64) !prints -> i64
+  --> ./tests/cases/effects/err_function_value_effects.aipl:32:36
+   |
+32 | fn pure_slot_name() -> Pure { run: shout }
+   |                                    ^^^^^
+
+error: struct "Pure" field "run": expected (i64) -> i64, got (i64) !prints -> i64
+  --> ./tests/cases/effects/err_function_value_effects.aipl:35:56
+   |
+35 | fn wider_than_slot(Logger { run as r }) -> Pure { run: r }
+   |                                                        ^
+
+error: fn "apply_logged" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/effects/err_function_value_effects.aipl:42:39
+   |
+42 | fn undeclared_caller(x: i64) -> i64 { apply_logged(shout, x) }
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^
