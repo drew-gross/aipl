@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">229 files, 2276 items.</p>
+      <p class="summary">229 files, 2285 items.</p>
 
       <ul class="files">
 
@@ -520,7 +520,7 @@
           <p class="file-summary"><code>aipl_syntax::ast::Expr</code> and <code>ExprKind</code> as AIPL declares them, with the structural dump the lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">12 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">13 private</a></span>
 
 
           <ul class="items">
@@ -537,6 +537,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-expr.html#item-LambdaParam"><code>LambdaParam</code></a>
+              <span class="kind kind-struct">struct</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-expr.html#item-Capture"><code>Capture</code></a>
               <span class="kind kind-struct">struct</span>
             </li>
 
@@ -1057,7 +1062,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">205 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">208 private</a></span>
 
 
           <ul class="items">
@@ -2307,7 +2312,7 @@
           <p class="file-summary">The source text of an expression, written from its tree: what a lint's advice quotes when it says &quot;write <code>xs.is_empty()</code>&quot; about code it read as <code>len(xs) == 0</code>.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-expr_text.html#private">25 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lint-expr_text.html#private">26 private</a></span>
 
 
           <ul class="items">
@@ -4460,7 +4465,7 @@
           <p class="file-summary">The formatter's token-stream walker. It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">173 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">175 private</a></span>
 
 
           <ul class="items">

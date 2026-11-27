@@ -392,7 +392,7 @@ fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
                 K::Call(Callee::User(name.clone()), args, false),
                 e.span.clone(),
             );
-            rw(K::Lambda(params, Box::new(body)))
+            rw(K::Lambda(params, Box::new(body), Vec::new()))
         }
         K::Num(_) | K::Float(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit => {
             e.clone()
@@ -504,7 +504,15 @@ fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
         )),
         K::TypeArgs(x, tys) => rw(K::TypeArgs(Box::new(lcr_expr(x, lcr, scope)), tys.clone())),
         K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
-        K::Lambda(params, body) => {
+        K::Lambda(params, body, captures) => {
+            let captures = captures
+                .iter()
+                .map(|c| aipl_syntax::ast::Capture {
+                    name: c.name.clone(),
+                    init: c.init.as_ref().map(|i| lcr_expr(i, lcr, scope)),
+                    span: c.span.clone(),
+                })
+                .collect();
             for p in params {
                 scope.push(p.name.clone());
             }
@@ -512,7 +520,7 @@ fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
             for _ in params {
                 scope.pop();
             }
-            rw(K::Lambda(params.clone(), Box::new(body)))
+            rw(K::Lambda(params.clone(), Box::new(body), captures))
         }
         K::Match(scrutinee, arms) => {
             let scrutinee = lcr_expr(scrutinee, lcr, scope);
@@ -732,7 +740,7 @@ fn ty_has_refinement(t: &Type) -> bool {
             ty_has_refinement(i)
         }
         Type::Dict(a, b) | Type::Result(a, b) => ty_has_refinement(a) || ty_has_refinement(b),
-        Type::Fn(ps, r, _) => ps.iter().any(ty_has_refinement) || ty_has_refinement(r),
+        Type::Fn(ps, r, _, _) => ps.iter().any(ty_has_refinement) || ty_has_refinement(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_refinement),
         _ => false,
     }
@@ -748,7 +756,7 @@ fn ty_has_var(t: &Type) -> bool {
         | Type::Without(i, _) => ty_has_var(i),
         Type::Dict(a, b) | Type::Result(a, b) => ty_has_var(a) || ty_has_var(b),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_var),
-        Type::Fn(ps, r, _) => ps.iter().any(ty_has_var) || ty_has_var(r),
+        Type::Fn(ps, r, _, _) => ps.iter().any(ty_has_var) || ty_has_var(r),
         Type::Primitive(_)
         | Type::Named(_)
         | Type::Unit
@@ -780,10 +788,11 @@ fn instance_named(t: &Type) -> Type {
         Type::Without(i, x) => Type::Without(go(i), x.clone()),
         Type::Dict(k, v) => Type::Dict(go(k), go(v)),
         Type::Result(a, b) => Type::Result(go(a), go(b)),
-        Type::Fn(ps, r, effects) => Type::Fn(
+        Type::Fn(ps, r, effects, mutating) => Type::Fn(
             ps.iter().map(instance_named).collect(),
             go(r),
             effects.clone(),
+            *mutating,
         ),
         Type::Tuple(es) => Type::Tuple(es.iter().map(instance_named).collect()),
         other => other.clone(),
@@ -858,10 +867,11 @@ fn lt_ty(
             Box::new(lt_ty(ok, fields_map, order)),
             Box::new(lt_ty(err, fields_map, order)),
         ),
-        Type::Fn(params, ret, effects) => Type::Fn(
+        Type::Fn(params, ret, effects, mutating) => Type::Fn(
             params.iter().map(|p| lt_ty(p, fields_map, order)).collect(),
             Box::new(lt_ty(ret, fields_map, order)),
             effects.clone(),
+            *mutating,
         ),
         Type::Named(_) | Type::Primitive(_) | Type::Unit | Type::Any | Type::ConcatStr => t.clone(),
         // `lower_generics` resolves every *concrete* generic application to a
@@ -890,7 +900,15 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             bindings.clone(),
             Box::new(lt_expr(body, fm, ord)),
         ),
-        ExprKind::Lambda(params, body) => {
+        ExprKind::Lambda(params, body, captures) => {
+            let captures = captures
+                .iter()
+                .map(|c| aipl_syntax::ast::Capture {
+                    name: c.name.clone(),
+                    init: c.init.as_ref().map(|i| lt_expr(i, fm, ord)),
+                    span: c.span.clone(),
+                })
+                .collect();
             let new_params: Vec<LambdaParam> = params
                 .iter()
                 .map(|p| LambdaParam {
@@ -898,7 +916,7 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
                     ..p.clone()
                 })
                 .collect();
-            ExprKind::Lambda(new_params, Box::new(lt_expr(body, fm, ord)))
+            ExprKind::Lambda(new_params, Box::new(lt_expr(body, fm, ord)), captures)
         }
         ExprKind::Num(_)
         | ExprKind::Float(_)
@@ -1097,12 +1115,13 @@ impl GenericLowerer {
             Type::Result(ok, err) => {
                 Type::Result(Box::new(self.lower_ty(ok)?), Box::new(self.lower_ty(err)?))
             }
-            Type::Fn(ps, r, effects) => Type::Fn(
+            Type::Fn(ps, r, effects, mutating) => Type::Fn(
                 ps.iter()
                     .map(|p| self.lower_ty(p))
                     .collect::<Result<_, _>>()?,
                 Box::new(self.lower_ty(r)?),
                 effects.clone(),
+                *mutating,
             ),
             Type::Tuple(es) => Type::Tuple(
                 es.iter()
@@ -1187,7 +1206,21 @@ impl GenericLowerer {
             K::Shim(effect, bindings, body) => {
                 K::Shim(effect.clone(), bindings.clone(), b(self, body)?)
             }
-            K::Lambda(params, body) => {
+            K::Lambda(params, body, captures) => {
+                let captures = captures
+                    .iter()
+                    .map(|c| {
+                        Ok(aipl_syntax::ast::Capture {
+                            name: c.name.clone(),
+                            init: c
+                                .init
+                                .as_ref()
+                                .map(|i| b(self, i).map(|x| *x))
+                                .transpose()?,
+                            span: c.span.clone(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 let params = params
                     .iter()
                     .map(|p| {
@@ -1197,7 +1230,7 @@ impl GenericLowerer {
                         })
                     })
                     .collect::<Result<_, Error>>()?;
-                K::Lambda(params, b(self, body)?)
+                K::Lambda(params, b(self, body)?, captures)
             }
             K::Num(_)
             | K::Float(_)
@@ -1688,7 +1721,7 @@ pub fn monomorphize(
                 !f.sig
                     .params
                     .iter()
-                    .any(|p| matches!(p.ty, Type::Fn(_, _, _)))
+                    .any(|p| matches!(p.ty, Type::Fn(_, _, _, _)))
             })
             .map(|f| f.name.text.clone()),
     );
@@ -3154,7 +3187,7 @@ impl Mono<'_> {
                 self.bind_field(po, ao, vars, map);
                 self.bind_field(pe, ae, vars, map);
             }
-            (Type::Fn(ps, pr, _), Type::Fn(as_, ar, _)) => {
+            (Type::Fn(ps, pr, _, _), Type::Fn(as_, ar, _, _)) => {
                 for (p, a) in ps.iter().zip(as_) {
                     self.bind_field(p, a, vars, map);
                 }
@@ -3241,7 +3274,7 @@ impl Mono<'_> {
             .iter()
             .find(|(n, _, _)| n == field)
             .and_then(|(_, ft, _)| match ft {
-                Type::Fn(_, ret, _) => Some((**ret).clone()),
+                Type::Fn(_, ret, _, _) => Some((**ret).clone()),
                 _ => None,
             })
     }
@@ -3453,7 +3486,7 @@ fn bind(
     // optional, a struct, or a variant (a generic function can abstract over a
     // generic struct/variant `K`, higher-order-generics style). Only `()` and a
     // function type are rejected.
-    if matches!(ty, Type::Unit | Type::Fn(_, _, _)) {
+    if matches!(ty, Type::Unit | Type::Fn(_, _, _, _)) {
         return Err(Error::at(
             format!(
                 "\"{}\" in \"{gname}\" resolved to {}, which is not a valid type argument",
@@ -3999,13 +4032,13 @@ fn normalize_param_ty(
             Box::new(normalize_inner(ok, type_vars, counter)),
             Box::new(normalize_inner(err, type_vars, counter)),
         )),
-        Type::Fn(params, ret, effects) => {
+        Type::Fn(params, ret, effects, mutating) => {
             let ps = params
                 .iter()
                 .map(|p| normalize_param_ty(p, type_vars, counter, fname))
                 .collect::<Result<Vec<_>, _>>()?;
             let r = normalize_param_ty(ret, type_vars, counter, fname)?;
-            Ok(Type::Fn(ps, Box::new(r), effects.clone()))
+            Ok(Type::Fn(ps, Box::new(r), effects.clone(), *mutating))
         }
         Type::Tuple(elems) => {
             let es = elems
@@ -4061,13 +4094,14 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             Box::new(normalize_inner(ok, type_vars, counter)),
             Box::new(normalize_inner(err, type_vars, counter)),
         ),
-        Type::Fn(params, ret, effects) => Type::Fn(
+        Type::Fn(params, ret, effects, mutating) => Type::Fn(
             params
                 .iter()
                 .map(|p| normalize_inner(p, type_vars, counter))
                 .collect(),
             Box::new(normalize_inner(ret, type_vars, counter)),
             effects.clone(),
+            *mutating,
         ),
         Type::Tuple(elems) => Type::Tuple(
             elems
@@ -4109,10 +4143,11 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
             Box::new(subst_vars(ok, map)),
             Box::new(subst_vars(err, map)),
         ),
-        Type::Fn(params, ret, effects) => Type::Fn(
+        Type::Fn(params, ret, effects, mutating) => Type::Fn(
             params.iter().map(|p| subst_vars(p, map)).collect(),
             Box::new(subst_vars(ret, map)),
             effects.clone(),
+            *mutating,
         ),
         Type::Tuple(elems) => Type::Tuple(elems.iter().map(|e| subst_vars(e, map)).collect()),
         Type::Generic(name, args) => Type::Generic(
@@ -4140,7 +4175,9 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         | Type::Without(inner, _) => ty_mentions(inner, name),
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
         Type::Result(ok, err) => ty_mentions(ok, name) || ty_mentions(err, name),
-        Type::Fn(ps, ret, _) => ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name),
+        Type::Fn(ps, ret, _, _) => {
+            ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name)
+        }
         Type::Tuple(elems) => elems.iter().any(|e| ty_mentions(e, name)),
         Type::Generic(n, args) => n == name || args.iter().any(|a| ty_mentions(a, name)),
     }
@@ -4161,7 +4198,7 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         | Type::Without(inner, _) => ty_contains_var(inner, vars),
         Type::Dict(k, v) => ty_contains_var(k, vars) || ty_contains_var(v, vars),
         Type::Result(ok, err) => ty_contains_var(ok, vars) || ty_contains_var(err, vars),
-        Type::Fn(ps, ret, _) => {
+        Type::Fn(ps, ret, _, _) => {
             ps.iter().any(|p| ty_contains_var(p, vars)) || ty_contains_var(ret, vars)
         }
         Type::Tuple(elems) => elems.iter().any(|e| ty_contains_var(e, vars)),
@@ -4331,7 +4368,7 @@ fn collect_free(
             collect_free(cond, bound, env, out, seen);
             collect_free(b, bound, env, out, seen);
         }
-        ExprKind::Lambda(ps, b) => {
+        ExprKind::Lambda(ps, b, _) => {
             let added: Vec<String> = ps
                 .iter()
                 .filter_map(|p| bound.insert(p.name.clone()).then(|| p.name.clone()))
@@ -4471,7 +4508,7 @@ pub(crate) fn count_uses<'a>(
                 bound.remove(v.as_str());
             }
         }
-        ExprKind::Lambda(ps, b) => {
+        ExprKind::Lambda(ps, b, _) => {
             let added: Vec<&str> = ps
                 .iter()
                 .filter(|p| bound.insert(&p.name))
@@ -4637,7 +4674,7 @@ fn mentions_abstract_type(ty: &Type) -> bool {
         Type::Dict(k, v) | Type::Result(k, v) => {
             mentions_abstract_type(k) || mentions_abstract_type(v)
         }
-        Type::Fn(ps, r, _) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
+        Type::Fn(ps, r, _, _) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
         Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_abstract_type),
         // A type the checker could not pin down is abstract in exactly the sense
         // this asks about: only monomorphization settles it, so a body carrying
@@ -4704,7 +4741,7 @@ pub fn inline_small_post_mono(
                 && is_inline_shape_typed(
                     f.params
                         .iter()
-                        .any(|p| matches!(p.ty, ConcreteType::Fn(_, _, _))),
+                        .any(|p| matches!(p.ty, ConcreteType::Fn(_, _, _, _))),
                     &f.body,
                 )
                 // Not recursive: every copy would carry the call back to `f`, so
@@ -4895,7 +4932,7 @@ fn has_inline_shape_mono(f: &ConcreteFn) -> bool {
     is_inline_shape_typed(
         f.params
             .iter()
-            .any(|p| matches!(p.ty, ConcreteType::Fn(_, _, _))),
+            .any(|p| matches!(p.ty, ConcreteType::Fn(_, _, _, _))),
         &f.body,
     )
 }
@@ -4951,7 +4988,7 @@ fn has_placeholder(t: &Type) -> bool {
         Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => has_placeholder(i),
         Type::Dict(k, v) => has_placeholder(k) || has_placeholder(v),
         Type::Result(a, b) => has_placeholder(a) || has_placeholder(b),
-        Type::Fn(ps, r, _) => ps.iter().any(has_placeholder) || has_placeholder(r),
+        Type::Fn(ps, r, _, _) => ps.iter().any(has_placeholder) || has_placeholder(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(has_placeholder),
         _ => false,
     }
@@ -5283,6 +5320,6 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         ExprKind::Construct(_, inits) => inits.iter().map(|i| c(&i.value)).sum(),
         ExprKind::Match(s, arms) => c(s) + arms.iter().map(|a| c(&a.body)).sum::<usize>(),
         ExprKind::IfLet(arm, s, else_b) => c(s) + c(&arm.body) + c(else_b),
-        ExprKind::Lambda(_, body) => c(body),
+        ExprKind::Lambda(_, body, _) => c(body),
     }
 }

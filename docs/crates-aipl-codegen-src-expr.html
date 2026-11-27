@@ -64,6 +64,20 @@
 
 
 
+        <section class="item" id="item-Capture">
+          <h3>
+            <a class="anchor" href="#item-Capture">Capture</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Capture</code></pre>
+
+          <div class="doc"><p>One entry of the capture list in front of a lambda, <code>[mut total, mut n = 0] |x| ..</code>: a variable the closure mutates. Without an initializer it names a variable of the enclosing function, which the closure takes over; with one it is state the closure starts with and owns.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-synthesized_name">
           <h3>
             <a class="anchor" href="#item-synthesized_name">synthesized_name</a>
@@ -83,7 +97,7 @@
             <a class="anchor" href="#item-name_at">name_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5569: Span) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5902: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
 
@@ -369,7 +383,9 @@
 
             </li>
 
-            <li id="item-Lambda"><code>Lambda(LambdaParam[], Expr)</code>
+            <li id="item-Lambda"><code>Lambda(LambdaParam[], Expr, captures: Capture[] = [])</code>
+
+              <div class="doc"><p><code>captures</code> is last so an artifact built before it decodes a lambda as the plain one it was.</p></div>
 
 
             </li>
@@ -882,6 +898,20 @@
           <pre class="signature"><code>fn show_ann(self: Ty?) -&#62; str</code></pre>
 
           <div class="doc"><p><code>: T</code> when a binding or a lambda parameter was annotated, and nothing when it was not — so the dump reads like the source did.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_captures">
+          <h3>
+            <a class="anchor" href="#item-show_captures">show_captures</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_captures(self: Capture[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The capture list of a lambda in a dump: nothing when there is none, else <code>, [mut a, mut b = 0]</code>.</p></div>
 
 
         </section>

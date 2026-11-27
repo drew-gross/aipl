@@ -73,7 +73,7 @@ impl Conversion {
     }
 
     fn signature_of(&self, ty: &ConcreteType) -> Option<usize> {
-        let ConcreteType::Fn(params, ret, _) = ty else {
+        let ConcreteType::Fn(params, ret, _, _) = ty else {
             return None;
         };
         self.signatures
@@ -85,12 +85,13 @@ impl Conversion {
     fn map_type(&self, ty: &ConcreteType) -> ConcreteType {
         let map = |t: &ConcreteType| Box::new(self.map_type(t));
         match ty {
-            ConcreteType::Fn(params, ret, effects) => match self.signature_of(ty) {
+            ConcreteType::Fn(params, ret, effects, mutating) => match self.signature_of(ty) {
                 Some(i) => ConcreteType::Named(self.signatures[i].variant.clone()),
                 None => ConcreteType::Fn(
                     params.iter().map(|p| self.map_type(p)).collect(),
                     map(ret),
                     effects.clone(),
+                    *mutating,
                 ),
             },
             ConcreteType::Optional(t) => ConcreteType::Optional(map(t)),
@@ -178,6 +179,7 @@ impl Conversion {
                     args.iter().map(|a| a.ty.clone()).collect(),
                     Box::new(e.ty.clone()),
                     Vec::new(),
+                    false,
                 );
                 self.signature_of(&probe)
             }
@@ -361,7 +363,7 @@ fn find_makers(e: &Typed, signatures: &mut Vec<Signature>) {
     } = &e.kind
     {
         if name.starts_with(MAKE_PREFIX) {
-            if let ConcreteType::Fn(params, ret, _) = &e.ty {
+            if let ConcreteType::Fn(params, ret, _, _) = &e.ty {
                 if !signatures
                     .iter()
                     .any(|s| s.params == *params && s.ret == **ret)

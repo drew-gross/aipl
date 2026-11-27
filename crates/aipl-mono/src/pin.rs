@@ -51,7 +51,7 @@ enum It {
     Set(Box<It>, Ord),
     Dict(Box<It>, Box<It>),
     Res(Box<It>, Box<It>),
-    Fn(Vec<It>, Box<It>, Vec<String>),
+    Fn(Vec<It>, Box<It>, Vec<String>, bool),
     /// A generic struct or variant applied to arguments (`Box<T>`).
     Gen(String, Vec<It>),
     /// A refinement (`T[] without []`). Invisible to every rule but the ones about refinements:
@@ -297,7 +297,7 @@ impl Table {
             It::Dict(a, b) | It::Res(a, b) => self.occurs(v, &a) || self.occurs(v, &b),
             It::Gen(_, args) => args.iter().any(|a| self.occurs(v, a)),
             It::Without(t, _) => self.occurs(v, &t),
-            It::Fn(ps, r, _) => ps.iter().any(|p| self.occurs(v, p)) || self.occurs(v, &r),
+            It::Fn(ps, r, _, _) => ps.iter().any(|p| self.occurs(v, p)) || self.occurs(v, &r),
         }
     }
 
@@ -387,7 +387,7 @@ impl Table {
                 self.unify(k1, k2)?;
                 self.unify(v1, v2)
             }
-            (It::Fn(p1, r1, e1), It::Fn(p2, r2, e2)) if p1.len() == p2.len() && e1 == e2 => {
+            (It::Fn(p1, r1, e1, _), It::Fn(p2, r2, e2, _)) if p1.len() == p2.len() && e1 == e2 => {
                 for (x, y) in p1.iter().zip(p2) {
                     self.unify(x, y)?;
                 }
@@ -433,10 +433,11 @@ impl Table {
             }
             It::Dict(k, v) => Ty::Dict(boxed(&k), boxed(&v)),
             It::Res(a, b) => Ty::Result(boxed(&a), boxed(&b)),
-            It::Fn(ps, r, effects) => Ty::Fn(
+            It::Fn(ps, r, effects, mutating) => Ty::Fn(
                 ps.iter().map(|p| self.resolve(p)).collect(),
                 boxed(&r),
                 effects,
+                mutating,
             ),
             It::Var(v) => match self.slots[v].kind {
                 Kind::Float => Ty::Primitive(Primitive::F64),
@@ -1049,7 +1050,12 @@ fn peel(t: &Type) -> Type {
         Type::Set(t, o) => Type::Set(b(t), *o),
         Type::Dict(k, v) => Type::Dict(b(k), b(v)),
         Type::Result(a, c) => Type::Result(b(a), b(c)),
-        Type::Fn(ps, r, effects) => Type::Fn(ps.iter().map(peel).collect(), b(r), effects.clone()),
+        Type::Fn(ps, r, effects, mutating) => Type::Fn(
+            ps.iter().map(peel).collect(),
+            b(r),
+            effects.clone(),
+            *mutating,
+        ),
         other => other.clone(),
     }
 }
@@ -1362,11 +1368,11 @@ fn typed_returned_lambdas_in_returns(e: &mut Expr, returned: &Type) {
 }
 
 fn typed_result_lambdas(e: &mut Expr, returned: &Type) {
-    let Type::Fn(params, ret, _) = returned else {
+    let Type::Fn(params, ret, _, _) = returned else {
         return;
     };
     match &mut e.kind {
-        ExprKind::Lambda(lambda_params, body) if lambda_params.len() == params.len() => {
+        ExprKind::Lambda(lambda_params, body, _) if lambda_params.len() == params.len() => {
             for (p, ty) in lambda_params.iter_mut().zip(params) {
                 p.ty.get_or_insert_with(|| ty.clone());
             }
@@ -1721,10 +1727,11 @@ impl Pinner<'_> {
             }
             Type::Dict(k, v) => It::Dict(Box::new(go(self, k)?), Box::new(go(self, v)?)),
             Type::Result(a, b) => It::Res(Box::new(go(self, a)?), Box::new(go(self, b)?)),
-            Type::Fn(ps, r, effects) => It::Fn(
+            Type::Fn(ps, r, effects, mutating) => It::Fn(
                 ps.iter().map(|p| go(self, p)).collect::<Res<Vec<_>>>()?,
                 Box::new(go(self, r)?),
                 effects.clone(),
+                *mutating,
             ),
             Type::Without(t, x) => {
                 use aipl_syntax::ast::Exclusion;
@@ -1847,7 +1854,7 @@ impl Pinner<'_> {
                 self.mentions_refinement(&a) || self.mentions_refinement(&b)
             }
             It::Gen(_, args) => args.iter().any(|a| self.mentions_refinement(a)),
-            It::Fn(ps, r, _) => {
+            It::Fn(ps, r, _, _) => {
                 ps.iter().any(|p| self.mentions_refinement(p)) || self.mentions_refinement(&r)
             }
             _ => false,
@@ -2326,7 +2333,7 @@ impl Pinner<'_> {
             }
             // A constructor named as a value stands for its case: a function building `V`, or (for a
             // case without a payload) a `V`.
-            (It::Fn(_, ret, _), It::Case(v)) | (It::Case(v), It::Fn(_, ret, _)) => {
+            (It::Fn(_, ret, _, _), It::Case(v)) | (It::Case(v), It::Fn(_, ret, _, _)) => {
                 let (ret, v) = (self.table.shallow(ret), self.table.shallow(v));
                 self.agree(&ret, &v)
             }
@@ -2364,7 +2371,7 @@ impl Pinner<'_> {
                 self.agree(k1, k2)?;
                 self.agree(v1, v2)
             }
-            (It::Fn(p1, r1, given), It::Fn(p2, r2, wanted)) if p1.len() == p2.len() => {
+            (It::Fn(p1, r1, given, _), It::Fn(p2, r2, wanted, _)) if p1.len() == p2.len() => {
                 // A function performing fewer effects is accepted where one performing more is
                 // expected, never the other way.
                 if let Some(extra) = given.iter().find(|e| !wanted.contains(e)) {
@@ -3316,7 +3323,8 @@ impl Pinner<'_> {
                 self.node(K::Match(Box::new(scrut), out), ty, e)
             }
             // A closure with nothing to take its parameter types from has to write them.
-            ExprKind::Lambda(params, body) if params.iter().all(|p| p.ty.is_some()) => {
+            ExprKind::Lambda(params, body, captures) if params.iter().all(|p| p.ty.is_some()) => {
+                self.reject_captures_for_now(captures, &e.span)?;
                 let mut ptys = Vec::new();
                 let mut scope = Vec::new();
                 let mut typed = Vec::new();
@@ -3347,10 +3355,12 @@ impl Pinner<'_> {
                     ptys,
                     Box::new(body.ty.clone()),
                     sorted_effects(&performed.unwrap_or_default()),
+                    false,
                 );
                 self.node(K::Lambda(typed, Box::new(body)), ty, e)
             }
-            ExprKind::Lambda(params, _) => {
+            ExprKind::Lambda(params, _, captures) => {
+                self.reject_captures_for_now(captures, &e.span)?;
                 let untyped = params.iter().find(|p| p.ty.is_none());
                 let (name, span) = untyped.map_or(("x", &e.span), |p| (p.name.as_str(), &p.span));
                 return reject(
@@ -3400,6 +3410,24 @@ impl Pinner<'_> {
         }
     }
 
+    /// A closure that mutates what it captures is written but not yet typed.
+    fn reject_captures_for_now(
+        &self,
+        captures: &[aipl_syntax::ast::Capture],
+        span: &Span,
+    ) -> Res<()> {
+        match captures.first() {
+            Some(capture) => reject(
+                format!(
+                    "a closure that mutates what it captures (`[mut {}]`) is not supported yet",
+                    capture.name
+                ),
+                span,
+            ),
+            None => Ok(()),
+        }
+    }
+
     /// A function value keeps a copy of what its body reads of the function it was written in, taken
     /// when it is made, so a `mut` binding it names would be read as it was then and not as it is
     /// later: refused until a mutable capture has a meaning.
@@ -3439,7 +3467,7 @@ impl Pinner<'_> {
     /// An argument that is stored as a value (a field, a binding, an assigned place), where a
     /// closure is a function value: it performs no effect.
     fn value_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
-        let ExprKind::Lambda(params, body) = &arg.kind else {
+        let ExprKind::Lambda(params, body, _) = &arg.kind else {
             return self.arg(arg, expected);
         };
         self.reject_mutable_captures(params, body, &arg.span)?;
@@ -3682,7 +3710,7 @@ impl Pinner<'_> {
             let (ptys, ret, _) = self.instantiate(name, &sig, &e.span)?;
             return Ok(self.node(
                 TExprKind::Ident(name.to_string()),
-                It::Fn(ptys, Box::new(ret), sorted_effects(&sig.effects)),
+                It::Fn(ptys, Box::new(ret), sorted_effects(&sig.effects), false),
                 e,
             ));
         }
@@ -3971,12 +3999,13 @@ impl Pinner<'_> {
             It::Opt(t) => Type::Optional(boxed(&t)),
             It::Arr(t) => Type::Array(boxed(&t)),
             It::Case(t) => Type::Case(boxed(&t)),
-            It::Fn(ps, r, effects) => Type::Fn(
+            It::Fn(ps, r, effects, mutating) => Type::Fn(
                 ps.iter()
                     .map(|p| self.refined(p, unconstrained_as_unknown))
                     .collect(),
                 boxed(&r),
                 effects,
+                mutating,
             ),
             It::Res(a, b) => Type::Result(boxed(&a), boxed(&b)),
             It::Dict(k, v) => Type::Dict(boxed(&k), boxed(&v)),
@@ -4295,7 +4324,7 @@ impl Pinner<'_> {
         if !aipl_syntax::is_shim_closure_name(name) {
             return Ok(None);
         }
-        let ExprKind::Lambda(params, body) = &value.kind else {
+        let ExprKind::Lambda(params, body, _) = &value.kind else {
             return Ok(None);
         };
         let Some((_, shim)) = aipl_syntax::shim_closure_chain(e) else {
@@ -4393,7 +4422,7 @@ impl Pinner<'_> {
                 );
             }
         }
-        Ok(Some(It::Fn(ptys, Box::new(ret), Vec::new())))
+        Ok(Some(It::Fn(ptys, Box::new(ret), Vec::new(), false)))
     }
 
     /// The rules for a `shim`: a shimmable effect, every operation bound once, each bound function
@@ -5241,7 +5270,7 @@ impl Pinner<'_> {
             if let Some(binder) = binder {
                 self.resolve(&e.name_span, Target::Local(binder));
             }
-            let It::Fn(ptys, ret, effects) = self.table.shallow(&ty) else {
+            let It::Fn(ptys, ret, effects, _) = self.table.shallow(&ty) else {
                 return reject(format!("{name:?} is not a function"), &e.span);
             };
             for effect in &effects {
@@ -5732,7 +5761,7 @@ impl Pinner<'_> {
                 if let It::Named(_) | It::Gen(..) = self.table.shallow(&recv.ty) {
                     let owner = self.table.shallow(&recv.ty);
                     if let Ok(field) = self.field_type(&owner, name, &e.span) {
-                        if let It::Fn(ptys, ret, effects) = self.table.shallow(&field) {
+                        if let It::Fn(ptys, ret, effects, _) = self.table.shallow(&field) {
                             for effect in &effects {
                                 self.require_effect(display(name), effect, &e.span, true)?;
                             }
@@ -6046,7 +6075,8 @@ impl Pinner<'_> {
     /// (`[]` for `none`), so the body only ever calls one that returns the sequence.
     fn returns_many_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
         use aipl_syntax::ast::{LambdaParam, MatchArm, Pattern};
-        let (It::Fn(params, sequence, _), span) = (self.table.shallow(expected), arg.span.clone())
+        let (It::Fn(params, sequence, _, _), span) =
+            (self.table.shallow(expected), arg.span.clone())
         else {
             return self.arg(arg, expected);
         };
@@ -6055,7 +6085,7 @@ impl Pinner<'_> {
         };
         // The function as written, its result left for it to say.
         let result = self.fresh();
-        let loose = It::Fn(params.clone(), Box::new(result.clone()), Vec::new());
+        let loose = It::Fn(params.clone(), Box::new(result.clone()), Vec::new(), false);
         let probe = self.arg(arg, &loose)?;
         self.coerce_expr(&probe, &loose, &span, "an argument")?;
         let wrong = |p: &mut Self, given: &It| -> Res<TExpr<It>> {
@@ -6129,7 +6159,7 @@ impl Pinner<'_> {
         };
         let wrapper = match &arg.kind {
             // The lambda, its result and each `return` of its own wrapped.
-            ExprKind::Lambda(lambda_params, body) => {
+            ExprKind::Lambda(lambda_params, body, captures) => {
                 fn wrap_returns(e: &mut Expr, wrap: &dyn Fn(Expr) -> Expr) {
                     if matches!(e.kind, ExprKind::Lambda(..)) {
                         return;
@@ -6150,6 +6180,7 @@ impl Pinner<'_> {
                 at(ExprKind::Lambda(
                     lambda_params.clone(),
                     Box::new(wrap(body)),
+                    captures.clone(),
                 ))
             }
             // `|p0, p1| wrap(f(p0, p1))`.
@@ -6173,6 +6204,7 @@ impl Pinner<'_> {
                         })
                         .collect(),
                     Box::new(wrap(call)),
+                    Vec::new(),
                 ))
             }
             _ => {
@@ -6246,7 +6278,7 @@ impl Pinner<'_> {
         {
             // The variant the constructor builds is the variant the `Case` is a case of.
             let built = match self.table.shallow(&typed.ty) {
-                It::Fn(_, ret, _) => *ret,
+                It::Fn(_, ret, _, _) => *ret,
                 other => other,
             };
             if let It::Case(variant) = self.table.shallow(expected) {
@@ -6272,7 +6304,7 @@ impl Pinner<'_> {
                     // The function keeps its effects in its type, and the type it is handed
                     // for has to accept them.
                     let allowed = match self.table.shallow(expected) {
-                        It::Fn(_, _, allowed) => allowed,
+                        It::Fn(_, _, allowed, _) => allowed,
                         _ => sig.effects.clone(),
                     };
                     if let Some(effect) = sig.effects.iter().find(|e| !allowed.contains(e)) {
@@ -6282,13 +6314,14 @@ impl Pinner<'_> {
                         );
                     }
                     let (ptys, ret, _) = self.instantiate(name, &sig, &arg.span)?;
-                    let ty = It::Fn(ptys, Box::new(ret), sorted_effects(&sig.effects));
+                    let ty = It::Fn(ptys, Box::new(ret), sorted_effects(&sig.effects), false);
                     return Ok(self.node(TExprKind::Ident(name.clone()), ty, arg));
                 }
             }
         }
-        if let ExprKind::Lambda(params, body) = &arg.kind {
-            let It::Fn(ptys, ret, effects) = self.table.shallow(expected) else {
+        if let ExprKind::Lambda(params, body, captures) = &arg.kind {
+            self.reject_captures_for_now(captures, &arg.span)?;
+            let It::Fn(ptys, ret, effects, mutating) = self.table.shallow(expected) else {
                 return reject("a closure where no function is expected", &arg.span);
             };
             if ptys.len() != params.len() {
@@ -6358,7 +6391,7 @@ impl Pinner<'_> {
             }
             let body = body?;
             self.coerce_expr(&body, &ret, &body.span, Site::Lambda)?;
-            let ty = It::Fn(ptys, ret, effects);
+            let ty = It::Fn(ptys, ret, effects, mutating);
             return Ok(self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg));
         }
         self.expr(arg)
@@ -6520,7 +6553,7 @@ fn case_domains(sig: &aipl_syntax::ast::Signature) -> Result<HashMap<String, Str
             Type::Generic(_, args) | Type::Tuple(args) => {
                 args.iter().for_each(|a| walk(a, params, arms, out))
             }
-            Type::Fn(ps, r, _) => {
+            Type::Fn(ps, r, _, _) => {
                 ps.iter().for_each(|p| walk(p, params, arms, out));
                 walk(r, params, arms, out);
             }

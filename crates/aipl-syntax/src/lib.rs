@@ -773,7 +773,7 @@ pub mod ast {
             | Type::Without(inner, _) => ty_mentions_any(inner),
             Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
             Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
-            Type::Fn(params, ret, _) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
+            Type::Fn(params, ret, _, _) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
             Type::Tuple(elems) => elems.iter().any(ty_mentions_any),
             Type::Generic(_, args) => args.iter().any(ty_mentions_any),
         }
@@ -1268,7 +1268,7 @@ pub mod ast {
         /// `(A, B) !e -> R` — the type of a function value: a lambda, or a function
         /// used by name. The strings are the effects a call performs, each once, in
         /// sorted order.
-        Fn(Vec<Type>, Box<Type>, Vec<String>),
+        Fn(Vec<Type>, Box<Type>, Vec<String>, bool),
         /// `(A, B, C)` — a tuple of 2+ types, stored inline like a struct,
         /// addressed by pointer (sret). Lowered to a synthetic named struct
         /// `__tuple$A$B$C` before type-checking, so only the parser and the
@@ -1378,7 +1378,7 @@ pub mod ast {
         Set(Box<ConcreteType>, SetOrder),
         Dict(Box<ConcreteType>, Box<ConcreteType>),
         Result(Box<ConcreteType>, Box<ConcreteType>),
-        Fn(Vec<ConcreteType>, Box<ConcreteType>, Vec<String>),
+        Fn(Vec<ConcreteType>, Box<ConcreteType>, Vec<String>, bool),
         /// `Case<V>` with `V` resolved — see [`Type::Case`]. Holds the variant's
         /// concrete name rather than its type, because the tag is all there is
         /// at runtime and the name is only needed to render a case back
@@ -1420,12 +1420,13 @@ pub mod ast {
                 Type::Result(a, b) => {
                     ConcreteType::Result(Box::new(a.to_concrete()?), Box::new(b.to_concrete()?))
                 }
-                Type::Fn(ps, r, effects) => ConcreteType::Fn(
+                Type::Fn(ps, r, effects, mutating) => ConcreteType::Fn(
                     ps.iter()
                         .map(Type::to_concrete)
                         .collect::<Option<Vec<_>>>()?,
                     Box::new(r.to_concrete()?),
                     effects.clone(),
+                    *mutating,
                 ),
                 // The variant has to have resolved to a name by now; a `Case`
                 // still over a type variable is as abstract as the variable is.
@@ -1455,10 +1456,11 @@ pub mod ast {
                 ConcreteType::Result(a, b) => {
                     Type::Result(Box::new(a.widen()), Box::new(b.widen()))
                 }
-                ConcreteType::Fn(ps, r, effects) => Type::Fn(
+                ConcreteType::Fn(ps, r, effects, mutating) => Type::Fn(
                     ps.iter().map(ConcreteType::widen).collect(),
                     Box::new(r.widen()),
                     effects.clone(),
+                    *mutating,
                 ),
             }
         }
@@ -1938,7 +1940,7 @@ pub mod ast {
         /// lifted to a synthesized function and captured variables passed in).
         /// Parameter types are usually inferred from the receiving function's
         /// signature, so they're optional.
-        Lambda(Vec<LambdaParam>, Box<Expr>),
+        Lambda(Vec<LambdaParam>, Box<Expr>, Vec<Capture>),
         /// `(a, b, c)` — a tuple literal of 2+ values. Lowered to
         /// `Construct(synth_struct_name, ..)` by mono's `infer` after element
         /// types are known; only the parser through the mono pass see this.
@@ -1963,6 +1965,17 @@ pub mod ast {
         /// stamps the call without the wrapper, so every later pass can treat
         /// it as unreachable.
         TypeArgs(Box<Expr>, Vec<Type>),
+    }
+
+    /// One entry of the capture list in front of a lambda, `[mut total, mut n = 0] |x| ..`: a
+    /// variable the closure mutates. Without an initializer it names a variable of the enclosing
+    /// function, which the closure takes over; with one it is state the closure starts with and
+    /// owns.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Capture {
+        pub name: String,
+        pub init: Option<Expr>,
+        pub span: Span,
     }
 
     /// A lambda parameter: a name and an optional type annotation (inferred
@@ -3256,7 +3269,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             collect_operators(&arm.body, out);
             collect_operators(else_b, out);
         }
-        K::Lambda(_, body) => collect_operators(body, out),
+        K::Lambda(_, body, _) => collect_operators(body, out),
         K::TupleLit(elems) => {
             for e in elems {
                 collect_operators(e, out);
@@ -3953,7 +3966,7 @@ pub mod concrete {
             ConcreteType::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), type_name(inner)),
             ConcreteType::Dict(k, v) => format!("#{{{}: {}}}", type_name(k), type_name(v)),
             ConcreteType::Result(ok, err) => format!("{}!{}", type_name(ok), type_name(err)),
-            ConcreteType::Fn(params, ret, effects) => {
+            ConcreteType::Fn(params, ret, effects, _) => {
                 let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
                 format!(
                     "({ps}){} -> {}",
@@ -4057,7 +4070,7 @@ pub fn raw_type_name(t: &Type) -> String {
             suffix_operand(err, raw_type_name)
         ),
         Type::Without(base, x) => format!("{} without {}", raw_type_name(base), x.spelling()),
-        Type::Fn(params, ret, effects) => {
+        Type::Fn(params, ret, effects, _) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!(
                 "({ps}){} -> {}",
@@ -4112,7 +4125,7 @@ pub fn type_name(t: &Type) -> String {
             suffix_operand(err, type_name)
         ),
         Type::Without(base, x) => format!("{} without {}", type_name(base), x.spelling()),
-        Type::Fn(params, ret, effects) => {
+        Type::Fn(params, ret, effects, _) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({ps}){} -> {}", effects_spelling(effects), type_name(ret))
         }
@@ -4500,10 +4513,11 @@ pub fn erase_refinement_ty(t: &Type) -> Type {
             Box::new(erase_refinement_ty(a)),
             Box::new(erase_refinement_ty(b)),
         ),
-        T::Fn(ps, r, effects) => T::Fn(
+        T::Fn(ps, r, effects, mutating) => T::Fn(
             ps.iter().map(erase_refinement_ty).collect(),
             Box::new(erase_refinement_ty(r)),
             effects.clone(),
+            *mutating,
         ),
         T::Tuple(es) => T::Tuple(es.iter().map(erase_refinement_ty).collect()),
         T::Generic(n, args) => {
@@ -4564,10 +4578,11 @@ pub fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
             Box::new(subst_type_params(ok, map)),
             Box::new(subst_type_params(err, map)),
         ),
-        Type::Fn(ps, r, effects) => Type::Fn(
+        Type::Fn(ps, r, effects, mutating) => Type::Fn(
             ps.iter().map(|p| subst_type_params(p, map)).collect(),
             Box::new(subst_type_params(r, map)),
             effects.clone(),
+            *mutating,
         ),
         Type::Tuple(es) => Type::Tuple(es.iter().map(|e| subst_type_params(e, map)).collect()),
         Type::Generic(name, args) => Type::Generic(
@@ -4674,7 +4689,7 @@ fn arm_type_decls(program: &mut ast::Program) -> Vec<ast::RefinementDecl> {
                 qualified_names(a, out);
                 qualified_names(b, out);
             }
-            Type::Fn(ps, r, _) => {
+            Type::Fn(ps, r, _, _) => {
                 ps.iter().for_each(|p| qualified_names(p, out));
                 qualified_names(r, out);
             }
@@ -4805,10 +4820,11 @@ fn expand_refinement_ty(
         T::Set(i, o) => T::Set(Box::new(sub(i)?), *o),
         T::Dict(k, v) => T::Dict(Box::new(sub(k)?), Box::new(sub(v)?)),
         T::Result(a, b) => T::Result(Box::new(sub(a)?), Box::new(sub(b)?)),
-        T::Fn(ps, r, effects) => T::Fn(
+        T::Fn(ps, r, effects, mutating) => T::Fn(
             ps.iter().map(&mut sub).collect::<Result<_, _>>()?,
             Box::new(sub(r)?),
             effects.clone(),
+            *mutating,
         ),
         T::Tuple(es) => T::Tuple(es.iter().map(&mut sub).collect::<Result<_, _>>()?),
         T::Generic(n, args) => T::Generic(
@@ -4865,7 +4881,7 @@ fn fill_defaults_in(t: &mut Type, defaults: &HashMap<String, Vec<Option<Type>>>)
             fill_defaults_in(a, defaults);
             fill_defaults_in(b, defaults);
         }
-        T::Fn(ps, r, _) => {
+        T::Fn(ps, r, _, _) => {
             ps.iter_mut().for_each(|p| fill_defaults_in(p, defaults));
             fill_defaults_in(r, defaults);
         }
@@ -4973,7 +4989,7 @@ fn each_type_in_expr_mut(e: &mut ast::Expr, f: &mut impl FnMut(&mut Type)) {
                 f(t);
             }
         }
-        K::Lambda(params, _) => {
+        K::Lambda(params, _, _) => {
             for p in params {
                 if let Some(t) = &mut p.ty {
                     f(t);
@@ -5126,7 +5142,7 @@ fn collect_free(
             collect_free(body, bound, out);
             bound.pop();
         }
-        K::Lambda(params, body) => {
+        K::Lambda(params, body, _) => {
             let depth = bound.len();
             bound.extend(params.iter().map(|p| p.name.clone()));
             collect_free(body, bound, out);
@@ -5170,7 +5186,7 @@ pub fn mentions_typevar(t: &ast::Type) -> bool {
             mentions_typevar(v)
         }
         T::Dict(k, v) | T::Result(k, v) => mentions_typevar(k) || mentions_typevar(v),
-        T::Fn(ps, r, _) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
+        T::Fn(ps, r, _, _) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
         T::Tuple(es) | T::Generic(_, es) => es.iter().any(mentions_typevar),
         T::Unit
         | T::Primitive(_)
@@ -5293,7 +5309,7 @@ pub fn ctor_ref_case(e: &ast::Expr) -> Option<(&str, &str)> {
             }
             n.as_str()
         }
-        ast::ExprKind::Lambda(params, body) => {
+        ast::ExprKind::Lambda(params, body, _) => {
             let ast::ExprKind::Call(name, args, _) = &body.kind else {
                 return None;
             };

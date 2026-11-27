@@ -235,7 +235,7 @@ pub fn desugared(self: Expr) -> CoreExpr {
     // The element sits where the step's name is written, so an error about it points at the name.
     let named = expr(FieldProjection(ident("p"), "x")).named_at(5..6);
     let Call(_, arguments, _, _) = named.desugared().kind.as_case::<Call>()?;
-    let Lambda(_, step) = arguments[1]?.kind.as_case::<Lambda>()?;
+    let Lambda(_, step, _) = arguments[1]?.kind.as_case::<Lambda>()?;
     assert(step.name_span == 5..6);
     let Field(element, _) = step.kind.as_case::<Field>()?;
     assert(element.span == 5..6);
@@ -336,7 +336,7 @@ fn with_binders_lowered(self: CoreExpr) -> CoreExpr {
             self,
             IfLet(arm.lifted_arm(), scrutinee, otherwise),
         ),
-        Lambda(params, body) => core_with_kind(
+        Lambda(params, body, captures) => core_with_kind(
             self,
             Lambda(
                 params.map(|p: LambdaParam| LambdaParam {
@@ -353,6 +353,7 @@ fn with_binders_lowered(self: CoreExpr) -> CoreExpr {
                         p.written.value_or(WrittenNames {}),
                     ),
                 ),
+                captures=captures,
             ),
         ),
         _ => self,

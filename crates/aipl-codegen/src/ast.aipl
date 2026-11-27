@@ -29,6 +29,7 @@
 import { Span, equal as == } from builtins;
 import { BraceEntry } from "./brace_entry.aipl";
 import {
+    Capture as CaptureNode,
     Expr as ExprNode,
     FieldInit as FieldInitNode,
     LambdaParam as LambdaParamNode,
@@ -85,6 +86,8 @@ variant Ast =
     | Suffix(SuffixNode)
     | FieldInit(FieldInitNode)
     | LambdaParam(LambdaParamNode)
+    # The capture list in front of a lambda: `[mut total, mut n = 0]`.
+    | Captures(CaptureNode[])
     | Entry(BraceEntry)
     | Entries(BraceEntry[])
     | Arms(MatchArm[])
@@ -133,6 +136,7 @@ pub fn ast_case_name(self: Ast) -> str {
         Suffix(..) => "a postfix suffix",
         FieldInit(..) => "a field initializer",
         LambdaParam(..) => "a lambda parameter",
+        Captures(..) => "a lambda's capture list",
         Entry(..) => "a brace-literal entry",
         Entries(..) => "a list of brace-literal entries",
         Arms(..) => "a list of match arms",

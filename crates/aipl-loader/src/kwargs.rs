@@ -1788,14 +1788,34 @@ impl Expander {
                 Box::new(self.expand_expr(b, locals)?),
             ),
             ExprKind::Return(x) => ExprKind::Return(Box::new(self.expand_expr(x, locals)?)),
-            ExprKind::Lambda(params, body) => {
+            ExprKind::Lambda(params, body, captures) => {
                 let mut inner = locals.clone();
                 for p in params {
                     inner.insert(p.name.clone());
                 }
+                // The state a capture starts with is a name of the closure's own; what a
+                // capture without one names belongs to the enclosing function.
+                for c in captures.iter().filter(|c| c.init.is_some()) {
+                    inner.insert(c.name.clone());
+                }
+                let captures = captures
+                    .iter()
+                    .map(|c| {
+                        Ok(aipl_syntax::ast::Capture {
+                            name: c.name.clone(),
+                            init: c
+                                .init
+                                .as_ref()
+                                .map(|i| self.expand_expr(i, locals))
+                                .transpose()?,
+                            span: c.span.clone(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 ExprKind::Lambda(
                     params.iter().map(LambdaParam::clone).collect(),
                     Box::new(self.expand_expr(body, &inner)?),
+                    captures,
                 )
             }
         };

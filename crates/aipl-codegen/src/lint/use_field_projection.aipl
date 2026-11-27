@@ -154,7 +154,7 @@ fn projection(self: Expr<Call>) -> Projection? {
             lambda: none,
         });
     };
-    let Lambda([parameter], body) = argument.kind else { return none; };
+    let Lambda([parameter], body, []) = argument.kind else { return none; };
     if (parameter.ty.is_some()) { return none; };
     let steps = body.chain(parameter.synthesized_name())?;
     if (steps.is_empty()) { return none; };

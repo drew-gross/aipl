@@ -110,6 +110,7 @@ import {
     Ast,
     Attr as AAttr,
     Body as ABody,
+    Captures as ACaptures,
     CaseParam as ACaseParam,
     Const as AConst,
     DetachedDoc as ADetachedDoc,
@@ -186,6 +187,7 @@ import {
     ByStruct,
     ByTuple,
     Call,
+    Capture,
     Char,
     Construct,
     Expr,
@@ -820,9 +822,11 @@ fn types() -> Production<AiplTok, Ast>[] {
     // opens the same way: `(A, B) -> R` over `(A, B)[]` over `(A, B)!E` over
     // `(A, B)`.
     let ty_head: Rule<AiplTok> = OneOf([
+        // `(A) mut !prints -> R`: a function that mutates what it captured says `mut` first.
         // `(A) !prints -> R`: the effects a call performs come between the parameters and the
         // arrow, where a declaration puts them. Ahead of the pure form, and of the result `(A)!E`
         // that its first `!` also starts: only the arrow after the run of effects makes it this.
+        Then([Named("ty_parens"), Lit("mut"), Many(Named("effect")), Lit("->"), Named("ty")]),
         Then([Named("ty_parens"), Many(Named("effect"), min=1), Lit("->"), Named("ty")]),
         Then([Named("ty_parens"), Lit("->"), Named("ty")]),
         Then([Named("ty_parens"), Lit("["), Lit("]")]),
@@ -1287,9 +1291,12 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         // The same token opens and closes this one, which is the case a scan for
         // a leading and a trailing run of tokens could never tell from a list.
         Then([
+            Maybe(Named("captures")),
             Many(Named("lambda_param"), sep=Lit(","), trailing_sep=false, nested_in=pipes()),
             Named("block"),
         ]),
+        // A closure with no parameters: `|| { .. }`. The `||` is one token.
+        Then([Maybe(Named("captures")), Lit("||"), Named("block")]),
     ]);
 
     // `else` takes a block or another `if` — never an arbitrary expression, so
@@ -1365,13 +1372,30 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Lit("/"),
         Lit("%"),
     ]);
-    let lambda: Rule<AiplTok> = OneOf([
-        Then([
-            Many(Named("lambda_param"), sep=Lit(","), trailing_sep=false, nested_in=pipes()),
-            Named("expr"),
+
+    // `[mut total, mut n = 0]` in front of a lambda: what the closure mutates. A variable of the
+    // enclosing function, which the closure takes over, or state it starts with and owns. The
+    // leading `[` is never an array literal's, since no expression starts with `mut`.
+    let captures: Rule<AiplTok> = Then([
+        Lit("["),
+        Many(Named("capture"), min=1, sep=Lit(","), trailing_sep=false),
+        Lit("]"),
+    ]);
+    let capture: Rule<AiplTok> = Then([
+        Lit("mut"),
+        Term(Name),
+        Maybe(Then([Lit("="), Named("expr")])),
+    ]);
+    let lambda: Rule<AiplTok> = Then([
+        Maybe(Named("captures")),
+        OneOf([
+            Then([
+                Many(Named("lambda_param"), sep=Lit(","), trailing_sep=false, nested_in=pipes()),
+                Named("expr"),
+            ]),
+            Then([Lit("||"), Named("block")]),
+            Then([Lit("||"), Named("expr")]),
         ]),
-        Then([Lit("||"), Named("block")]),
-        Then([Lit("||"), Named("expr")]),
     ]);
 
     // `Point { x, y }`, `Wrap(inner)` and `(a, b)` take the argument apart in place
@@ -1418,6 +1442,8 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         p("arg", arg, TryMk(lower_arg)),
         p("op_value", op_value, Mk(lower_op_value)),
         p("lambda", lambda, TryMk(lower_lambda)),
+        p("captures", captures, TryMk(lower_captures)),
+        p("capture", capture, TryMk(lower_capture)),
         p("lambda_param", lambda_param, TryMk(lower_lambda_param)),
         p("field_init", field_init, TryMk(lower_field_init)),
         p("brace_body", brace_body, TryMk(lower_brace_body)),
@@ -1787,7 +1813,7 @@ fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
                 let order = order_after_hash(toks);
                 return ok(AExpr(brace_literal(as_entries(kid(kids, 0, sp)?, sp)?, order, tsp)?));
             };
-            if (head == "|") { return ok(AExpr(lambda_of(kids, tsp, sp)?)); };
+            if (head == "|" || head == "||") { return ok(AExpr(lambda_of(kids, tsp, sp)?)); };
             if (head.starts_with('"') || head.starts_with('`')) {
                 return ok(AExpr(at(Str(str_lit_value(head)), tsp)));
             };
@@ -2182,10 +2208,11 @@ fn lower_lambda(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // the no-parameter form is.
     match (node.own_texts(src)) {
         ["||", ..] => {
-            let body = kid_expr(kids, 0, sp)?;
+            let (captures, rest) = split_captures(kids);
+            let body = kid_expr(rest, 0, sp)?;
             let span = body.span;
             let no_params: LambdaParam[] = [];
-            ok(AExpr(at(Lambda(no_params, body), span)))
+            ok(AExpr(at(Lambda(no_params, body, captures=captures), span)))
         },
         _ => ok(AExpr(lambda_of(kids, node.tok_span(), sp)?)),
     }
@@ -2194,10 +2221,50 @@ fn lower_lambda(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # `|a, b| body` — the parameters are every child but the last, which is the
 # body. Shared with the value-position lambda in `atom`, which is the same shape
 # with a block for a body.
-fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
+fn lambda_of(written: Ast[], span: Span, sp: Span) -> Expr!ParseError {
+    let (captures, kids) = split_captures(written);
     let last = kids.len() - 1;
     let body = kid_expr(kids, last, sp)?;
-    ok(at(Lambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
+    ok(at(Lambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body, captures=captures), span))
+}
+
+# The capture list a lambda's children start with, if it has one, and the rest.
+fn split_captures(kids: Ast[]) -> (Capture[], Ast[]) {
+    if (let some(first) = kids.first()) {
+        if (let ACaptures(captures) = first) { return (captures, kids.drop_first()); };
+    };
+    // A tuple slot gives an empty array no type, so it is written.
+    let no_captures: Capture[] = [];
+    (no_captures, kids)
+}.test({
+    let nothing: Ast[] = [];
+    assert(split_captures(nothing).0.is_empty());
+    let one = Capture { name: "n", init: none, span: 0..0 };
+    let (captures, rest) = split_captures([ACaptures([one]), AName("x")]);
+    assert(captures.len() == 1);
+    assert(rest.len() == 1);
+})
+
+# `captures` — the `[..]` list of a lambda: its entries, in order.
+fn lower_captures(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    mut captures: Capture[] = [];
+    for (let k : kids) {
+        let ACaptures(entry) = k else { return err(wrong_kind("a capture", k, sp)); };
+        set captures.extend(entry);
+    }
+    ok(ACaptures(captures))
+}
+
+# `capture` — `mut name` or `mut name = init`: the name is the second token, and the initializer,
+# if there is one, the only child.
+fn lower_capture(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let init: Expr? = if (kids.is_empty()) { none } else { some(kid_expr(kids, 0, sp)?) };
+    match (node.own_texts(src)) {
+        [_, name, ..] => ok(ACaptures([Capture { name, init, span: sp }])),
+        _ => err(ParseError { message: "a capture matched no name", span: sp }),
+    }
 }
 
 fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
@@ -3915,7 +3982,12 @@ fn named_param(
     };
     let ty = match (arity) {
         ReturnsMany => match (written) {
-            TyFn(parameters, result, effects) => TyFn(parameters, TyArray(result), effects),
+            TyFn(parameters, result, effects, mutating) => TyFn(
+                parameters,
+                TyArray(result),
+                effects,
+                mutating=mutating,
+            ),
             _ => written,
         },
         ZeroOrMore => variadic_seq_ty(written),
@@ -4674,6 +4746,12 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
     // The effects a call performs sit between the parameters and the arrow. A `!` after
     // the list that no arrow follows is still a result.
     assert(ty_dump("(i64) !prints -> str") == "Fn([i64], str, !prints)");
+    assert(ty_dump("() mut -> ()") == "Fn([], (), mut)");
+    assert(
+        ty_dump(
+            "(i64, str) mut !prints !clock -> bool",
+        ) == "Fn([i64, str], bool, mut !prints !clock)",
+    );
     assert(ty_dump("() !prints !reads_files -> bool") == "Fn([], bool, !prints !reads_files)");
     assert(
         ty_dump(
@@ -4696,7 +4774,8 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
 
     // The arity refusal names the suffix that was actually written, which is
     // what makes the advice runnable rather than generic.
-    assert(ty_dump("()") == "error: a tuple type needs at least 2 elements, e.g. (i64, str)");
+    // `()` on its own is the unit type, which is what a function that returns nothing returns.
+    assert(ty_dump("()") == "()");
     assert(ty_dump("()[]") == "error: a tuple type needs at least 2 elements, e.g. (i64, str)[]");
     assert(ty_dump("()?") == "error: a tuple type needs at least 2 elements, e.g. (i64, str)?");
     assert(
@@ -4957,6 +5036,16 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("f(k?= o)") == "f(KwFwd(k, o))");
     // A lambda in value position takes a block body; it builds the same node.
     assert(expr_dump("|x| { x }") == "Lambda([x], x)");
+    assert(expr_dump("|| { 1 }") == "Lambda([], 1)");
+
+    // A capture list in front of a lambda names what the closure mutates: a variable of the
+    // enclosing function, or state it starts with.
+    assert(expr_dump("f([mut total] |x| x)") == "f(Lambda([x], x, [mut total]))");
+    assert(expr_dump("f([mut a, mut n = 0] || 1)") == "f(Lambda([], 1, [mut a, mut n = 0]))");
+    assert(expr_dump("[mut total] |x| { x }") == "Lambda([x], x, [mut total])");
+    assert(expr_dump("[mut n = 1] || { n }") == "Lambda([], n, [mut n = 1])");
+    // An array literal is still one.
+    assert(expr_dump("[a, b]") == "[a, b]");
 
     // `if`, with and without an `else`, and the ladder. An else-less `if` gets
     // a synthetic unit, so it is typed exactly like `if (..) { .. } else {}`.
@@ -6796,7 +6885,11 @@ fn lower_ty_head(src: str, node: Parts, written: Ast[]) -> Ast!ParseError {
         // `(A, B) -> R` and `(A, B)!E`: a list on the left, and the token
         // between says which. Anything else on the left is `A!E`.
         if (let ATys(ts) = head) {
-            if (ops == "->") { return ok(ATy(TyFn(ts, rhs, effects))); };
+            // The tokens the node matched itself are `mut` (if written) and the arrow.
+            let written = node.own_texts(src);
+            if (written.contains("->")) {
+                return ok(ATy(TyFn(ts, rhs, effects, mutating=written.contains("mut"))));
+            };
             return ok(ATy(TyResult(tuple_ty(ts, "!Error", sp)?, rhs)));
         };
         return ok(ATy(TyResult(as_ty(head, sp)?, rhs)));
@@ -6805,7 +6898,7 @@ fn lower_ty_head(src: str, node: Parts, written: Ast[]) -> Ast!ParseError {
         return match (ops) {
             "[]" => ok(ATy(TyArray(tuple_ty(ts, "[]", sp)?))),
             "?" => ok(ATy(TyOptional(tuple_ty(ts, "?", sp)?))),
-            _ => ok(ATy(tuple_ty(ts, "", sp)?)),
+            _ => if (ts.is_empty()) { ok(ATy(TyUnit)) } else { ok(ATy(tuple_ty(ts, "", sp)?)) },
         };
     };
     let t = as_ty(head, sp)?;

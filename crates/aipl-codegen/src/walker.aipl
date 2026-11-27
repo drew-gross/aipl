@@ -732,11 +732,15 @@ fn paren_ty(self: W) -> WDoc!FmtError {
     let closed = args.w.expect(")")?.w;
     let list = comma_list_docs(args.docs, TyParens);
 
-    // `(A) !prints -> R`: the effects a call performs sit between the list and the arrow.
-    if (closed.effects_then_arrow()) {
-        let WDocs { w, docs } = closed.fn_effects([]);
-        let r = w.bump().w.ty()?;
-        return ok(WDoc { w: r.w, doc: Concat([list, ..docs, Text(" -> "), r.doc]) });
+    // `(A) mut !prints -> R`: whether the function mutates what it captured and the effects a call
+    // performs sit between the list and the arrow.
+    let mutating = closed.peek_text() == "mut";
+    let tail = if (mutating) { closed.bump().w } else { closed };
+    if (mutating || tail.effects_then_arrow()) {
+        let WDocs { w, docs } = tail.fn_effects([]);
+        let r = w.expect("->")?.w.ty()?;
+        let mut_doc = if (mutating) { Text(" mut") } else { Text("") };
+        return ok(WDoc { w: r.w, doc: Concat([list, mut_doc, ..docs, Text(" -> "), r.doc]) });
     };
     if (closed.peek_text() == "->") {
         let r = closed.bump().w.ty()?;
@@ -2300,9 +2304,9 @@ fn atom(self: W) -> WDoc!FmtError {
     if (t == "match") { return self.match_expr(); };
     if (t == "shim") { return self.shim_expr(); };
 
-    // A lambda used as a value (`let f = |x: i64| { .. }`). Only the single-`|`
-    // form reaches expression position; `||` there would be a binary operator.
-    if (t == "|") { return self.lambda(); };
+    // A lambda used as a value (`let f = |x: i64| { .. }`), with or without parameters. At the
+    // start of an operand `||` cannot be the binary operator.
+    if (t == "|" || t == "||" || self.at_captures()) { return self.lambda(); };
     if (t == "(") { return self.paren_atom(); };
     if (t == "[") { return self.array_atom(); };
     if (t == "#") { return self.set_or_dict_atom(); };
@@ -2780,7 +2784,9 @@ fn call_arg(self: W) -> WDoc!FmtError {
         let v = n.w.bump().w.expr()?;
         return ok(WDoc { w: v.w, doc: Concat([Text(`{n.text}=`), v.doc]) });
     };
-    if (self.peek_text() == "|" || self.peek_text() == "||") { return self.lambda(); };
+    if (self.peek_text() == "|" || self.peek_text() == "||" || self.at_captures()) {
+        return self.lambda();
+    };
 
     // A bare operator passed as a value: an operator token immediately followed
     // by `,` or a closing bracket.
@@ -2793,16 +2799,44 @@ fn call_arg(self: W) -> WDoc!FmtError {
 
 fn is_arg_end(t: str) -> bool { t == "," || t == ")" || t == "]" }
 
+# Does a capture list start at the cursor: `[mut ..`? No expression starts with `mut`, so the `[`
+# is never an array literal's.
+fn at_captures(self: W) -> bool { self.peek_text() == "[" && self.peek_text_n(1) == "mut" }
+
+# The capture list in front of a lambda, `[mut total, mut n = 0] `, or nothing when there is none.
+fn captures(self: W) -> WDoc!FmtError {
+    if (!self.at_captures()) { return ok(WDoc { w: self, doc: Text("") }); };
+    mut w = self.bump().w;
+    mut items: Doc[] = [];
+    while (w.more_before("]")) {
+        let WStr { w as after_mut } = w.expect("mut")?;
+        let WStr { w as after_name, text } = after_mut.bump();
+        if (after_name.peek_text() == "=") {
+            let init = after_name.bump().w.expr()?;
+            set items.push(Concat([Text(`mut {text} = `), init.doc]));
+            set w = init.w;
+        } else {
+            set items.push(Text(`mut {text}`));
+            set w = after_name;
+        };
+        if (w.peek_text() == ",") { set w = w.bump().w; };
+    }
+    let closed = w.expect("]")?.w;
+    ok(WDoc { w: closed, doc: Concat([Text("["), ..items.intersperse(Text(", ")), Text("] ")]) })
+}
+
 fn lambda(self: W) -> WDoc!FmtError {
-    let params = if (self.peek_text() == "||") {
-        WDocs { w: self.bump().w, docs: [] }
+    let captured = self.captures()?;
+    let start = captured.w;
+    let params = if (start.peek_text() == "||") {
+        WDocs { w: start.bump().w, docs: [] }
     } else {
-        let opened = self.expect("|")?.w;
+        let opened = start.expect("|")?.w;
         let ps = opened.lambda_params([])?;
         WDocs { w: ps.w.expect("|")?.w, docs: ps.docs }
     };
     let body = if (params.w.peek_text() == "{") { params.w.block()? } else { params.w.expr()? };
-    mut d = [Text("|"), ..params.docs.intersperse(Text(", "))];
+    mut d = [captured.doc, Text("|"), ..params.docs.intersperse(Text(", "))];
     set d.push(Text("| "));
     set d.push(body.doc);
     ok(WDoc { w: body.w, doc: Concat(d) })
@@ -3251,6 +3285,10 @@ fn walker_of(src: str) -> W!FmtError {
     );
     assert(walker_of("( i64 , str ) ! Error")?.ty().rendered(100)? == "(i64, str)!Error");
 
+    // `mut` comes first, and a closure that returns nothing returns `()`.
+    assert(walker_of("(i64)mut->()")?.ty().rendered(100)? == "(i64) mut -> ()");
+    assert(walker_of("( ) mut ! prints->()")?.ty().rendered(100)? == "() mut !prints -> ()");
+
     // A refinement: `without` and its excluded value take a space each side,
     // and bind looser than every suffix — so a refined optional is written in
     // parens, which a one-element list renders as a grouping.
@@ -3466,6 +3504,16 @@ fn walker_of(src: str) -> W!FmtError {
     // Lambdas.
     assert(walker_of("| x | x")?.expr().rendered(100)? == "|x| x");
     assert(walker_of("| x : i64 | x")?.expr().rendered(100)? == "|x: i64| x");
+
+    // The capture list in front of a closure, and a closure with no parameters in value position.
+    assert(
+        walker_of("[ mut total ] | x | { x }")?.expr().rendered(100)? == "[mut total] |x| { x }",
+    );
+    assert(
+        walker_of("[mut a,mut n=0]||{n}")?.expr().rendered(100)? == "[mut a, mut n = 0] || { n }",
+    );
+    assert(walker_of("|| { 1 }")?.expr().rendered(100)? == "|| { 1 }");
+    assert(walker_of("[a, b]")?.expr().rendered(100)? == "[a, b]");
     assert(walker_of("f ( | | x )")?.expr().rendered(100)? == "f(|| x)");
 
     // --- if / match ---------------------------------------------------------

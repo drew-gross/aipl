@@ -62,7 +62,7 @@ impl Mono<'_> {
             if !wanted || self.is_function_argument(arg) {
                 continue;
             }
-            let Ty::Fn(parameter_tys, ret, _) = arg.ty.clone() else {
+            let Ty::Fn(parameter_tys, ret, _, _) = arg.ty.clone() else {
                 continue;
             };
             *fresh += 1;

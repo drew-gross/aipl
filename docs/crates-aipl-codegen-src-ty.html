@@ -84,7 +84,9 @@
 
             </li>
 
-            <li id="item-Fn"><code>Fn(Ty[], Ty, str[])</code>
+            <li id="item-Fn"><code>Fn(Ty[], Ty, str[], mutating: bool = false)</code>
+
+              <div class="doc"><p><code>mutating</code> is last so an artifact built before it decodes a function type as the plain one it was.</p></div>
 
 
             </li>
@@ -291,9 +293,9 @@
             <a class="anchor" href="#item-effects_text">effects_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn effects_text(self: str[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn effects_text(self: str[], mutating: bool) -&#62; str</code></pre>
 
-          <div class="doc"><p>The effects of a function type as written after its parameters: <code> !prints !reads_files</code>, and nothing for a type with none.</p></div>
+          <div class="doc"><p>What follows a function type's parameters, as written: <code> mut !prints !reads_files</code>, and nothing for a type that mutates nothing and performs no effect.</p></div>
 
 
         </section>
@@ -305,9 +307,9 @@
             <a class="anchor" href="#item-show_effects">show_effects</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn show_effects(self: str[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn show_effects(self: str[], mutating: bool) -&#62; str</code></pre>
 
-          <div class="doc"><p>The effects of a function type in <code>show_ty</code>'s form: <code>, !prints</code>, and nothing for none.</p></div>
+          <div class="doc"><p>What a function type's <code>mut</code> and effects add to <code>show_ty</code>'s form: <code>, mut !prints</code>, and nothing for none.</p></div>
 
 
         </section>

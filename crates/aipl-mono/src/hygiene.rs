@@ -211,7 +211,7 @@ impl Walk<'_> {
                 self.expr(body);
                 self.unbind(bound);
             }
-            ExprKind::Lambda(params, body) => {
+            ExprKind::Lambda(params, body, _) => {
                 for p in params {
                     self.bind(&p.name);
                 }

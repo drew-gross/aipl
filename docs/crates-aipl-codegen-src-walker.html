@@ -1656,7 +1656,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$63845: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$64116: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -2499,6 +2499,34 @@
           <pre class="signature"><code>fn is_arg_end(t: str) -&#62; bool</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-at_captures">
+          <h3>
+            <a class="anchor" href="#item-at_captures">at_captures</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn at_captures(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Does a capture list start at the cursor: <code>[mut ..</code>? No expression starts with <code>mut</code>, so the <code>[</code> is never an array literal's.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-captures">
+          <h3>
+            <a class="anchor" href="#item-captures">captures</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn captures(self: W) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p>The capture list in front of a lambda, <code>[mut total, mut n = 0] </code>, or nothing when there is none.</p></div>
 
 
         </section>

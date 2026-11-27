@@ -142,14 +142,14 @@ fn element_of(ty: &Ty) -> Option<Ty> {
 
 fn fn_param(f: &P) -> Option<Ty> {
     match &f.ty {
-        Ty::Fn(params, _, _) => params.first().cloned(),
+        Ty::Fn(params, _, _, _) => params.first().cloned(),
         _ => None,
     }
 }
 
 fn fn_result(f: &P) -> Option<Ty> {
     match &f.ty {
-        Ty::Fn(_, ret, _) => Some((**ret).clone()),
+        Ty::Fn(_, ret, _, _) => Some((**ret).clone()),
         _ => None,
     }
 }
@@ -221,6 +221,7 @@ fn lambda(param: TLambdaParam<Ty>, body: P, like: &P) -> P {
         vec![param.ty.clone()],
         Box::new(body.ty.clone()),
         Vec::new(),
+        false,
     );
     TExpr::rebuilt(TExprKind::Lambda(vec![param], Box::new(body)), ty, like)
 }
@@ -844,6 +845,7 @@ fn chain(whole: &P, outer: Option<&Callee>) -> Option<P> {
                 vec![produced.clone(), produced.clone()],
                 Box::new(produced),
                 Vec::new(),
+                false,
             ),
             whole.span.clone(),
         ));

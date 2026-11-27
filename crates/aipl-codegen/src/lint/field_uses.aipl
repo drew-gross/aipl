@@ -158,7 +158,7 @@ fn rebinds(self: Expr, name: str) -> bool {
         For(n, _, _, index) => n == name || index == some(name),
         LetPattern(binding, _, _) => binding.binders().contains(name),
         ForPattern(binding, _, _, index) => binding.binders().contains(name) || index == some(name),
-        Lambda(params, _) => params.any(|p| p.binding.binders().contains(name)),
+        Lambda(params, _, _) => params.any(|p| p.binding.binders().contains(name)),
         Match(_, arms) => arms.any(|arm| arm.pattern.pat_bindings().contains(name)),
         _ => false,
     }

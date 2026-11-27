@@ -94,7 +94,7 @@ pub fn identity_lambda(function: Function) -> LintHit[] {
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.
 fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
-    let Lambda(parameters, body) = self.kind;
+    let Lambda(parameters, body, _) = self.kind;
     if (advised.contains(self.span)) { return none; };
     let Call(name, arguments, _, _) = body.kind.as_case::<Call>()?;
     if (name.is_operator_name() || arguments.len() != parameters.len() || parameters.any(

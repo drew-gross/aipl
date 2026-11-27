@@ -111,6 +111,7 @@ pub(crate) fn free_locals(
                     args.iter().map(|a| a.ty.clone()).collect(),
                     Box::new(e.ty.clone()),
                     Vec::new(),
+                    false,
                 );
                 out.push((name.clone(), ty));
             }
@@ -265,7 +266,7 @@ impl Mono<'_> {
             TExprKind::Lambda(p, _) => p.len() == count,
             TExprKind::Ident(_) => {
                 self.is_function_argument(a)
-                    && matches!(&a.ty, aipl_syntax::typed::Ty::Fn(p, _, _) if p.len() == count)
+                    && matches!(&a.ty, aipl_syntax::typed::Ty::Fn(p, _, _, _) if p.len() == count)
             }
             _ => false,
         };
@@ -404,7 +405,7 @@ impl Mono<'_> {
                 let captures = self.typed_lambda_captures(&params, &body);
                 let ret = body.ty.clone();
                 let effects = match &argument_ty {
-                    ConcreteType::Fn(_, _, effects) => effects.clone(),
+                    ConcreteType::Fn(_, _, effects, _) => effects.clone(),
                     _ => Vec::new(),
                 };
                 let name = self.lift_lambda(&params, &body, &captures, ret.to_type(), effects);
@@ -415,7 +416,7 @@ impl Mono<'_> {
                 }
             }
             TExprKind::Ident(g) => {
-                let ConcreteType::Fn(parameter_tys, ret, _) = &argument.ty else {
+                let ConcreteType::Fn(parameter_tys, ret, _, _) = &argument.ty else {
                     unreachable!("a function argument has a function type");
                 };
                 if let Some(binding) = self.cur_lenv.get(&g).cloned() {

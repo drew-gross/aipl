@@ -1481,7 +1481,7 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
             check_operators(&arm.body, view)?;
             check_operators(else_b, view)?;
         }
-        ExprKind::Lambda(_, body) => check_operators(body, view)?,
+        ExprKind::Lambda(_, body, _) => check_operators(body, view)?,
         ExprKind::Num(_)
         | ExprKind::Float(_)
         | ExprKind::Bool(_)
@@ -1790,13 +1790,14 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
             Box::new(rewrite_type(ok, view, type_vars)),
             Box::new(rewrite_type(err, view, type_vars)),
         ),
-        Type::Fn(params, ret, effects) => Type::Fn(
+        Type::Fn(params, ret, effects, mutating) => Type::Fn(
             params
                 .iter()
                 .map(|p| rewrite_type(p, view, type_vars))
                 .collect(),
             Box::new(rewrite_type(ret, view, type_vars)),
             effects.clone(),
+            *mutating,
         ),
         Type::Tuple(elems) => Type::Tuple(
             elems
@@ -2171,11 +2172,22 @@ fn rewrite_expr(
         }
         // Lambda params are locals in the body; their optional type annotations
         // may reference structs, so rewrite those through the view.
-        ExprKind::Lambda(params, body) => {
+        ExprKind::Lambda(params, body, captures) => {
             let mut inner = locals.clone();
             for p in params {
                 inner.insert(p.name.clone());
             }
+            for c in captures.iter().filter(|c| c.init.is_some()) {
+                inner.insert(c.name.clone());
+            }
+            let captures = captures
+                .iter()
+                .map(|c| aipl_syntax::ast::Capture {
+                    name: c.name.clone(),
+                    init: c.init.as_ref().map(|i| rewrite_expr(i, view, sc, locals)),
+                    span: c.span.clone(),
+                })
+                .collect();
             ExprKind::Lambda(
                 params
                     .iter()
@@ -2186,6 +2198,7 @@ fn rewrite_expr(
                     })
                     .collect(),
                 Box::new(rewrite_expr(body, view, sc, &inner)),
+                captures,
             )
         }
     };

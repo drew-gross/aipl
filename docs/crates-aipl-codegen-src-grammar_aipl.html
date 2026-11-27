@@ -846,7 +846,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$75641: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$76839: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1116,9 +1116,51 @@ shim random seeded_with_clock() { body }
             <a class="anchor" href="#item-lambda_of">lambda_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lambda_of(kids: Ast[], span: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
+          <pre class="signature"><code>fn lambda_of(written: Ast[], span: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>|a, b| body</code> — the parameters are every child but the last, which is the body. Shared with the value-position lambda in <code>atom</code>, which is the same shape with a block for a body.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-split_captures">
+          <h3>
+            <a class="anchor" href="#item-split_captures">split_captures</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn split_captures(kids: Ast[]) -&#62; (Capture[], Ast[])</code></pre>
+
+          <div class="doc"><p>The capture list a lambda's children start with, if it has one, and the rest.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_captures">
+          <h3>
+            <a class="anchor" href="#item-lower_captures">lower_captures</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_captures(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>captures</code> — the <code>[..]</code> list of a lambda: its entries, in order.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_capture">
+          <h3>
+            <a class="anchor" href="#item-lower_capture">lower_capture</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_capture(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>capture</code> — <code>mut name</code> or <code>mut name = init</code>: the name is the second token, and the initializer, if there is one, the only child.</p></div>
 
 
         </section>
@@ -1456,7 +1498,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$114825: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$117777: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1750,7 +1792,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$131574: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$134526: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -2562,7 +2604,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$178320: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$181380: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

@@ -1056,7 +1056,8 @@ fn parses_function_type_parameter() {
         Type::Fn(
             vec![Type::Primitive(Primitive::I64)],
             Box::new(Type::Primitive(Primitive::I64)),
-            Vec::new()
+            Vec::new(),
+            false
         )
     );
     // Zero-arg and multi-arg function types parse too.
@@ -1069,7 +1070,8 @@ fn parses_function_type_parameter() {
         Type::Fn(
             vec![Type::Primitive(Primitive::I64)],
             Box::new(Type::Primitive(Primitive::I64)),
-            vec!["prints".to_string(), "reads_files".to_string()]
+            vec!["prints".to_string(), "reads_files".to_string()],
+            false
         )
     );
 
@@ -1084,7 +1086,7 @@ fn parses_lambda_argument() {
         panic!("expected call, got {:?}", f.body.kind)
     };
     assert_eq!(name, "apply");
-    let ExprKind::Lambda(params, body) = &args[0].kind else {
+    let ExprKind::Lambda(params, body, _) = &args[0].kind else {
         panic!("expected lambda, got {:?}", args[0].kind)
     };
     assert_eq!(params.len(), 1);
@@ -1104,6 +1106,48 @@ fn parses_lambda_forms() {
 }
 
 #[test]
+fn parses_a_capture_list_before_a_lambda() {
+    let p = parse("fn main() -> i64 { apply([mut total, mut n = 0] |x| { x }, 5) }").unwrap();
+    let f = fn_item(&p, 0);
+    let ExprKind::Call(_, args, _) = &f.body.kind else {
+        panic!("expected call, got {:?}", f.body.kind)
+    };
+    let ExprKind::Lambda(params, _, captures) = &args[0].kind else {
+        panic!("expected lambda, got {:?}", args[0].kind)
+    };
+    assert_eq!(params.len(), 1);
+    let named: Vec<(&str, bool)> = captures
+        .iter()
+        .map(|c| (c.name.as_str(), c.init.is_some()))
+        .collect();
+    assert_eq!(named, vec![("total", false), ("n", true)]);
+
+    // A closure with no parameters is a value too, and an array literal is still one.
+    let p = parse("fn counter() -> i64 { let f = [mut x] || { 1 }; 0 }").unwrap();
+    let ExprKind::Let(_, _, value, _) = &fn_item(&p, 0).body.kind else {
+        panic!("expected let")
+    };
+    assert!(
+        matches!(&value.kind, ExprKind::Lambda(params, _, captures) if params.is_empty() && captures.len() == 1)
+    );
+    parse("fn main() -> i64 { let xs = [a, b]; 0 }").unwrap();
+}
+
+#[test]
+fn parses_a_function_type_that_mutates() {
+    let p = parse("fn apply(f: (i64) mut !prints -> ()) -> i64 { 0 }").unwrap();
+    assert_eq!(
+        fn_item(&p, 0).sig.params[0].ty,
+        Type::Fn(
+            vec![Type::Primitive(Primitive::I64)],
+            Box::new(Type::Unit),
+            vec!["prints".to_string()],
+            true
+        )
+    );
+}
+
+#[test]
 fn or_token_serves_both_roles() {
     // `||` is still infix logical-or inside an expression...
     let p = parse("fn main() -> bool { a || b }").unwrap();
@@ -1119,7 +1163,7 @@ fn or_token_serves_both_roles() {
     let ExprKind::Call(_, args, _) = &f.body.kind else {
         panic!("expected call")
     };
-    let ExprKind::Lambda(params, body) = &args[0].kind else {
+    let ExprKind::Lambda(params, body, _) = &args[0].kind else {
         panic!("expected lambda, got {:?}", args[0].kind)
     };
     assert!(params.is_empty());

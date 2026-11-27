@@ -110,7 +110,7 @@ fn apply(func: &P, arg: P) -> Option<P> {
             Some(crate::typed_util::rename_scoped(body, &map, None))
         }
         TExprKind::Ident(g) => {
-            let Ty::Fn(_, result, _) = &func.ty else {
+            let Ty::Fn(_, result, _, _) = &func.ty else {
                 return None;
             };
             Some(TExpr::new(

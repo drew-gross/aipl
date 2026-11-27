@@ -85,7 +85,7 @@ impl Binder<'_> {
                 self.bind(pk, ak);
                 self.bind(pv, av);
             }
-            (Ty::Fn(pp, pr, _), Ty::Fn(ap, ar, _)) => {
+            (Ty::Fn(pp, pr, _, _), Ty::Fn(ap, ar, _, _)) => {
                 for (p, a) in pp.iter().zip(ap) {
                     self.bind(p, a);
                 }

@@ -59,7 +59,7 @@ impl Names {
                     self.reserve(index);
                 }
             }
-            ExprKind::Lambda(params, _) => {
+            ExprKind::Lambda(params, _, _) => {
                 for p in params {
                     self.reserve(&p.name);
                 }

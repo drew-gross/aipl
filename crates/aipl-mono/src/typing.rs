@@ -47,7 +47,7 @@ pub(crate) fn mangle_type(ty: &Type) -> String {
         Type::Set(e, o) => format!("{}_{}", set_mangle(*o), mangle_type(e)),
         Type::Dict(k, v) => format!("dict_{}_{}", mangle_type(k), mangle_type(v)),
         Type::Result(ok, err) => format!("res_{}_{}", mangle_type(ok), mangle_type(err)),
-        Type::Fn(ps, ret, _) => {
+        Type::Fn(ps, ret, _, _) => {
             let args = ps.iter().map(mangle_type).collect::<Vec<_>>().join("_");
             format!("fn_{}_{}", args, mangle_type(ret))
         }
@@ -213,7 +213,7 @@ fn outer_assign(body: &Expr, declared: &HashSet<String>) -> Option<(String, Span
             })
             .or_else(|| outer_assign(else_b, declared)),
         // A lambda body is a separate function; its captures are checked there.
-        ExprKind::Lambda(_, _) => None,
+        ExprKind::Lambda(_, _, _) => None,
         _ => crate::children(body)
             .into_iter()
             .find_map(|c| outer_assign(c, declared)),
@@ -576,7 +576,7 @@ impl TypeValidator<'_> {
             // erased by monomorphization, so there's no runtime value to carry.
             Type::Result(ok, err) => {
                 for (p, side) in [(ok, "Ok"), (err, "Err")] {
-                    if let Type::Fn(_, _, _) = &**p {
+                    if let Type::Fn(_, _, _, _) = &**p {
                         return Err(Error::msg(format!(
                             "{ctx}: a result {side} payload cannot be a function, got {}",
                             tyname(p)
@@ -590,7 +590,7 @@ impl TypeValidator<'_> {
             }
             // A function type (a lambda parameter): validate its argument and
             // return types. `check_fn` separately forbids it as a *return* type.
-            Type::Fn(params, ret, _) => {
+            Type::Fn(params, ret, _, _) => {
                 for p in params {
                     self.check_ty(p, type_params, ctx)?;
                 }
@@ -709,7 +709,7 @@ impl TypeValidator<'_> {
             Type::Result(_, _) => Err(Error::msg(format!(
                 "{ctx}: a result cannot be an array, optional, or dict element"
             ))),
-            Type::Fn(_, _, _) => Err(Error::msg(format!(
+            Type::Fn(_, _, _, _) => Err(Error::msg(format!(
                 "{ctx}: arrays and optionals cannot contain function types"
             ))),
             Type::Tuple(_) => Err(Error::msg(format!(
@@ -791,7 +791,7 @@ pub(crate) fn span_map_signature(array_form: &Signature) -> Signature {
     // `f: (T) -> U` becomes `f: (u64) -> U`: the index replaces the element, and
     // `U` stays the variable the return type is built from.
     if let Some(f) = sig.params.get_mut(1) {
-        if let Type::Fn(params, _, _) = &mut f.ty {
+        if let Type::Fn(params, _, _, _) = &mut f.ty {
             if let Some(p) = params.first_mut() {
                 *p = Type::Primitive(Primitive::U64);
             }
@@ -951,7 +951,7 @@ pub(crate) fn names_a_type_named(t: &Type, names: &[&str]) -> bool {
         | Type::Without(inner, _) => names_a_type_named(inner, names),
         Type::Dict(k, v) => names_a_type_named(k, names) || names_a_type_named(v, names),
         Type::Result(ok, err) => names_a_type_named(ok, names) || names_a_type_named(err, names),
-        Type::Fn(ps, ret, _) => {
+        Type::Fn(ps, ret, _, _) => {
             ps.iter().any(|p| names_a_type_named(p, names)) || names_a_type_named(ret, names)
         }
         Type::Tuple(elems) => elems.iter().any(|e| names_a_type_named(e, names)),
@@ -974,7 +974,7 @@ pub(crate) fn mentions_type_named(t: &Type, v: &str) -> bool {
         Type::Dict(a, b) | Type::Result(a, b) => {
             mentions_type_named(a, v) || mentions_type_named(b, v)
         }
-        Type::Fn(ps, r, _) => {
+        Type::Fn(ps, r, _, _) => {
             ps.iter().any(|p| mentions_type_named(p, v)) || mentions_type_named(r, v)
         }
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(|e| mentions_type_named(e, v)),
@@ -991,7 +991,7 @@ pub(crate) fn mentions_typevar(t: &Type) -> bool {
         }
         Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
         Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
-        Type::Fn(ps, r, _) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
+        Type::Fn(ps, r, _, _) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_typevar),
         Type::Unit
         | Type::Primitive(_)
@@ -1023,7 +1023,7 @@ pub(crate) fn tyname(t: &Type) -> String {
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), tyname(inner)),
         Type::Dict(k, v) => format!("#{{{}: {}}}", tyname(k), tyname(v)),
         Type::Result(ok, err) => format!("{}!{}", tyname(ok), tyname(err)),
-        Type::Fn(params, ret, _) => {
+        Type::Fn(params, ret, _, _) => {
             let ps = params.iter().map(tyname).collect::<Vec<_>>().join(", ");
             format!("({ps}) -> {}", tyname(ret))
         }
@@ -1166,7 +1166,7 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
         // it is given has to fit what it takes, and what it returns has to fit
         // what is wanted back — which is how a generic caller's still-open return
         // (`map`'s `U`) accepts a function parameter whose return is known.
-        (Type::Fn(ap, ar, _), Type::Fn(bp, br, _)) if ap.len() == bp.len() => ap
+        (Type::Fn(ap, ar, _, _), Type::Fn(bp, br, _, _)) if ap.len() == bp.len() => ap
             .iter()
             .zip(bp)
             .try_for_each(|(a, b)| coerce(b, a))
@@ -1282,7 +1282,7 @@ pub(crate) fn collect_var_bindings(
             collect_var_bindings(po, ao, vars, map);
             collect_var_bindings(pe, ae, vars, map);
         }
-        (Type::Fn(ps, pr, _), Type::Fn(as_, ar, _)) => {
+        (Type::Fn(ps, pr, _, _), Type::Fn(as_, ar, _, _)) => {
             for (p, a) in ps.iter().zip(as_) {
                 collect_var_bindings(p, a, vars, map);
             }

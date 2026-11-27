@@ -7276,7 +7276,7 @@ fn is_inline_slot(ty: &ConcreteType, decls: &HashMap<&str, TypeDeclRef>) -> bool
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => true,
         // A function value is stored as its 8-byte code address (an i64); it owns
         // nothing, so like a scalar it needs no drop.
-        ConcreteType::Fn(_, _, _) => true,
+        ConcreteType::Fn(_, _, _, _) => true,
         ConcreteType::Optional(_) => is_inline_slot(opt_core(ty), decls),
         _ => false,
     }
@@ -8283,7 +8283,7 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
         }
         // A function value is its code address whatever it performs: the checker has decided
         // whether the effects of one fit the slot it is in.
-        (ConcreteType::Fn(ap, ar, _), ConcreteType::Fn(bp, br, _)) => {
+        (ConcreteType::Fn(ap, ar, _, _), ConcreteType::Fn(bp, br, _, _)) => {
             ap.len() == bp.len()
                 && ap.iter().zip(bp).all(|(a, b)| coercible(a, b))
                 && coercible(ar, br)
@@ -8348,7 +8348,9 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
         )),
         // The branches of an `if` hold functions that perform different effects: the value
         // may be either, so it performs both.
-        (ConcreteType::Fn(xp, xr, xe), ConcreteType::Fn(yp, yr, ye)) if xp.len() == yp.len() => {
+        (ConcreteType::Fn(xp, xr, xe, xm), ConcreteType::Fn(yp, yr, ye, ym))
+            if xp.len() == yp.len() =>
+        {
             let mut effects = xe.clone();
             effects.extend(ye.iter().cloned());
             effects.sort();
@@ -8362,6 +8364,7 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
                 params,
                 Box::new(merge_types(xr, yr)?),
                 effects,
+                *xm || *ym,
             ))
         }
         _ => None,
@@ -9861,7 +9864,7 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
         // released, dispatched on the tag — see `emit_rc`).
         ConcreteType::Result(ok, err) => needs_drop(ok, structs) || needs_drop(err, structs),
         // Function types are erased by monomorphization; never a runtime value.
-        ConcreteType::Fn(_, _, _) => false,
+        ConcreteType::Fn(_, _, _, _) => false,
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         // Generic applications are lowered to Named by lower_generics before codegen.
     }
@@ -11655,7 +11658,7 @@ fn emit_rc_w<M: Module>(
         }
         // Unreachable: `needs_drop` returns false for function types (erased by
         // monomorphization), so this arm is guarded out above.
-        ConcreteType::Fn(_, _, _) => {}
+        ConcreteType::Fn(_, _, _, _) => {}
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         // Already handled by the `is_str_repr` guard above.
         ConcreteType::ConcatStr => unreachable!(),
@@ -15767,7 +15770,7 @@ fn type_symbol(ty: &ConcreteType) -> String {
         }
         ConcreteType::Dict(k, v) => format!("dict${}${}", type_symbol(k), type_symbol(v)),
         ConcreteType::Result(ok, err) => format!("{}$err${}", type_symbol(ok), type_symbol(err)),
-        ConcreteType::Fn(params, ret, _) => {
+        ConcreteType::Fn(params, ret, _, _) => {
             let ps = params.iter().map(type_symbol).collect::<Vec<_>>().join("$");
             format!("fn${ps}$to${}", type_symbol(ret))
         }
@@ -17078,7 +17081,7 @@ fn compile_call_expr_direct<M: Module>(
     // any surviving call through a `ConcreteType::Fn` binding is a runtime one).
     // `recv.f(rest)` through a local `f` is that call with `recv` first, as a field's is.
     if !style || matches!(callee, Callee::Local(_)) {
-        if let Some(ConcreteType::Fn(ptys, ret, _)) = env.get(name).map(env_binding_type) {
+        if let Some(ConcreteType::Fn(ptys, ret, _, _)) = env.get(name).map(env_binding_type) {
             return compile_indirect_call(
                 module, builder, cx, scopes, name, &ptys, &ret, args, span,
             );
@@ -20792,7 +20795,7 @@ fn compile_call_expr_direct<M: Module>(
                 }
                 // Function types are erased by monomorphization: a function is
                 // never a runtime value, so it can't be carried in one.
-                ConcreteType::Fn(_, _, _) => {
+                ConcreteType::Fn(_, _, _, _) => {
                     return Err(Error::at(
                         format!("{name:?} payload cannot be a function ({})", type_name(&t)),
                         payload.span.clone(),
@@ -21501,8 +21504,8 @@ fn compile_binop<M: Module>(
                 // `none`/`[]`/`#{}` operand against the other side — then walk
                 // it with `emit_eq`. `!=` is the bitwise negation of `==`.
                 let opn = binop_spelling(op);
-                if matches!(lt, ConcreteType::Fn(_, _, _))
-                    || matches!(rt, ConcreteType::Fn(_, _, _))
+                if matches!(lt, ConcreteType::Fn(_, _, _, _))
+                    || matches!(rt, ConcreteType::Fn(_, _, _, _))
                 {
                     return Err(Error::at(
                         format!("\"{opn}\" is not supported for function values"),
@@ -21648,7 +21651,7 @@ fn has_placeholder_ty(t: &ConcreteType) -> bool {
         }
         ConcreteType::Dict(k, v) => has_placeholder_ty(k) || has_placeholder_ty(v),
         ConcreteType::Result(a, b) => has_placeholder_ty(a) || has_placeholder_ty(b),
-        ConcreteType::Fn(ps, r, _) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
+        ConcreteType::Fn(ps, r, _, _) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
         _ => false,
     }
 }
@@ -21886,6 +21889,7 @@ fn compile_expr_inner<M: Module>(
                         effects.dedup();
                         effects
                     },
+                    false,
                 );
                 (addr, ty)
             } else {

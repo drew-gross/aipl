@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{Callee, Expr, ExprKind, FieldInit, LambdaParam, MatchArm, WrittenNames};
+use crate::ast::{Callee, Capture, Expr, ExprKind, FieldInit, LambdaParam, MatchArm, WrittenNames};
 use crate::names::Names;
 use crate::SpanStr;
 
@@ -198,8 +198,16 @@ impl Renamer<'_> {
                 Box::new(self.go(s, map)),
                 Box::new(self.go(else_b, map)),
             ),
-            ExprKind::Lambda(ps, b) => {
-                let names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
+            ExprKind::Lambda(ps, b, captures) => {
+                // A captured variable is the enclosing function's, so it is renamed with it; the
+                // state a capture starts with is the closure's own, a binder like a parameter.
+                let mut names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
+                names.extend(
+                    captures
+                        .iter()
+                        .filter(|c| c.init.is_some())
+                        .map(|c| c.name.clone()),
+                );
                 let (inner, renamed) = self.scope(map, &names);
                 let ps = ps
                     .iter()
@@ -208,7 +216,19 @@ impl Renamer<'_> {
                         ..p.clone()
                     })
                     .collect();
-                ExprKind::Lambda(ps, Box::new(self.go(b, &inner)))
+                let captures = captures
+                    .iter()
+                    .map(|c| Capture {
+                        name: if c.init.is_some() {
+                            known_as(&renamed, &c.name)
+                        } else {
+                            map.get(&c.name).cloned().unwrap_or_else(|| c.name.clone())
+                        },
+                        init: c.init.as_ref().map(|i| self.go(i, map)),
+                        span: c.span.clone(),
+                    })
+                    .collect();
+                ExprKind::Lambda(ps, Box::new(self.go(b, &inner)), captures)
             }
         };
         Expr::rebuilt(kind, e)

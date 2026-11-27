@@ -1161,7 +1161,7 @@ impl Mono<'_> {
         }
         if let TExprKind::Lambda(params, body) = &e.kind {
             if matches!(e.ty, ConcreteType::Fn(..)) {
-                let ConcreteType::Fn(_, ret, effects) = &e.ty else {
+                let ConcreteType::Fn(_, ret, effects, _) = &e.ty else {
                     unreachable!()
                 };
                 // What the lambda reads of its surroundings travels with the value:
@@ -1852,7 +1852,12 @@ fn positions_of(range: TExpr<ConcreteType>) -> TExpr<ConcreteType> {
                 span.clone(),
             )),
         ),
-        ConcreteType::Fn(vec![index.clone()], Box::new(index.clone()), Vec::new()),
+        ConcreteType::Fn(
+            vec![index.clone()],
+            Box::new(index.clone()),
+            Vec::new(),
+            false,
+        ),
         span.clone(),
     );
     TExpr::new(
@@ -1909,7 +1914,7 @@ fn named_types(t: &Type, out: &mut Vec<String>) {
             named_types(a, out);
             named_types(b, out);
         }
-        Type::Fn(ps, r, _) => {
+        Type::Fn(ps, r, _, _) => {
             ps.iter().for_each(|p| named_types(p, out));
             named_types(r, out);
         }

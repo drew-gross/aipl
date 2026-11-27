@@ -20,7 +20,8 @@ variant Ty =
     | Set(Ty, SetOrder)
     | Dict(Ty, Ty)
     | Result(Ty, Ty)
-    | Fn(Ty[], Ty, str[])
+    # `mutating` is last so an artifact built before it decodes a function type as the plain one it was.
+    | Fn(Ty[], Ty, str[], mutating: bool = false)
     | Tuple(Ty[])
     | Generic(str, Ty[])
     | Any
@@ -64,20 +65,29 @@ pub fn show_order(self: SetOrder) -> str {
     assert(Asc.show_order() == ", Asc");
 })
 
-# The effects of a function type as written after its parameters: ` !prints !reads_files`, and
-# nothing for a type with none.
-fn effects_text(self: str[]) -> str { self.map(|effect| ` !{effect}`).join(sep="") }.test({
-    assert(["prints"].effects_text() == " !prints");
-    assert(["prints", "reads_files"].effects_text() == " !prints !reads_files");
-    assert([].effects_text() == "");
+# What follows a function type's parameters, as written: ` mut !prints !reads_files`, and nothing
+# for a type that mutates nothing and performs no effect.
+fn effects_text(self: str[], mutating: bool) -> str {
+    let mut_text = if (mutating) { " mut" } else { "" };
+    `{mut_text}{self.map(|effect| ` !{effect}`).join(sep="")}`
+}.test({
+    assert([].effects_text(false) == "");
+    assert([].effects_text(true) == " mut");
+    assert(["prints"].effects_text(false) == " !prints");
+    assert(["prints", "reads_files"].effects_text(false) == " !prints !reads_files");
+    assert(["prints"].effects_text(true) == " mut !prints");
 })
 
-# The effects of a function type in `show_ty`'s form: `, !prints`, and nothing for none.
-fn show_effects(self: str[]) -> str {
-    if (self.is_empty()) { "" } else { `, {self.map(|effect| `!{effect}`).join(sep=" ")}` }
+# What a function type's `mut` and effects add to `show_ty`'s form: `, mut !prints`, and nothing
+# for none.
+fn show_effects(self: str[], mutating: bool) -> str {
+    let words = [..if (mutating) { ["mut"] } else { [] }, ..self.map(|effect| `!{effect}`)];
+    if (words.is_empty()) { "" } else { `, {words.join(sep=" ")}` }
 }.test({
-    assert([].show_effects() == "");
-    assert(["prints", "writes"].show_effects() == ", !prints !writes");
+    assert([].show_effects(false) == "");
+    assert(["prints", "writes"].show_effects(false) == ", !prints !writes");
+    assert(["prints"].show_effects(true) == ", mut !prints");
+    assert([].show_effects(true) == ", mut");
 })
 
 # A type as it is written in source: `i64[]`, `str?`, `#>{i64}`, `(i64, str) -> bool`. The
@@ -96,7 +106,7 @@ pub fn type_text(self: Ty) -> str {
         Set(t, o) => `#{o.set_spelling()}\{{t.type_text()}\}`,
         Dict(k, v) => `#\{{k.type_text()}: {v.type_text()}\}`,
         Result(o, e) => `{o.suffix_operand()}!{e.suffix_operand()}`,
-        Fn(ps, r, effects) => `({ps$type_text().join(sep=", ")}){effects.effects_text()} -> {r.type_text()}`,
+        Fn(ps, r, effects, mutating) => `({ps$type_text().join(sep=", ")}){effects.effects_text(mutating)} -> {r.type_text()}`,
         Tuple(ts) => `({ts$type_text().join(sep=", ")})`,
         Generic(n, args) => `{n}<{args$type_text().join(sep=", ")}>`,
         Without(t, x) => `{t.type_text()} without {x.show_exclusion()}`,
@@ -112,6 +122,8 @@ pub fn type_text(self: Ty) -> str {
     assert(Result(i64_ty, Primitive(Str)).type_text() == "i64!str");
     assert(Fn([i64_ty, Primitive(Str)], Unit, []).type_text() == "(i64, str) -> ()");
     assert(Fn([i64_ty], Unit, ["prints"]).type_text() == "(i64) !prints -> ()");
+    assert(Fn([], Unit, [], mutating=true).type_text() == "() mut -> ()");
+    assert(Fn([i64_ty], Unit, ["prints"], mutating=true).type_text() == "(i64) mut !prints -> ()");
     assert(
         Fn([], i64_ty, ["prints", "reads_files"]).type_text() == "() !prints !reads_files -> i64",
     );
@@ -160,7 +172,7 @@ pub fn show_ty(self: Ty) -> str {
         Set(t, o) => `Set({t.show_ty()}{o.show_order()})`,
         Dict(k, v) => `Dict({k.show_ty()}, {v.show_ty()})`,
         Result(o, e) => `Result({o.show_ty()}, {e.show_ty()})`,
-        Fn(ps, r, effects) => `Fn([{show_tys(ps)}], {r.show_ty()}{effects.show_effects()})`,
+        Fn(ps, r, effects, mutating) => `Fn([{show_tys(ps)}], {r.show_ty()}{effects.show_effects(mutating)})`,
         Tuple(ts) => `Tuple({show_tys(ts)})`,
         Generic(n, args) => `Generic({n}, {show_tys(args)})`,
         Without(t, x) => `Without({t.show_ty()}, {x.show_exclusion()})`,
@@ -173,6 +185,7 @@ pub fn show_ty(self: Ty) -> str {
     assert(Result(Unit, Named("Error")).show_ty() == "Result((), Error)");
     assert(Fn([i64_ty, Primitive(Str)], Unit, []).show_ty() == "Fn([i64, str], ())");
     assert(Fn([i64_ty], Unit, ["prints"]).show_ty() == "Fn([i64], (), !prints)");
+    assert(Fn([i64_ty], Unit, ["prints"], mutating=true).show_ty() == "Fn([i64], (), mut !prints)");
     assert(Tuple([i64_ty, Any]).show_ty() == "Tuple(i64, any)");
     assert(Generic("Box", [Named("T")]).show_ty() == "Generic(Box, T)");
     assert(Case(Named("V")).show_ty() == "Case(V)");
@@ -198,7 +211,12 @@ pub fn promoted(self: Ty, vars: str[]) -> Ty {
         Without(t, excluded) => Without(t.promoted(vars), excluded),
         Dict(k, v) => Dict(k.promoted(vars), v.promoted(vars)),
         Result(o, e) => Result(o.promoted(vars), e.promoted(vars)),
-        Fn(params, ret, effects) => Fn(params$promoted(vars), ret.promoted(vars), effects),
+        Fn(params, ret, effects, mutating) => Fn(
+            params$promoted(vars),
+            ret.promoted(vars),
+            effects,
+            mutating=mutating,
+        ),
         Tuple(elements) => Tuple(elements$promoted(vars)),
         Generic(n, args) => Generic(n, args$promoted(vars)),
     }

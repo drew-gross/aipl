@@ -22,6 +22,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map,
     not_equal as !=,
     starts_with,
 } from builtins;
@@ -32,6 +33,7 @@ import {
     Bool,
     ByPattern,
     Call,
+    Capture,
     Char,
     Construct,
     DictLit,
@@ -132,7 +134,7 @@ pub fn expr_text(self: Expr) -> str {
         } else {
             `{name} \{ {fields$field_init_text().join(sep=", ")} }`
         },
-        Lambda(params, body) => `|{params$param_text().join(sep=", ")}| {body.body_text()}`,
+        Lambda(params, body, captures) => `{captures.captures_text()}|{params$param_text().join(sep=", ")}| {body.body_text()}`,
         If(condition, then, otherwise) => `if ({condition.expr_text()}) {then.braced()}{otherwise.else_text()}`,
         IfLet(arm, value, otherwise) => `if (let {arm.pattern.pat_text()} = {value.expr_text()}) {arm.body.braced()}{otherwise.else_text()}`,
         Match(scrutinee, arms) => `match ({scrutinee.expr_text()}) \{ {arms$arm_text().join(sep=", ")} }`,
@@ -479,6 +481,16 @@ fn binding_text(self: Binding) -> str {
         ByPattern(pattern) => pattern.pat_text(),
         _ => self.show_binding(),
     }
+}
+
+# The capture list in front of a lambda, `[mut total, mut n = 0] `, and nothing for none.
+fn captures_text(self: Capture[]) -> str {
+    if (self.is_empty()) { return ""; };
+    let entries = self.map(|c| match (c.init) {
+        some(init) => `mut {c.name} = {init.expr_text()}`,
+        none => `mut {c.name}`,
+    });
+    `[{entries.join(sep=", ")}] `
 }
 
 fn param_text(self: LambdaParam) -> str {

@@ -108,6 +108,11 @@ struct FieldInit { name: str, value: Expr, name_span: Span = 0..0, shorthand: bo
 # that the binding is always a `Name`.
 struct LambdaParam { binding: Binding, ty: Ty?, span: Span, written: WrittenNames? = none }
 
+# One entry of the capture list in front of a lambda, `[mut total, mut n = 0] |x| ..`: a variable
+# the closure mutates. Without an initializer it names a variable of the enclosing function, which
+# the closure takes over; with one it is state the closure starts with and owns.
+struct Capture { name: str, init: Expr?, span: Span }
+
 # The name of the parameter `self` lowers to: see `name_at`.
 pub fn synthesized_name(self: LambdaParam) -> str { self.binding.name_at(self.span) }.test({
     let plain = LambdaParam { binding: Name("x"), ty: none, span: 4..5 };
@@ -280,7 +285,8 @@ variant ExprKind =
     | Unit
     | Seq(Expr, Expr)
     | Return(Expr)
-    | Lambda(LambdaParam[], Expr)
+    # `captures` is last so an artifact built before it decodes a lambda as the plain one it was.
+    | Lambda(LambdaParam[], Expr, captures: Capture[] = [])
     | TupleLit(Expr[])
     | KwArg(name: str, value: Expr, forwarded: bool)
     # `f::<T, U>(args)`: the call, and the types written between the angles.
@@ -399,7 +405,7 @@ pub fn show_expr(self: Expr) -> str {
         Unit => "()",
         Seq(a, b) => `Seq({a.show_expr()}, {b.show_expr()})`,
         Return(e) => `Return({e.show_expr()})`,
-        Lambda(ps, body) => `Lambda([{ps$show_lambda_param().join(sep=", ")}], {body.show_expr()})`,
+        Lambda(ps, body, captures) => `Lambda([{ps$show_lambda_param().join(sep=", ")}], {body.show_expr()}{captures.show_captures()})`,
         TupleLit(es) => `Tuple({show_exprs(es)})`,
         TypeArgs(call, tys) => `TypeArgs({call.show_expr()}, [{tys.map(show_ty).join(sep=", ")}])`,
         KwArg(name, value, forwarded) => if (forwarded) {
@@ -540,6 +546,16 @@ fn show_opt_expr(self: Expr?) -> str { self$show_expr().value_or("") }
 # `: T` when a binding or a lambda parameter was annotated, and nothing when it
 # was not — so the dump reads like the source did.
 fn show_ann(self: Ty?) -> str { self.map(|t| `: {t.show_ty()}`).value_or("") }
+
+# The capture list of a lambda in a dump: nothing when there is none, else `, [mut a, mut b = 0]`.
+fn show_captures(self: Capture[]) -> str {
+    if (self.is_empty()) { return ""; };
+    let shown = self.map(|c| match (c.init) {
+        some(init) => `mut {c.name} = {init.show_expr()}`,
+        none => `mut {c.name}`,
+    });
+    `, [{shown.join(sep=", ")}]`
+}
 
 fn show_lambda_param(self: LambdaParam) -> str {
     `{self.binding.show_binding()}{show_ann(self.ty)}`
@@ -682,7 +698,17 @@ pub fn mapped<X: cases>(
         Try(x) => Try(f(x)),
         Seq(first, rest) => Seq(f(first), f(rest)),
         Return(x) => Return(f(x)),
-        Lambda(params, body) => Lambda(params, f(body)),
+        Lambda(params, body, written) => {
+            mut captures: (Capture without X throughout)[] = []; #[allow]
+            for (let c : written) {
+                set captures.push(Capture {
+                    name: c.name,
+                    init: if (let some(e) = c.init) { some(f(e)) } else { none },
+                    span: c.span,
+                });
+            }
+            Lambda(params, f(body), captures=captures)
+        },
         TupleLit(elements) => TupleLit(elements.map(f)),
         KwArg(name, value, forwarded) => KwArg(name, f(value), forwarded),
         TypeArgs(x, types) => TypeArgs(f(x), types),
@@ -809,8 +835,8 @@ pub fn subexprs(self: Expr) -> Expr[] {
         | KwArg(_, x, _)
         | TypeArgs(x, _)
         | Spread(x)
-        | Lambda(_, x)
         | Shim(_, _, x) => [x],
+        Lambda(_, body, captures) => [body, ..captures$init.collect_ok()],
         Construct(_, inits) => inits$value,
         DictLit(pairs) => pairs$to_array().join(),
         Seq(a, b)
@@ -859,9 +885,10 @@ pub fn promoted_annotations(self: Expr, vars: str[]) -> Expr {
     let kind = match (self.kind) {
         Let(name, ty, value, body) => Let(name, ty$promoted(vars), value, body),
         LetMut(name, ty, value, body) => LetMut(name, ty$promoted(vars), value, body),
-        Lambda(params, body) => Lambda(
+        Lambda(params, body, captures) => Lambda(
             params.map(|p| LambdaParam { ..p, ty: p.ty$promoted(vars) }),
             body,
+            captures=captures,
         ),
         _ => self.kind,
     };

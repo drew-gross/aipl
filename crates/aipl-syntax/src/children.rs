@@ -155,7 +155,7 @@ impl Expr {
             | K::KwArg(_, x, _)
             | K::TypeArgs(x, _)
             | K::Spread(x)
-            | K::Lambda(_, x) => Children::of([x]),
+            | K::Lambda(_, x, _) => Children::of([x]),
             K::Seq(a, b)
             | K::Index(a, b)
             | K::Let(_, _, a, b)
@@ -197,7 +197,7 @@ impl Expr {
             | K::KwArg(_, x, _)
             | K::TypeArgs(x, _)
             | K::Spread(x)
-            | K::Lambda(_, x) => ChildrenMut::of([x]),
+            | K::Lambda(_, x, _) => ChildrenMut::of([x]),
             K::Seq(a, b)
             | K::Index(a, b)
             | K::Let(_, _, a, b)

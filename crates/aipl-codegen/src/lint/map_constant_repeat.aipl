@@ -64,7 +64,7 @@ pub fn map_constant_repeat(self: Call(_, arguments, _, callee)) -> LintHit? {
     if (callee != Map) { return none; };
 
     let [receiver, lambda] = arguments else { return none; };
-    let Lambda([parameter], constant) = lambda.kind else { return none; };
+    let Lambda([parameter], constant, []) = lambda.kind else { return none; };
     if (receiver.is_range() || !constant.is_constant(parameter.synthesized_name())) {
         return none;
     };

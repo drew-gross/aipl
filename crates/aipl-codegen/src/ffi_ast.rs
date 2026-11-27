@@ -222,7 +222,7 @@ fn replace_type_var(t: &mut ast::Type, name: &str, with: &ast::Type) {
             replace_type_var(a, name, with);
             replace_type_var(b, name, with);
         }
-        T::Fn(ps, r, _) => {
+        T::Fn(ps, r, _, _) => {
             ps.iter_mut().for_each(|p| replace_type_var(p, name, with));
             replace_type_var(r, name, with);
         }
@@ -409,6 +409,7 @@ fn ty(v: &FfiValue) -> R<ast::Type> {
             each(at(payload, 0, case)?, ty)?,
             one(1)?,
             effect_set(at(payload, 2, case)?)?,
+            flag(at(payload, 3, case)?)?,
         ),
         "Tuple" => T::Tuple(each(at(payload, 0, case)?, ty)?),
         "Generic" => T::Generic(
@@ -517,6 +518,14 @@ fn lambda_param(v: &FfiValue) -> R<ast::LambdaParam> {
     Ok(ast::LambdaParam {
         name,
         ty: maybe(field(v, "ty")?, ty)?,
+        span: span(field(v, "span")?)?,
+    })
+}
+
+fn capture(v: &FfiValue) -> R<ast::Capture> {
+    Ok(ast::Capture {
+        name: text(field(v, "name")?)?,
+        init: maybe(field(v, "init")?, expr)?,
         span: span(field(v, "span")?)?,
     })
 }
@@ -649,7 +658,11 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
         "Unit" => K::Unit,
         "Seq" => K::Seq(sub(0)?, sub(1)?),
         "Return" => K::Return(sub(0)?),
-        "Lambda" => K::Lambda(each(at(payload, 0, case)?, lambda_param)?, sub(1)?),
+        "Lambda" => K::Lambda(
+            each(at(payload, 0, case)?, lambda_param)?,
+            sub(1)?,
+            each(at(payload, 2, case)?, capture)?,
+        ),
         "TupleLit" => K::TupleLit(each(at(payload, 0, case)?, expr)?),
         "KwArg" => K::KwArg(name(0)?, sub(1)?, flag(at(payload, 2, case)?)?),
         "TypeArgs" => K::TypeArgs(sub(0)?, each(at(payload, 1, case)?, ty)?),
