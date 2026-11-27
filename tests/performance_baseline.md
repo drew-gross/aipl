@@ -407,6 +407,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/docs/doc_comments | 15 | 1043 | 1043 | 2248 | 7052 |
 | tests/cases/docs/module_docs | 3 | 193 | 193 | 617 | 4712 |
 | tests/cases/effects/declaring_prints_allows_print_call | 1 | 88 | 88 | 478 | 4184 |
+| tests/cases/effects/function_value_call_order | 16 | 840 | 420 | 898 | 3460 |
 | tests/cases/effects/function_value_effects | 11 | 333 | 157 | 1045 | 5108 |
 | tests/cases/effects/over_declared_effects_are_fine | 0 | 0 | 0 | 40 | 496 |
 | tests/cases/effects/random | 7 | 221 | 221 | 1469 | 5744 |
@@ -554,6 +555,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/lambdas/filter_map | 25 | 1586 | 936 | 6399 | 11800 |
 | tests/cases/lambdas/fn_ref_shadowing | 1 | 40 | 40 | 435 | 1252 |
 | tests/cases/lambdas/generic_fn_as_value | 25 | 1710 | 1766 | 6842 | 16228 |
+| tests/cases/lambdas/lent_variables | 0 | 0 | 0 | 352 | 1040 |
 | tests/cases/lambdas/map_capture | 2 | 128 | 128 | 670 | 1456 |
 | tests/cases/lambdas/map_empty | 3 | 72 | 72 | 750 | 3176 |
 | tests/cases/lambdas/map_fresh_variant | 4 | 144 | 160 | 646 | 1748 |

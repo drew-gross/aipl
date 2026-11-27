@@ -1,0 +1,44 @@
+# A call of a function value that performs an effect stays where it is written: the optimizer does
+# not move a binding's call past a later statement, as it may a pure one. The calls here, through a
+# field and through a local, print before and after "between", in the order of the source.
+
+import { print } from builtins;
+
+struct Logger { run: (i64) !prints -> i64 }
+
+pub fn make() -> Logger {
+    run: |x| {
+        print(`field {x}`);
+        x
+    },
+}
+
+pub fn make_function() -> (i64) !prints -> i64 {
+    |x| {
+        print(`local {x}`);
+        x
+    }
+}
+
+fn main() !prints {
+    let logger = make();
+    let first = logger.run(1);
+    print("between");
+    let second = logger.run(2);
+    print(`{first} {second}`);
+
+    let function = make_function();
+    let third = function(3);
+    print("between");
+    let fourth = function(4);
+    print(`{third} {fourth}`);
+}
+--- stdout ---
+field 1
+between
+field 2
+1 2
+local 3
+between
+local 4
+3 4

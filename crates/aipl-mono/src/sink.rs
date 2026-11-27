@@ -194,7 +194,20 @@ fn placeholder<T: TyRepr>() -> TExpr<T> {
 /// [`reaches_blocked`] over the typed tree.
 fn reaches_blocked_typed<T: TyRepr>(e: &TExpr<T>, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
-        TExprKind::Call { callee, .. } => blocked.contains(callee.name()),
+        TExprKind::Call {
+            callee, type_args, ..
+        } => {
+            blocked.contains(callee.name())
+                // A call of a function value carries the function's type, which says whether the
+                // call performs an effect or changes the closure.
+                || type_args.first().is_some_and(|t| {
+                    matches!(
+                        t.to_type(),
+                        aipl_syntax::ast::Type::Fn(_, _, ref effects, mutating)
+                            if mutating || !effects.is_empty()
+                    )
+                })
+        }
         TExprKind::Ident(name) => blocked.contains(name),
         TExprKind::Shim(..) => true,
         _ => false,
