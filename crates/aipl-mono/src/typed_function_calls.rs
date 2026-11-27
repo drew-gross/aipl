@@ -39,6 +39,92 @@ impl Mono<'_> {
         }
     }
 
+    /// `e` with each function that a call wants and cannot name written as the lambda that calls
+    /// it: a local `g` as `|a| g(a)`, and any other expression of function type (a call that
+    /// returns one) bound to a local first. The callee is specialized for the function it is
+    /// handed, which has to be a lambda or a name, and the lambda captures what it calls.
+    pub(crate) fn expand_local_functions(&self, e: &mut TExpr<Ty>, fresh: &mut usize) {
+        e.for_each_child_mut(&mut |child| self.expand_local_functions(child, fresh));
+        let TExprKind::Call { callee, args, .. } = &mut e.kind else {
+            return;
+        };
+        let declared = self.declared_parameters(callee.name());
+        let native = matches!(
+            callee,
+            Callee::Map | Callee::Filter | Callee::FilterMap | Callee::ZipWith
+        );
+        let mut bound: Vec<(String, TExpr<Ty>)> = Vec::new();
+        for (i, arg) in args.iter_mut().enumerate() {
+            let wanted = native
+                || declared
+                    .as_ref()
+                    .is_some_and(|d| d.get(i).is_some_and(|p| matches!(p, Type::Fn(..))));
+            if !wanted || self.is_function_argument(arg) {
+                continue;
+            }
+            let Ty::Fn(parameter_tys, ret) = arg.ty.clone() else {
+                continue;
+            };
+            *fresh += 1;
+            let local = match &arg.kind {
+                TExprKind::Ident(local) => local.clone(),
+                _ => {
+                    let local = format!("$fn$eta{fresh}");
+                    let value = std::mem::replace(
+                        arg,
+                        TExpr::new(
+                            TExprKind::Ident(local.clone()),
+                            arg.ty.clone(),
+                            arg.span.clone(),
+                        ),
+                    );
+                    bound.push((local.clone(), value));
+                    local
+                }
+            };
+            let params: Vec<aipl_syntax::typed::TLambdaParam<Ty>> = parameter_tys
+                .iter()
+                .enumerate()
+                .map(|(n, ty)| aipl_syntax::typed::TLambdaParam {
+                    name: format!("{local}$a{n}"),
+                    ty: ty.clone(),
+                    span: arg.span.clone(),
+                })
+                .collect();
+            let call = TExpr::new(
+                TExprKind::Call {
+                    callee: Callee::Local(local),
+                    type_args: Vec::new(),
+                    args: params
+                        .iter()
+                        .map(|p| {
+                            TExpr::new(
+                                TExprKind::Ident(p.name.clone()),
+                                p.ty.clone(),
+                                arg.span.clone(),
+                            )
+                        })
+                        .collect(),
+                    method_style: false,
+                },
+                (*ret).clone(),
+                arg.span.clone(),
+            );
+            let ty = arg.ty.clone();
+            let span = arg.span.clone();
+            *arg = TExpr::new(TExprKind::Lambda(params, Box::new(call)), ty, span);
+        }
+        for (name, value) in bound.into_iter().rev() {
+            let (ty, span) = (e.ty.clone(), e.span.clone());
+            let call = std::mem::replace(e, TExpr::new(TExprKind::Unit, ty.clone(), span.clone()));
+            *e = TExpr::new(
+                TExprKind::Let(name, Box::new(value), Box::new(call)),
+                ty,
+                span,
+            );
+        }
+    }
+
     /// The declared parameter types of a user function, concrete or generic.
     pub(crate) fn declared_parameters(&self, name: &str) -> Option<Vec<Type>> {
         if let Some(generic) = self.generics.get(name) {
@@ -89,8 +175,12 @@ impl Mono<'_> {
                 && params.iter().zip(args).any(|(p, a)| {
                     matches!(p, Type::Fn(..))
                         && (matches!(a.kind, TExprKind::Lambda(..))
-                            || matches!(&a.kind, TExprKind::Ident(_))
-                                && matches!(a.ty, ConcreteType::Fn(..)))
+                            || matches!(&a.kind, TExprKind::Ident(g)
+                                if matches!(a.ty, ConcreteType::Fn(..))
+                                    && (self.cur_lenv.contains_key(g)
+                                        || self.concrete.contains_key(g)
+                                        || self.generics.contains_key(g)
+                                        || Callee::from_canonical(g).is_some_and(|c| c.is_builtin()))))
                 })
         })
     }

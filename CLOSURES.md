@@ -40,7 +40,9 @@ values at the moment the lambda is made; mutating a captured binding is a later 
 Stage 1 is built: a capturing lambda stored in a variant, a struct field or a `let` works
 (`closure_conversion.rs`, cases `tests/cases/functions/closures.aipl` and `closure_values.aipl`). A
 captured `mut` binding is refused in the pinner (`reject_mutable_captures`), which is also where a
-lambda's other refusals are made.
+lambda's other refusals are made. A function may return a function: the lambda it ends in (or
+`return`s) is typed from the declared return type (`typed_returned_lambdas`), and a local or call
+result handed where a callee wants a function is wrapped as `|a| g(a)` (`expand_local_functions`).
 
 ### 2. The todo app uses it
 - [ ] `Element` carries `on_click: (Todo[]) -> Todo[]` generically (`Element<M>`); `view` builds
@@ -48,10 +50,8 @@ lambda's other refusals are made.
 - [ ] `GUI_TODO_APP.md` stage 4 updated to say handlers, not `clicked` by key.
 
 ### 3. Follow-ups
-- [ ] `==` on a type holding a closure, a function returning a bare function value, arrays and
-      optionals of functions, and mutating captures, each its own decision.
-- [ ] A closure held in a local and handed to a function that takes a function (the callee is
-      specialized for the lambda, which a local is not): check it, and make it work or refuse it.
+- [ ] `==` on a type holding a closure, arrays and optionals of functions, and mutating
+      captures, each its own decision.
 
 ## Done when
 

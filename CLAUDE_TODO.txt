@@ -26,8 +26,8 @@ without (refinements; goal: `desugared` returns an Expr that cannot hold LetPatt
   once those hold: annotate `desugared`, then drop the dead LetPattern/ForPattern/ProviderShim arms downstream of desugar (item.aipl own_names, expr.aipl helpers shared with the surface); check ffi_ast.rs still decodes it. Same for Binding and Param::pattern
 function values:
   CLOSURES.md plans captures for lambdas stored in data (defunctionalized into a synthesized variant in mono; onClick for projects/todo)
-  a function value has no captured environment: a lambda stored in data (a variant payload, a struct field) is lifted with no captures (typed_infer.rs `lower`: `lift_lambda(.., &[], ..)`), so `fn make(n: u64) -> Node { Button(|m| { m + n }) }` fails with `unknown identifier "$inl0_n"` (the same on the commit before 2026-11-24; small tests pass only when inlining substitutes a literal for the capture). Blocks React-style onClick handlers that close over props
-  a function cannot return a bare function value ("cannot return a function value"), and arrays and optionals cannot hold function types, though a variant or struct holding one can be in an array
+  arrays and optionals cannot hold function types, though a variant or struct holding one can be in an array
+  a call's result cannot be called directly: `f(1)(2)` is a parse error (`let g = f(1); g(2)` works)
   `==` on a type holding a function value is refused ("equality is not supported for type (i64) -> i64"), so an element tree with handlers cannot be compared in a test
   a lambda whose body starts with `[` does not parse: `|xs| [..xs, x]` gives "expected `{`"; `|xs| { [..xs, x] }` does
 

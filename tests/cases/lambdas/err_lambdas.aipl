@@ -69,9 +69,6 @@ fn lambda_body_type() -> i64 { apply_i64(|x| true, 3) }
 fn map_not_array() !prints {
     print(to_str(map(5, |x| x + 1)));
 }
-
-// A function value cannot be returned.
-fn return_function() -> (i64) -> i64 { inc }
 --- check --compile ---
 error: "x" is not a function
   --> ./tests/cases/lambdas/err_lambdas.aipl:31:5
@@ -132,9 +129,3 @@ error: fn "map" arg 0: expected _[], got i64
    |
 70 |     print(to_str(map(5, |x| x + 1)));
    |                      ^
-
-error: fn "return_function": cannot return a function value ((i64) -> i64)
-  --> ./tests/cases/lambdas/err_lambdas.aipl:74:4
-   |
-74 | fn return_function() -> (i64) -> i64 { inc }
-   |    ^^^^^^^^^^^^^^^

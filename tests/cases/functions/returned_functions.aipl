@@ -1,0 +1,54 @@
+# A function may return a function: a lambda, with or without captures, a function by name, and one
+# that itself returns a function. The type the function declares is the type the lambda it ends in
+# has, so its parameters need no annotation.
+
+import { equal as ==, map, wrapping_add as + } from builtins;
+
+fn adder(n: i64) -> (i64) -> i64 { |x| { x + n } }
+
+fn doubler() -> (i64) -> i64 { |x| { x + x } }
+
+fn inc(x: i64) -> i64 { x + 1 }
+
+fn named() -> (i64) -> i64 { inc }
+
+fn chosen(flag: bool, n: i64) -> (i64) -> i64 {
+    if (flag) { return |x| { x + n }; };
+    inc
+}
+
+fn curried(a: i64) -> (i64) -> (i64) -> i64 { |b| { |c| { a + b + c } } }
+
+fn use_them(n: i64) -> i64 {
+    let add = adder(n);
+    let twice = doubler();
+    let one = named();
+    add(1) + twice(2) + one(3)
+}.test({
+    assert(use_them(10) == 19);
+})
+
+fn pick(flag: bool) -> i64 {
+    let on = chosen(true, 100);
+    let off = chosen(false, 100);
+    if (flag) { on(1) } else { off(1) }
+}.test({
+    assert(pick(true) == 101);
+    assert(pick(false) == 2);
+})
+
+fn apply_curried(a: i64) -> i64 {
+    let first = curried(a);
+    let second = first(2);
+    second(3)
+}.test({
+    assert(apply_curried(1) == 6);
+})
+
+# A returned closure handed to a function that takes a function.
+fn mapped(n: i64) -> i64[] {
+    let add = adder(n);
+    [1, 2, 3].map(add)
+}.test({
+    assert(mapped(10) == [11, 12, 13]);
+})

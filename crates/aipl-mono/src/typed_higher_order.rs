@@ -99,6 +99,24 @@ pub(crate) fn free_locals(
                 out.push((name.clone(), e.ty.clone()));
             }
         }
+        // A call through a local reads it: its type is the function type the call has.
+        TExprKind::Call {
+            callee: Callee::Local(name),
+            args,
+            ..
+        } => {
+            if !bound.contains(name) && scope.contains(name) && !out.iter().any(|(n, _)| n == name)
+            {
+                let ty = ConcreteType::Fn(
+                    args.iter().map(|a| a.ty.clone()).collect(),
+                    Box::new(e.ty.clone()),
+                );
+                out.push((name.clone(), ty));
+            }
+            for a in args {
+                free_locals(a, scope, bound, out);
+            }
+        }
         TExprKind::Let(name, value, body) | TExprKind::LetMut(name, value, body) => {
             free_locals(value, scope, bound, out);
             bound.push(name.clone());

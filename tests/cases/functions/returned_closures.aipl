@@ -1,0 +1,60 @@
+# Closures that capture arrays and strings, returned directly: from a function, from the branches of an
+# `if`, from a closure, and handed on to `map`. What they hold is released with them, which the leak
+# gate checks.
+
+import { equal as ==, map, print, wrapping_add as + } from builtins;
+
+fn appender(extra: i64[]) -> (i64[]) -> i64[] {
+    let doubled = [..extra, ..extra];
+    |xs| { [..xs, ..doubled] }
+}
+
+fn labeler(prefix: str) -> (str) -> str {
+    let p = `{prefix}:`;
+    |s| { `{p}{s}` }
+}
+
+fn double(xs: i64[]) -> i64[] { [..xs, ..xs] }
+
+fn pick(which: i64, extra: i64[]) -> (i64[]) -> i64[] {
+    if (which == 0) {
+        |xs| { [..xs, ..extra] }
+    } else if (which == 1) {
+        double
+    } else {
+        |xs| { [..extra, ..xs] }
+    }
+}
+
+fn curried(a: i64) -> (i64) -> (i64) -> i64 { |b| { |c| { a + b + c } } }
+
+fn early(flag: bool, n: i64) -> (i64) -> i64 {
+    if (flag) { return |x| { x + n }; };
+    |x| { x }
+}
+
+fn main() !prints {
+    let f = appender([1, 2]);
+    print(`{f([0])} {f([9])}`);
+    let p0 = pick(0, [5]);
+    let p1 = pick(1, [5]);
+    let p2 = pick(2, [5]);
+    print(`{p0([1])} {p1([1])} {p2([1])}`);
+    let l = labeler("id");
+    print(l("x"));
+    let c = curried(1);
+    let c2 = c(2);
+    print(`{c2(3)}`);
+    let e1 = early(true, 10);
+    let e2 = early(false, 10);
+    print(`{e1(1)} {e2(1)}`);
+    let g = early(true, 100);
+    print(`{[1, 2, 3].map(g)}`);
+}
+--- stdout ---
+[0, 1, 2, 1, 2] [9, 1, 2, 1, 2]
+[1, 5] [1, 1] [5, 1]
+id:x
+6
+11 1
+[101, 102, 103]

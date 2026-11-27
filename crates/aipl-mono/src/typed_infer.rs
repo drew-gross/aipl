@@ -31,9 +31,6 @@ impl Mono<'_> {
                 && !self.cur_lenv.contains_key(name)
                 && concrete(&e.ty).is_some();
         }
-        if matches!(e.ty, Ty::Fn(..)) {
-            return false;
-        }
         let sub = |x: &TExpr<Ty>| self.supported(x, concrete);
         match &e.kind {
             TExprKind::Int(_)
@@ -616,7 +613,9 @@ impl Mono<'_> {
             None => (template, type_args),
         };
         let source = *self.typed_fns.get(source_name)?;
-        self.names = Names::of_typed(&source.body);
+        let mut expanded = source.body.clone();
+        self.expand_local_functions(&mut expanded, &mut 0);
+        self.names = Names::of_typed(&expanded);
         for p in params {
             self.names.reserve(&p.name);
         }
@@ -648,7 +647,7 @@ impl Mono<'_> {
                     .get(v)
                     .and_then(|t| Ty::from_type(t)?.concretize(&|_| None))
             };
-            let _ = source.body.map_types(&mut |t: &Ty| {
+            let _ = expanded.map_types(&mut |t: &Ty| {
                 t.concretize_with(&subst, &record)?.to_type().to_concrete()
             });
         }
@@ -657,7 +656,7 @@ impl Mono<'_> {
         }
         // An application the pinner already resolved to its instance is made where it is used.
         let mut used: Vec<String> = Vec::new();
-        let _ = source.body.map_types(&mut |t: &Ty| {
+        let _ = expanded.map_types(&mut |t: &Ty| {
             if let Some(c) = t.concretize(&|v| {
                 type_args
                     .get(v)
@@ -687,7 +686,7 @@ impl Mono<'_> {
                 .to_concrete()
         };
         if (specialized.is_none() && params.len() != source.sig.params.len())
-            || !self.supported(&source.body, &concrete)
+            || !self.supported(&expanded, &concrete)
         {
             return None;
         }
@@ -755,7 +754,7 @@ impl Mono<'_> {
             }
             next += 1;
         }
-        let mut body = source.body.map_types(&mut |t| concrete(t))?;
+        let mut body = expanded.map_types(&mut |t| concrete(t))?;
         let mut has_rope = false;
         body.walk(&mut |n| {
             has_rope |= matches!(&n.kind, TExprKind::Call { callee: Callee::RopeStr, args, .. } if args.len() == 2);

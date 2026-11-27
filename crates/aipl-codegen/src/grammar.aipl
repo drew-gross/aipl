@@ -303,10 +303,10 @@ variant Refusal = Msg(str) | Fn((str) -> str)
 # `Build` have a payload-free arm at all; until it existed there was no way to
 # write one, which is why there is still no `NoLower`-style arm on anything else.
 #
-# Function values are non-capturing and non-generic (`check.rs`), so a lowering
-# is a named top-level `fn lower_x(..)`, a constructor (`Kids(Object)`), or a
-# lambda that reads only its parameters — whose types it takes from the arm's
-# payload, so `Text(|t| Bool(t == "true"))` needs no annotation. A production
+# Function values are non-generic (`check.rs`), so a lowering is a named
+# top-level `fn lower_x(..)`, a constructor (`Kids(Object)`), or a lambda —
+# whose parameter types it takes from the arm's payload, so
+# `Text(|t| Bool(t == "true"))` needs no annotation. A production
 # whose value *is* its children under one case wants that constructor and
 # nothing around it — `Kids(List)`, never a `fn keep(kids) { List(kids) }`
 # wrapper, which is only the constructor spelled out longhand. They also can't

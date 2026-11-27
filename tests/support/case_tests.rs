@@ -305,6 +305,8 @@ case_tests! {
     cases_functions_recursion_factorial_recursion_large = "cases/functions/recursion/factorial_recursion_large",
     cases_functions_recursion_mutual_recursion = "cases/functions/recursion/mutual_recursion",
     cases_functions_return = "cases/functions/return",
+    cases_functions_returned_closures = "cases/functions/returned_closures",
+    cases_functions_returned_functions = "cases/functions/returned_functions",
     cases_functions_returns_many = "cases/functions/returns_many",
     cases_functions_simple_call = "cases/functions/simple_call",
     cases_functions_typed_body_without_calls = "cases/functions/typed_body_without_calls",

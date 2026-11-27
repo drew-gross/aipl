@@ -452,6 +452,8 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/functions/recursion/factorial_recursion_large | 0 | 0 | 0 | 136 | 220 |
 | tests/cases/functions/recursion/mutual_recursion | 0 | 0 | 0 | 822 | 544 |
 | tests/cases/functions/return | 11 | 684 | 684 | 2592 | 6916 |
+| tests/cases/functions/returned_closures | 26 | 1387 | 1387 | 5718 | 14224 |
+| tests/cases/functions/returned_functions | 1 | 40 | 40 | 672 | 2144 |
 | tests/cases/functions/returns_many | 7 | 384 | 384 | 4718 | 12820 |
 | tests/cases/functions/simple_call | 0 | 0 | 0 | 58 | 276 |
 | tests/cases/functions/typed_body_without_calls | 0 | 0 | 0 | 2 | 8 |

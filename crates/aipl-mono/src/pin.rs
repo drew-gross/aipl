@@ -1257,7 +1257,11 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
         defaults.push(pinned);
     }
     p.env = everything;
-    let body = p.expr(&f.body)?;
+    let mut written = f.body.clone();
+    if let Some(returned @ Type::Fn(..)) = &f.sig.return_ty {
+        typed_returned_lambdas(&mut written, returned);
+    }
+    let body = p.expr(&written)?;
     let ret = p.ret.clone();
     p.coerce_expr(
         &body,
@@ -1320,7 +1324,64 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     })
 }
 
-/// The rules on how a function may be declared as a method, and on what it may return.
+/// `e`, the body of a function that returns a function of type `returned`, with the untyped
+/// parameters of every lambda it can end in, or `return`, given that type's parameter types: where
+/// the result is, the type is known, as it is for a lambda in a field. A lambda that itself returns
+/// a function is typed the same way, one level in.
+fn typed_returned_lambdas(e: &mut Expr, returned: &Type) {
+    // A `return` belongs to the function it is written in, so a lambda's body is not searched.
+    if !matches!(e.kind, ExprKind::Lambda(..)) {
+        for child in e.children_mut() {
+            typed_returned_lambdas_in_returns(child, returned);
+        }
+    }
+    typed_result_lambdas(e, returned);
+}
+
+fn typed_returned_lambdas_in_returns(e: &mut Expr, returned: &Type) {
+    if let ExprKind::Return(value) = &mut e.kind {
+        typed_result_lambdas(value, returned);
+    }
+    if !matches!(e.kind, ExprKind::Lambda(..)) {
+        for child in e.children_mut() {
+            typed_returned_lambdas_in_returns(child, returned);
+        }
+    }
+}
+
+fn typed_result_lambdas(e: &mut Expr, returned: &Type) {
+    let Type::Fn(params, ret) = returned else {
+        return;
+    };
+    match &mut e.kind {
+        ExprKind::Lambda(lambda_params, body) if lambda_params.len() == params.len() => {
+            for (p, ty) in lambda_params.iter_mut().zip(params) {
+                p.ty.get_or_insert_with(|| ty.clone());
+            }
+            typed_returned_lambdas(body, ret);
+        }
+        ExprKind::Let(_, _, _, rest) | ExprKind::LetMut(_, _, _, rest) => {
+            typed_result_lambdas(rest, returned)
+        }
+        ExprKind::Seq(_, rest) => typed_result_lambdas(rest, returned),
+        ExprKind::If(_, then, otherwise) => {
+            typed_result_lambdas(then, returned);
+            typed_result_lambdas(otherwise, returned);
+        }
+        ExprKind::IfLet(arm, _, otherwise) => {
+            typed_result_lambdas(&mut arm.body, returned);
+            typed_result_lambdas(otherwise, returned);
+        }
+        ExprKind::Match(_, arms) => {
+            for arm in arms {
+                typed_result_lambdas(&mut arm.body, returned);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The rules on how a function may be declared as a method.
 fn check_method_declaration(f: &Function) -> Res<()> {
     let name = display(&f.name.text);
     let fail = |what: &str| reject(format!("fn {name:?}: {what}"), &f.name.span);
@@ -1334,12 +1395,6 @@ fn check_method_declaration(f: &Function) -> Res<()> {
         if f.sig.return_ty.is_some() {
             return fail("a mutating method cannot return a value");
         }
-    }
-    if let Some(rt @ Type::Fn(..)) = &f.sig.return_ty {
-        return fail(&format!(
-            "cannot return a function value ({})",
-            aipl_syntax::type_name(rt)
-        ));
     }
     Ok(())
 }
