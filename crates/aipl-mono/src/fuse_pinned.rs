@@ -142,14 +142,14 @@ fn element_of(ty: &Ty) -> Option<Ty> {
 
 fn fn_param(f: &P) -> Option<Ty> {
     match &f.ty {
-        Ty::Fn(params, _) => params.first().cloned(),
+        Ty::Fn(params, _, _) => params.first().cloned(),
         _ => None,
     }
 }
 
 fn fn_result(f: &P) -> Option<Ty> {
     match &f.ty {
-        Ty::Fn(_, ret) => Some((**ret).clone()),
+        Ty::Fn(_, ret, _) => Some((**ret).clone()),
         _ => None,
     }
 }
@@ -217,7 +217,11 @@ fn is_pure(func: &P, blocked: &HashSet<String>) -> bool {
 }
 
 fn lambda(param: TLambdaParam<Ty>, body: P, like: &P) -> P {
-    let ty = Ty::Fn(vec![param.ty.clone()], Box::new(body.ty.clone()));
+    let ty = Ty::Fn(
+        vec![param.ty.clone()],
+        Box::new(body.ty.clone()),
+        Vec::new(),
+    );
     TExpr::rebuilt(TExprKind::Lambda(vec![param], Box::new(body)), ty, like)
 }
 
@@ -836,7 +840,11 @@ fn chain(whole: &P, outer: Option<&Callee>) -> Option<P> {
         let produced = element_of(&inner.ty)?;
         fused.push(TExpr::new(
             TExprKind::Ident(step.name().to_string()),
-            Ty::Fn(vec![produced.clone(), produced.clone()], Box::new(produced)),
+            Ty::Fn(
+                vec![produced.clone(), produced.clone()],
+                Box::new(produced),
+                Vec::new(),
+            ),
             whole.span.clone(),
         ));
     }

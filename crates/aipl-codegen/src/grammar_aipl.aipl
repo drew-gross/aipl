@@ -820,6 +820,10 @@ fn types() -> Production<AiplTok, Ast>[] {
     // opens the same way: `(A, B) -> R` over `(A, B)[]` over `(A, B)!E` over
     // `(A, B)`.
     let ty_head: Rule<AiplTok> = OneOf([
+        // `(A) !prints -> R`: the effects a call performs come between the parameters and the
+        // arrow, where a declaration puts them. Ahead of the pure form, and of the result `(A)!E`
+        // that its first `!` also starts: only the arrow after the run of effects makes it this.
+        Then([Named("ty_parens"), Many(Named("effect"), min=1), Lit("->"), Named("ty")]),
         Then([Named("ty_parens"), Lit("->"), Named("ty")]),
         Then([Named("ty_parens"), Lit("["), Lit("]")]),
         // A result: `A!E`, `(A, B)!E`, or the void `!E`. One alternative, with
@@ -3911,7 +3915,7 @@ fn named_param(
     };
     let ty = match (arity) {
         ReturnsMany => match (written) {
-            TyFn(parameters, result) => TyFn(parameters, TyArray(result)),
+            TyFn(parameters, result, effects) => TyFn(parameters, TyArray(result), effects),
             _ => written,
         },
         ZeroOrMore => variadic_seq_ty(written),
@@ -4666,6 +4670,18 @@ pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
     assert(ty_dump("(i64) -> str") == "Fn([i64], str)");
     assert(ty_dump("() -> bool") == "Fn([], bool)");
     assert(ty_dump("(i64) -> (str) -> bool") == "Fn([i64], Fn([str], bool))");
+
+    // The effects a call performs sit between the parameters and the arrow. A `!` after
+    // the list that no arrow follows is still a result.
+    assert(ty_dump("(i64) !prints -> str") == "Fn([i64], str, !prints)");
+    assert(ty_dump("() !prints !reads_files -> bool") == "Fn([], bool, !prints !reads_files)");
+    assert(
+        ty_dump(
+            "(i64) !prints -> (str) !clock -> bool",
+        ) == "Fn([i64], Fn([str], bool, !clock), !prints)",
+    );
+    assert(ty_dump("(i64)!Error") == "Result(i64, Error)");
+    assert(ty_dump("(i64, str)!Error") == "Result(Tuple(i64, str), Error)");
     assert(ty_dump("(i64, str)") == "Tuple(i64, str)");
     assert(ty_dump("(i64, str)[]") == "Array(Tuple(i64, str))");
     assert(ty_dump("(i64, str)?") == "Optional(Tuple(i64, str))");
@@ -6758,9 +6774,21 @@ fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 #
 # `!E` is the one alternative with no left operand at all: a result whose ok side
 # is unit, which is why a single child under a `!` lowers to `TyResult(TyUnit, ..)`.
-fn lower_ty_head(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+fn lower_ty_head(src: str, node: Parts, written: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let ops = node.own_token_text(src);
+
+    // The effects of `(A) !prints -> R` arrive among the children as names; what is left is the
+    // alternative's other parts.
+    mut effects: str[] = [];
+    mut kids: Ast[] = [];
+    for (let k : written) {
+        if (let AName(effect) = k) {
+            set effects.push(effect);
+        } else {
+            set kids.push(k);
+        };
+    }
     let head = kid(kids, 0, sp)?;
     if (kids.len() == 2) {
         let rhs = as_ty(kid(kids, 1, sp)?, sp)?;
@@ -6768,7 +6796,7 @@ fn lower_ty_head(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         // `(A, B) -> R` and `(A, B)!E`: a list on the left, and the token
         // between says which. Anything else on the left is `A!E`.
         if (let ATys(ts) = head) {
-            if (ops == "->") { return ok(ATy(TyFn(ts, rhs))); };
+            if (ops == "->") { return ok(ATy(TyFn(ts, rhs, effects))); };
             return ok(ATy(TyResult(tuple_ty(ts, "!Error", sp)?, rhs)));
         };
         return ok(ATy(TyResult(as_ty(head, sp)?, rhs)));

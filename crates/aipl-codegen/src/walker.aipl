@@ -44,6 +44,7 @@ import {
     value_or,
     value_or_err,
     wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_increment as ++,
 } from builtins;
 import {
@@ -730,6 +731,13 @@ fn paren_ty(self: W) -> WDoc!FmtError {
     let args = self.bump().w.ty_list(")", [])?;
     let closed = args.w.expect(")")?.w;
     let list = comma_list_docs(args.docs, TyParens);
+
+    // `(A) !prints -> R`: the effects a call performs sit between the list and the arrow.
+    if (closed.effects_then_arrow()) {
+        let WDocs { w, docs } = closed.fn_effects([]);
+        let r = w.bump().w.ty()?;
+        return ok(WDoc { w: r.w, doc: Concat([list, ..docs, Text(" -> "), r.doc]) });
+    };
     if (closed.peek_text() == "->") {
         let r = closed.bump().w.ty()?;
         return ok(WDoc { w: r.w, doc: Concat([list, Text(" -> "), r.doc]) });
@@ -750,6 +758,16 @@ fn paren_ty(self: W) -> WDoc!FmtError {
     };
     let arrs = closed.array_suffixes([]);
     ok(WDoc { w: arrs.w, doc: Concat([list, ..arrs.docs]) })
+}
+
+# Does a run of `!effect`s followed by `->` start at the cursor, as after the parameters of
+# `(A) !prints -> R`? A `!` that no arrow follows is a result type, `(A)!E`.
+fn effects_then_arrow(self: W) -> bool {
+    mut n: u64 = 0;
+    while (self.peek_text_n(n) == "!" && self.peek_is_n(n + 1, Ident)) {
+        set n += 2;
+    }
+    n != 0 && self.peek_text_n(n) == "->"
 }
 
 # Comma-separated types up to (not consuming) `end`.
@@ -3217,6 +3235,21 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("( i64 ) -> ( str ) -> bool")?.ty().rendered(100)? == "(i64) -> (str) -> bool",
     );
+
+    // The effects of a call, between the parameters and the arrow, one space each side. A `!`
+    // with no arrow after its run of names is a result, written against what it follows.
+    assert(walker_of("( i64 ) ! prints -> bool")?.ty().rendered(100)? == "(i64) !prints -> bool");
+    assert(
+        walker_of("()!prints!reads_files->bool")?
+            .ty()
+            .rendered(100)? == "() !prints !reads_files -> bool",
+    );
+    assert(
+        walker_of("(i64) -> (str) ! clock -> bool")?
+            .ty()
+            .rendered(100)? == "(i64) -> (str) !clock -> bool",
+    );
+    assert(walker_of("( i64 , str ) ! Error")?.ty().rendered(100)? == "(i64, str)!Error");
 
     // A refinement: `without` and its excluded value take a space each side,
     // and bind looser than every suffix — so a refined optional is written in

@@ -1055,11 +1055,24 @@ fn parses_function_type_parameter() {
         f.sig.params[0].ty,
         Type::Fn(
             vec![Type::Primitive(Primitive::I64)],
-            Box::new(Type::Primitive(Primitive::I64))
+            Box::new(Type::Primitive(Primitive::I64)),
+            Vec::new()
         )
     );
     // Zero-arg and multi-arg function types parse too.
     parse("fn g(h: () -> i64) -> i64 { h() }").unwrap();
+
+    // The effects of a call come between the parameters and the arrow, sorted and each once.
+    let p = parse("fn apply(f: (i64) !reads_files !prints !prints -> i64) -> i64 { 0 }").unwrap();
+    assert_eq!(
+        fn_item(&p, 0).sig.params[0].ty,
+        Type::Fn(
+            vec![Type::Primitive(Primitive::I64)],
+            Box::new(Type::Primitive(Primitive::I64)),
+            vec!["prints".to_string(), "reads_files".to_string()]
+        )
+    );
+
     parse("fn g(h: (i64, bool) -> str) -> i64 { 0 }").unwrap();
 }
 

@@ -110,6 +110,7 @@ pub(crate) fn free_locals(
                 let ty = ConcreteType::Fn(
                     args.iter().map(|a| a.ty.clone()).collect(),
                     Box::new(e.ty.clone()),
+                    Vec::new(),
                 );
                 out.push((name.clone(), ty));
             }
@@ -264,7 +265,7 @@ impl Mono<'_> {
             TExprKind::Lambda(p, _) => p.len() == count,
             TExprKind::Ident(_) => {
                 self.is_function_argument(a)
-                    && matches!(&a.ty, aipl_syntax::typed::Ty::Fn(p, _) if p.len() == count)
+                    && matches!(&a.ty, aipl_syntax::typed::Ty::Fn(p, _, _) if p.len() == count)
             }
             _ => false,
         };
@@ -408,7 +409,7 @@ impl Mono<'_> {
                 }
             }
             TExprKind::Ident(g) => {
-                let ConcreteType::Fn(parameter_tys, ret) = &argument.ty else {
+                let ConcreteType::Fn(parameter_tys, ret, _) = &argument.ty else {
                     unreachable!("a function argument has a function type");
                 };
                 if let Some(binding) = self.cur_lenv.get(&g).cloned() {

@@ -222,7 +222,7 @@ fn replace_type_var(t: &mut ast::Type, name: &str, with: &ast::Type) {
             replace_type_var(a, name, with);
             replace_type_var(b, name, with);
         }
-        T::Fn(ps, r) => {
+        T::Fn(ps, r, _) => {
             ps.iter_mut().for_each(|p| replace_type_var(p, name, with));
             replace_type_var(r, name, with);
         }
@@ -405,7 +405,11 @@ fn ty(v: &FfiValue) -> R<ast::Type> {
         "Set" => T::Set(one(0)?, set_order(at(payload, 1, case)?)?),
         "Dict" => T::Dict(one(0)?, one(1)?),
         "Result" => T::Result(one(0)?, one(1)?),
-        "Fn" => T::Fn(each(at(payload, 0, case)?, ty)?, one(1)?),
+        "Fn" => T::Fn(
+            each(at(payload, 0, case)?, ty)?,
+            one(1)?,
+            effect_set(at(payload, 2, case)?)?,
+        ),
         "Tuple" => T::Tuple(each(at(payload, 0, case)?, ty)?),
         "Generic" => T::Generic(
             text(at(payload, 0, case)?)?,
@@ -708,6 +712,14 @@ fn at<'a>(payload: &'a [FfiValue], i: usize, case: &str) -> R<&'a FfiValue> {
     payload
         .get(i)
         .ok_or_else(|| format!("{case} has no payload slot {i}"))
+}
+
+/// The effects of a function type: each once, in sorted order, however they were written.
+fn effect_set(v: &FfiValue) -> R<Vec<String>> {
+    let mut effects = each(v, text)?;
+    effects.sort();
+    effects.dedup();
+    Ok(effects)
 }
 
 fn each<T>(v: &FfiValue, f: impl Fn(&FfiValue) -> R<T>) -> R<Vec<T>> {

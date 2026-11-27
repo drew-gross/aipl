@@ -7272,7 +7272,7 @@ fn is_inline_slot(ty: &ConcreteType, decls: &HashMap<&str, TypeDeclRef>) -> bool
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => true,
         // A function value is stored as its 8-byte code address (an i64); it owns
         // nothing, so like a scalar it needs no drop.
-        ConcreteType::Fn(_, _) => true,
+        ConcreteType::Fn(_, _, _) => true,
         ConcreteType::Optional(_) => is_inline_slot(opt_core(ty), decls),
         _ => false,
     }
@@ -9831,7 +9831,7 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
         // released, dispatched on the tag — see `emit_rc`).
         ConcreteType::Result(ok, err) => needs_drop(ok, structs) || needs_drop(err, structs),
         // Function types are erased by monomorphization; never a runtime value.
-        ConcreteType::Fn(_, _) => false,
+        ConcreteType::Fn(_, _, _) => false,
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         // Generic applications are lowered to Named by lower_generics before codegen.
     }
@@ -11625,7 +11625,7 @@ fn emit_rc_w<M: Module>(
         }
         // Unreachable: `needs_drop` returns false for function types (erased by
         // monomorphization), so this arm is guarded out above.
-        ConcreteType::Fn(_, _) => {}
+        ConcreteType::Fn(_, _, _) => {}
         // Tuple type annotations are lowered to Named by lower_tuples before codegen.
         // Already handled by the `is_str_repr` guard above.
         ConcreteType::ConcatStr => unreachable!(),
@@ -15737,7 +15737,7 @@ fn type_symbol(ty: &ConcreteType) -> String {
         }
         ConcreteType::Dict(k, v) => format!("dict${}${}", type_symbol(k), type_symbol(v)),
         ConcreteType::Result(ok, err) => format!("{}$err${}", type_symbol(ok), type_symbol(err)),
-        ConcreteType::Fn(params, ret) => {
+        ConcreteType::Fn(params, ret, _) => {
             let ps = params.iter().map(type_symbol).collect::<Vec<_>>().join("$");
             format!("fn${ps}$to${}", type_symbol(ret))
         }
@@ -17047,7 +17047,7 @@ fn compile_call_expr_direct<M: Module>(
     // any surviving call through a `ConcreteType::Fn` binding is a runtime one).
     // `recv.f(rest)` through a local `f` is that call with `recv` first, as a field's is.
     if !style || matches!(callee, Callee::Local(_)) {
-        if let Some(ConcreteType::Fn(ptys, ret)) = env.get(name).map(env_binding_type) {
+        if let Some(ConcreteType::Fn(ptys, ret, _)) = env.get(name).map(env_binding_type) {
             return compile_indirect_call(
                 module, builder, cx, scopes, name, &ptys, &ret, args, span,
             );
@@ -20761,7 +20761,7 @@ fn compile_call_expr_direct<M: Module>(
                 }
                 // Function types are erased by monomorphization: a function is
                 // never a runtime value, so it can't be carried in one.
-                ConcreteType::Fn(_, _) => {
+                ConcreteType::Fn(_, _, _) => {
                     return Err(Error::at(
                         format!("{name:?} payload cannot be a function ({})", type_name(&t)),
                         payload.span.clone(),
@@ -21470,7 +21470,9 @@ fn compile_binop<M: Module>(
                 // `none`/`[]`/`#{}` operand against the other side — then walk
                 // it with `emit_eq`. `!=` is the bitwise negation of `==`.
                 let opn = binop_spelling(op);
-                if matches!(lt, ConcreteType::Fn(_, _)) || matches!(rt, ConcreteType::Fn(_, _)) {
+                if matches!(lt, ConcreteType::Fn(_, _, _))
+                    || matches!(rt, ConcreteType::Fn(_, _, _))
+                {
                     return Err(Error::at(
                         format!("\"{opn}\" is not supported for function values"),
                         span.clone(),
@@ -21615,7 +21617,7 @@ fn has_placeholder_ty(t: &ConcreteType) -> bool {
         }
         ConcreteType::Dict(k, v) => has_placeholder_ty(k) || has_placeholder_ty(v),
         ConcreteType::Result(a, b) => has_placeholder_ty(a) || has_placeholder_ty(b),
-        ConcreteType::Fn(ps, r) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
+        ConcreteType::Fn(ps, r, _) => ps.iter().any(has_placeholder_ty) || has_placeholder_ty(r),
         _ => false,
     }
 }
@@ -21847,6 +21849,7 @@ fn compile_expr_inner<M: Module>(
                 let ty = ConcreteType::Fn(
                     info.param_types().cloned().collect(),
                     Box::new(info.return_ty.clone()),
+                    Vec::new(),
                 );
                 (addr, ty)
             } else {

@@ -105,7 +105,7 @@ fn anonymous_any_again(sig: &mut aipl_syntax::ast::Signature) {
                 again(a);
                 again(b);
             }
-            Type::Fn(ps, r) => {
+            Type::Fn(ps, r, _) => {
                 ps.iter_mut().for_each(again);
                 again(r);
             }

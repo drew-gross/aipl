@@ -106,8 +106,8 @@ pub enum Ty {
     Set(Box<Ty>, PinnedOrder),
     Dict(Box<Ty>, Box<Ty>),
     Result(Box<Ty>, Box<Ty>),
-    /// A lambda's or function value's type; compile-time only.
-    Fn(Vec<Ty>, Box<Ty>),
+    /// A lambda's or function value's type, with the effects a call performs.
+    Fn(Vec<Ty>, Box<Ty>, Vec<String>),
 }
 
 /// A pinned type after monomorphization: [`Ty`] without [`Ty::Var`].
@@ -124,7 +124,7 @@ pub enum ConcreteTy {
     Set(Box<ConcreteTy>, PinnedOrder),
     Dict(Box<ConcreteTy>, Box<ConcreteTy>),
     Result(Box<ConcreteTy>, Box<ConcreteTy>),
-    Fn(Vec<ConcreteTy>, Box<ConcreteTy>),
+    Fn(Vec<ConcreteTy>, Box<ConcreteTy>, Vec<String>),
 }
 
 impl Ty {
@@ -147,12 +147,13 @@ impl Ty {
             Type::Set(t, order) => Ty::Set(boxed(t)?, PinnedOrder::of(*order)?),
             Type::Dict(k, v) => Ty::Dict(boxed(k)?, boxed(v)?),
             Type::Result(ok, err) => Ty::Result(boxed(ok)?, boxed(err)?),
-            Type::Fn(params, ret) => Ty::Fn(
+            Type::Fn(params, ret, effects) => Ty::Fn(
                 params
                     .iter()
                     .map(Ty::from_type)
                     .collect::<Option<Vec<_>>>()?,
                 boxed(ret)?,
+                effects.clone(),
             ),
             Type::Tuple(_) | Type::Any | Type::Unknown | Type::ConcatStr | Type::Without(..) => {
                 return None
@@ -168,7 +169,7 @@ impl Ty {
             Ty::Unit | Ty::Never | Ty::Primitive(_) | Ty::Named(_) => false,
             Ty::Case(t) | Ty::Optional(t) | Ty::Array(t) | Ty::Set(t, _) => t.mentions_var(),
             Ty::Dict(a, b) | Ty::Result(a, b) => a.mentions_var() || b.mentions_var(),
-            Ty::Fn(params, ret) => params.iter().any(Ty::mentions_var) || ret.mentions_var(),
+            Ty::Fn(params, ret, _) => params.iter().any(Ty::mentions_var) || ret.mentions_var(),
         }
     }
 
@@ -205,12 +206,13 @@ impl Ty {
             Ty::Set(t, order) => ConcreteTy::Set(boxed(t)?, *order),
             Ty::Dict(k, v) => ConcreteTy::Dict(boxed(k)?, boxed(v)?),
             Ty::Result(ok, err) => ConcreteTy::Result(boxed(ok)?, boxed(err)?),
-            Ty::Fn(params, ret) => ConcreteTy::Fn(
+            Ty::Fn(params, ret, effects) => ConcreteTy::Fn(
                 params
                     .iter()
                     .map(|p| p.concretize_with(subst, instance))
                     .collect::<Option<Vec<_>>>()?,
                 boxed(ret)?,
+                effects.clone(),
             ),
         })
     }
@@ -231,9 +233,11 @@ impl ConcreteTy {
             ConcreteTy::Set(t, order) => Ty::Set(boxed(t), *order),
             ConcreteTy::Dict(k, v) => Ty::Dict(boxed(k), boxed(v)),
             ConcreteTy::Result(ok, err) => Ty::Result(boxed(ok), boxed(err)),
-            ConcreteTy::Fn(params, ret) => {
-                Ty::Fn(params.iter().map(ConcreteTy::to_ty).collect(), boxed(ret))
-            }
+            ConcreteTy::Fn(params, ret, effects) => Ty::Fn(
+                params.iter().map(ConcreteTy::to_ty).collect(),
+                boxed(ret),
+                effects.clone(),
+            ),
         }
     }
 }
@@ -266,7 +270,11 @@ impl TyRepr for Ty {
             Ty::Set(t, order) => Type::Set(boxed(t), order.to_set_order()),
             Ty::Dict(k, v) => Type::Dict(boxed(k), boxed(v)),
             Ty::Result(ok, err) => Type::Result(boxed(ok), boxed(err)),
-            Ty::Fn(params, ret) => Type::Fn(params.iter().map(Ty::to_type).collect(), boxed(ret)),
+            Ty::Fn(params, ret, effects) => Type::Fn(
+                params.iter().map(Ty::to_type).collect(),
+                boxed(ret),
+                effects.clone(),
+            ),
         }
     }
 }

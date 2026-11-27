@@ -42,7 +42,7 @@
 ; struct __m38__Signature 96 type_vars@0:__m38__TypeParam[] params@24:__m38__Param[] effects@48:str[] return_ty@72:__m32__Ty? is_method@88:bool
 ; struct __m38__TypeParam 88 name@0:str bound@24:__m37__Bound default@56:__m32__Ty? name_span@72:__builtin_Span
 ; variant __m37__Bound 32 Any Ord Int Variant Cases Arm(8:str)
-; variant __m32__Ty 56 boxed Unit Primitive(8:__m31__Prim) Named(8:str) Case(8:__m32__Ty) TypeVar(8:str) Optional(8:__m32__Ty) Array(8:__m32__Ty) Set(8:__m32__Ty,16:__m32__SetOrder) Dict(8:__m32__Ty,16:__m32__Ty) Result(8:__m32__Ty,16:__m32__Ty) Fn(8:__m32__Ty[],32:__m32__Ty) Tuple(8:__m32__Ty[]) Generic(8:str,32:__m32__Ty[]) Any Without(8:__m32__Ty,16:__m32__Exclusion)
+; variant __m32__Ty 64 boxed Unit Primitive(8:__m31__Prim) Named(8:str) Case(8:__m32__Ty) TypeVar(8:str) Optional(8:__m32__Ty) Array(8:__m32__Ty) Set(8:__m32__Ty,16:__m32__SetOrder) Dict(8:__m32__Ty,16:__m32__Ty) Result(8:__m32__Ty,16:__m32__Ty) Fn(8:__m32__Ty[],32:__m32__Ty,40:str[]) Tuple(8:__m32__Ty[]) Generic(8:str,32:__m32__Ty[]) Any Without(8:__m32__Ty,16:__m32__Exclusion)
 ; variant __m31__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
 ; variant __m32__SetOrder 8 Unordered Desc Asc
 ; variant __m32__Exclusion 32 EmptyArray NamedCase(8:str) Throughout(8:str)
@@ -661,4 +661,4 @@
 ; data 502 __tostr_lit_101 66616c7365
 
 ; __m19__builtin_table
-; source-fingerprint 10822911852495771313
+; source-fingerprint 5972184793713429249

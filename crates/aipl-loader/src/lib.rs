@@ -1790,12 +1790,13 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
             Box::new(rewrite_type(ok, view, type_vars)),
             Box::new(rewrite_type(err, view, type_vars)),
         ),
-        Type::Fn(params, ret) => Type::Fn(
+        Type::Fn(params, ret, effects) => Type::Fn(
             params
                 .iter()
                 .map(|p| rewrite_type(p, view, type_vars))
                 .collect(),
             Box::new(rewrite_type(ret, view, type_vars)),
+            effects.clone(),
         ),
         Type::Tuple(elems) => Type::Tuple(
             elems

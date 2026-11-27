@@ -732,7 +732,7 @@ fn ty_has_refinement(t: &Type) -> bool {
             ty_has_refinement(i)
         }
         Type::Dict(a, b) | Type::Result(a, b) => ty_has_refinement(a) || ty_has_refinement(b),
-        Type::Fn(ps, r) => ps.iter().any(ty_has_refinement) || ty_has_refinement(r),
+        Type::Fn(ps, r, _) => ps.iter().any(ty_has_refinement) || ty_has_refinement(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_refinement),
         _ => false,
     }
@@ -748,7 +748,7 @@ fn ty_has_var(t: &Type) -> bool {
         | Type::Without(i, _) => ty_has_var(i),
         Type::Dict(a, b) | Type::Result(a, b) => ty_has_var(a) || ty_has_var(b),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_var),
-        Type::Fn(ps, r) => ps.iter().any(ty_has_var) || ty_has_var(r),
+        Type::Fn(ps, r, _) => ps.iter().any(ty_has_var) || ty_has_var(r),
         Type::Primitive(_)
         | Type::Named(_)
         | Type::Unit
@@ -780,7 +780,11 @@ fn instance_named(t: &Type) -> Type {
         Type::Without(i, x) => Type::Without(go(i), x.clone()),
         Type::Dict(k, v) => Type::Dict(go(k), go(v)),
         Type::Result(a, b) => Type::Result(go(a), go(b)),
-        Type::Fn(ps, r) => Type::Fn(ps.iter().map(instance_named).collect(), go(r)),
+        Type::Fn(ps, r, effects) => Type::Fn(
+            ps.iter().map(instance_named).collect(),
+            go(r),
+            effects.clone(),
+        ),
         Type::Tuple(es) => Type::Tuple(es.iter().map(instance_named).collect()),
         other => other.clone(),
     }
@@ -854,9 +858,10 @@ fn lt_ty(
             Box::new(lt_ty(ok, fields_map, order)),
             Box::new(lt_ty(err, fields_map, order)),
         ),
-        Type::Fn(params, ret) => Type::Fn(
+        Type::Fn(params, ret, effects) => Type::Fn(
             params.iter().map(|p| lt_ty(p, fields_map, order)).collect(),
             Box::new(lt_ty(ret, fields_map, order)),
+            effects.clone(),
         ),
         Type::Named(_) | Type::Primitive(_) | Type::Unit | Type::Any | Type::ConcatStr => t.clone(),
         // `lower_generics` resolves every *concrete* generic application to a
@@ -1092,11 +1097,12 @@ impl GenericLowerer {
             Type::Result(ok, err) => {
                 Type::Result(Box::new(self.lower_ty(ok)?), Box::new(self.lower_ty(err)?))
             }
-            Type::Fn(ps, r) => Type::Fn(
+            Type::Fn(ps, r, effects) => Type::Fn(
                 ps.iter()
                     .map(|p| self.lower_ty(p))
                     .collect::<Result<_, _>>()?,
                 Box::new(self.lower_ty(r)?),
+                effects.clone(),
             ),
             Type::Tuple(es) => Type::Tuple(
                 es.iter()
@@ -1678,7 +1684,12 @@ pub fn monomorphize(
         concrete_fns
             .iter()
             .filter(|f| entries.contains(&f.name.text))
-            .filter(|f| !f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))))
+            .filter(|f| {
+                !f.sig
+                    .params
+                    .iter()
+                    .any(|p| matches!(p.ty, Type::Fn(_, _, _)))
+            })
             .map(|f| f.name.text.clone()),
     );
     // The `check` command synthesizes a `__test_main` driver (calling each
@@ -3138,7 +3149,7 @@ impl Mono<'_> {
                 self.bind_field(po, ao, vars, map);
                 self.bind_field(pe, ae, vars, map);
             }
-            (Type::Fn(ps, pr), Type::Fn(as_, ar)) => {
+            (Type::Fn(ps, pr, _), Type::Fn(as_, ar, _)) => {
                 for (p, a) in ps.iter().zip(as_) {
                     self.bind_field(p, a, vars, map);
                 }
@@ -3225,7 +3236,7 @@ impl Mono<'_> {
             .iter()
             .find(|(n, _, _)| n == field)
             .and_then(|(_, ft, _)| match ft {
-                Type::Fn(_, ret) => Some((**ret).clone()),
+                Type::Fn(_, ret, _) => Some((**ret).clone()),
                 _ => None,
             })
     }
@@ -3437,7 +3448,7 @@ fn bind(
     // optional, a struct, or a variant (a generic function can abstract over a
     // generic struct/variant `K`, higher-order-generics style). Only `()` and a
     // function type are rejected.
-    if matches!(ty, Type::Unit | Type::Fn(_, _)) {
+    if matches!(ty, Type::Unit | Type::Fn(_, _, _)) {
         return Err(Error::at(
             format!(
                 "\"{}\" in \"{gname}\" resolved to {}, which is not a valid type argument",
@@ -3983,13 +3994,13 @@ fn normalize_param_ty(
             Box::new(normalize_inner(ok, type_vars, counter)),
             Box::new(normalize_inner(err, type_vars, counter)),
         )),
-        Type::Fn(params, ret) => {
+        Type::Fn(params, ret, effects) => {
             let ps = params
                 .iter()
                 .map(|p| normalize_param_ty(p, type_vars, counter, fname))
                 .collect::<Result<Vec<_>, _>>()?;
             let r = normalize_param_ty(ret, type_vars, counter, fname)?;
-            Ok(Type::Fn(ps, Box::new(r)))
+            Ok(Type::Fn(ps, Box::new(r), effects.clone()))
         }
         Type::Tuple(elems) => {
             let es = elems
@@ -4045,12 +4056,13 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             Box::new(normalize_inner(ok, type_vars, counter)),
             Box::new(normalize_inner(err, type_vars, counter)),
         ),
-        Type::Fn(params, ret) => Type::Fn(
+        Type::Fn(params, ret, effects) => Type::Fn(
             params
                 .iter()
                 .map(|p| normalize_inner(p, type_vars, counter))
                 .collect(),
             Box::new(normalize_inner(ret, type_vars, counter)),
+            effects.clone(),
         ),
         Type::Tuple(elems) => Type::Tuple(
             elems
@@ -4092,9 +4104,10 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
             Box::new(subst_vars(ok, map)),
             Box::new(subst_vars(err, map)),
         ),
-        Type::Fn(params, ret) => Type::Fn(
+        Type::Fn(params, ret, effects) => Type::Fn(
             params.iter().map(|p| subst_vars(p, map)).collect(),
             Box::new(subst_vars(ret, map)),
+            effects.clone(),
         ),
         Type::Tuple(elems) => Type::Tuple(elems.iter().map(|e| subst_vars(e, map)).collect()),
         Type::Generic(name, args) => Type::Generic(
@@ -4122,7 +4135,7 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         | Type::Without(inner, _) => ty_mentions(inner, name),
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
         Type::Result(ok, err) => ty_mentions(ok, name) || ty_mentions(err, name),
-        Type::Fn(ps, ret) => ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name),
+        Type::Fn(ps, ret, _) => ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name),
         Type::Tuple(elems) => elems.iter().any(|e| ty_mentions(e, name)),
         Type::Generic(n, args) => n == name || args.iter().any(|a| ty_mentions(a, name)),
     }
@@ -4143,7 +4156,7 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         | Type::Without(inner, _) => ty_contains_var(inner, vars),
         Type::Dict(k, v) => ty_contains_var(k, vars) || ty_contains_var(v, vars),
         Type::Result(ok, err) => ty_contains_var(ok, vars) || ty_contains_var(err, vars),
-        Type::Fn(ps, ret) => {
+        Type::Fn(ps, ret, _) => {
             ps.iter().any(|p| ty_contains_var(p, vars)) || ty_contains_var(ret, vars)
         }
         Type::Tuple(elems) => elems.iter().any(|e| ty_contains_var(e, vars)),
@@ -4619,7 +4632,7 @@ fn mentions_abstract_type(ty: &Type) -> bool {
         Type::Dict(k, v) | Type::Result(k, v) => {
             mentions_abstract_type(k) || mentions_abstract_type(v)
         }
-        Type::Fn(ps, r) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
+        Type::Fn(ps, r, _) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
         Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_abstract_type),
         // A type the checker could not pin down is abstract in exactly the sense
         // this asks about: only monomorphization settles it, so a body carrying
@@ -4686,7 +4699,7 @@ pub fn inline_small_post_mono(
                 && is_inline_shape_typed(
                     f.params
                         .iter()
-                        .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
+                        .any(|p| matches!(p.ty, ConcreteType::Fn(_, _, _))),
                     &f.body,
                 )
                 // Not recursive: every copy would carry the call back to `f`, so
@@ -4877,7 +4890,7 @@ fn has_inline_shape_mono(f: &ConcreteFn) -> bool {
     is_inline_shape_typed(
         f.params
             .iter()
-            .any(|p| matches!(p.ty, ConcreteType::Fn(_, _))),
+            .any(|p| matches!(p.ty, ConcreteType::Fn(_, _, _))),
         &f.body,
     )
 }
@@ -4933,7 +4946,7 @@ fn has_placeholder(t: &Type) -> bool {
         Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => has_placeholder(i),
         Type::Dict(k, v) => has_placeholder(k) || has_placeholder(v),
         Type::Result(a, b) => has_placeholder(a) || has_placeholder(b),
-        Type::Fn(ps, r) => ps.iter().any(has_placeholder) || has_placeholder(r),
+        Type::Fn(ps, r, _) => ps.iter().any(has_placeholder) || has_placeholder(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(has_placeholder),
         _ => false,
     }

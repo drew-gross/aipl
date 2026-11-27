@@ -27,6 +27,7 @@ pub(crate) const MAKE_PREFIX: &str = "__closure$";
 struct Signature {
     params: Vec<ConcreteType>,
     ret: ConcreteType,
+    effects: Vec<String>,
     variant: String,
     apply: String,
     /// The functions that can stand for a value of the type, with what each captures.
@@ -67,23 +68,25 @@ impl Conversion {
     }
 
     fn signature_of(&self, ty: &ConcreteType) -> Option<usize> {
-        let ConcreteType::Fn(params, ret) = ty else {
+        let ConcreteType::Fn(params, ret, effects) = ty else {
             return None;
         };
         self.signatures
             .iter()
-            .position(|s| s.params == *params && s.ret == **ret)
+            .position(|s| s.params == *params && s.ret == **ret && s.effects == *effects)
     }
 
     /// `ty` with every converted function type replaced by its variant.
     fn map_type(&self, ty: &ConcreteType) -> ConcreteType {
         let map = |t: &ConcreteType| Box::new(self.map_type(t));
         match ty {
-            ConcreteType::Fn(params, ret) => match self.signature_of(ty) {
+            ConcreteType::Fn(params, ret, effects) => match self.signature_of(ty) {
                 Some(i) => ConcreteType::Named(self.signatures[i].variant.clone()),
-                None => {
-                    ConcreteType::Fn(params.iter().map(|p| self.map_type(p)).collect(), map(ret))
-                }
+                None => ConcreteType::Fn(
+                    params.iter().map(|p| self.map_type(p)).collect(),
+                    map(ret),
+                    effects.clone(),
+                ),
             },
             ConcreteType::Optional(t) => ConcreteType::Optional(map(t)),
             ConcreteType::Array(t) => ConcreteType::Array(map(t)),
@@ -169,6 +172,7 @@ impl Conversion {
                 let probe = ConcreteType::Fn(
                     args.iter().map(|a| a.ty.clone()).collect(),
                     Box::new(e.ty.clone()),
+                    Vec::new(),
                 );
                 self.signature_of(&probe)
             }
@@ -343,15 +347,16 @@ fn find_makers(e: &Typed, signatures: &mut Vec<Signature>) {
     } = &e.kind
     {
         if name.starts_with(MAKE_PREFIX) {
-            if let ConcreteType::Fn(params, ret) = &e.ty {
+            if let ConcreteType::Fn(params, ret, effects) = &e.ty {
                 if !signatures
                     .iter()
-                    .any(|s| s.params == *params && s.ret == **ret)
+                    .any(|s| s.params == *params && s.ret == **ret && s.effects == *effects)
                 {
                     let n = signatures.len();
                     signatures.push(Signature {
                         params: params.clone(),
                         ret: (**ret).clone(),
+                        effects: effects.clone(),
                         variant: format!("Closure${n}"),
                         apply: format!("apply${n}"),
                         cases: Vec::new(),

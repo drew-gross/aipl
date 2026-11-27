@@ -80,7 +80,11 @@ fn step_ident(
     };
     Some(TExpr::new(
         TExprKind::Ident(step.name().to_string()),
-        Ty::Fn(vec![(*element).clone(), (*element).clone()], element),
+        Ty::Fn(
+            vec![(*element).clone(), (*element).clone()],
+            element,
+            Vec::new(),
+        ),
         span.clone(),
     ))
 }
@@ -92,7 +96,7 @@ fn lower_pinned(e: &mut aipl_syntax::typed::TExpr<aipl_syntax::typed::Ty>, names
         let Some(step) = Callee::from_canonical(name).and_then(|c| c.reduction_step()) else {
             return;
         };
-        let Ty::Fn(params, result) = &e.ty else {
+        let Ty::Fn(params, result, _) = &e.ty else {
             return;
         };
         let [sequence] = params.as_slice() else {

@@ -573,7 +573,7 @@ pub fn ty_names(self: Ty) -> #{str} {
         TypeVar(..) | TyUnit | Primitive(..) | Any => #{},
         Generic(base, args) => #{base, ..args$ty_names().union_all()},
         Dict(a, b) | Result(a, b) => #{..a.ty_names(), ..b.ty_names()},
-        TyFn(params, ret) => #{..params$ty_names().union_all(), ..ret.ty_names()},
+        TyFn(params, ret, _) => #{..params$ty_names().union_all(), ..ret.ty_names()},
         TyTuple(elements) => elements$ty_names().union_all(),
     }
 }.test({
