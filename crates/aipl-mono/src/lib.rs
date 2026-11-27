@@ -2533,8 +2533,9 @@ impl Mono<'_> {
                     .is_some_and(|f| mentions_mutating_function(&f.body))
                 {
                     return Err(Error::msg(format!(
-                        "fn {name:?} uses a closure that mutates what it captures, which is \
-                         checked but not compiled yet"
+                        "fn {name:?} uses a closure that mutates what it captures in a way that \
+                         is not compiled yet (handing one to a function that takes a function, \
+                         for one)"
                     )));
                 }
                 return Err(Error::msg(format!(

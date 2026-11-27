@@ -99,6 +99,23 @@ pub(crate) fn free_locals(
                 out.push((name.clone(), e.ty.clone()));
             }
         }
+        // The place a `set` writes is a local it mentions, whether or not the value reads it.
+        TExprKind::Assign(target, value, rest) => {
+            let mut root = &**target;
+            while let TExprKind::Field(object, _) = &root.kind {
+                root = object;
+            }
+            if let TExprKind::Ident(name) = &root.kind {
+                if !bound.contains(name)
+                    && scope.contains(name)
+                    && !out.iter().any(|(n, _)| n == name)
+                {
+                    out.push((name.clone(), root.ty.clone()));
+                }
+            }
+            free_locals(value, scope, bound, out);
+            free_locals(rest, scope, bound, out);
+        }
         // A call through a local reads it: its type is the function type the call has.
         TExprKind::Call {
             callee: Callee::Local(name),
@@ -181,6 +198,112 @@ fn parameter(name: &str, ty: &ConcreteType) -> Param {
         arity: Arity::One,
         default: None,
         implicit_some: false,
+    }
+}
+
+impl Mono<'_> {
+    /// A lambda that mutates what it captured, lifted to a function of its own. Everything the
+    /// body mentions from outside travels in one struct; the lifted function takes it as the
+    /// receiver of a mutating method, `fn lam(mut self: Env, args)`, unpacks it into locals of
+    /// the names the body uses, runs the body, and packs it up again. What stands for the value
+    /// is a call to `__closure$lam` with the struct, which `closure_conversion` turns into the
+    /// closure.
+    pub(crate) fn lift_mutating_lambda(
+        &mut self,
+        params: &[TLambdaParam<ConcreteType>],
+        body: &Typed,
+        effects: Vec<String>,
+        e: &Typed,
+    ) -> Typed {
+        let span = e.span.clone();
+        let captures = self.typed_lambda_captures(params, body);
+        let env = self.synth_name("env");
+        self.syn_structs.insert(
+            env.clone(),
+            captures
+                .iter()
+                .map(|(name, ty)| (name.clone(), ty.to_type(), None))
+                .collect(),
+        );
+        let env_ty = ConcreteType::Named(env.clone());
+        let receiver = format!("{env}$self");
+        let name = self.synth_name("lambda");
+        let at_receiver = || ident(&receiver, &env_ty, &span);
+        let pack = |from: &dyn Fn(&str, &ConcreteType) -> Typed| {
+            TExpr::new(
+                TExprKind::Construct(
+                    env.clone(),
+                    captures
+                        .iter()
+                        .map(|(n, t)| aipl_syntax::typed::TFieldInit {
+                            name: aipl_syntax::SpanStr::synthetic(n.clone()),
+                            value: from(n, t),
+                        })
+                        .collect(),
+                ),
+                env_ty.clone(),
+                span.clone(),
+            )
+        };
+        // The body, then the struct written back into the receiver.
+        let write_back = TExpr::new(
+            TExprKind::Assign(
+                Box::new(at_receiver()),
+                Box::new(pack(&|n, t| ident(n, t, &span))),
+                Box::new(TExpr::new(
+                    TExprKind::Unit,
+                    ConcreteType::Unit,
+                    span.clone(),
+                )),
+            ),
+            ConcreteType::Unit,
+            span.clone(),
+        );
+        let mut lifted_body = TExpr::new(
+            TExprKind::Seq(Box::new(body.clone()), Box::new(write_back)),
+            ConcreteType::Unit,
+            span.clone(),
+        );
+        for (n, t) in captures.iter().rev() {
+            let field = TExpr::new(
+                TExprKind::Field(Box::new(at_receiver()), n.clone()),
+                t.clone(),
+                span.clone(),
+            );
+            lifted_body = TExpr::new(
+                TExprKind::LetMut(n.clone(), Box::new(field), Box::new(lifted_body)),
+                ConcreteType::Unit,
+                span.clone(),
+            );
+        }
+        let mut lifted: Vec<Param> = vec![Param {
+            mutable: true,
+            ..parameter(&receiver, &env_ty)
+        }];
+        lifted.extend(params.iter().map(|p| Param {
+            name_span: aipl_syntax::ast::NameSpan(p.span.clone()),
+            ..parameter(&p.name, &p.ty)
+        }));
+        self.concrete.insert(
+            name.clone(),
+            ConcreteTemplate {
+                params: lifted,
+                effects,
+                return_ty: None,
+                typed: Some(lifted_body),
+            },
+        );
+        self.enqueue_concrete(&name);
+        TExpr::new(
+            TExprKind::Call {
+                callee: Callee::User(format!("{}{name}", crate::closure_conversion::MAKE_PREFIX)),
+                type_args: Vec::new(),
+                args: vec![pack(&|n, t| ident(n, t, &span))],
+                method_style: false,
+            },
+            e.ty.clone(),
+            span,
+        )
     }
 }
 

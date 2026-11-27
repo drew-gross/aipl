@@ -18,10 +18,6 @@ use crate::{ArgShape, Mono, Param, ParamSpec};
 impl Mono<'_> {
     /// Whether a node, and everything under it, is a form that is typed from the pinned tree.
     fn supported(&self, e: &TExpr<Ty>, concrete: &dyn Fn(&Ty) -> Option<ConcreteType>) -> bool {
-        // A function that mutates what it captured is typed but not compiled yet.
-        if matches!(e.ty, Ty::Fn(_, _, _, true)) {
-            return false;
-        }
         // A lambda used as a value becomes a function of its own that captures nothing.
         if let (TExprKind::Lambda(params, body), Ty::Fn(..)) = (&e.kind, &e.ty) {
             return concrete(&e.ty).is_some()
@@ -30,10 +26,16 @@ impl Mono<'_> {
         }
         // A function used as a value is queued for emission.
         if let (TExprKind::Ident(name), Ty::Fn(..)) = (&e.kind, &e.ty) {
-            return self.concrete.contains_key(name)
-                && !self.generics.contains_key(name)
-                && !self.cur_lenv.contains_key(name)
-                && concrete(&e.ty).is_some();
+            // A function named as a value; any other name of function type is a local holding one.
+            if self.concrete.contains_key(name) || self.generics.contains_key(name) {
+                return !self.generics.contains_key(name)
+                    && !self.cur_lenv.contains_key(name)
+                    && concrete(&e.ty).is_some();
+            }
+            if !self.cur_lenv.contains_key(name) {
+                return concrete(&e.ty).is_some();
+            }
+            return false;
         }
         let sub = |x: &TExpr<Ty>| self.supported(x, concrete);
         match &e.kind {
@@ -1161,6 +1163,14 @@ impl Mono<'_> {
                     let desugared = self.desugar_mutating_call(e);
                     return self.lower(desugared);
                 }
+            }
+        }
+        // A lambda that mutates what it captured, which has something to capture.
+        if let (TExprKind::Lambda(params, body), ConcreteType::Fn(_, _, effects, true)) =
+            (&e.kind, &e.ty)
+        {
+            if !self.typed_lambda_captures(params, body).is_empty() {
+                return self.lift_mutating_lambda(params, body, effects.clone(), &e);
             }
         }
         if let TExprKind::Lambda(params, body) = &e.kind {

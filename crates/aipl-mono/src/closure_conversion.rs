@@ -31,6 +31,11 @@ struct Signature {
     ret: ConcreteType,
     variant: String,
     apply: String,
+    /// `apply` for a call of a closure that mutates what it captured: it takes the closure as
+    /// `mut`, as a mutating method takes its receiver, and answers the closure afterwards.
+    apply_mutating: String,
+    /// Whether any closure of the type mutates what it captured, or any call of one is made.
+    mutating: bool,
     /// The functions that can stand for a value of the type, with what each captures.
     cases: Vec<Case>,
 }
@@ -38,6 +43,9 @@ struct Signature {
 struct Case {
     function: String,
     captures: Vec<ConcreteType>,
+    /// The function takes the closure's captures as the `mut` receiver of a mutating method (the
+    /// one capture is the struct holding them) and answers them as they are afterwards.
+    mutating: bool,
 }
 
 impl Case {
@@ -148,11 +156,17 @@ impl Conversion {
                     })
                     .collect(),
             });
-            fns.push(this.apply_function(s));
+            fns.extend(this.apply_functions(s));
         }
     }
 
-    fn case_index(&mut self, signature: usize, function: &str, captures: &[ConcreteType]) -> usize {
+    fn case_index(
+        &mut self,
+        signature: usize,
+        function: &str,
+        captures: &[ConcreteType],
+        mutating: bool,
+    ) -> usize {
         let cases = &mut self.signatures[signature].cases;
         match cases.iter().position(|c| c.function == function) {
             Some(i) => i,
@@ -160,6 +174,7 @@ impl Conversion {
                 cases.push(Case {
                     function: function.to_string(),
                     captures: captures.to_vec(),
+                    mutating,
                 });
                 cases.len() - 1
             }
@@ -169,12 +184,25 @@ impl Conversion {
     fn rewrite(&mut self, e: &mut Typed) {
         // What the node is is read from the types it was given, before they are replaced.
         let original = e.ty.clone();
+        // A call of a closure that mutates what it captured is marked by the closure's type
+        // among its type arguments, and answers the closure.
+        let mutating_call = match &e.kind {
+            TExprKind::Call {
+                callee: Callee::Local(_),
+                type_args,
+                ..
+            } => type_args
+                .first()
+                .filter(|t| matches!(t, ConcreteType::Fn(_, _, _, true)))
+                .and_then(|t| self.signature_of(t)),
+            _ => None,
+        };
         let call_signature = match &e.kind {
             TExprKind::Call {
                 callee: Callee::Local(_),
                 args,
                 ..
-            } => {
+            } if mutating_call.is_none() => {
                 let probe = ConcreteType::Fn(
                     args.iter().map(|a| a.ty.clone()).collect(),
                     Box::new(e.ty.clone()),
@@ -207,7 +235,8 @@ impl Conversion {
                 let function = name[MAKE_PREFIX.len()..].to_string();
                 let signature = self.signature_of(&original).expect("found by `find`");
                 let captures: Vec<ConcreteType> = args.iter().map(|a| a.ty.clone()).collect();
-                let index = self.case_index(signature, &function, &captures);
+                let mutating = matches!(original, ConcreteType::Fn(_, _, _, true));
+                let index = self.case_index(signature, &function, &captures, mutating);
                 let case = self.signatures[signature].cases[index].name();
                 let variant = self.signatures[signature].variant.clone();
                 let args = std::mem::take(args);
@@ -228,12 +257,32 @@ impl Conversion {
                         // A function named as a value captures nothing: a lambda that does is
                         // made through `__closure$`.
                         let function = name.clone();
-                        let index = self.case_index(signature, &function, &[]);
+                        let index = self.case_index(signature, &function, &[], false);
                         let case = self.signatures[signature].cases[index].name();
                         let variant = self.signatures[signature].variant.clone();
                         e.kind = TExprKind::Ident(format!("{case}@{variant}"));
                     }
                 }
+            }
+            TExprKind::Call {
+                callee,
+                type_args,
+                args,
+                method_style,
+            } if mutating_call.is_some() => {
+                let Callee::Local(local) = callee.clone() else {
+                    unreachable!("matched above");
+                };
+                let signature = &self.signatures[mutating_call.expect("checked")];
+                let closure = TExpr::new(
+                    TExprKind::Ident(local),
+                    ConcreteType::Named(signature.variant.clone()),
+                    e.span.clone(),
+                );
+                args.insert(0, closure);
+                *callee = Callee::User(signature.apply_mutating.clone());
+                *method_style = true;
+                type_args.clear();
             }
             TExprKind::Call {
                 callee,
@@ -258,15 +307,30 @@ impl Conversion {
         }
     }
 
-    /// `apply$<n>(closure, args..)`: the call of whichever function the closure is.
-    fn apply_function(&self, s: &Signature) -> ConcreteFn {
+    /// `apply$<n>(closure, args..)`: the call of whichever function the closure is; and for a type
+    /// some closure of which mutates what it captured, `apply$<n>$mut`, which answers the closure
+    /// as the call left it.
+    fn apply_functions(&self, s: &Signature) -> Vec<ConcreteFn> {
+        let mut out = vec![self.apply_function(s, false)];
+        if s.mutating {
+            out.push(self.apply_function(s, true));
+        }
+        out
+    }
+
+    fn apply_function(&self, s: &Signature, mutating_call: bool) -> ConcreteFn {
         let span = Span::default();
+        let unit = ConcreteType::Unit;
         let closure_ty = ConcreteType::Named(s.variant.clone());
         let argument_names: Vec<String> = (0..s.params.len()).map(|i| format!("a{i}")).collect();
+        let node = |kind: TExprKind<ConcreteType>, ty: &ConcreteType| {
+            TExpr::new(kind, ty.clone(), span.clone())
+        };
+        let ident = |name: &str, ty: &ConcreteType| node(TExprKind::Ident(name.to_string()), ty);
         let mut params = vec![ConcreteParam {
             name: "closure".to_string(),
             ty: closure_ty.clone(),
-            mutable: false,
+            mutable: mutating_call,
             owned: false,
         }];
         params.extend(
@@ -281,46 +345,96 @@ impl Conversion {
                 }),
         );
         let ret = self.map_type(&s.ret);
+        let arguments = || -> Vec<Typed> {
+            argument_names
+                .iter()
+                .zip(&s.params)
+                .map(|(name, ty)| ident(name, &self.map_type(ty)))
+                .collect()
+        };
         let arms = s
             .cases
             .iter()
             .map(|case| {
                 let capture_names: Vec<String> =
                     (0..case.captures.len()).map(|i| format!("c{i}")).collect();
-                let mut args: Vec<Typed> = argument_names
-                    .iter()
-                    .zip(&s.params)
-                    .map(|(name, ty)| {
-                        TExpr::new(
-                            TExprKind::Ident(name.clone()),
-                            self.map_type(ty),
-                            span.clone(),
+                let body = if case.mutating {
+                    // The one capture is the struct the function takes as its `mut` receiver. A
+                    // call that answers the closure writes the struct back into it; the other
+                    // keeps no change.
+                    let env_ty = self.map_type(&case.captures[0]);
+                    let call = node(
+                        TExprKind::Call {
+                            callee: Callee::User(case.function.clone()),
+                            type_args: Vec::new(),
+                            args: std::iter::once(ident("state", &env_ty))
+                                .chain(arguments())
+                                .collect(),
+                            method_style: true,
+                        },
+                        &env_ty,
+                    );
+                    let finished = if mutating_call {
+                        let rebuilt = node(
+                            TExprKind::Call {
+                                callee: Callee::User(format!("{}@{}", case.name(), s.variant)),
+                                type_args: Vec::new(),
+                                args: vec![ident("state", &env_ty)],
+                                method_style: false,
+                            },
+                            &closure_ty,
+                        );
+                        node(
+                            TExprKind::Assign(
+                                Box::new(ident("closure", &closure_ty)),
+                                Box::new(rebuilt),
+                                Box::new(node(TExprKind::Unit, &unit)),
+                            ),
+                            &unit,
                         )
-                    })
-                    .collect();
-                args.extend(capture_names.iter().zip(&case.captures).map(|(name, ty)| {
-                    TExpr::new(
-                        TExprKind::Ident(name.clone()),
-                        self.map_type(ty),
-                        span.clone(),
+                    } else {
+                        node(TExprKind::Unit, &unit)
+                    };
+                    node(
+                        TExprKind::LetMut(
+                            "state".to_string(),
+                            Box::new(ident(&capture_names[0], &env_ty)),
+                            Box::new(node(
+                                TExprKind::Assign(
+                                    Box::new(ident("state", &env_ty)),
+                                    Box::new(call),
+                                    Box::new(finished),
+                                ),
+                                &unit,
+                            )),
+                        ),
+                        &unit,
                     )
-                }));
-                TMatchArm {
-                    pattern: TPattern::Ctor {
-                        name: case.name(),
-                        bindings: capture_names,
-                        ignore_payload: false,
-                    },
-                    body: TExpr::new(
+                } else {
+                    let mut args = arguments();
+                    args.extend(
+                        capture_names
+                            .iter()
+                            .zip(&case.captures)
+                            .map(|(name, ty)| ident(name, &self.map_type(ty))),
+                    );
+                    node(
                         TExprKind::Call {
                             callee: Callee::User(case.function.clone()),
                             type_args: Vec::new(),
                             args,
                             method_style: false,
                         },
-                        ret.clone(),
-                        span.clone(),
-                    ),
+                        &ret,
+                    )
+                };
+                TMatchArm {
+                    pattern: TPattern::Ctor {
+                        name: case.name(),
+                        bindings: capture_names,
+                        ignore_payload: false,
+                    },
+                    body,
                     span: span.clone(),
                 }
             })
@@ -334,46 +448,51 @@ impl Conversion {
         effects.sort();
         effects.dedup();
         ConcreteFn {
-            name: s.apply.clone(),
+            name: if mutating_call {
+                s.apply_mutating.clone()
+            } else {
+                s.apply.clone()
+            },
             params,
             effects,
             effects_by_type: true,
-            return_ty: Some(ret.clone()),
-            body: TExpr::new(
-                TExprKind::Match(
-                    Box::new(TExpr::new(
-                        TExprKind::Ident("closure".to_string()),
-                        closure_ty,
-                        span.clone(),
-                    )),
-                    arms,
-                ),
-                ret,
-                span,
+            // A mutating function answers its first parameter and no value of its own.
+            return_ty: if mutating_call {
+                None
+            } else {
+                Some(ret.clone())
+            },
+            body: node(
+                TExprKind::Match(Box::new(ident("closure", &closure_ty)), arms),
+                if mutating_call { &unit } else { &ret },
             ),
         }
     }
 }
 
-/// The function types that have a `__closure$` call in `e`, added to `signatures`.
+/// The function types that have a `__closure$` call in `e`, or the type of a function that mutates
+/// what it captured at any node, added to `signatures`.
 fn find_makers(e: &Typed, signatures: &mut Vec<Signature>) {
-    if let TExprKind::Call {
-        callee: Callee::User(name),
-        ..
-    } = &e.kind
-    {
-        if name.starts_with(MAKE_PREFIX) {
-            if let ConcreteType::Fn(params, ret, _, _) = &e.ty {
-                if !signatures
-                    .iter()
-                    .any(|s| s.params == *params && s.ret == **ret)
-                {
+    let is_maker = matches!(
+        &e.kind,
+        TExprKind::Call { callee: Callee::User(name), .. } if name.starts_with(MAKE_PREFIX)
+    );
+    if let ConcreteType::Fn(params, ret, _, mutating) = &e.ty {
+        if is_maker || *mutating {
+            match signatures
+                .iter_mut()
+                .find(|s| s.params == *params && s.ret == **ret)
+            {
+                Some(known) => known.mutating |= *mutating,
+                None => {
                     let n = signatures.len();
                     signatures.push(Signature {
                         params: params.clone(),
                         ret: (**ret).clone(),
                         variant: format!("Closure${n}"),
                         apply: format!("apply${n}"),
+                        apply_mutating: format!("apply${n}$mut"),
+                        mutating: *mutating,
                         cases: Vec::new(),
                     });
                 }

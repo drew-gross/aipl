@@ -50,9 +50,19 @@ which calls it may not elide, sink or defer.
 
 ## Stages
 
-Order: 3, then 4; 5 any time after 3.
+Order: 4, then 5.
 
-Stages 1 and 2 are built. Pinner: `[mut x]` takes a `mut` variable of the enclosing function (not a
+Stages 1, 2 and 3 are built. A mutating closure compiles as a lifted function
+`lam(mut self: Env, args)` where `Env` is a synthesized struct holding everything its body mentions
+from outside; the lifted body unpacks `self` into locals named as the source names them, runs the
+body, and packs them back (`lift_mutating_lambda`). `[mut n = 0]` is `mut n = 0;` around a
+`[mut n]` closure, made by the pinner, so mono sees one kind of capture. The closure is a variant
+case holding `Env`; a group of closures of one type has `apply$n` (plain call) and, when any of them
+mutates, `apply$n$mut` (`mut` closure, answering it as the call left it); `set f(x);` is
+`f = apply$n$mut(f, x)`. A call of a mutating closure is marked by the closure's type as its one type
+argument. State is only observable through effects until stage 4. A mutating closure cannot be handed
+to a function that takes a function (the call is declined with a message saying so), and cannot
+`return` early (the write-back would be skipped). Stages 1 and 2: Pinner: `[mut x]` takes a `mut` variable of the enclosing function (not a
 loop's from outside the loop) or declares owned state `[mut n = 0]`; the body must `set` each, may
 `set` no other `mut` variable, and returns nothing; the closure's type is `() mut ..`; a plain function
 fits where `mut` is allowed, never the reverse (`agree`); `set f(x);` lowers to `set f = f(x)`, a call
@@ -71,14 +81,6 @@ as non-mutating. Two things the syntax needed that were not there: `()` is now t
 function type can return nothing, and a closure with no parameters (`|| { .. }`) can be written in
 value position.
 
-### 3. Closures that own their state
-- [ ] The captured variables of a mutating closure are one synthesized struct; the lifted function
-      takes it as `mut self` and the `apply` function takes the closure as `mut`, matches on the
-      case and stores the updated environment back into it.
-- [ ] A call `set f(x);` stores the updated closure back into `f`.
-- [ ] Cases: a counter factory returned and called twice, two copies of a closure counting
-      separately, state of a heap value (an array pushed to), leak gate clean.
-
 ### 4. Lending
 - [ ] A closure over an enclosing variable that is only passed down writes the variable back
       after its last use. A mutating closure is not handed to a higher-order function that is
@@ -91,5 +93,7 @@ value position.
 ## Done when
 
 `fn counter() -> () mut !prints -> () { mut x = 0; [mut x] || { set x++; print(`{x}`) } }` checks,
-`let mut f = counter(); set f(); set f();` prints 1 and 2, a second `counter()` starts again at 1,
-using `x` in `counter` after the closure is made is an error, and the whole corpus is green.
+`mut f = counter(); set f(); set f();` prints 1 and 2, a second `counter()` starts again at 1,
+using `x` in `counter` after the closure is made is an error, and the whole corpus is green. (Met by
+`tests/cases/lambdas/mutating_closures.aipl`; what remains is the lending in stage 4 and the
+optimizer in stage 5, after which the plan is deleted.)

@@ -1,0 +1,113 @@
+# A closure that mutates what it captures owns that state: each call changes it, a copy of the
+# closure is a copy of the state, and two closures made by one function count apart. What a closure
+# takes from the function around it, `[mut total]`, and what it starts with, `[mut seen = []]`, are
+# the same thing once it is made. Calling one is `set f(x);`, and what a `mut` type accepts includes
+# a function that mutates nothing.
+
+import {
+    equal as ==,
+    print,
+    push,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
+
+# A closure that counts how often it has been called, and says so.
+pub fn counter() -> () mut !prints -> () {
+    mut calls = 0;
+    [mut calls] || {
+        set calls++;
+        print(`call {calls}`);
+    }
+}.test({
+    mut lines: str[] = [];
+    shim prints {
+        print = |text| {
+            set lines.push(text);
+        },
+        put = |text| {
+            set lines.push(text);
+        },
+    } {
+        mut first = counter();
+        mut second = counter();
+        set first();
+        set first();
+        set second();
+        set first();
+    };
+    assert(lines == ["call 1", "call 2", "call 1", "call 3"]);
+})
+
+# The state is a value: a copy of the closure starts from where the original was and goes its own
+# way, and an array in it is not shared.
+pub fn adder(start: i64) -> (i64) mut !prints -> () {
+    mut total = start;
+    [mut total] |x: i64| {
+        set total += x;
+        print(`total {total}`);
+    }
+}.test({
+    mut lines: str[] = [];
+    shim prints {
+        print = |text| {
+            set lines.push(text);
+        },
+        put = |text| {
+            set lines.push(text);
+        },
+    } {
+        mut a = adder(10);
+        set a(5);
+        mut copy = a;
+        set a(1);
+        set copy(100);
+    };
+    assert(lines == ["total 15", "total 16", "total 115"]);
+})
+
+# State the closure starts with, and a heap value in it.
+pub fn recorder() -> () mut !prints -> () {
+    [mut seen = []] || {
+        set seen.push(7);
+        print(`{seen}`);
+    }
+}.test({
+    mut lines: str[] = [];
+    shim prints {
+        print = |text| {
+            set lines.push(text);
+        },
+        put = |text| {
+            set lines.push(text);
+        },
+    } {
+        mut recorded = recorder();
+        set recorded();
+        set recorded();
+    };
+    assert(lines == ["[7]", "[7, 7]"]);
+})
+
+# A function that mutates nothing is accepted where one that does is expected.
+pub fn plain(x: i64) !prints {
+    print(`plain {x}`);
+}
+
+fn main() !prints {
+    mut tick = counter();
+    set tick();
+    set tick();
+    mut add = adder(1);
+    set add(2);
+    mut notes = recorder();
+    set notes();
+    mut quiet: (i64) mut !prints -> () = plain;
+    set quiet(3);
+}
+--- stdout ---
+call 1
+call 2
+total 3
+[7]
+plain 3

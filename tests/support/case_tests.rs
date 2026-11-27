@@ -497,6 +497,7 @@ case_tests! {
     cases_lambdas_map_in_place = "cases/lambdas/map_in_place",
     cases_lambdas_map_span = "cases/lambdas/map_span",
     cases_lambdas_method_form = "cases/lambdas/method_form",
+    cases_lambdas_mutating_closures = "cases/lambdas/mutating_closures",
     cases_lambdas_named_fn_args = "cases/lambdas/named_fn_args",
     cases_lambdas_operator_as_value = "cases/lambdas/operator_as_value",
     cases_lambdas_operator_as_value_custom = "cases/lambdas/operator_as_value_custom",

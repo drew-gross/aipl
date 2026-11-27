@@ -560,6 +560,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/lambdas/map_in_place | 16 | 972 | 1004 | 2983 | 7276 |
 | tests/cases/lambdas/map_span | 31 | 1778 | 1810 | 5280 | 9304 |
 | tests/cases/lambdas/method_form | 15 | 639 | 855 | 1550 | 3492 |
+| tests/cases/lambdas/mutating_closures | 9 | 439 | 105 | 1855 | 7976 |
 | tests/cases/lambdas/named_fn_args | 10 | 435 | 363 | 1950 | 4532 |
 | tests/cases/lambdas/operator_as_value | 5 | 298 | 298 | 989 | 4676 |
 | tests/cases/lambdas/operator_as_value_custom | 2 | 108 | 108 | 561 | 4420 |

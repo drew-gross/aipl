@@ -652,6 +652,10 @@ struct CaptureScope {
     lent: Vec<String>,
     /// The bindings to put back.
     saved: Vec<(String, Option<Binding>)>,
+    /// The state the closure starts with, `[mut n = 0]`: each is a `mut` variable around the
+    /// closure that the closure then takes, so nothing after the pinner sees a second kind of
+    /// capture.
+    owned: Vec<(String, TExpr<It>)>,
 }
 
 struct Pinner<'a> {
@@ -3422,7 +3426,8 @@ impl Pinner<'_> {
                     sorted_effects(&performed.unwrap_or_default()),
                     !captures.is_empty(),
                 );
-                self.node(K::Lambda(typed, Box::new(body)), ty, e)
+                let lambda = self.node(K::Lambda(typed, Box::new(body)), ty, e);
+                self.with_owned_state(taken.owned, lambda, e)
             }
             ExprKind::Lambda(params, _, _) => {
                 let untyped = params.iter().find(|p| p.ty.is_none());
@@ -3515,7 +3520,8 @@ impl Pinner<'_> {
             match &c.init {
                 Some(init) => {
                     let value = self.expr(init)?;
-                    owned.push((c.name.clone(), value.ty, written(&c.span)));
+                    owned.push((c.name.clone(), value.ty.clone(), written(&c.span)));
+                    scope.owned.push((c.name.clone(), value));
                 }
                 None => {
                     let Some(b) = self.env.get(&c.name).cloned() else {
@@ -3585,6 +3591,23 @@ impl Pinner<'_> {
         Ok(scope)
     }
 
+    /// `lambda` with the state its capture list starts it with bound around it.
+    fn with_owned_state(
+        &mut self,
+        owned: Vec<(String, TExpr<It>)>,
+        lambda: TExpr<It>,
+        at: &Expr,
+    ) -> TExpr<It> {
+        let ty = lambda.ty.clone();
+        owned.into_iter().rev().fold(lambda, |inner, (name, init)| {
+            self.node(
+                TExprKind::LetMut(name, Box::new(init), Box::new(inner)),
+                ty.clone(),
+                at,
+            )
+        })
+    }
+
     /// Puts back what [`Pinner::enter_captures`] changed.
     fn restore_captures(&mut self, saved: Vec<(String, Option<Binding>)>) {
         for (name, old) in saved.into_iter().rev() {
@@ -3603,6 +3626,24 @@ impl Pinner<'_> {
         captures: &[Capture],
         body: &TExpr<It>,
     ) -> Res<()> {
+        // The closure's state is written back when its body ends, which a `return` would skip.
+        fn returns_early(e: &TExpr<It>) -> Option<Span> {
+            match &e.kind {
+                TExprKind::Return(_) => Some(e.span.clone()),
+                TExprKind::Lambda(..) => None,
+                _ => {
+                    let mut found = None;
+                    e.for_each_child(&mut |c| found = found.take().or_else(|| returns_early(c)));
+                    found
+                }
+            }
+        }
+        if let Some(at) = returns_early(body) {
+            return reject(
+                "a closure that mutates what it captures cannot `return` early yet",
+                &at,
+            );
+        }
         let mut assigned = HashSet::new();
         crate::typed_util::assigned_names(body, &mut assigned);
         for c in captures {
@@ -5487,8 +5528,11 @@ impl Pinner<'_> {
             }
             // A call of a closure that mutates what it captured answers the closure as it is
             // afterwards, as a call of a mutating method answers its receiver: `set f(x);`.
-            let answer = if mutating { ty.clone() } else { *ret };
-            return Ok(call(typed, answer, self));
+            if mutating {
+                // The closure's type among the type arguments says which kind of call it is.
+                return Ok(call_with(vec![ty.clone()], typed, ty.clone(), self));
+            }
+            return Ok(call(typed, *ret, self));
         }
         if method_style && !args.is_empty() {
             if let Some(s) = self.decls.sigs.get(name).filter(|s| !s.sig.is_method()) {
@@ -6633,7 +6677,8 @@ impl Pinner<'_> {
                 self.finish_captures(&taken.lent, captures, &body)?;
             }
             let ty = It::Fn(ptys, ret, effects, mutating || !captures.is_empty());
-            return Ok(self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg));
+            let lambda = self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg);
+            return Ok(self.with_owned_state(taken.owned, lambda, arg));
         }
         self.expr(arg)
     }

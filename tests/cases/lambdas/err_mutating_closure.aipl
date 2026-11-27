@@ -58,6 +58,15 @@ fn returns_a_value() -> () mut -> i64 {
     }
 }
 
+# The state is written back when the body ends, which an early `return` would skip.
+fn returns_early() -> () mut !prints -> () {
+    mut x = 0;
+    [mut x] || {
+        set x++;
+        return print("early");
+    }
+}
+
 # The variable is the closure's once it is taken.
 fn used_after() -> () mut -> () {
     mut x = 0;
@@ -159,32 +168,38 @@ error: a closure that mutates what it captures returns nothing, but its body is 
 56 |         set x++;
    |             ^^^
 
-error: "x" was moved into a closure that mutates it, and is the closure's from there on
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:67:9
+error: return value is (), but the function returns () mut !prints -> ()
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:66:16
    |
-67 |     set x++;
+66 |         return print("early");
+   |                ^^^^^^^^^^^^^^
+
+error: "x" was moved into a closure that mutates it, and is the closure's from there on
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:76:9
+   |
+76 |     set x++;
    |         ^
 
 error: `[mut x]` would take "x" on every pass of a loop, and it is declared outside the loop
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:75:18
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:84:18
    |
-75 |         let f = [mut x] || {
+84 |         let f = [mut x] || {
    |                  ^^^^^
 
 error: struct "Plain" field "run": expected () -> (), got () mut -> ()
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:95:14
-   |
-95 |         run: [mut x] || {
-   |              ^^^^^^^^^^^^
+   --> ./tests/cases/lambdas/err_mutating_closure.aipl:104:14
+    |
+104 |         run: [mut x] || {
+    |              ^^^^^^^^^^^^
 
 error: the result of the mutating closure "tick" is discarded, losing the mutation; write "set tick(..)" to mutate it in place
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:117:5
+   --> ./tests/cases/lambdas/err_mutating_closure.aipl:126:5
     |
-117 |     tick();
+126 |     tick();
     |     ^^^^^^
 
 error: set: cannot assign to immutable binding "tick" (use "let mut")
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:123:9
+   --> ./tests/cases/lambdas/err_mutating_closure.aipl:132:9
     |
-123 |     set tick();
+132 |     set tick();
     |         ^^^^

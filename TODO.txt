@@ -462,6 +462,7 @@ matrices:
   support more than 2 dimensions
 
 types:
+  rust-style one writer at a time thing that works through closures i.e. if a function returns a closure that mutates it's argument, the caller can no longer mutate the argument
   add a "matches" function that replaces is_ident and similar
   functions with keyword arguments:
     should be able to pass these anywhere the keyword arguments are't used (and they get implicitly defaulted)
