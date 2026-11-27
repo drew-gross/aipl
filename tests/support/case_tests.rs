@@ -280,6 +280,7 @@ case_tests! {
     cases_floats_shortest_round_trip = "cases/floats/shortest_round_trip",
     cases_floats_to_float = "cases/floats/to_float",
     cases_floats_to_str = "cases/floats/to_str",
+    cases_functions_closure_lifetimes = "cases/functions/closure_lifetimes",
     cases_functions_closure_values = "cases/functions/closure_values",
     cases_functions_closures = "cases/functions/closures",
     cases_functions_destructured_params = "cases/functions/destructured_params",

@@ -1,0 +1,62 @@
+# What a closure captures from the heap lives as long as the closure does: past the function that
+# made it, past a change to the binding it was copied from, and through every copy of it. The leak
+# gate checks that it is all released.
+
+import { print, push } from builtins;
+
+struct Handler { name: str, run: (i64[]) -> i64[] }
+
+variant Node = Button(label: str, on_click: (i64[]) -> i64[]) | Plain
+
+fn fire(self: Node, model: i64[]) -> i64[] {
+    match (self) {
+        Button(_, on_click) => on_click(model),
+        Plain => model,
+    }
+}
+
+# A closure over an array and a string, returned after both locals are gone.
+fn appender(label: str, extra: i64[]) -> Node {
+    let doubled = [..extra, ..extra];
+    let text = `{label}!`;
+    Button(text, |xs| { [..xs, ..doubled] })
+}
+
+# A closure over a copy of a value that is changed afterwards sees the value as it was.
+fn snapshot() -> Node {
+    mut extra = [1, 2];
+    let kept = extra;
+    let node = Button("snapshot", |xs| { [..xs, ..kept] });
+    set extra.push(3);
+    set extra.push(4);
+    node
+}
+
+# A closure over another closure's node.
+fn chained(inner: Node) -> Handler { name: "chained", run: |xs| { inner.fire(inner.fire(xs)) } }
+
+fn main() !prints {
+    let made = appender("add", [7, 8]);
+    print(`{made.fire([1])} {made.fire([2])}`);
+
+    let copy = made;
+    print(`{copy.fire([3])}`);
+
+    print(`{snapshot().fire([0])}`);
+
+    let nested = chained(appender("x", [5]));
+    print(`{nested.name} {nested.run([0])}`);
+
+    let nodes = [appender("a", [1]), snapshot(), Plain, appender("b", [2, 3])];
+    mut total: i64[] = [];
+    for (let node : nodes) {
+        set total = node.fire(total);
+    }
+    print(`{total}`);
+}
+--- stdout ---
+[1, 7, 8, 7, 8] [2, 7, 8, 7, 8]
+[3, 7, 8, 7, 8]
+[0, 1, 2]
+chained [0, 5, 5, 5, 5]
+[1, 1, 1, 2, 2, 3, 2, 3]
