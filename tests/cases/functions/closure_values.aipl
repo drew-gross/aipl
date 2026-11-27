@@ -1,0 +1,30 @@
+# Closures that capture arrays and strings, in a variant and in a struct field, in a built program:
+# what they hold is released with them, which the leak gate checks.
+
+import { print } from builtins;
+
+struct Handler { name: str, run: (i64[]) -> i64[] }
+
+variant Node = Button(label: str, on_click: (i64[]) -> i64[]) | Plain
+
+fn double(xs: i64[]) -> i64[] { [..xs, ..xs] }
+
+fn fire(self: Node, model: i64[]) -> i64[] {
+    match (self) {
+        Button(_, on_click) => on_click(model),
+        Plain => model,
+    }
+}
+
+fn main() !prints {
+    let extra = [7, 8];
+    let tag = "hello";
+    let n: i64 = 3;
+    let a = Button("a", |xs| { [..xs, ..extra] });
+    let b = Button("b", double);
+    let c = Button("c", |xs| { [..xs, n] });
+    let h = Handler { name: `{tag}!`, run: |xs| { [..extra, ..xs] } };
+    print(`{a.fire([1])} {b.fire([1])} {c.fire([1])} {h.name} {h.run([9])}`);
+}
+--- stdout ---
+[1, 7, 8] [1, 1] [1, 3] hello! [7, 8, 9]

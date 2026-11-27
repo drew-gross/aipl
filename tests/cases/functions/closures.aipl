@@ -1,0 +1,50 @@
+# A lambda stored in data keeps the locals it reads: a parameter, a destructured field, a local
+# binding. Each is a copy taken when the lambda is made.
+
+import { equal as ==, map, value_or, wrapping_add as + } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+variant Node = Button(on_click: (u64) -> u64) | Plain
+
+variant Op = Run(f: (i64) -> i64)
+
+fn make(n: u64) -> Node { Button(|m| { m + n }) }
+
+fn press(self: Node, model: u64) -> u64 {
+    match (self) {
+        Button(on_click) => on_click(model),
+        Plain => model,
+    }
+}.test({
+    assert(make(5).press(1) == 6);
+    assert(Plain.press(1) == 1);
+})
+
+fn shifted(Point { x, y }) -> Op { Run(|n| { n + x + y }) }
+
+fn twice(op: Op, n: i64) -> i64 {
+    match (op) {
+        Run(f) => f(f(n)),
+    }
+}.test({
+    assert(twice(shifted(Point { x: 1, y: 2 }), 0) == 6);
+})
+
+fn local(base: i64) -> i64 {
+    let f = |n: i64| { n + base };
+    f(1) + f(2)
+}.test({
+    assert(local(10) == 23);
+})
+
+fn offset(n: i64) -> i64 { n + 100 }
+
+# A named function and a capturing lambda of one signature in one array.
+fn mixed(base: i64, pick: bool) -> i64 {
+    let ops = [Run(|n| { n + base }), Run(offset)];
+    ops[if (pick) { 0 } else { 1 }].map(|op| twice(op, 1)).value_or(0)
+}.test({
+    assert(mixed(5, true) == 11);
+    assert(mixed(5, false) == 201);
+})

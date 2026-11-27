@@ -432,6 +432,8 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/floats/shortest_round_trip | 18 | 890 | 890 | 997 | 1616 |
 | tests/cases/floats/to_float | 11 | 281 | 281 | 747 | 2948 |
 | tests/cases/floats/to_str | 14 | 483 | 483 | 1010 | 4756 |
+| tests/cases/functions/closure_values | 17 | 1030 | 1030 | 3400 | 10444 |
+| tests/cases/functions/closures | 2 | 160 | 80 | 533 | 1472 |
 | tests/cases/functions/destructured_params | 16 | 1057 | 1057 | 2703 | 7524 |
 | tests/cases/functions/exit_code | 0 | 0 | 0 | 2 | 8 |
 | tests/cases/functions/fn_value_field | 1 | 88 | 88 | 236 | 1224 |

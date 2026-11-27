@@ -3255,7 +3255,7 @@ impl Pinner<'_> {
                         span: param.span.clone(),
                     });
                 }
-                self.reject_captures(params, body, &e.span)?;
+                self.reject_mutable_captures(params, body, &e.span)?;
                 let saved_test = std::mem::replace(&mut self.in_test, false);
                 // A function value has no effects of its own to perform.
                 let saved_effects = std::mem::take(&mut self.effects);
@@ -3317,24 +3317,26 @@ impl Pinner<'_> {
         }
     }
 
-    /// A function value carries no environment, so its body may name nothing local to the function
-    /// it was written in.
-    fn reject_captures(
+    /// A function value keeps a copy of what its body reads of the function it was written in, taken
+    /// when it is made, so a `mut` binding it names would be read as it was then and not as it is
+    /// later: refused until a mutable capture has a meaning.
+    fn reject_mutable_captures(
         &self,
         params: &[aipl_syntax::ast::LambdaParam],
         body: &Expr,
         span: &Span,
     ) -> Res<()> {
-        let locals: HashMap<String, Type> = self
+        let mutable: HashMap<String, Type> = self
             .env
-            .keys()
-            .map(|name| (name.clone(), Type::Unit))
+            .iter()
+            .filter(|(_, binding)| binding.mutable)
+            .map(|(name, _)| (name.clone(), Type::Unit))
             .collect();
-        match crate::free_vars(body, params, &locals).into_iter().next() {
+        match crate::free_vars(body, params, &mutable).into_iter().next() {
             Some((captured, _)) => reject(
                 format!(
-                    "a lambda used as a value cannot capture local {captured:?} \
-                     (function values are non-capturing)"
+                    "a lambda used as a value cannot capture the `mut` binding {captured:?}: it \
+                     would keep the value it has now, not the later ones"
                 ),
                 span,
             ),
@@ -3342,13 +3344,22 @@ impl Pinner<'_> {
         }
     }
 
+    /// An argument of a constructor, stored in the value it makes: a lambda there is a function
+    /// value and keeps what it captures.
+    fn constructor_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
+        if let ExprKind::Lambda(params, body) = &arg.kind {
+            self.reject_mutable_captures(params, body, &arg.span)?;
+        }
+        self.arg(arg, expected)
+    }
+
     /// An argument that is stored as a value (a field, a binding, an assigned place), where a
-    /// closure is a function value: it captures nothing and performs no effect.
+    /// closure is a function value: it performs no effect.
     fn value_arg(&mut self, arg: &Expr, expected: &It) -> Res<TExpr<It>> {
         let ExprKind::Lambda(params, body) = &arg.kind else {
             return self.arg(arg, expected);
         };
-        self.reject_captures(params, body, &arg.span)?;
+        self.reject_mutable_captures(params, body, &arg.span)?;
         let saved_effects = std::mem::take(&mut self.effects);
         let typed = self.arg(arg, expected);
         self.effects = saved_effects;
@@ -5606,7 +5617,7 @@ impl Pinner<'_> {
             let mut typed = Vec::new();
             for (arg, slot) in args.iter().zip(&case.payload) {
                 let pty = self.lower(&slot.ty, &map, &arg.span)?;
-                let t = self.arg(arg, &pty)?;
+                let t = self.constructor_arg(arg, &pty)?;
                 self.coerce_expr(&t, &pty, &t.span, "a constructor argument")?;
                 typed.push(t);
             }
@@ -5638,7 +5649,7 @@ impl Pinner<'_> {
             let mut typed = Vec::new();
             for (arg, pty) in args.iter().zip(&payload) {
                 let pty = self.lower(pty, &HashMap::new(), &arg.span)?;
-                let t = self.arg(arg, &pty)?;
+                let t = self.constructor_arg(arg, &pty)?;
                 self.coerce_expr(&t, &pty, &t.span, "a constructor argument")?;
                 typed.push(t);
             }

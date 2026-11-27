@@ -1165,8 +1165,28 @@ impl Mono<'_> {
                 let ConcreteType::Fn(_, ret) = &e.ty else {
                     unreachable!()
                 };
-                let name = self.lift_lambda(params, body, &[], ret.to_type());
-                e.kind = TExprKind::Ident(name);
+                // What the lambda reads of its surroundings travels with the value:
+                // `closure_conversion` turns this call into the value that holds them.
+                let captures = self.typed_lambda_captures(params, body);
+                let name = self.lift_lambda(params, body, &captures, ret.to_type());
+                e.kind = if captures.is_empty() {
+                    TExprKind::Ident(name)
+                } else {
+                    TExprKind::Call {
+                        callee: Callee::User(format!(
+                            "{}{name}",
+                            crate::closure_conversion::MAKE_PREFIX
+                        )),
+                        type_args: Vec::new(),
+                        args: captures
+                            .iter()
+                            .map(|(n, t)| {
+                                TExpr::new(TExprKind::Ident(n.clone()), t.clone(), e.span.clone())
+                            })
+                            .collect(),
+                        method_style: false,
+                    }
+                };
                 return e;
             }
         }

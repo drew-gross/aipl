@@ -300,7 +300,7 @@ impl Mono<'_> {
 
     /// What a lambda captures from the scope around it: the locals its body reads, and the captures
     /// of each function-typed parameter it calls, which arrive as parameters of this function.
-    fn typed_lambda_captures(
+    pub(crate) fn typed_lambda_captures(
         &self,
         params: &[TLambdaParam<ConcreteType>],
         body: &Typed,

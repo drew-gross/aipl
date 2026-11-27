@@ -47,14 +47,7 @@ fn return_void_for_i64() -> i64 {}
 
 fn return_bare_for_optional() -> i64? { 5 }
 
-// A lambda used as a *value* may not capture a local, and its parameters must
-// be typed.
-fn value_lambda_capture() -> i64 {
-    let n = 5;
-    let f = |x: i64| { x + n };
-    f(10)
-}
-
+// A lambda used as a *value* has typed parameters.
 fn value_lambda_untyped() -> i64 {
     let f = |x| { x + 1 };
     f(10)
@@ -131,26 +124,20 @@ error: fn "return_bare_for_optional": body returns i64, but the declared return 
 48 | fn return_bare_for_optional() -> i64? { 5 }
    |                                         ^
 
-error: a lambda used as a value cannot capture local "n" (function values are non-capturing)
-  --> ./tests/cases/functions/err_functions.aipl:54:13
-   |
-54 |     let f = |x: i64| { x + n };
-   |             ^^^^^^^^^^^^^^^^^^
-
 error: lambda parameter "x" used as a value must be typed, e.g. `|x: i64| ...`
-  --> ./tests/cases/functions/err_functions.aipl:59:14
+  --> ./tests/cases/functions/err_functions.aipl:52:14
    |
-59 |     let f = |x| { x + 1 };
+52 |     let f = |x| { x + 1 };
    |              ^
 
 error: arithmetic operand: expected (), got i64
-  --> ./tests/cases/functions/err_functions.aipl:69:42
+  --> ./tests/cases/functions/err_functions.aipl:62:42
    |
-69 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
+62 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
    |                                          ^^^^^^^^^^^^^^^
 
 error: fn "subject": body returns i64, but the declared return type is ()
-  --> ./tests/cases/functions/err_functions.aipl:72:16
+  --> ./tests/cases/functions/err_functions.aipl:65:16
    |
-72 | fn subject() { 5 }
+65 | fn subject() { 5 }
    |                ^

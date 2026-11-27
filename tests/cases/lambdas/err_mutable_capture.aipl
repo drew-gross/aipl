@@ -1,0 +1,45 @@
+# A lambda used as a value keeps a copy of what it reads, taken when it is made, so a `mut` binding
+# it names is refused: the copy would not follow the binding.
+
+import { wrapping_add as + } from builtins;
+
+variant Op = Run(f: (i64) -> i64)
+
+struct Handler { f: (i64) -> i64 }
+
+fn in_constructor() -> Op {
+    mut n = 1;
+    set n = 2;
+    Run(|x| { x + n })
+}
+
+fn in_field() -> Handler {
+    mut n = 1;
+    set n = 2;
+    Handler { f: |x| { x + n } }
+}
+
+fn in_binding() -> i64 {
+    mut n = 1;
+    set n = 2;
+    let g = |x: i64| { x + n };
+    g(1)
+}
+--- check --compile ---
+error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones
+  --> ./tests/cases/lambdas/err_mutable_capture.aipl:13:9
+   |
+13 |     Run(|x| { x + n })
+   |         ^^^^^^^^^^^^^
+
+error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones
+  --> ./tests/cases/lambdas/err_mutable_capture.aipl:19:18
+   |
+19 |     Handler { f: |x| { x + n } }
+   |                  ^^^^^^^^^^^^^
+
+error: a lambda used as a value cannot capture the `mut` binding "n": it would keep the value it has now, not the later ones
+  --> ./tests/cases/lambdas/err_mutable_capture.aipl:25:13
+   |
+25 |     let g = |x: i64| { x + n };
+   |             ^^^^^^^^^^^^^^^^^^

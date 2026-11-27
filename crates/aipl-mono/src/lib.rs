@@ -25,6 +25,7 @@ use std::{
     sync::OnceLock,
 };
 
+mod closure_conversion;
 mod match_check;
 mod patterns;
 pub mod pin;
@@ -1942,6 +1943,11 @@ pub fn monomorphize(
         .iter()
         .map(|ty| settled(ty, "a variable a shim closure captures"))
         .collect();
+    let (mut concrete_structs, mut concrete_variants, mut out_fns) =
+        (concrete_structs, concrete_variants, out_fns);
+    if let Some(conversion) = closure_conversion::Conversion::find(&out_fns) {
+        conversion.apply(&mut out_fns, &mut concrete_structs, &mut concrete_variants);
+    }
     Ok(MonoProgram {
         structs: concrete_structs,
         variants: concrete_variants,
