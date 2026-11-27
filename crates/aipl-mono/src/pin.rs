@@ -5245,7 +5245,7 @@ impl Pinner<'_> {
                 return reject(format!("{name:?} is not a function"), &e.span);
             };
             for effect in &effects {
-                self.require_effect(display(name), effect, &e.span)?;
+                self.require_effect(display(name), effect, &e.span, true)?;
             }
             if ptys.len() != args.len() {
                 return reject(
@@ -5734,7 +5734,7 @@ impl Pinner<'_> {
                     if let Ok(field) = self.field_type(&owner, name, &e.span) {
                         if let It::Fn(ptys, ret, effects) = self.table.shallow(&field) {
                             for effect in &effects {
-                                self.require_effect(display(name), effect, &e.span)?;
+                                self.require_effect(display(name), effect, &e.span, true)?;
                             }
                             if let Some(declaring) = self.declaring_struct(&owner) {
                                 self.resolve(
@@ -5834,7 +5834,7 @@ impl Pinner<'_> {
             );
         }
         for effect in &sig.effects {
-            self.require_effect(display(name), effect, &e.span)?;
+            self.require_effect(display(name), effect, &e.span, false)?;
         }
         let (ptys, ret, type_args) = self.instantiate(name, &sig, &e.span)?;
         // Plain arguments first, so a closure is typed knowing what the others pinned.
@@ -6192,7 +6192,13 @@ impl Pinner<'_> {
     /// What performing `effect` here needs: the function being typed declares it, or it is
     /// recorded as performed by the lambda whose effects are being inferred. `callee` names what
     /// performs it, for the message.
-    fn require_effect(&mut self, callee: &str, effect: &str, span: &Span) -> Res<()> {
+    fn require_effect(
+        &mut self,
+        callee: &str,
+        effect: &str,
+        span: &Span,
+        is_value: bool,
+    ) -> Res<()> {
         if self.effects.iter().any(|e| e == effect) {
             return Ok(());
         }
@@ -6206,6 +6212,20 @@ impl Pinner<'_> {
             None if self.closure_outer.is_some() => {
                 let outer = self.closure_outer.clone().unwrap_or_default();
                 reject(slot_effect_message(callee, effect, &outer), span)
+            }
+            // A function value is called through a name that is not a function's, which the
+            // message says.
+            None if is_value
+                && effect != "measure"
+                && !self.effects.iter().any(|e| e == "measure") =>
+            {
+                reject(
+                    format!(
+                        "{callee:?} is a function value that performs \"!{effect}\", but the \
+                         calling function does not declare it"
+                    ),
+                    span,
+                )
             }
             None => reject(
                 undeclared_effect_message(callee, effect, &self.effects),

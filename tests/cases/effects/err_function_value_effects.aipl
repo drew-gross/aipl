@@ -41,13 +41,13 @@ fn declared(x: i64) !prints -> i64 { apply_logged(shout, x) }
 
 fn undeclared_caller(x: i64) -> i64 { apply_logged(shout, x) }
 --- check --compile ---
-error: fn "f" has effect "!prints" but the calling function does not declare it
+error: "f" is a function value that performs "!prints", but the calling function does not declare it
   --> ./tests/cases/effects/err_function_value_effects.aipl:19:62
    |
 19 | fn undeclared_call(f: (i64) !prints -> i64, x: i64) -> i64 { f(x) }
    |                                                              ^^^^
 
-error: fn "run" has effect "!prints" but the calling function does not declare it
+error: "run" is a function value that performs "!prints", but the calling function does not declare it
   --> ./tests/cases/effects/err_function_value_effects.aipl:21:49
    |
 21 | fn undeclared_field(l: Logger, x: i64) -> i64 { l.run(x) }
