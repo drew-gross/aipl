@@ -575,7 +575,6 @@ skills:
   make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 lint:
-  [1, 2, 3].map(add) should lint to [1, 2, 3]$add even when add is a closure
   lint let some(foo) = bar else { return none; }; to let foo = bar?;
   lint simple let/else desturcturings to as_case<C>()? (vs else return none)
   make a passes_lint helper (maybe accepts a lint name?) to replace lint_function_unfilled(...)?.is_empty()

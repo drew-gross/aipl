@@ -1,0 +1,47 @@
+# A function value is called as a method on its first argument: `x.f(y)` is `f(x, y)`, whether `f`
+# is a local, a parameter, a name a pattern bound, a field, or a closure that captures.
+
+import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
+
+struct Handler { run: (i64, i64) -> i64 }
+
+variant Op = Run(f: (i64, i64) -> i64)
+
+fn local(n: i64) -> i64 {
+    let add = |a: i64, b: i64| { a + b + n };
+    n.add(1)
+}.test({
+    assert(local(5) == 11);
+})
+
+fn parameter(f: (i64, i64) -> i64, x: i64) -> i64 { x.f(2) }.test({
+    assert(parameter(|a, b| { a * b }, 4) == 8);
+})
+
+fn bound(op: Op, x: i64) -> i64 {
+    match (op) {
+        Run(f) => x.f(10),
+    }
+}.test({
+    assert(bound(Run(|a, b| { a + b }), 1) == 11);
+})
+
+fn field(h: Handler, x: i64) -> i64 { h.run(x, 3) }.test({
+    assert(field(Handler { run: |a, b| { a + b } }, 1) == 4);
+})
+
+fn captured(n: i64) -> i64 {
+    let op = Run(|a, b| { a + b + n });
+    bound(op, 1)
+}.test({
+    assert(captured(100) == 111);
+})
+
+fn made(n: i64) -> (i64, i64) -> i64 { |a, b| { a + b + n } }
+
+fn returned(n: i64) -> i64 {
+    let f = made(n);
+    1.f(2)
+}.test({
+    assert(returned(10) == 13);
+})

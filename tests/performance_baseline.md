@@ -443,6 +443,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/functions/forward_reference | 0 | 0 | 0 | 28 | 172 |
 | tests/cases/functions/jit_constant | 2 | 106 | 106 | 557 | 4408 |
 | tests/cases/functions/jit_identity | 0 | 0 | 0 | 39 | 212 |
+| tests/cases/functions/method_call_on_function_value | 0 | 0 | 0 | 213 | 1060 |
 | tests/cases/functions/nonempty_variadic | 31 | 2018 | 1388 | 4019 | 10036 |
 | tests/cases/functions/owned_inplace | 2 | 88 | 88 | 733 | 1584 |
 | tests/cases/functions/owned_inplace_bool | 2 | 34 | 34 | 669 | 1320 |

@@ -296,6 +296,7 @@ case_tests! {
     cases_functions_forward_reference = "cases/functions/forward_reference",
     cases_functions_jit_constant = "cases/functions/jit_constant",
     cases_functions_jit_identity = "cases/functions/jit_identity",
+    cases_functions_method_call_on_function_value = "cases/functions/method_call_on_function_value",
     cases_functions_nonempty_variadic = "cases/functions/nonempty_variadic",
     cases_functions_owned_inplace = "cases/functions/owned_inplace",
     cases_functions_owned_inplace_bool = "cases/functions/owned_inplace_bool",

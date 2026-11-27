@@ -17045,7 +17045,8 @@ fn compile_call_expr_direct<M: Module>(
     // A free call whose callee is a local holding a function value is an
     // indirect call (mono resolved HOF-parameter calls to concrete callees, so
     // any surviving call through a `ConcreteType::Fn` binding is a runtime one).
-    if !style {
+    // `recv.f(rest)` through a local `f` is that call with `recv` first, as a field's is.
+    if !style || matches!(callee, Callee::Local(_)) {
         if let Some(ConcreteType::Fn(ptys, ret)) = env.get(name).map(env_binding_type) {
             return compile_indirect_call(
                 module, builder, cx, scopes, name, &ptys, &ret, args, span,
