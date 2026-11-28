@@ -1779,3 +1779,55 @@ fn the_method_a_set_calls_goes_to_the_function_it_names() {
         "{documented}"
     );
 }
+
+const MAPPED: &str = "import { wrapping_add as + } from builtins;\n\
+                      \n\
+                      struct Item { id: i64 }\n\
+                      \n\
+                      fn bumped(self: Item) -> Item { id: self.id + 1 }\n\
+                      \n\
+                      fn each(items: Item[]) -> i64[] { items$bumped()$id }\n";
+
+/// A name after `$` is a use of the function or field it maps, as it is after `.`.
+#[test]
+fn a_mapped_call_and_a_mapped_field_go_to_their_declarations() {
+    let workspace = Workspace::new("mapped", &[("main.aipl", MAPPED)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let uri = workspace.uri("main.aipl");
+    assert_eq!(
+        definition_starts(&mut server, &uri, MAPPED, "bumped()$id"),
+        vec![cursor_on(MAPPED, "bumped(self")],
+    );
+    assert_eq!(
+        definition_starts(&mut server, &uri, MAPPED, "id }\n"),
+        vec![cursor_on(MAPPED, "id: i64 }")],
+    );
+}
+
+/// A builtin's source opened on its own is the program, though the function it declares is named
+/// `__builtin_<name>` there: what that function uses goes to its declaration like anywhere else.
+#[test]
+fn a_builtins_own_file_goes_to_what_its_function_uses() {
+    aipl::install_parser_hooks();
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/aipl-mono/src/builtin_tabulate.aipl"
+    );
+    let text = fs::read_to_string(path).expect("read the builtin");
+    let uri = format!("file://{path}");
+    let mut server = Server::new();
+    open(&mut server, &uri, &text);
+    // `tabulate` maps `fitted` over the rows; `rule` is a plain call.
+    for (snippet, declaration) in [
+        ("fitted(columns.len()", "fitted<T: any>(\n"),
+        ("rule(widths, \"=\"),", "rule(\n    # How wide"),
+    ] {
+        let found = definition_at(&mut server, &uri, cursor_on(&text, snippet));
+        assert_eq!(found["uri"], json!(uri), "from {snippet:?}");
+        assert_eq!(
+            found["range"]["start"],
+            cursor_on(&text, declaration),
+            "from {snippet:?}"
+        );
+    }
+}

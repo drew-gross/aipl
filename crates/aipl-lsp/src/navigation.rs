@@ -100,7 +100,13 @@ impl Navigation {
         // place to jump from or to.
         let file_of = |name: &str| -> Option<PathBuf> {
             if name.starts_with("__builtin_") {
-                return None;
+                // The file of a builtin, opened on its own, is what its author writes: the
+                // function it declares is named `__builtin_<file stem without builtin_>`.
+                let own = root
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .is_some_and(|stem| name.strip_prefix("__") == Some(stem));
+                return own.then(|| root.clone());
             }
             match mangled_file_index(name) {
                 Some(index) => files.get(index as usize)?.clone(),

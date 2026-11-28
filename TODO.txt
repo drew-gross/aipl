@@ -540,7 +540,7 @@ parser:
 
 grammar:
   as_* in grammar.aipl should use as_case().value_or_err or something like that (maybe make a lint for this?)
-  maybe can do some sort of recovery even when not using Expectr
+  maybe can do some sort of recovery even when not using Expect
   fixit suggestions from expect
   TokenRule's unterminated should move into only the places where it's actually used
   make an ebnf loader as well as dumper
