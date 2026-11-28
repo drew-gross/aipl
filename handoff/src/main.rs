@@ -350,39 +350,44 @@ fn nextest_build() -> Cmd {
 
 /// Whether any dogfooded `.aipl` is newer than the artifact compiled from it.
 ///
-/// The sources are every `.aipl` under `crates/aipl-codegen/src/`, which is a
-/// superset of `DOGFOOD_SOURCE_FILES` — deliberately, so that adding a file to
-/// the list cannot leave this check silently blind to it. A file in that
-/// directory that the list doesn't name costs at most one
-/// needless regeneration, on the run that edits it and not after: generation is
-/// deterministic, so an artifact rebuilt from sources that did not really change
-/// comes out byte-identical and the promote leaves nothing in the diff — it
-/// costs the seconds, not the churn.
+/// The sources are every `.aipl` under `crates/aipl-codegen/src/`, in its subdirectories too (the
+/// lints are in `lint/`), which is a superset of `DOGFOOD_SOURCE_FILES` — deliberately, so that
+/// adding a file to the list cannot leave this check silently blind to it. A file there that the
+/// list doesn't name costs at most one needless regeneration, on the run that edits it and not
+/// after: generation is deterministic, so an artifact rebuilt from sources that did not really
+/// change comes out byte-identical and the promote leaves nothing in the diff — it costs the
+/// seconds, not the churn.
 ///
 /// Unreadable metadata answers "not behind": a missing artifact is a different
 /// problem, reported by the run itself, and a missing source is the loud panic
 /// `read_dogfood_sources` already raises.
 fn ir_is_behind_sources(repo: &Path) -> bool {
     let dir = repo.join("crates/aipl-codegen/src");
-    let artifact = |name: &str| {
-        std::fs::metadata(dir.join(name))
-            .and_then(|m| m.modified())
-            .ok()
-    };
     // The checked-in artifact is the compiled object; the `.clif` it was
     // generated from is a working-tree intermediate that need not exist.
-    let Some(artifact) = artifact("dogfood.o") else {
+    let Some(artifact) = std::fs::metadata(dir.join("dogfood.o"))
+        .and_then(|m| m.modified())
+        .ok()
+    else {
         return false;
     };
-    let Ok(entries) = std::fs::read_dir(&dir) else {
+    any_aipl_newer_than(&dir, artifact)
+}
+
+/// Whether a `.aipl` file under `dir`, at any depth, was modified after `time`.
+fn any_aipl_newer_than(dir: &Path, time: std::time::SystemTime) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return false;
     };
     entries.flatten().any(|e| {
         let path = e.path();
+        if path.is_dir() {
+            return any_aipl_newer_than(&path, time);
+        }
         path.extension().is_some_and(|x| x == "aipl")
             && e.metadata()
                 .and_then(|m| m.modified())
-                .is_ok_and(|t| t > artifact)
+                .is_ok_and(|t| t > time)
     })
 }
 
@@ -1251,6 +1256,53 @@ mod tests {
             fail_cases: fail_cases.iter().map(|c| (*c).to_string()).collect(),
             ..Default::default()
         }
+    }
+
+    /// A repo with the compiled artifact and one dogfooded source at `relative` under
+    /// `crates/aipl-codegen/src/`, the source modified `offset` seconds after the artifact
+    /// (before it, when negative).
+    fn repo_with_source(name: &str, relative: &str, offset: i64) -> std::path::PathBuf {
+        let repo = std::env::temp_dir().join(format!("handoff-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&repo);
+        let src = repo.join("crates/aipl-codegen/src");
+        let source = src.join(relative);
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::write(src.join("dogfood.o"), b"object").unwrap();
+        std::fs::write(&source, b"fn f() {}").unwrap();
+        let artifact = std::fs::metadata(src.join("dogfood.o"))
+            .unwrap()
+            .modified()
+            .unwrap();
+        let at = if offset >= 0 {
+            artifact + std::time::Duration::from_secs(offset as u64)
+        } else {
+            artifact - std::time::Duration::from_secs(offset.unsigned_abs())
+        };
+        std::fs::File::options()
+            .write(true)
+            .open(&source)
+            .unwrap()
+            .set_modified(at)
+            .unwrap();
+        repo
+    }
+
+    #[test]
+    fn a_source_in_a_subdirectory_newer_than_the_artifact_makes_the_ir_stale() {
+        // The lints are under `lint/`, and an edit to one is an edit to the compiler.
+        let behind = repo_with_source("behind-sub", "lint/assert.aipl", 10);
+        assert!(ir_is_behind_sources(&behind));
+        let top = repo_with_source("behind-top", "walker.aipl", 10);
+        assert!(ir_is_behind_sources(&top));
+        let _ = std::fs::remove_dir_all(&behind);
+        let _ = std::fs::remove_dir_all(&top);
+    }
+
+    #[test]
+    fn sources_older_than_the_artifact_leave_it_current() {
+        let repo = repo_with_source("current", "lint/assert.aipl", -10);
+        assert!(!ir_is_behind_sources(&repo));
+        let _ = std::fs::remove_dir_all(&repo);
     }
 
     #[test]
