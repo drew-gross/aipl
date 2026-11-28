@@ -20,7 +20,6 @@ projects:
     press() should destructure self. Also we should have tuple destructuring
   make a C compiler in aipl to get some more exercise out of the parser library and formatter and etc.
   mtg:
-    card names should be scryfall links
     split in analysis by number of cards
     port merge_metagames to aipl, use it directly in the analyzer
     sub-archetypes

@@ -299,6 +299,8 @@ let STYLE = """
     #hull .down { fill: #c0392b; }
     #hull line { stroke: #ccc; }
     #hull .stripe { fill: #f1f4f8; }
+    #hull .link { fill: #1a6fb5; cursor: pointer; }
+    #hull .link:hover { text-decoration: underline; }
     #panel .link { fill: #1a6fb5; cursor: pointer; pointer-events: all; }
     #panel .sortable { pointer-events: all; cursor: pointer; }
     #panel .sortable:hover { fill: #1a6fb5; }
@@ -439,6 +441,18 @@ let SCRIPT = """
         hull_bottom = Math.max(hull_bottom, y + HULL_ROW);
         return node;
     }
+    // The page of a card on Scryfall: a search for exactly its name, which opens the card itself.
+    function scryfall(name) {
+        return "https://scryfall.com/search?q=" + encodeURIComponent('!"' + name + '"');
+    }
+    // An anchor to `url`, opened in a new tab.
+    function hull_anchor(url) {
+        var anchor = document.createElementNS("http://www.w3.org/2000/svg", "a");
+        anchor.setAttribute("href", url);
+        anchor.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", url);
+        anchor.setAttribute("target", "_blank");
+        return anchor;
+    }
     function draw_hull() {
         while (hull.firstChild) hull.removeChild(hull.firstChild);
         hull_bottom = 0;
@@ -458,7 +472,7 @@ let SCRIPT = """
                 var parts = entry.split(/[:,]/).map(Number);
                 return { copies: parts[0], decks: parts[1], win: parts[2], loss: parts[3] };
             });
-            return { section: each.getAttribute("data-section"), name: each.getAttribute("data-name").split(" // ")[0], tallies: tallies };
+            return { section: each.getAttribute("data-section"), full: each.getAttribute("data-name"), name: each.getAttribute("data-name").split(" // ")[0], tallies: tallies };
         });
         // One number of copies as the cells of its row: the copies, the decks, their share, their
         // win rate, and its change from the baseline, coloured as it is up or down.
@@ -515,7 +529,10 @@ let SCRIPT = """
                     hull.appendChild(stripe);
                 }
                 var least = card.tallies[0].copies, most = card.tallies[card.tallies.length - 1].copies;
-                fit_text(hull_put(card.name + " (" + least + "-" + most + ")", 0, y), HULL_NAME - 14);
+                var name_node = fit_text(hull_put(card.name + " (" + least + "-" + most + ")", 0, y, "link"), HULL_NAME - 14);
+                var anchor = hull_anchor(scryfall(card.full));
+                hull.replaceChild(anchor, name_node);
+                anchor.appendChild(name_node);
                 card.tallies.forEach(function(tally, at) {
                     var group = at % HULL_GROUPS;
                     if (at > 0 && group === 0) y += HULL_ROW;
@@ -527,17 +544,34 @@ let SCRIPT = """
             });
             if (agreed.length) {
                 y += HULL_ROW;
-                var node = hull_put("Same in every deck:", 0, y, "note"), text = node.textContent;
+                // The cards every deck plays alike, each a link, as many to a line as fit.
+                var node = hull_put("Same in every deck:", 0, y, "note"), on_line = 0;
+                var item_parts = function(card, at, indent) {
+                    var link = hull_anchor(scryfall(card.full)), name = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+                    name.setAttribute("class", "link");
+                    if (indent) name.setAttribute("dx", 6);
+                    name.textContent = card.name + " (" + card.tallies[0].copies + ")";
+                    link.appendChild(name);
+                    var parts = [link];
+                    if (at < agreed.length - 1) {
+                        var comma = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+                        comma.textContent = ",";
+                        parts.push(comma);
+                    }
+                    return parts;
+                };
                 agreed.forEach(function(card, at) {
-                    var item = card.name + " (" + card.tallies[0].copies + ")" + (at < agreed.length - 1 ? "," : "");
-                    node.textContent = text + " " + item;
-                    if (node.getComputedTextLength() > HULL_WIDTH) {
-                        node.textContent = text;
+                    var parts = item_parts(card, at, true);
+                    parts.forEach(function(part) { node.appendChild(part); });
+                    if (node.getComputedTextLength() > HULL_WIDTH && on_line > 0) {
+                        parts.forEach(function(part) { node.removeChild(part); });
                         y += HULL_ROW;
-                        text = item;
-                        node = hull_put(text, 0, y, "note");
+                        node = hull_put("", 0, y, "note");
+                        parts = item_parts(card, at, false);
+                        parts.forEach(function(part) { node.appendChild(part); });
+                        on_line = 1;
                     } else {
-                        text += " " + item;
+                        on_line++;
                     }
                 });
             }
