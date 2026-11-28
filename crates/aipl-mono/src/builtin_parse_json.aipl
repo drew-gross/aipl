@@ -89,13 +89,7 @@ variant JsonTok = Str(str) | Num | Kw | Punct
 
 # The AST. `Number` keeps the source spelling (see the header); an `Object` keeps
 # its members in source order, a repeated key included.
-variant Json =
-    | Null
-    | Bool(bool)
-    | Number(str)
-    | String(str)
-    | Array(Json[])
-    | Object(members: Member[])
+variant Json = Null | Bool(bool) | Number(str) | String(str) | Array(Json[]) | Object(Member[])
 
 # One `"key": value` pair of an object.
 struct Member { key: str, value: Json }
@@ -153,9 +147,7 @@ fn lower_member(src: str, node: Parts, kids: Json[]) -> Json!ParseError {
 
 # The object holding every member of `members`, each a one-member object, in
 # order.
-fn object_of(members: Json[]) -> Json {
-    Object(members.collect_arms::<Object>()$members.join())
-}.test({
+fn object_of(members: Json[]) -> Json { Object(members.collect_arms::<Object>()$0.join()) }.test({
     let a = Member { key: "a", value: Null };
     let b = Member { key: "b", value: Bool(true) };
     assert(object_of([Object([a]), Object([b])]) == Object([a, b]));

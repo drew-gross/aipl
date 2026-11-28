@@ -398,7 +398,6 @@ grammer ideas:
 
 syntax:
   maybe make ! like ? except for getting errors? I don't really like the message_of helpers. Then it sorta becomes a !? operator which I kinda like
-  allow accessing variant arm fields by index so e.g. Object(members.collect_arms::<Object>()$0.join()) works of Object is defined as Object(Member[]) (instead of Object(members: Member[]))
   Braces: a lambda given as a keyword argument needs braces, so it's l.zip(with=|x, y| { x + y }). The unbraced form works positionally but not after with=.
   syntax for required keyword arguments
   syntax for multiple without should be variant CoreKind = ExprKind without (A, B, C) throughout
@@ -972,6 +971,7 @@ vscode:
   discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
 
 handoff:
+  add a guare to make sure handoff isn't running in parallel
   Run aipl check tests in a parallel work queue, rather than by shard (more advanced test runner)
   lets make handoff faster by speculatively starting IR regeneration in parallel with discovery. That way, if discovery succeeds, we've already made a bunch of progress, and if discovery fails, we can kill the IR regeneration with no real cost
   make a graph based builder that doesn't rebuild, like bazel

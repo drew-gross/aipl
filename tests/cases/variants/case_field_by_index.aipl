@@ -1,0 +1,25 @@
+# A value known to be one case of a variant has its unnamed payload slots by position: `c.0` is
+# the first slot, so a case with unnamed slots can be read without taking it apart. `$0` reads it
+# off every element of an array of them, as `$r` reads a named slot. A named slot is read by its
+# name and only by it (see `err_case_field_index_of_named`).
+
+import { collect_arms, equal as ==, join, wrapping_add as + } from builtins;
+
+variant Shape = Circle(i64) | Pair(i64, i64) | Group(i64[]) | Dot
+
+fn radius(c: Circle) -> i64 { c.0 }.test({
+    assert(radius(Circle(4)) == 4);
+})
+
+// A second unnamed slot is the next position.
+fn sum(p: Pair) -> i64 { p.0 + p.1 }.test({
+    assert(sum(Pair(2, 5)) == 7);
+})
+
+fn radii(shapes: Shape[]) -> i64[] { shapes.collect_arms::<Circle>()$0 }.test({
+    assert(radii([Circle(1), Dot, Circle(2), Pair(1, 1)]) == [1, 2]);
+})
+
+fn members(shapes: Shape[]) -> i64[] { shapes.collect_arms::<Group>()$0.join() }.test({
+    assert(members([Group([1, 2]), Dot, Group([3])]) == [1, 2, 3]);
+})

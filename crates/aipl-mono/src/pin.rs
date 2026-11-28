@@ -3046,13 +3046,15 @@ impl Pinner<'_> {
                 // names, as a struct is by its fields.
                 if let Some((case, slots, index)) = self.case_field(&x.ty, &owner, field) {
                     // `Case@Variant`: the case's constructor, which names both.
-                    if let Some((bare, variant)) = case.split_once('@') {
+                    if let (Some((bare, variant)), Some(name)) =
+                        (case.split_once('@'), slots[index].as_ref())
+                    {
                         self.resolve(
                             &e.name_span,
                             Target::CaseField {
                                 variant: variant.to_string(),
                                 case: bare.to_string(),
-                                field: field.clone(),
+                                field: name.clone(),
                             },
                         );
                     }
@@ -3825,7 +3827,15 @@ impl Pinner<'_> {
             return None;
         }
         let slots: Vec<Option<String>> = case.payload.iter().map(|p| p.name.clone()).collect();
-        let index = slots.iter().position(|n| n.as_deref() == Some(field))?;
+        // A named slot is read by its name and nothing else; an unnamed one by its position
+        // (`value.0`, spelled `_0` by now).
+        let index = slots
+            .iter()
+            .position(|n| n.as_deref() == Some(field))
+            .or_else(|| {
+                let position: usize = field.strip_prefix('_')?.parse().ok()?;
+                slots.get(position)?.is_none().then_some(position)
+            })?;
         Some((format!("{}@{variant}", case.name.text), slots, index))
     }
 

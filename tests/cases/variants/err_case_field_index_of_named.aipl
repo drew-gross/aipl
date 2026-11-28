@@ -1,0 +1,11 @@
+# A slot that has a name is read by that name and no other way: `r.0` is not its position.
+
+variant Shape = Rect(width: i64, height: i64) | Dot
+
+pub fn width(r: Rect) -> i64 { r.0 }
+--- check --compile ---
+error: field access on non-struct value of type Shape
+ --> ./tests/cases/variants/err_case_field_index_of_named.aipl:5:32
+  |
+5 | pub fn width(r: Rect) -> i64 { r.0 }
+  |                                ^
