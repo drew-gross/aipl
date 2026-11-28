@@ -9,16 +9,16 @@ struct Named { id: i64, label: str }
 fn wrap(p: Point) -> Point? { some(p) }.test({
     // Construct and match-unwrap a struct optional.
     let op = some(Point { x: 7, y: 8 });
-    assert(op == some(Point { x: 7, y: 8 }));
+    assert(op? == Point { x: 7, y: 8 });
     let x = op$x.value_or(-1);
     assert(x == 7);
 
     // As a function return (sret), round-tripped.
-    assert(wrap(Point { x: 5, y: 6 }) == some(Point { x: 5, y: 6 }));
+    assert(wrap(Point { x: 5, y: 6 })? == Point { x: 5, y: 6 });
 
     // Optional of a heap-field struct (alloc balance through some/match).
     let on = some(Named { id: 9, label: "z" });
-    assert(on == some(Named { id: 9, label: "z" }));
+    assert(on? == Named { id: 9, label: "z" });
     let lbl = on$label.value_or("?");
     assert(lbl == "z");
 })

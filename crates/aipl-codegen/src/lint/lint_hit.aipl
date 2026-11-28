@@ -153,11 +153,11 @@ pub fn filled_with(self: LintHit, spell: (Need) -> Spelling?) -> FilledHit? {
     assert(advice.filled_with(|need| some(Spelling {
         text: "is_case",
         request: some(Request { library: "builtins", item: "is_case" }),
-    })) == some(hit("write is_case(x), importing `is_case` from builtins", 4..5)));
-    assert(advice.filled_with(|need| some(Spelling { text: "isa", request: none })) == some(hit(
+    }))? == hit("write is_case(x), importing `is_case` from builtins", 4..5));
+    assert(advice.filled_with(|need| some(Spelling { text: "isa", request: none }))? == hit(
         "write isa(x)",
         4..5,
-    )));
+    ));
 
     // Advice for what cannot be written is dropped.
     assert(advice.filled_with(|need| none) == none);

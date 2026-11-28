@@ -17,5 +17,5 @@ fn full_first(Contact { name }) -> str { name.first }.test({
     };
     assert(full_first(c) == "Ada"); // heap str through two struct levels
     assert(c.name.last == "Lovelace");
-    assert(c.nick == some("Countess")); // optional field on outer
+    assert(c.nick? == "Countess"); // optional field on outer
 })

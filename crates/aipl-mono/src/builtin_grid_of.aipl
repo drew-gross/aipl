@@ -18,7 +18,7 @@ pub fn grid_of<T: any>(
 ) -> Grid<T> { grid_from(width, (0..width * height).map(|cell| value)) }.test({
     let grid = grid_of(3, 2, "x");
     assert(grid == grid_from(3, ["x", "x", "x", "x", "x", "x"]));
-    assert(grid.grid_get(1, 2) == some("x"));
+    assert(grid.grid_get(1, 2)? == "x");
     // Off the grid, as in any grid.
     assert(grid.grid_get(2, 0) == none);
     assert(grid.grid_get(0, 3) == none);

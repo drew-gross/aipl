@@ -48,13 +48,13 @@ pub fn prim_from_name(name: str) -> Prim? {
         _ => none,
     }
 }.test({
-    assert(prim_from_name("i64") == some(I64));
-    assert(prim_from_name("bool") == some(Bool));
+    assert(prim_from_name("i64")? == I64);
+    assert(prim_from_name("bool")? == Bool);
     // Not a primitive: a user type, a bound, and a name that only looks close.
     assert(prim_from_name("Point") == none);
     assert(prim_from_name("any") == none);
     assert(prim_from_name("i65") == none);
     // Round-trips, which is the property the two functions have to keep.
-    assert(prim_from_name(I8.prim_name()) == some(I8));
-    assert(prim_from_name(Char.prim_name()) == some(Char));
+    assert(prim_from_name(I8.prim_name())? == I8);
+    assert(prim_from_name(Char.prim_name())? == Char);
 })

@@ -1,0 +1,130 @@
+# The `assert_some_equal` lint: `assert(x == some(v))` — a test asserting that an optional holds a
+# value by comparing it with `some(v)`. `assert(x? == v)` says it with one less constructor: `?`
+# ends the test, as a failure, when `x` is `none`, so the comparison that follows only has to say
+# what `x` holds. It is how a test already reads a result (`parse(s)? == v`), and the error of one
+# (`parse(s)!? == "message"`) is the same shape.
+#
+# Only the assertion's whole condition is looked at, and only in a test's own body: a helper
+# declared inside a test, or a lambda, may return something `?` has no business propagating a
+# `none` from, and an assertion that is one part of a larger condition (`a && x == some(v)`) is
+# not rewritten by moving the `?`. Either side may be the `some(..)`; two of them are left alone.
+#
+# The hit points at the assertion, which is the line the `#[allow]` goes on.
+
+import { collect_ok, equal as ==, first, is_empty, is_some, not_equal as != } from builtins;
+import { Assert, Equal, Some } from "../builtin_table.aipl";
+import { Call, Expr, descendants_of_kind } from "../expr.aipl";
+import { TestBody, fn_role } from "../fn_names.aipl";
+import { Function } from "../item.aipl";
+import { expr_text, operand_text } from "./expr_text.aipl";
+import { LintHit, lint_function_unfilled, lint_message, shown } from "./lint_hit.aipl";
+
+# A hit for each assertion of the test body `self` that compares an optional with `some(..)`.
+pub fn assert_some_equal(Function { name, body }) -> LintHit[] {
+    if (name.text.fn_role() != TestBody) { return []; };
+    body.descendants_of_kind::<Call>()$flagged().collect_ok()
+}.test({
+    // Either side may be the `some(..)`; the other gets the `?`.
+    assert(lint_function_unfilled(
+        "fn f() -> i64? { none }.test({ assert(f() == some(1)); })",
+        assert_some_equal,
+    )?.shown() == [
+        `an assertion that an optional is some(..) — write "f()? == 1", which fails the test when it is none`,
+    ]);
+    assert(lint_function_unfilled(
+        "fn f() -> i64? { none }.test({ assert(some(1) == f()); })",
+        assert_some_equal,
+    )?.shown() == [
+        `an assertion that an optional is some(..) — write "f()? == 1", which fails the test when it is none`,
+    ]);
+    // A receiver that binds looser than `?` is parenthesized, and the value is written as it is.
+    assert(lint_function_unfilled(
+        "fn f() -> i64? { none }.test({ assert(f() + 1 == some(g(2) + 1)); })",
+        assert_some_equal,
+    )?.shown() == [
+        `an assertion that an optional is some(..) — write "(f() + 1)? == g(2) + 1", which fails the test when it is none`,
+    ]);
+    // The `!` of a result's error is the receiver as written.
+    assert(lint_function_unfilled(
+        """fn f() -> i64!str { ok(1) }.test({ assert(f()! == some("bad")); })""",
+        assert_some_equal,
+    )?.shown() == [
+        `an assertion that an optional is some(..) — write "f()!? == "bad"", which fails the test when it is none`,
+    ]);
+
+    // Not the shape: no `some(..)`, two of them, another operator, a larger condition, not an
+    // assertion, and code that is not a test's own body.
+    assert(
+        lint_function_unfilled(
+            "fn f() -> i64? { none }.test({ assert(f() == none); })",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() -> i64? { none }.test({ assert(some(1) == some(2)); })",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() -> i64? { none }.test({ assert(f() != some(1)); })",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() -> i64? { none }.test({ assert(true && f() == some(1)); })",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() -> i64? { none }.test({ let same = f() == some(1); })",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() -> i64? { none }.test({ fn same() -> bool { assert(f() == some(1)); true } })",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+    assert(
+        lint_function_unfilled(
+            "fn f() -> bool { assert(g() == some(1)); true }",
+            assert_some_equal,
+        )?.is_empty(),
+    );
+})
+
+# The hit for `self`, when it is an assertion of exactly an `==` with a `some(..)` on one side.
+fn flagged(self: Expr<Call>) -> LintHit? {
+    let Call(_, arguments, _, Assert) = self.kind else { return none; };
+    let Call(_, [left, right], _, Equal) = arguments.first()?.kind else { return none; };
+    let on_left = left.some_payload();
+    let on_right = right.some_payload();
+    if (on_left.is_some() == on_right.is_some()) { return none; };
+    let (receiver, value) = if (let some(payload) = on_right) {
+        (left, payload)
+    } else {
+        (right, on_left?)
+    };
+    some(lint_message(
+        `an assertion that an optional is some(..) — write "{receiver.receiver_text()}? == {value.expr_text()}", which fails the test when it is none`,
+        span=self.span,
+    ))
+}
+
+# What `self` holds, when it is `some(..)` of one thing.
+fn some_payload(self: Expr) -> Expr? {
+    let Call(_, [payload], _, callee) = self.kind else { return none; };
+    if (callee == Some) { some(payload) } else { none }
+}
+
+# `self` as the receiver of the `?` that replaces a `some(..)`: its text, with the error of a
+# result written as the postfix `!` it was, which the tree holds as a call of `error_of`.
+fn receiver_text(self: Expr) -> str {
+    let Call(name, [result], _, _) = self.kind else { return self.operand_text(); };
+    if (name == "__builtin_error_of") { `{result.operand_text()}!` } else { self.operand_text() }
+}

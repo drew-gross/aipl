@@ -6,13 +6,13 @@
 import { equal as ==, to_digit } from builtins;
 
 test({
-    assert('0'.to_digit() == some(0));
-    assert('8'.to_digit() == some(8));
-    assert('9'.to_digit() == some(9));
+    assert('0'.to_digit()? == 0);
+    assert('8'.to_digit()? == 8);
+    assert('9'.to_digit()? == 9);
     assert('/'.to_digit() == none); // one below '0'
     assert(':'.to_digit() == none); // one above '9'
     assert('a'.to_digit() == none);
     assert(' '.to_digit() == none);
     // The value extracts through the optional like any other `i64?`.
-    assert('7'.to_digit() == some(7));
+    assert('7'.to_digit()? == 7);
 })

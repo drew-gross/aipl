@@ -91,12 +91,12 @@ pub fn parse_spec(src: str) -> Spec!str {
     // The preamble is the source; sections fill their fields.
     let s = parse_spec("fn main() {}\n--- stdout ---\nhi\n")?;
     assert(s.source == "fn main() {}");
-    assert(s.stdout == some("hi"));
+    assert(s.stdout? == "hi");
     assert(s.stderr == none);
 
     // Trailing newlines are stripped from a body, interior ones kept.
     let two = parse_spec("x\n--- stdout ---\na\nb\n\n\n")?;
-    assert(two.stdout == some("a\nb"));
+    assert(two.stdout? == "a\nb");
 
     // No markers at all: everything is source.
     let bare = parse_spec("just source\n")?;
@@ -105,7 +105,7 @@ pub fn parse_spec(src: str) -> Spec!str {
 
     // `report` is a section like any other text one: the body, trailing newlines
     // stripped.
-    assert(parse_spec("x\n--- report ---\nallocations 0\n")?.report == some("allocations 0"));
+    assert(parse_spec("x\n--- report ---\nallocations 0\n")?.report? == "allocations 0");
     assert(parse_spec("x\n--- stdout ---\nallocations: 0\n")?.report == none);
 
     // `performance` was a section once; a file that still has one is told where
@@ -115,8 +115,8 @@ pub fn parse_spec(src: str) -> Spec!str {
     )));
 
     // `exit code` is parsed, and must be an integer.
-    assert(parse_spec("x\n--- exit code ---\n3\n")?.exit_code == some(3));
-    assert(parse_spec("x\n--- exit code ---\n-1\n")?.exit_code == some(-1));
+    assert(parse_spec("x\n--- exit code ---\n3\n")?.exit_code? == 3);
+    assert(parse_spec("x\n--- exit code ---\n-1\n")?.exit_code? == -1);
     assert(parse_spec("x\n--- exit code ---\nnope\n").is_err_and(|e| e.contains("integer")));
 
     // `check` with flags pins a projection of `aipl check`'s output, and a bare `check` pins all of
@@ -178,10 +178,10 @@ pub fn parse_spec(src: str) -> Spec!str {
     // Companions, both flavors.
     let Spec { extra_files } = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
     assert(extra_files.len() == 1);
-    assert(extra_files[0]$path == some("m.aipl"));
+    assert(extra_files[0]$path? == "m.aipl");
     let Spec { expect_files } = parse_spec("x\n--- expect file: out.txt ---\nwritten\n")?;
     assert(expect_files.len() == 1);
-    assert(expect_files[0]$contents == some("written"));
+    assert(expect_files[0]$contents? == "written");
 
     // Rejections: a mistyped marker, and unusable companion paths.
     assert(parse_spec("x\n--- stdou ---\n").is_err_and(|m| m.contains("unknown section")));

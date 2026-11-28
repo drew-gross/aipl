@@ -111,8 +111,8 @@ fn add_mine(mut self: Mark[,], cell: (u64, u64)) {
     // A flag, or a reveal, stays as it is.
     let flag: (u64, u64) = (0, 0);
     let revealed: (u64, u64) = (1, 1);
-    assert(game.add_mine(flag)[flag] == some(Flagged(true)));
-    assert(game.add_mine(revealed)[revealed] == some(Revealed(true)));
+    assert(game.add_mine(flag)[flag]? == Flagged(true));
+    assert(game.add_mine(revealed)[revealed]? == Revealed(true));
     // Off the board, nothing.
     assert(game.add_mine((5, 5)) == game);
 })
@@ -195,7 +195,7 @@ fn place_mines(
     shim random seeded_with_int(1) {
         set flagged.place_mines(1, corner);
     };
-    assert(flagged[far] == some(Flagged(true)));
+    assert(flagged[far]? == Flagged(true));
 })
 
 # The cells touching `cell`, including diagonally, that are on the board.
@@ -266,8 +266,8 @@ fn reveal(mut self: Mark[,], cell: (u64, u64)) {
 }.test({
     // A number stops at itself.
     let game = new_game(3, 3).add_mines([(2, 2)]);
-    assert(game.reveal((2, 1))[(2, 1)] == some(Revealed(false)));
-    assert(game.reveal((2, 1))[(2, 0)] == some(Hidden(false)));
+    assert(game.reveal((2, 1))[(2, 1)]? == Revealed(false));
+    assert(game.reveal((2, 1))[(2, 0)]? == Hidden(false));
 
     // A region with no mines around it opens, border and all: here that is
     // every cell but the mine, so it wins.
@@ -289,13 +289,13 @@ fn toggle_flag(mut self: Mark[,], cell: (u64, u64)) {
 }.test({
     let game = new_game(2, 2).add_mines([(1, 1)]);
     let corner: (u64, u64) = (0, 0);
-    assert(game.toggle_flag(corner)[corner] == some(Flagged(false)));
+    assert(game.toggle_flag(corner)[corner]? == Flagged(false));
     // Flagging twice takes the flag off again.
-    assert(game.toggle_flag(corner).toggle_flag(corner)[corner] == some(Hidden(false)));
+    assert(game.toggle_flag(corner).toggle_flag(corner)[corner]? == Hidden(false));
     // A flag protects its cell from a reveal.
-    assert(game.toggle_flag(corner).reveal(corner)[corner] == some(Flagged(false)));
+    assert(game.toggle_flag(corner).reveal(corner)[corner]? == Flagged(false));
     // A revealed cell takes no flag.
-    assert(game.reveal(corner).toggle_flag(corner)[corner] == some(Revealed(false)));
+    assert(game.reveal(corner).toggle_flag(corner)[corner]? == Revealed(false));
     // Off the board: nothing happens.
     assert(game.toggle_flag((9, 9)) == game);
 })
@@ -393,16 +393,16 @@ fn render(self: Mark[,], show_mines: bool, cursor: (u64, u64)?) -> str {
         +-------+
     """);
     // A shorter count still fills the box's width.
-    assert(game.toggle_flag((1, 2)).render(false, none).split("\n")[0] == some("Mines: 9 "));
+    assert(game.toggle_flag((1, 2)).render(false, none).split("\n")[0]? == "Mines: 9 ");
 
     // The cursor takes the spaces either side of its cell, and every row keeps its
     // width, so a row drawn over a longer one leaves nothing of it.
     let middle: (u64, u64) = (1, 1);
-    assert(game.render(false, some(middle)).split("\n")[3] == some("| .[1]# |"));
+    assert(game.render(false, some(middle)).split("\n")[3]? == "| .[1]# |");
     let first: (u64, u64) = (0, 0);
     let last: (u64, u64) = (0, 2);
-    assert(game.render(false, some(first)).split("\n")[2] == some("|[.]1 # |"));
-    assert(game.render(false, some(last)).split("\n")[2] == some("| . 1[#]|"));
+    assert(game.render(false, some(first)).split("\n")[2]? == "|[.]1 # |");
+    assert(game.render(false, some(last)).split("\n")[2]? == "| . 1[#]|");
 })
 
 # One step toward the start of a board's side, stopping at the first cell.
@@ -609,7 +609,7 @@ fn play(self: Session) !prints !random !read_stdin_raw !terminal -> Mark[,] {
     let moved = mined.play_typed([27, 91, 66]);
     assert(moved.game == mined.game);
     assert(moved.moves == [..board_moves, ..board_moves]);
-    assert(moved.written[2] == some(mined.game.render(false, some(down))));
+    assert(moved.written[2]? == mined.game.render(false, some(down)));
 
     // `r` on a mine ends the game, and on the one safe cell of a board wins it; a
     // finished game is not drawn again.
@@ -620,7 +620,7 @@ fn play(self: Session) !prints !random !read_stdin_raw !terminal -> Mark[,] {
     // `f` flags the cell, and the next frame shows the flag under the cursor.
     let flagged = mined.play_typed([FLAG_KEY]);
     assert(flagged.game == mined.game.toggle_flag(origin));
-    assert(flagged.written[2] == some(flagged.game.render(false, some(origin))));
+    assert(flagged.written[2]? == flagged.game.render(false, some(origin)));
 
     // The first `r` of a game places the mines, away from the cursor, and opens the
     // cells around it; it is never a loss, and a flag put down before it stays.
@@ -628,13 +628,13 @@ fn play(self: Session) !prints !random !read_stdin_raw !terminal -> Mark[,] {
     let fresh = Session { game: new_game(8, 8), cursor: middle, mined: false };
     let first = fresh.play_typed([REVEAL_KEY]);
     assert(first.game.status() == Playing);
-    assert(first.game[middle] == some(Revealed(false)));
+    assert(first.game[middle]? == Revealed(false));
     assert([middle, ..first.game.neighbors(middle)].all(|cell| first.game[cell] == some(Revealed(
         false,
     ))));
     let flag_first = Session { ..fresh, game: fresh.game.toggle_flag((0, 0)) };
     let kept = flag_first.play_typed([REVEAL_KEY]);
-    assert(kept.game[(0, 0)] == some(Flagged(kept.game.is_mine((0, 0)))));
+    assert(kept.game[(0, 0)]? == Flagged(kept.game.is_mine((0, 0))));
     // On a flagged cell nothing is revealed, so no mines are placed yet either.
     let guarded = Session { ..fresh, cursor: origin, game: fresh.game.toggle_flag(origin) };
     assert(guarded.play_typed([REVEAL_KEY]).game == guarded.game);

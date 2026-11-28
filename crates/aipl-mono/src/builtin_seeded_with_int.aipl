@@ -11,5 +11,5 @@ pub fn seeded_with_int(
     seed: u64,
 ) -> RandomProvider { seed: some(seed) }.test({
     assert(seeded_with_int(42) == RandomProvider { seed: some(42) });
-    assert(seeded_with_int(0).seed == some(0));
+    assert(seeded_with_int(0).seed? == 0);
 })

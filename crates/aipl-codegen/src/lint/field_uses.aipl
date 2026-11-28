@@ -123,7 +123,7 @@ pub fn sole_fields(
         let body = lower_aipl_block_surface(src)?;
         ok(body.sole_fields(name, body.field_reads(), none))
     }
-    assert(sole("{ f(p.a, p.b) }", "p")? == some(["a", "b"]));
+    assert(sole("{ f(p.a, p.b) }", "p")?? == ["a", "b"]);
     // A bare mention keeps the value whole.
     assert(sole("{ f(p, p.a) }", "p")? == none);
     // A field spoken for, a tuple position, a rebinding, a field read off two values.
@@ -139,7 +139,7 @@ pub fn sole_fields(
         ok(body.sole_fields("p", [..body.field_reads(), ..bound.field_reads()], some(bound)))
     }
     // A read in the value runs before the pattern binds, so it is not a second base.
-    assert(with_value("{ p.a }", "{ h(q.a) }")? == some(["a"]));
+    assert(with_value("{ p.a }", "{ h(q.a) }")?? == ["a"]);
     // A name the value mentions is an outer one the pattern would shadow.
     assert(with_value("{ p.a }", "{ h(a) }")? == none);
 })

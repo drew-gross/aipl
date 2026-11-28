@@ -24,7 +24,7 @@ fn probe() -> bool { true }.test({
     // Usable wherever a literal is: after `[`/`,`, as a call argument, as the
     // value of a `{ }` block / return.
     let xs = [-1, -2, -3];
-    assert(xs[1] == some(-2));
+    assert(xs[1]? == -2);
     assert(id(-7) == -7);
     assert(neg_one() == -1);
 })

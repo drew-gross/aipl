@@ -10,14 +10,14 @@ import { equal as ==, len } from builtins;
 
 # The one element of an array of exactly one, or `none` when it holds none or several.
 pub fn only<T: any>(self: T[]) -> T? { if (self.len() == 1) { self[0] } else { none } }.test({
-    assert([7].only() == some(7));
-    assert(only(["a"]) == some("a")); // free-call form
+    assert([7].only()? == 7);
+    assert(only(["a"])? == "a"); // free-call form
     // None, or more than one: there is no one element to hand back.
     assert([1, 2][..0].only() == none);
     assert([1, 2].only() == none);
     assert([1, 2, 3].only() == none);
     // The element is whatever there is, `none`-able or not, and the receiver may be a `str`.
-    assert([some(3)].only() == some(some(3)));
-    assert("x".only() == some('x'));
+    assert([some(3)].only() == some(some(3))); #[allow]
+    assert("x".only()? == 'x');
     assert("xy".only() == none);
 })

@@ -9,8 +9,8 @@ fn ints() -> #{i64: str} { #{1: "one", 2: "two", 3: "three"} }.test({
     let d = ints();
     assert(d == #{1: "one", 2: "two", 3: "three"});
     assert(len(d) == 3);
-    assert(d.get(2) == some("two"));
-    assert(d.get(2) == some("two"));
+    assert(d.get(2)? == "two");
+    assert(d.get(2)? == "two");
     assert(d.get(9) == none); // absent
     assert(d.get(9) == none);
     assert(d.contains_key(1));
@@ -23,8 +23,8 @@ fn strs() -> #{str: i64} {
 }.test({
     let d = strs();
     assert(d == #{"a": 10, "b": 20});
-    assert(d.get("b") == some(20));
-    assert(d.get("b") == some(20));
+    assert(d.get("b")? == 20);
+    assert(d.get("b")? == 20);
 })
 
 fn dedup() -> #{i64: str} {
@@ -32,7 +32,7 @@ fn dedup() -> #{i64: str} {
 }.test({
     let d = dedup();
     assert(len(d) == 1);
-    assert(d.get(1) == some("y"));
+    assert(d.get(1)? == "y");
 })
 
 fn make_empty() -> #{i64: str} { #{} }.test({

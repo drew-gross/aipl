@@ -32,5 +32,5 @@ pub fn to_dict<K: any, V: any>(self: (K, V)[]) -> #{K: V} {
     assert(none_at_all.to_dict().is_empty()); // empty
     let last_wins = [(1, "a"), (2, "b"), (1, "c")].to_dict();
     assert(last_wins == #{1: "c", 2: "b"}); // last write wins
-    assert(last_wins.get(1) == some("c"));
+    assert(last_wins.get(1)? == "c");
 })

@@ -49,18 +49,20 @@ pub fn map_find_if<T: any, U: any>(
 
     fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }
     assert(nonzero(0) == none);
-    assert(nonzero(2) == some(2));
+    assert(nonzero(2)? == 2);
 
-    assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 15) == some(20));
+    assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 15)? == 20);
     assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 99) == none);
     // The first match, not the last.
-    assert([5, 1, 7].map_find_if(|x| x * 2, |y| y > 2) == some(10));
+    assert([5, 1, 7].map_find_if(|x| x * 2, |y| y > 2)? == 10);
     // Free-call form, and named functions for both halves.
-    assert(map_find_if([1, 2, 3], double, is_big) == some(6));
+    assert(map_find_if([1, 2, 3], double, is_big)? == 6);
     // A `str` receiver iterates its chars.
-    assert("ab c".map_find_if(|c| c == ' ', |hit| hit) == some(true));
+    assert("ab c".map_find_if(|c| c == ' ', |hit| hit)? == true);
     // The empty array.
     assert([1, 2][..0].map_find_if(double, is_big) == none);
+
     // The mapped value may be an optional: the first `some` of a lookup.
-    assert([0, 3, 5].map_find_if(nonzero, is_some) == some(some(3)));
+    // `?` on this optional of an optional misreads it (see CLAUDE_TODO.txt), so it is compared whole.
+    assert([0, 3, 5].map_find_if(nonzero, is_some) == some(some(3))); #[allow]
 })

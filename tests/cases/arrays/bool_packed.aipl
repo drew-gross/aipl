@@ -10,8 +10,8 @@ fn packed() -> bool[] { [true, false, true, true, false, false, true, false, tru
     assert(len(xs) == 9);
 
     // Indexing yields `bool?` in bounds, `none` out of bounds.
-    assert(xs[0] == some(true));
-    assert(xs[8] == some(true)); // in the second byte
+    assert(xs[0]? == true);
+    assert(xs[8]? == true); // in the second byte
     assert(xs[9] == none);
 
     // Iteration reads each packed bit in order.

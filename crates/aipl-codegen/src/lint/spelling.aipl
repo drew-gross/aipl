@@ -94,52 +94,52 @@ pub fn spelled(
     fn missing(library: str, item: str) -> Request? { some(Request { library, item }) }
 
     // Imported already: the name the file gave it, with nothing left to import.
-    assert(spelling("import { is_case as isa } from builtins;", Builtin(IsCase))? == some(Spelling {
+    assert(spelling("import { is_case as isa } from builtins;", Builtin(IsCase))?? == Spelling {
         text: "isa",
         request: none,
-    }));
+    });
 
     // Not imported: its own name, and the import that supplies it, from the library it is in.
-    assert(spelling("fn f() { }", Builtin(Len))? == some(Spelling {
+    assert(spelling("fn f() { }", Builtin(Len))?? == Spelling {
         text: "len",
         request: missing("builtins", "len"),
-    }));
-    assert(spelling("fn f() { }", Builtin(Insert))? == some(Spelling {
+    });
+    assert(spelling("fn f() { }", Builtin(Insert))?? == Spelling {
         text: "insert",
         request: missing("sets", "insert"),
-    }));
+    });
 
     // The same name from another library is not the builtin.
-    assert(spelling("import { insert } from sets;", Builtin(Len))? == some(Spelling {
+    assert(spelling("import { insert } from sets;", Builtin(Len))?? == Spelling {
         text: "len",
         request: missing("builtins", "len"),
-    }));
+    });
 
     // The name is the file's own, for something else: the builtin is imported under another one.
-    assert(spelling("""import { len } from "./a.aipl";""", Builtin(Len))? == some(Spelling {
+    assert(spelling("""import { len } from "./a.aipl";""", Builtin(Len))?? == Spelling {
         text: "builtin_len",
         request: missing("builtins", "len as builtin_len"),
-    }));
-    assert(spelling("fn len() { } fn builtin_len() { }", Builtin(Len))? == some(Spelling {
+    });
+    assert(spelling("fn len() { } fn builtin_len() { }", Builtin(Len))?? == Spelling {
         text: "builtin_len_",
         request: missing("builtins", "len as builtin_len_"),
-    }));
+    });
 
     // An operator builtin is written as its operator, imported under that alias.
-    assert(spelling("fn f() { }", Builtin(WrappingAdd))? == some(Spelling {
+    assert(spelling("fn f() { }", Builtin(WrappingAdd))?? == Spelling {
         text: "+",
         request: missing("builtins", "wrapping_add as +"),
-    }));
+    });
     assert(spelling(
         "import { wrapping_add as + } from builtins;",
         Builtin(WrappingAdd),
-    )? == some(Spelling { text: "+", request: none }));
+    )?? == Spelling { text: "+", request: none });
 
     // Imported by name only, it is still not available as an operator.
-    assert(spelling(
-        "import { wrapping_add } from builtins;",
-        Builtin(WrappingAdd),
-    )? == some(Spelling { text: "+", request: missing("builtins", "wrapping_add as +") }));
+    assert(spelling("import { wrapping_add } from builtins;", Builtin(WrappingAdd))?? == Spelling {
+        text: "+",
+        request: missing("builtins", "wrapping_add as +"),
+    });
 
     // The operator is another flavor's: the spelling is taken.
     assert(
@@ -150,14 +150,11 @@ pub fn spelled(
     assert(spelling(
         "import { saturating_add as + } from builtins;",
         Builtin(SaturatingIncrement),
-    )? == some(Spelling {
-        text: "++",
-        request: missing("builtins", "saturating_increment as ++"),
-    }));
+    )?? == Spelling { text: "++", request: missing("builtins", "saturating_increment as ++") });
     assert(spelling(
         "import { saturating_add as +, saturating_increment as ++ } from builtins;",
         Builtin(SaturatingIncrement),
-    )? == some(Spelling { text: "++", request: none }));
+    )?? == Spelling { text: "++", request: none });
 
     // The operator is bound to the other flavor.
     assert(
@@ -221,8 +218,8 @@ fn free_name(self: Item[], candidate: str) -> str {
 fn operator_provided(self: str) -> str? {
     operator_spellings().find_if(|operator| operator.operator_named_forms().contains(self))
 }.test({
-    assert("wrapping_add".operator_provided() == some("+"));
-    assert("saturating_increment".operator_provided() == some("++"));
+    assert("wrapping_add".operator_provided()? == "+");
+    assert("saturating_increment".operator_provided()? == "++");
     assert("len".operator_provided() == none);
 })
 

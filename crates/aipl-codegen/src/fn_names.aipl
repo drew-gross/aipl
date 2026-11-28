@@ -108,8 +108,8 @@ pub fn test_helper_name(f: str, helper: str) -> str { `{test_fn_name(f)}${helper
 fn after(self: str, prefix: str) -> str? {
     if (self.starts_with(prefix)) { some(self[prefix.len()..]) } else { none }
 }.test({
-    assert("__test$f".after("__test$") == some("f"));
-    assert("__test$".after("__test$") == some(""));
+    assert("__test$f".after("__test$")? == "f");
+    assert("__test$".after("__test$")? == "");
     assert("map".after("__test$") == none);
 })
 
@@ -133,10 +133,10 @@ fn split_test_owner(rest: str) -> (str, str)? {
     };
     if (named) { some((owner, rest[end..])) } else { none }
 }.test({
-    assert(split_test_owner("f") == some(("f", "")));
-    assert(split_test_owner("f$lambda0") == some(("f", "$lambda0")));
-    assert(split_test_owner("__benchmark$f") == some(("__benchmark$f", "")));
-    assert(split_test_owner("__benchmark$f$g") == some(("__benchmark$f", "$g")));
+    assert(split_test_owner("f")? == ("f", ""));
+    assert(split_test_owner("f$lambda0")? == ("f", "$lambda0"));
+    assert(split_test_owner("__benchmark$f")? == ("__benchmark$f", ""));
+    assert(split_test_owner("__benchmark$f$g")? == ("__benchmark$f", "$g"));
     assert(split_test_owner("") == none);
     assert(split_test_owner("$x") == none);
     assert(split_test_owner("__benchmark$") == none);
@@ -190,11 +190,11 @@ pub fn source_function(self: str) -> str? {
     }
 }.test({
     assert("f".source_function() == none);
-    assert(test_fn_name("f").source_function() == some("f"));
-    assert(test_helper_name("f", "h").source_function() == some("f"));
-    assert(benchmark_fn_name("f").source_function() == some("f"));
-    assert(test_fn_name(benchmark_fn_name("f")).source_function() == some("f"));
-    assert(test_helper_name(benchmark_fn_name("f"), "h").source_function() == some("f"));
+    assert(test_fn_name("f").source_function()? == "f");
+    assert(test_helper_name("f", "h").source_function()? == "f");
+    assert(benchmark_fn_name("f").source_function()? == "f");
+    assert(test_fn_name(benchmark_fn_name("f")).source_function()? == "f");
+    assert(test_helper_name(benchmark_fn_name("f"), "h").source_function()? == "f");
     assert(unattached_test_name(1).source_function() == none);
     assert("__test$".source_function() == none);
 })

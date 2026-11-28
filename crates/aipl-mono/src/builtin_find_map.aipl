@@ -26,14 +26,14 @@ pub fn find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
 }.test({
     fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }
     assert(nonzero(0) == none);
-    assert(nonzero(2) == some(2));
+    assert(nonzero(2)? == 2);
 
-    assert([0, 3, 5].find_map(nonzero) == some(3));
+    assert([0, 3, 5].find_map(nonzero)? == 3);
     assert([0, 0].find_map(nonzero) == none);
     // The first answer, not the last, and the lambda form.
-    assert([1, 2, 3].find_map(|x| if (x > 1) { some(x * 10) } else { none }) == some(20));
+    assert([1, 2, 3].find_map(|x| if (x > 1) { some(x * 10) } else { none })? == 20);
     // Free-call form, and the empty array.
     assert(find_map([1, 2][..0], nonzero) == none);
     // A `str` receiver iterates its chars.
-    assert("a1b".find_map(to_digit) == some(1));
+    assert("a1b".find_map(to_digit)? == 1);
 })

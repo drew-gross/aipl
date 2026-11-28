@@ -29,7 +29,7 @@ fn sum(xs: u64[]) -> u64 {
 })
 
 fn first(xs: u64[]) -> u64? { xs[0] }.test({
-    assert(first([7]) == some(7));
+    assert(first([7])? == 7);
     assert(first([]) == none);
     assert(first([]).value_or(99) == 99);
 })

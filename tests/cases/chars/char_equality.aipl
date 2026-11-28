@@ -2,5 +2,5 @@ import { equal as ==, map, value_or } from builtins;
 
 fn second_is_e() -> i64 { "hello"[1].map(|c| if (c == 'e') { 101 } else { 0 }).value_or(0) }.test({
     assert(second_is_e() == 101);
-    assert("hello"[1] == some('e'));
+    assert("hello"[1]? == 'e');
 })

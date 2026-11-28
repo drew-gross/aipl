@@ -64,32 +64,30 @@ pub fn int_parse(self: str) -> i64? {
     let min = -9223372036854775808;
     if (neg) { some(v) } else { if (v == min) { none } else { some(0 - v) } }
 }.test({
-    assert(int_parse("123") == some(123));
-    assert("123".int_parse() == some(123)); // method form
-    assert("0".int_parse() == some(0));
-    assert("007".int_parse() == some(7)); // leading zeros are fine
-    assert("-45".int_parse() == some(-45));
-    assert("-0".int_parse() == some(0));
+    assert(int_parse("123")? == 123);
+    assert("123".int_parse()? == 123); // method form
+    assert("0".int_parse()? == 0);
+    assert("007".int_parse()? == 7); // leading zeros are fine
+    assert("-45".int_parse()? == -45);
+    assert("-0".int_parse()? == 0);
     assert("".int_parse() == none);
     assert("-".int_parse() == none); // a sign needs at least one digit
     assert("12a3".int_parse() == none); // no trailing garbage
     assert("+5".int_parse() == none); // no plus sign
     assert(" 5".int_parse() == none); // no whitespace
-    assert("9223372036854775807".int_parse() == some(9223372036854775807)); // i64::MAX
+    assert("9223372036854775807".int_parse()? == 9223372036854775807); // i64::MAX
     assert("9223372036854775808".int_parse() == none); // one past MAX
-    assert("-9223372036854775808".int_parse() == some(-9223372036854775808)); // i64::MIN
+    assert("-9223372036854775808".int_parse()? == -9223372036854775808); // i64::MIN
     assert("-9223372036854775809".int_parse() == none); // one past MIN
     assert("18446744073709551616".int_parse() == none); // far past, guard holds
 
     // Leading-zero trimming and the 19-significant-digit limit.
-    assert("00000000000000000000000000".int_parse() == some(0)); // all zeros, 26 of them
-    assert("-00000".int_parse() == some(0)); // negative zero, many zeros
+    assert("00000000000000000000000000".int_parse()? == 0); // all zeros, 26 of them
+    assert("-00000".int_parse()? == 0); // negative zero, many zeros
 
     // 30 leading zeros in front of a valid 19-digit i64::MAX: significant count
     // is 19, so it must still parse despite the long string.
-    assert("0000000000000000000000000000009223372036854775807".int_parse() == some(
-        9223372036854775807,
-    ));
+    assert("0000000000000000000000000000009223372036854775807".int_parse()? == 9223372036854775807);
     // 20 significant digits (the smallest 20-digit number) can never fit.
     assert("10000000000000000000".int_parse() == none);
 

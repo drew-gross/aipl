@@ -23,7 +23,7 @@ fn to_nonzero_list(xs: i64[]) -> List? {
         direction=Right,
     )
 }.test({
-    assert(to_nonzero_list([1, 2, 3]) == some(Cons(1, Cons(2, Cons(3, Nil)))));
-    assert(to_nonzero_list([]) == some(Nil)); // empty folds to `some(init)`
+    assert(to_nonzero_list([1, 2, 3])? == Cons(1, Cons(2, Cons(3, Nil))));
+    assert(to_nonzero_list([])? == Nil); // empty folds to `some(init)`
     assert(to_nonzero_list([1, 0, 3]) == none); // the rejected element ends it
 })

@@ -4,7 +4,7 @@
 import { equal as ==, saturating_divide as /, value_or, wrapping_add as + } from builtins;
 
 fn divide(x: i64, y: i64) -> i64? { if (y == 0) { none } else { some(x / y) } }.test({
-    assert(divide(100, 4) == some(25));
+    assert(divide(100, 4)? == 25);
     assert(divide(100, 0) == none);
     assert(divide(100, 4).value_or(-1) + divide(100, 0).value_or(-1) == 24);
 })

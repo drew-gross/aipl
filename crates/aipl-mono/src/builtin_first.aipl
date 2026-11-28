@@ -9,9 +9,9 @@ import { equal as == } from builtins;
 
 # The first element, or `none` if the array is empty.
 pub fn first<T: any>(self: T[]) -> T? { self[0] }.test({
-    assert([1, 2, 3].first() == some(1));
-    assert([7].first() == some(7));
-    assert(first(["a", "b"]) == some("a")); // free-call form
+    assert([1, 2, 3].first()? == 1);
+    assert([7].first()? == 7);
+    assert(first(["a", "b"])? == "a"); // free-call form
     // Empty: nothing to hand back.
     assert([1, 2][..0].first() == none);
 })

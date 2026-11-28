@@ -14,10 +14,10 @@ pub fn drop_n<T: any>(
     n: u64,
 ) -> T[] { self[n..] }.test({
     assert([1, 2, 3].drop_n(1).len() == 2);
-    assert([1, 2, 3].drop_n(1).first() == some(2));
+    assert([1, 2, 3].drop_n(1).first()? == 2);
     assert([1, 2, 3].drop_n(0).len() == 3);
     // At and past the end: empty, not an error.
     assert([1, 2, 3].drop_n(3).is_empty());
     assert([1, 2, 3].drop_n(99).is_empty());
-    assert(drop_n(["a", "b"], 1).first() == some("b")); // free-call form
+    assert(drop_n(["a", "b"], 1).first()? == "b"); // free-call form
 })

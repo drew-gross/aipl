@@ -11,6 +11,6 @@ fn first(grid: str[][]) -> str[]? { grid[0] }.test({
 
     let g = add_row([["a"]], ["b", "c"]);
     let row0 = first(g).value_or([]);
-    assert(row0[0] == some("a"));
+    assert(row0[0]? == "a");
     assert(len(row0) == 1);
 })

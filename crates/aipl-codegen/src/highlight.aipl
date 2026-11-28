@@ -331,8 +331,8 @@ pub fn matcher_regex(m: Matcher) -> str? {
         Caps(..) | Region(..) | Include(..) => none,
     }
 }.test({
-    assert(matcher_regex(Exact("->")) == some("->"));
-    assert(matcher_regex(CharRun("ab1".to_set(), first=#{'a', 'b'})) == some("[ab][1ab]*"));
+    assert((matcher_regex(Exact("->")))? == "->");
+    assert((matcher_regex(CharRun("ab1".to_set(), first=#{'a', 'b'})))? == "[ab][1ab]*");
     // The four delimiter-scanning matchers have no single-expression form.
     assert(matcher_regex(Delimited(`"`.to_set(), escaped=#{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);

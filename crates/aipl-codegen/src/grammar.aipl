@@ -869,7 +869,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> LinkedGrammar<K, A>!ParseEr
     };
 
     assert(prod_names(g) == ["list", "item"]);
-    assert(prod_names(g).find_index(|x| x == "item") == some(1));
+    assert(prod_names(g).find_index(|x| x == "item")? == 1);
     assert(prod_names(g).find_index(|x| x == "nope") == none);
 
     let linked = link(g)?;

@@ -34,17 +34,17 @@ import {
 pub fn inline_str(self: str) -> str? {
     if (self.len() > inline_capacity()) { none } else { some(pack_inline(self)) }
 }.test({
-    assert(inline_str("hi") == some("hi"));
+    assert(inline_str("hi")? == "hi");
     // Empty content is inline too — there is nothing to store.
-    assert(inline_str("") == some(""));
+    assert(inline_str("")? == "");
     // Exactly at the capacity still fits; one byte past it has no inline form.
-    assert(inline_str("1234567890123456789012") == some("1234567890123456789012"));
+    assert(inline_str("1234567890123456789012")? == "1234567890123456789012");
     assert(inline_str("12345678901234567890123") == none);
 
     // Content that arrives in another representation is repacked, not copied
     // through: a rope and a buffer both come back as the same value.
-    assert(inline_str(rope_str("abc", "def")) == some("abcdef"));
-    assert(inline_str(heap_str("abc")) == some("abc"));
+    assert(inline_str(rope_str("abc", "def"))? == "abcdef");
+    assert(inline_str(heap_str("abc"))? == "abc");
     // A string too long to be inline is still too long once it is a rope.
     assert(inline_str(rope_str("12345678901234567890", "123")) == none);
 })

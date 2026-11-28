@@ -299,9 +299,9 @@ pub fn builtin_imported(self: BuiltinEntry[], library: str, name: str) -> Builti
     self.find_if(|entry| entry.library == library && entry.import_name() == name)
 }.test({
     let table = builtin_table();
-    assert(table.builtin_imported("builtins", "len")$arm == some(Len));
-    assert(table.builtin_imported("sets", "union")$arm == some(Union));
-    assert(table.builtin_imported("json", "parse")$arm == some(ParseJson));
+    assert(table.builtin_imported("builtins", "len")$arm? == Len);
+    assert(table.builtin_imported("sets", "union")$arm? == Union);
+    assert(table.builtin_imported("json", "parse")$arm? == ParseJson);
     assert(table.builtin_imported("sets", "len") == none);
     assert(table.builtin_imported("builtins", "__builtin_len") == none);
 })

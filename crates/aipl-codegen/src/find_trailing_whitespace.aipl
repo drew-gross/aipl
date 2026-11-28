@@ -79,19 +79,19 @@ pub fn find_trailing_whitespace(src: str) -> Span? {
     assert(find_trailing_whitespace("a\n") == none); // a newline alone isn't trailing ws
 
     // A trailing space/tab at end of input spans the run.
-    assert(find_trailing_whitespace("oops ") == some(Span { start: 4, end: 5 }));
-    assert(find_trailing_whitespace("tab\t") == some(Span { start: 3, end: 4 }));
+    assert(find_trailing_whitespace("oops ")? == Span { start: 4, end: 5 });
+    assert(find_trailing_whitespace("tab\t")? == Span { start: 3, end: 4 });
 
     // Space before a LF, and a middle offending line (first one wins).
-    assert(find_trailing_whitespace("bad \nok") == some(Span { start: 3, end: 4 }));
-    assert(find_trailing_whitespace("a\nb \nc") == some(Span { start: 3, end: 4 }));
+    assert(find_trailing_whitespace("bad \nok")? == Span { start: 3, end: 4 });
+    assert(find_trailing_whitespace("a\nb \nc")? == Span { start: 3, end: 4 });
 
     // A space before a CRLF is flagged (the CR is part of the ending); a clean
     // CRLF is not.
-    assert(find_trailing_whitespace("crlf \r\nx") == some(Span { start: 4, end: 5 }));
+    assert(find_trailing_whitespace("crlf \r\nx")? == Span { start: 4, end: 5 });
     assert(find_trailing_whitespace("crlf\r\nx") == none);
 
     // A trailing space before a lone CR at EOF, and on a final otherwise-empty line.
-    assert(find_trailing_whitespace("end \r") == some(Span { start: 3, end: 4 }));
-    assert(find_trailing_whitespace("bad\n ") == some(Span { start: 4, end: 5 }));
+    assert(find_trailing_whitespace("end \r")? == Span { start: 3, end: 4 });
+    assert(find_trailing_whitespace("bad\n ")? == Span { start: 4, end: 5 });
 })

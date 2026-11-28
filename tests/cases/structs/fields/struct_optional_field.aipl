@@ -15,7 +15,7 @@ fn make(present: bool) -> Box {
     }
 }.test({
     let b = make(true);
-    assert(b.item == some("here"));
+    assert(b.item? == "here");
     let e = make(false);
     assert(e.item == none);
     assert(b.count.value_or(0) + e.count.value_or(35) == 42);

@@ -10,20 +10,20 @@ fn array_values() -> #{i64: i64[]} { #{1: [10, 20], 2: [30]} }.test({
     let d = array_values();
     assert(d == #{1: [10, 20], 2: [30]});
     assert(len(d.get(1).value_or([])) == 2);
-    assert(d.get(1) == some([10, 20]));
+    assert(d.get(1)? == [10, 20]);
 })
 
 fn optional_values() -> #{i64: i64?} { #{1: some(5), 2: none} }.test({
     let d = optional_values();
     assert(d == #{1: some(5), 2: none});
-    assert(d.get(1) == some(some(5)));
-    assert(d.get(2) == some(none));
+    assert(d.get(1) == some(some(5))); #[allow]
+    assert(d.get(2) == some(none)); #[allow]
 })
 
 fn struct_values() -> #{str: Point} { #{"o": Point { x: 1, y: 2 }} }.test({
     let d = struct_values();
     assert(d == #{"o": Point { x: 1, y: 2 }});
-    assert(d.get("o") == some(Point { x: 1, y: 2 }));
+    assert(d.get("o")? == Point { x: 1, y: 2 });
 })
 
 fn heap_str_values() -> #{str: str} {
@@ -31,12 +31,12 @@ fn heap_str_values() -> #{str: str} {
     #{heap_str("k1"): heap_str("ab"), heap_str("k2"): heap_str("cd")}
 }.test({
     let d = heap_str_values();
-    assert(d.get("k1") == some("ab"));
+    assert(d.get("k1")? == "ab");
     assert(len(d) == 2);
 })
 
 fn char_keys() -> #{char: i64} { #{'a': 1, 'b': 2} }.test({
-    assert(char_keys().get('b') == some(2));
+    assert(char_keys().get('b')? == 2);
     let b = #{true: "yes", false: "no"};
-    assert(b.get(true) == some("yes"));
+    assert(b.get(true)? == "yes");
 })

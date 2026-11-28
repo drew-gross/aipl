@@ -15,5 +15,5 @@ pub fn grid_from<T: any>(
     let grid = grid_from(2, [1, 2, 3, 4]);
     assert(grid == grid_from(2, [1, 2, 3, 4]));
     assert(grid != grid_from(4, [1, 2, 3, 4]));
-    assert(grid.grid_get(1, 1) == some(4));
+    assert(grid.grid_get(1, 1)? == 4);
 })

@@ -31,6 +31,6 @@ fn unit_square() -> Shape { Rect(1, 1) }.test({
 
     // An optional of a variant works like any composite element.
     let o = some(Circle(2));
-    assert(o == some(Circle(2)));
+    assert(o? == Circle(2));
     assert(o.is_some());
 })

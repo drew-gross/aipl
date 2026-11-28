@@ -320,9 +320,9 @@ pub fn str_lit_value(text: str) -> str {
 # unreachable from a lexed source — `char_lit_emit` refuses `''` and `'ab'` at
 # lex time — and is here so a consumer never has to assume that.
 pub fn char_lit_value(text: str) -> char? { text[1..text.len() - 1].unescape().only() }.test({
-    assert(char_lit_value("'x'") == some('x'));
-    assert(char_lit_value("""'\n'""") == some('\n'));
-    assert(char_lit_value("""'\''""") == some('\''));
+    assert(char_lit_value("'x'")? == 'x');
+    assert(char_lit_value("""'\n'""")? == '\n');
+    assert(char_lit_value("""'\''""")? == '\'');
     let c = "'q'";
     assert(lex_aipl_kinds(c)? == [CharTok(char_lit_value(c).value_or('?'))]);
 

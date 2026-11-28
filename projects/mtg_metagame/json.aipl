@@ -1,7 +1,7 @@
 # Reading a `Json` tree: looking a field up and taking it as text, a whole number
 # or a list. The tree comes from `parse` in the `json` library.
 
-import { equal as ==, find_map, int_parse, narrow, value_or_err } from builtins;
+import { equal as ==, find_map, int_parse, is_empty, narrow, value_or_err } from builtins;
 import { Array, Bool, Json, Member, Null, Number, Object, String } from json;
 
 # The value stored under `key`, if `self` is an object that has one. With a key
@@ -17,8 +17,8 @@ pub fn field(self: Json, key: str) -> Json? {
         Member { key: "b", value: Null },
         Member { key: "a", value: Number("2") },
     ]);
-    assert(object.field("a") == some(Number("1")));
-    assert(object.field("b") == some(Null));
+    assert(object.field("a")? == Number("1"));
+    assert(object.field("b")? == Null);
     assert(object.field("c") == none);
     assert(Number("1").field("a") == none);
 })
@@ -34,8 +34,8 @@ pub fn keys(self: Json) -> str[]? {
         Member { key: "b", value: Null },
         Member { key: "a", value: Number("1") },
     ]);
-    assert(object.keys() == some(["b", "a"]));
-    assert(Object([]).keys() == some([]));
+    assert(object.keys()? == ["b", "a"]);
+    assert(Object([]).keys()?.is_empty());
     assert(Array([]).keys() == none);
     assert(Null.keys() == none);
 })
@@ -47,7 +47,7 @@ pub fn elements(self: Json) -> Json[]? {
         Null | Bool(..) | Number(..) | String(..) | Object(..) => none,
     }
 }.test({
-    assert(Array([Null]).elements() == some([Null]));
+    assert(Array([Null]).elements()? == [Null]);
     assert(Null.elements() == none);
     assert(Object([]).elements() == none);
 })
@@ -59,8 +59,8 @@ pub fn scalar_text(self: Json) -> str? {
         Null | Bool(..) | Array(..) | Object(..) => none,
     }
 }.test({
-    assert(String("a").scalar_text() == some("a"));
-    assert(Number("12").scalar_text() == some("12"));
+    assert(String("a").scalar_text()? == "a");
+    assert(Number("12").scalar_text()? == "12");
     assert(Null.scalar_text() == none);
     assert(Array([]).scalar_text() == none);
 })
@@ -72,8 +72,8 @@ pub fn integer(self: Json) -> i64? {
         Null | Bool(..) | String(..) | Array(..) | Object(..) => none,
     }
 }.test({
-    assert(Number("7").integer() == some(7));
-    assert(Number("-7").integer() == some(-7));
+    assert(Number("7").integer()? == 7);
+    assert(Number("-7").integer()? == -7);
     assert(Number("1.5").integer() == none);
     assert(String("7").integer() == none);
 })
@@ -106,7 +106,7 @@ pub fn optional_text_field(self: Json, key: str) -> str? {
         Member { key: "a", value: String("x") },
         Member { key: "z", value: Null },
     ]);
-    assert(object.optional_text_field("a") == some("x"));
+    assert(object.optional_text_field("a")? == "x");
     assert(object.optional_text_field("z") == none);
     assert(object.optional_text_field("q") == none);
 })

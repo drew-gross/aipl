@@ -15,10 +15,10 @@ pub fn drop_last_n<T: any>(self: T[], n: u64) -> T[] {
     if (self.len() < n) { self[..0] } else { self[..self.len() - n] }
 }.test({
     assert([1, 2, 3].drop_last_n(1).len() == 2);
-    assert([1, 2, 3].drop_last_n(1).last() == some(2));
+    assert([1, 2, 3].drop_last_n(1).last()? == 2);
     assert([1, 2, 3].drop_last_n(0).len() == 3);
     // At and past the end: empty, not the whole array.
     assert([1, 2, 3].drop_last_n(3).is_empty());
     assert([1, 2, 3].drop_last_n(99).is_empty());
-    assert(drop_last_n(["a", "b"], 1).first() == some("a")); // free-call form
+    assert(drop_last_n(["a", "b"], 1).first()? == "a"); // free-call form
 })

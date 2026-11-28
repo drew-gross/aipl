@@ -9,9 +9,9 @@ import { equal as ==, len, wrapping_sub as - } from builtins;
 
 # The last element, or `none` if the array is empty.
 pub fn last<T: any>(self: T[]) -> T? { self[self.len() - 1] }.test({
-    assert([1, 2, 3].last() == some(3));
-    assert([7].last() == some(7));
-    assert(last(["a", "b"]) == some("b")); // free-call form
+    assert([1, 2, 3].last()? == 3);
+    assert([7].last()? == 7);
+    assert(last(["a", "b"])? == "b"); // free-call form
     // Empty: `len() - 1` wraps, and an out-of-range index is `none`.
     assert([1, 2][..0].last() == none);
 })

@@ -5,7 +5,7 @@
 import { equal as == } from builtins;
 
 fn pick(b: bool) -> str? { if (b) { some("present") } else { none } }.test({
-    assert(pick(true) == some("present"));
-    assert(pick(true) == some("present"));
+    assert(pick(true)? == "present");
+    assert(pick(true)? == "present");
     assert(pick(false) == none);
 })

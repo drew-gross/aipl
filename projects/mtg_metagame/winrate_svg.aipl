@@ -1254,7 +1254,7 @@ pub fn winrate_svg(self: Matrix, name: str) -> str {
     };
     let page = winrate_svg(matrix, "m");
     let lines = page.split("\n");
-    assert(lines.first() == some(`<?xml version="1.0" standalone="no"?>`));
+    assert(lines.first()? == `<?xml version="1.0" standalone="no"?>`);
     assert(page.contains("Winrate Matrix from m"));
     // A cell says its pairing, and a name is escaped.
     assert(page.contains(`data-info="A vs B &amp; C: 100% (1-0-0)"`));

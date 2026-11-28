@@ -40,8 +40,8 @@ pub fn round_number(self: str) -> u64? {
     let [word, number] = self.split(" ") else { return none; };
     if (word == "Round") { number.int_parse() } else { none }
 }.test({
-    assert(round_number("Round 7") == some(7));
-    assert(round_number("Round 12") == some(12));
+    assert(round_number("Round 7")? == 7);
+    assert(round_number("Round 12")? == 12);
     assert(round_number("Finals") == none);
     assert(round_number("Round x") == none);
     assert(round_number("Round 1 2") == none);
@@ -93,8 +93,8 @@ pub fn last_rounds(self: Match[]) -> #{str: u64} {
     };
     let other = Match { ..match_played, tournament: "y", round: "Round 2" };
     let last = last_rounds([match_played, other, Match { ..match_played, round: "Round 1" }]);
-    assert(last.get("x") == some(4));
-    assert(last.get("y") == some(2));
+    assert(last.get("x")? == 4);
+    assert(last.get("y")? == 2);
     assert(last.get("z") == none);
 })
 
@@ -132,17 +132,15 @@ pub fn slot_of(self: Match, last_rounds: #{str: u64}) -> u64? {
         record: Record {},
     };
     let last: #{str: u64} = #{"x": 9};
-    assert(match_played.slot_of(last) == some(0));
-    assert(Match { ..match_played, round: "Semifinals" }.slot_of(last) == some(1));
-    assert(Match { ..match_played, round: "Quarterfinals" }.slot_of(last) == some(2));
+    assert((match_played.slot_of(last))? == 0);
+    assert(Match { ..match_played, round: "Semifinals" }.slot_of(last)? == 1);
+    assert(Match { ..match_played, round: "Quarterfinals" }.slot_of(last)? == 2);
     // The last round of the main event, and the ones before it.
-    assert(Match { ..match_played, round: "Round 9" }.slot_of(last) == some(3));
-    assert(Match { ..match_played, round: "Round 8" }.slot_of(last) == some(4));
-    assert(Match { ..match_played, round: "Round 1" }.slot_of(last) == some(11));
+    assert(Match { ..match_played, round: "Round 9" }.slot_of(last)? == 3);
+    assert(Match { ..match_played, round: "Round 8" }.slot_of(last)? == 4);
+    assert(Match { ..match_played, round: "Round 1" }.slot_of(last)? == 11);
     // A tournament of fifteen rounds has its round 9 further from the end.
-    assert(Match { ..match_played, tournament: "y", round: "Round 9" }.slot_of(#{"y": 15}) == some(
-        9,
-    ));
+    assert(Match { ..match_played, tournament: "y", round: "Round 9" }.slot_of(#{"y": 15})? == 9);
     assert(Match { ..match_played, round: "Round 10" }.slot_of(last) == none);
     assert(Match { ..match_played, round: "Top 8" }.slot_of(last) == none);
     assert(Match { ..match_played, tournament: "z", round: "Round 1" }.slot_of(last) == none);
@@ -227,7 +225,7 @@ fn bracket_in(self: Match, Record { win, loss }) -> Bracket? {
         record: Record {},
     };
     let before = Record { win: 2, loss: 1, draw: 1 };
-    assert(match_played.bracket_in(before) == some(Bracket { win: 2, loss: 1 }));
+    assert((match_played.bracket_in(before))? == Bracket { win: 2, loss: 1 });
     assert(Match { ..match_played, round: "Finals" }.bracket_in(before) == none);
 })
 
@@ -243,8 +241,8 @@ pub fn first_bracket(self: Match) -> Bracket? { self.bracket_in(self.first_befor
         round: "Round 5",
         record: Record {},
     };
-    assert(match_played.first_bracket() == some(Bracket { win: 3, loss: 1 }));
-    assert(match_played.second_bracket() == some(Bracket { win: 1, loss: 3 }));
+    assert((match_played.first_bracket())? == Bracket { win: 3, loss: 1 });
+    assert((match_played.second_bracket())? == Bracket { win: 1, loss: 3 });
     assert(Match { ..match_played, second_before: none }.second_bracket() == none);
 })
 

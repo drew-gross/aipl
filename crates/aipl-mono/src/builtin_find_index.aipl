@@ -43,25 +43,25 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
     assert(is_nine(9));
     assert(!is_nine(8));
 
-    assert([1, 2, 3, 4].find_index(|x| x > 2) == some(2));
+    assert([1, 2, 3, 4].find_index(|x| x > 2)? == 2);
     assert([1, 2, 3].find_index(|x| x > 9) == none); // nothing matches
 
     // The *first* match, not the last: it stops there. And position 0 is a
     // match like any other — distinguishable from `none` only because the
     // answer is an optional.
-    assert([5, 1, 7].find_index(|x| x > 2) == some(0));
-    assert(find_index([2, 4], |x| x > 3) == some(1)); // function-call form too
+    assert([5, 1, 7].find_index(|x| x > 2)? == 0);
+    assert(find_index([2, 4], |x| x > 3)? == 1); // function-call form too
 
     // Generic over the element type — the same definition serves char and str.
-    assert(['a', 'b', 'c'].find_index(|c| c == 'b') == some(1));
-    assert(["go", "stop"].find_index(|s| s == "stop") == some(1));
+    assert(['a', 'b', 'c'].find_index(|c| c == 'b')? == 1);
+    assert(["go", "stop"].find_index(|s| s == "stop")? == 1);
     // A `str` receiver iterates its chars.
-    assert("a b".find_index(|c| c == ' ') == some(1));
+    assert("a b".find_index(|c| c == ' ')? == 1);
     assert("abc".find_index(|c| c == ' ') == none);
 
-    assert([8, 9, 9].find_index(is_nine) == some(1)); // a named predicate
+    assert([8, 9, 9].find_index(is_nine)? == 1); // a named predicate
     let limit = 3;
-    assert([1, 5, 9].find_index(|x| x > limit) == some(1)); // a captured bound
+    assert([1, 5, 9].find_index(|x| x > limit)? == 1); // a captured bound
     // `none` on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(is_nine).find_index(|x| x == 99) == none);
 
@@ -77,6 +77,6 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
         }
     }
     let keys = ["a", "b", "c"];
-    assert(value_for(keys, [10, 20, 30], "b") == some(20));
+    assert(value_for(keys, [10, 20, 30], "b")? == 20);
     assert(value_for(keys, [10, 20, 30], "z") == none);
 })

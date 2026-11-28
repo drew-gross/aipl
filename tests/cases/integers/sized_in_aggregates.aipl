@@ -92,14 +92,14 @@ test({
     // Array elements: indexing, length, rendering, equality.
     let xs = [1, 2, 4294967295];
     assert(xs.len() == 3);
-    assert(xs[2] == some(4294967295));
+    assert(xs[2]? == 4294967295);
     assert(to_str(xs) == "[1, 2, 4294967295]");
     assert(xs == [1, 2, 4294967295]);
     assert([umax] == [umax]);
 
     // Optionals.
     let o: u64? = some(3);
-    assert(o == some(3));
+    assert(o? == 3);
     assert(o != some(umax));
     assert(some(umax).value_or(0) == umax);
 
@@ -109,7 +109,7 @@ test({
     assert(!s.has(3));
     let d = #{1: 7};
     assert(d.contains_key(1));
-    assert(d.get(1) == some(7));
+    assert(d.get(1)? == 7);
 
     // Narrow widths keep their canonicalization through a field.
     let b200: u8 = 200;

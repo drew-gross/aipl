@@ -53,25 +53,25 @@ pub fn case_pattern(self: Pat) -> CasePattern? {
     if (!bindings.all(is_some)) { return none; };
     case.declared_case(bindings$value_or("_"))
 }.test({
-    assert(Ctor("Circle", bindings=["r"]).case_pattern() == some(CasePattern {
+    assert(Ctor("Circle", bindings=["r"]).case_pattern()? == CasePattern {
         case: "Circle",
         bindings: ["r"],
-    }));
-    assert(Ctor("Circle", ignore_payload=true).case_pattern() == some(CasePattern {
+    });
+    assert(Ctor("Circle", ignore_payload=true).case_pattern()? == CasePattern {
         case: "Circle",
         bindings: [],
-    }));
-    assert(Ctor("Empty").case_pattern() == some(CasePattern { case: "Empty", bindings: [] }));
+    });
+    assert(Ctor("Empty").case_pattern()? == CasePattern { case: "Empty", bindings: [] });
     assert(Ctor("some", bindings=["v"]).case_pattern() == none);
     assert(Ctor("ok", bindings=["v"]).case_pattern() == none);
     assert(Ctor("v").case_pattern() == none);
     assert(Wildcard.case_pattern() == none);
 
     // A slot that ignores its payload is still a pattern by position.
-    assert(Nested("Pair", [Wildcard, Ctor("b")]).case_pattern() == some(CasePattern {
+    assert(Nested("Pair", [Wildcard, Ctor("b")]).case_pattern()? == CasePattern {
         case: "Pair",
         bindings: ["_", "b"],
-    }));
+    });
     // A slot over a literal or a case is a real sub-pattern.
     assert(Nested("Pair", [Int(1), Ctor("b")]).case_pattern() == none);
     assert(Nested("Pair", [Ctor("Nil"), Ctor("b")]).case_pattern() == none);

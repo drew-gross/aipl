@@ -11,42 +11,42 @@ import { equal as ==, print, reverse, to_str, try_set, with } from builtins;
 variant Cell = Mark(i64) | Blank
 
 fn basics() {}.test({
-    assert([1, 2, 3].with(1, 9) == some([1, 9, 3]));
+    assert([1, 2, 3].with(1, 9)? == [1, 9, 3]);
     // The ends.
-    assert([1, 2, 3].with(0, 9) == some([9, 2, 3]));
-    assert([1, 2, 3].with(2, 9) == some([1, 2, 9]));
+    assert([1, 2, 3].with(0, 9)? == [9, 2, 3]);
+    assert([1, 2, 3].with(2, 9)? == [1, 2, 9]);
     // Past the end, and an empty receiver: nothing to replace.
     assert([1, 2, 3].with(3, 9) == none);
     assert([1, 2, 3].with(100, 9) == none);
     assert([1, 2][..0].with(0, 9) == none);
-    assert(with([1, 2], 0, 7) == some([7, 2])); // free-call form
+    assert(with([1, 2], 0, 7)? == [7, 2]); // free-call form
     // The receiver is not changed.
     let xs = [1, 2, 3];
     let ys = xs.with(0, 9);
-    assert(ys == some([9, 2, 3]));
+    assert(ys? == [9, 2, 3]);
     assert(xs == [1, 2, 3]);
 })
 
 // Elements that own something, and ones that don't take a whole word.
 fn other_elements() {}.test({
-    assert(["a", "b"].with(1, "z") == some(["a", "z"]));
-    assert([[1], [2, 3]].with(0, [7, 8]) == some([[7, 8], [2, 3]]));
-    assert([true, false, true].with(1, true) == some([true, true, true]));
-    assert([true, true, true].with(2, false) == some([true, true, false]));
+    assert(["a", "b"].with(1, "z")? == ["a", "z"]);
+    assert([[1], [2, 3]].with(0, [7, 8])? == [[7, 8], [2, 3]]);
+    assert([true, false, true].with(1, true)? == [true, true, true]);
+    assert([true, true, true].with(2, false)? == [true, true, false]);
     assert([true, false].with(2, true) == none);
     let narrow: u8[] = [1, 2, 3];
-    assert(narrow.with(1, 200) == some([1, 200, 3]));
-    assert([Mark(1), Blank].with(1, Mark(2)) == some([Mark(1), Mark(2)]));
+    assert(narrow.with(1, 200)? == [1, 200, 3]);
+    assert([Mark(1), Blank].with(1, Mark(2))? == [Mark(1), Mark(2)]);
 })
 
 // A view of another array: the write must not reach the array it looks into.
 fn views() {}.test({
     let xs = [1, 2, 3, 4];
     let tail = xs[1..];
-    assert(tail.with(0, 9) == some([9, 3, 4]));
+    assert(tail.with(0, 9)? == [9, 3, 4]);
     assert(xs == [1, 2, 3, 4]);
     let backwards = xs.reverse();
-    assert(backwards.with(0, 9) == some([9, 3, 2, 1]));
+    assert(backwards.with(0, 9)? == [9, 3, 2, 1]);
     assert(xs == [1, 2, 3, 4]);
 })
 

@@ -44,5 +44,5 @@ pub fn tuple_windows<T: any>(self: T[]) -> (T, T)[] {
     assert("".tuple_windows().is_empty());
     // Reading a pair back out.
     let w = [10, 20, 30].tuple_windows();
-    assert(w[1] == some((20, 30)));
+    assert(w[1]? == (20, 30));
 })

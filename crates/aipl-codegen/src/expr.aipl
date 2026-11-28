@@ -965,7 +965,7 @@ pub fn read(self: Expr) -> Read? {
     let Ident(name, _) = base.kind.as_case::<Ident>()?;
     some(Read { field, base: name })
 }.test({
-    assert(expr(Field(ident("p"), "x")).read() == some(Read { field: "x", base: "p" }));
+    assert(expr(Field(ident("p"), "x")).read()? == Read { field: "x", base: "p" });
     // Only a plain name has fields read off it here.
     assert(expr(Field(expr(Field(ident("p"), "q")), "x")).read() == none);
     assert(ident("p").read() == none);

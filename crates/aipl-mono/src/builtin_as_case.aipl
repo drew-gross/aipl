@@ -28,11 +28,11 @@ variant Shape = Circle(i64) | Square(i64) | Dot
 pub fn as_case<T: variant>(self: T, arm: Case<T>) -> T? {
     if (self.is_case(arm)) { some(self) } else { none }
 }.test({
-    assert(Circle(1).as_case::<Circle>() == some(Circle(1)));
+    assert((Circle(1).as_case::<Circle>())? == Circle(1));
     assert(Square(2).as_case::<Circle>() == none);
-    assert(Dot.as_case::<Dot>() == some(Dot));
+    assert((Dot.as_case::<Dot>())? == Dot);
     // The function-call form is the same call.
-    assert(as_case::<Square>(Square(2)) == some(Square(2)));
+    assert((as_case::<Square>(Square(2)))? == Square(2));
     // The payload decides nothing: only which case it is.
     assert(Circle(1).as_case::<Circle>() != Circle(2).as_case::<Circle>());
     if (let some(c) = Circle(7).as_case::<Circle>()) {

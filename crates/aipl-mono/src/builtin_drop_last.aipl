@@ -6,8 +6,8 @@ import { drop_last_n, equal as ==, is_empty, last, len } from builtins;
 # Every element except the last. An empty array stays empty.
 pub fn drop_last<T: any>(self: T[]) -> T[] { self.drop_last_n(1) }.test({
     assert([1, 2, 3].drop_last().len() == 2);
-    assert([1, 2, 3].drop_last().last() == some(2));
+    assert([1, 2, 3].drop_last().last()? == 2);
     assert([7].drop_last().is_empty());
     assert([1, 2][..0].drop_last().is_empty()); // already empty
-    assert(drop_last(["a", "b"]).last() == some("a")); // free-call form
+    assert(drop_last(["a", "b"]).last()? == "a"); // free-call form
 })

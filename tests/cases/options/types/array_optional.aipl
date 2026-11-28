@@ -6,7 +6,7 @@ import { equal as ==, len, value_or, wrapping_add as + } from builtins;
 
 fn pick(b: bool) -> str[]? { if (b) { some(["x", "y", "z"]) } else { none } }.test({
     let present = pick(true).value_or([]);
-    assert(present[1] == some("y"));
+    assert(present[1]? == "y");
     let absent = pick(false).value_or([]);
     assert(len(present) + len(absent) == 3); // 3 + 0
 })

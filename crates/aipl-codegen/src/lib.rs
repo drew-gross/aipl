@@ -2099,6 +2099,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/value_or_compare.aipl",
     "./lint/is_empty_longhand.aipl",
     "./lint/compare_empty_array.aipl",
+    "./lint/assert_some_equal.aipl",
     "./lint/lint.aipl",
     "./parse_and_partial_load.aipl",
     // The formatter: `format_source` is the whole pipeline, and its walker

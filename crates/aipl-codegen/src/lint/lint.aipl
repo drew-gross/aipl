@@ -20,6 +20,7 @@ import { hoist_test_fns } from "../hoist_test_fns.aipl";
 import { SuperProgram } from "../item.aipl";
 import { ResolvedProgram, resolve_callees } from "../resolve_callees.aipl";
 import { arm_block_value } from "./arm_block_value.aipl";
+import { assert_some_equal } from "./assert_some_equal.aipl";
 import { case_of_equal_is_case } from "./case_of_equal_is_case.aipl";
 import { char_set_literal } from "./char_set_literal.aipl";
 import { compare_empty_array } from "./compare_empty_array.aipl";
@@ -131,6 +132,7 @@ pub fn all_lints() -> Lint[] {
         Lint { name: "identity_lambda", run: OfFunction(identity_lambda) },
         Lint { name: "use_field_projection", run: OfFunction(use_field_projection) },
         Lint { name: "push_loop_zip_with", run: OfFunction(push_loop_zip_with) },
+        Lint { name: "assert_some_equal", run: OfFunction(assert_some_equal) },
         Lint { name: "return_loop_find_index", run: OfFunction(return_loop_find_index) },
         Lint { name: "interp_to_str", run: OfInterpolation(|i| [..interp_to_str(i)]) },
         Lint { name: "interp_literal", run: OfInterpolation(|i| [..interp_literal(i)]) },

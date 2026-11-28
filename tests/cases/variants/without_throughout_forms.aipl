@@ -105,7 +105,7 @@ fn lit_or_none(f: Flat) -> Lit? {
     }
 }.test({
     assert(lit_or_none(Off) == none);
-    assert(lit_or_none(Dim) == some(Dim));
+    assert(lit_or_none(Dim)? == Dim);
 })
 
 fn lit_of(n: i64) -> Lit!str { if (n == 0) { err("off") } else { ok(On(n)) } }.test({

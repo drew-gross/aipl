@@ -20,7 +20,7 @@ fn build(n: i64) -> Aaa {
         Nothing => assert(false),
         Has(z, n, s) => {
             // `q` read `99` — the slot after it — before the layout was fixed.
-            assert(z == some(Zzz { p: 22, q: 33, r: "inner" }));
+            assert(z? == Zzz { p: 22, q: 33, r: "inner" });
             assert(n == 99);
             assert(s == "tl");
         },

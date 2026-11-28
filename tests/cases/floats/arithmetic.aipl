@@ -98,7 +98,7 @@ test({
     assert(negate(2.5).to_str().equal("-2.5"));
     assert(negate(negate(2.5)).to_str().equal("2.5"));
     assert(halve(3.0).to_str().equal("1.5"));
-    assert(half_if_positive(3.0)$to_str().equal(some("1.5")));
+    assert(half_if_positive(3.0)$to_str()?.equal("1.5"));
     assert(half_if_positive(-3.0)$to_str().equal(none));
     assert(is_above_half(2.0));
     assert(!is_above_half(1.0));

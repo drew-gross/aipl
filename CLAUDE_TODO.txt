@@ -43,6 +43,7 @@ function values:
   a lambda whose body starts with `[` does not parse: `|xs| [..xs, x]` gives "expected `{`"; `|xs| { [..xs, x] }` does
 
 type checker:
+  `?` on a call whose value is an optional of an optional gives the wrong value in a test: `assert([some(3)].only()? == some(3))` fails though `[some(3)].only() == some(some(3))` passes, as does `d.get(2)? == none` on a dict `#{2: none}` (a user function returning `i64??` is fine); `assert_some_equal` advises `x? == v`, so those sites keep the whole comparison with `#[allow]`
   Expr::ty is still Option: the passes run on ast::Expr with optional stamps, not on typed::TExpr (typed.rs, erase/concretize are only exercised by tests). Porting every pre-/post-mono pass to TExpr would make a lost type unrepresentable
   fold_extends' receiver rule is still syntactic (annotated, or seeded by []/a reservation); a receiver that merely holds another function's array measured worse when pushed into (optimizations/fold_extends_value_or) — retry on exact types
   codegen still re-derives types bottom-up (compile_expr_inner) and reconciles with Expr::ty through has_placeholder_ty/coercible; with every node stamped it could read the stamp instead

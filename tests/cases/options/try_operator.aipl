@@ -11,9 +11,9 @@ fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
         some(`{s}!`)
     }
 
-    assert(bang(some("hi")) == some("hi!")); // some: unwrap and continue
+    assert(bang(some("hi"))? == "hi!"); // some: unwrap and continue
     assert(bang(none) == none); // none: early return
-    assert(add2(some(3), some(4)) == some(7)); // both some
+    assert(add2(some(3), some(4))? == 7); // both some
     assert(add2(some(3), none) == none); // second none propagates
     assert(add2(none, some(4)) == none); // first none propagates
 })

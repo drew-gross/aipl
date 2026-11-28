@@ -24,15 +24,15 @@ pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
 }.test({
     fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }
     assert(nonzero(0) == none);
-    assert(nonzero(2) == some(2));
+    assert(nonzero(2)? == 2);
 
     // The *last* answer, not the first.
-    assert([0, 3, 5].reverse_find_map(nonzero) == some(5));
-    assert([3, 0].reverse_find_map(nonzero) == some(3));
+    assert([0, 3, 5].reverse_find_map(nonzero)? == 5);
+    assert([3, 0].reverse_find_map(nonzero)? == 3);
     assert([0, 0].reverse_find_map(nonzero) == none);
     // The lambda form, the free-call form, and the empty array.
-    assert([1, 2, 3].reverse_find_map(|x| if (x > 1) { some(x * 10) } else { none }) == some(30));
+    assert([1, 2, 3].reverse_find_map(|x| if (x > 1) { some(x * 10) } else { none })? == 30);
     assert(reverse_find_map([1, 2][..0], nonzero) == none);
     // A `str` receiver iterates its chars.
-    assert("1a2b".reverse_find_map(to_digit) == some(2));
+    assert("1a2b".reverse_find_map(to_digit)? == 2);
 })

@@ -31,22 +31,22 @@ pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
     assert(is_nine(9));
     assert(!is_nine(8));
 
-    assert([1, 2, 3, 4].find_if(|x| x > 2) == some(3));
+    assert([1, 2, 3, 4].find_if(|x| x > 2)? == 3);
     assert([1, 2, 3].find_if(|x| x > 9) == none); // nothing matches
     // The *first* match, not the last: it stops there.
-    assert([5, 1, 7].find_if(|x| x > 2) == some(5));
-    assert(find_if([2, 4], |x| x > 3) == some(4)); // function-call form too
+    assert([5, 1, 7].find_if(|x| x > 2)? == 5);
+    assert(find_if([2, 4], |x| x > 3)? == 4); // function-call form too
 
     // Generic over the element type — the same definition serves char and str.
-    assert(['a', 'b', 'c'].find_if(|c| c == 'b') == some('b'));
-    assert(["go", "stop"].find_if(|s| s == "stop") == some("stop"));
+    assert(['a', 'b', 'c'].find_if(|c| c == 'b')? == 'b');
+    assert(["go", "stop"].find_if(|s| s == "stop")? == "stop");
     // A `str` receiver iterates its chars.
-    assert("a b".find_if(|c| c == ' ') == some(' '));
+    assert("a b".find_if(|c| c == ' ')? == ' ');
     assert("abc".find_if(|c| c == ' ') == none);
 
-    assert([8, 9, 9].find_if(is_nine) == some(9)); // a named predicate
+    assert([8, 9, 9].find_if(is_nine)? == 9); // a named predicate
     let limit = 3;
-    assert([1, 5, 9].find_if(|x| x > limit) == some(5)); // a captured bound
+    assert([1, 5, 9].find_if(|x| x > limit)? == 5); // a captured bound
     // `none` on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(is_nine).find_if(|x| x == 99) == none);
 })

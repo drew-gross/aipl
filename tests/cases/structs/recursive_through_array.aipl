@@ -65,7 +65,7 @@ test({
     let t = Tree { label: 1, kids: [leaf(2), Tree { label: 3, kids: [leaf(4)] }] };
     assert(t.total() == 10);
     assert(t.kids.len() == 2);
-    assert(t.kids[0] == some(leaf(2)));
+    assert(t.kids[0]? == leaf(2));
 
     // Structural equality recurses through the array field.
     assert(t == Tree { label: 1, kids: [leaf(2), Tree { label: 3, kids: [leaf(4)] }] });

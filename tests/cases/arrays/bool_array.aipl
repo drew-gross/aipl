@@ -15,6 +15,6 @@ fn count_true(bs: bool[]) -> i64 {
     assert(count_true(bs) == 3);
     assert(len(bs) == 4);
     // Indexing yields an optional element.
-    assert(bs[1] == some(false));
+    assert(bs[1]? == false);
     assert(bs[9] == none);
 })

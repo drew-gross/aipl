@@ -21,7 +21,7 @@ fn bare(text: str) -> Linked { Many(Literal(text)) }.test({
 fn lift<T: any>(self: T) -> T? { some(self) }
 
 fn lifted(text: str) -> Linked? { lift(Literal(text)) }.test({
-    assert(lifted("a") == some(Literal("a")));
+    assert(lifted("a")? == Literal("a"));
 })
 
 fn succeeded(text: str) -> Linked!str { ok(Literal(text)) }.test({

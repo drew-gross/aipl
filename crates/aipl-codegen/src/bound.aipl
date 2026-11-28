@@ -23,10 +23,10 @@ pub fn bound_from_name(name: str) -> Bound? {
         _ => none,
     }
 }.test({
-    assert(bound_from_name("any") == some(Any));
-    assert(bound_from_name("ord") == some(Ord));
-    assert(bound_from_name("int") == some(Int));
-    assert(bound_from_name("cases") == some(Cases));
+    assert(bound_from_name("any")? == Any);
+    assert(bound_from_name("ord")? == Ord);
+    assert(bound_from_name("int")? == Int);
+    assert(bound_from_name("cases")? == Cases);
     assert(bound_from_name("eq") == none);
 
     // `variant` is its own keyword in type-parameter position, so it is not a

@@ -19,8 +19,8 @@ fn make(n: i64) -> Node { val: n, next: none, extra: some(Wide { p: n, q: 5, r: 
     assert(w.val == 3);
 
     // The inline-struct payload, read back field by field through the box.
-    assert(w.extra$p == some(3));
-    assert(w.extra$s == some("z"));
+    assert(w.extra$p? == 3);
+    assert(w.extra$s? == "z");
 
     // The boxed-pointer optional beside it is unaffected.
     assert(w.next == none);

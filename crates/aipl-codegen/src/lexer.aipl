@@ -1450,7 +1450,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     // underneath untouched. This is the depth tracking, for free.
     let nested_brace = "`a{ {x} }b`";
     assert(lex(nested_brace, tpl_rules)?.tokens.len() == 9);
-    assert(lex(nested_brace, tpl_rules)?.tokens[7] == some(tok(nested_brace, Tpl("b"), 9..10)));
+    assert(lex(nested_brace, tpl_rules)?.tokens[7]? == tok(nested_brace, Tpl("b"), 9..10));
 
     // The stack *is* the depth counter: a template inside an interpolation
     // inside a template nests by pushing, with nothing counting anything. The
@@ -1458,7 +1458,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     // `M_TPL` back on.
     let deep = "`a{`x`}b`";
     assert(lex(deep, tpl_rules)?.tokens.len() == 9);
-    assert(lex(deep, tpl_rules)?.tokens[4] == some(tok(deep, Tpl("x"), 4..5)));
+    assert(lex(deep, tpl_rules)?.tokens[4]? == tok(deep, Tpl("x"), 4..5));
 
     // An empty segment emits no text token at all: `UpToAny` declines at a stop,
     // so the rule matching the terminator wins there instead.
@@ -1466,12 +1466,12 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
 
     // A mode still open at the end of the source is reported against the token
     // that opened it — the backtick, not the whole remaining line.
-    assert(lex("`ab", tpl_rules)! == some(lex_err("unterminated template", 0..1)));
+    assert(lex("`ab", tpl_rules)!? == lex_err("unterminated template", 0..1));
 
     // An interpolation left open still names the *template*, not the `{`: the
     // `{` pushed the base mode, which is bracket bookkeeping rather than an
     // unfinished lexical construct.
-    assert(lex("`a{x", tpl_rules)! == some(lex_err("unterminated template", 0..1)));
+    assert(lex("`a{x", tpl_rules)!? == lex_err("unterminated template", 0..1));
 
     // And an unclosed bracket on its own is no lexical error at all — it is a
     // token stream a parser will complain about.

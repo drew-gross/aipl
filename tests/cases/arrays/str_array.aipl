@@ -14,7 +14,7 @@ fn appended(xs: str[], s: str) -> str[] {
     mut ys = xs;
     set ys.push("baz");
     // index yields str?
-    assert(ys[0] == some("foo"));
+    assert(ys[0]? == "foo");
     assert(ys == ["foo", "bar", "baz"]);
     mut count = 0;
     for (let s : ys) {

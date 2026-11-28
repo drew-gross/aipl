@@ -20,8 +20,8 @@ fn make() -> Tags {
     Tags { id: 7, names: ns }
 }.test({
     let Tags { names, id } = make();
-    assert(names[0] == some("a"));
-    assert(names[1] == some("b"));
+    assert(names[0]? == "a");
+    assert(names[1]? == "b");
     let n: i64 = len(names).narrow().value_or(0);
     assert(id * 10 + n == 72);
 })

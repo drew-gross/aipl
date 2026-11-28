@@ -34,9 +34,9 @@ pub fn grid_try_set<T: any>(
 }.test({
     let two: u64 = 2;
     let grid = Grid { width: two, cells: [1, 2, 3, 4, 5, 6] };
-    assert(grid.grid_try_set(1, 0, 30).grid_get(1, 0) == some(30));
-    assert(grid.grid_try_set(1, 0, 30).grid_get(1, 1) == some(4));
-    assert(grid_try_set(grid, 2, 1, 60).grid_get(2, 1) == some(60));
+    assert(grid.grid_try_set(1, 0, 30).grid_get(1, 0)? == 30);
+    assert(grid.grid_try_set(1, 0, 30).grid_get(1, 1)? == 4);
+    assert(grid_try_set(grid, 2, 1, 60).grid_get(2, 1)? == 60);
 
     // A column off the row would land in the next row; a row off the bottom is
     // past the cells. Neither changes anything.

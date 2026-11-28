@@ -2124,7 +2124,7 @@ pub fn parse<K: variant, A: any>(
     // adds no text, and nothing else was dropped.
     let trivial = "a // c\n b;";
     let mended = parse_cst_recovering(trivial, lex_toks(trivial, trivia_rules())?, g_e, "stmts")?;
-    assert(mended.cst$text(trivial) == some(trivial));
+    assert(mended.cst$text(trivial)? == trivial);
     assert(mended.errors$span == [8..9]);
 
     // ---- Expect: it does not backtrack ----

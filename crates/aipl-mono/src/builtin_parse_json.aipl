@@ -312,20 +312,22 @@ pub fn parse(self: str) -> Json!str {
     //
     // `trailing_sep=false` leaves the dangling comma unconsumed, so
     // the enclosing rule is what reports it.
-    assert(parse("[1, 2,]")! == some("expected a JSON value, found `]` (at byte 6)"));
-    assert(parse("""{"a": 1,}""")! == some("expected Str, found `}` (at byte 8)"));
+    assert(parse("[1, 2,]")!? == "expected a JSON value, found `]` (at byte 6)");
+    assert(parse("""{"a": 1,}""")!? == "expected Str, found `}` (at byte 8)");
 
     // ---- errors ----
-    assert(parse("")! == some("expected a JSON value, found end of input (at byte 0)"));
-    assert(parse("[1")! == some(
-        "expected `,` or `]`, found end of input (`[` at line 1 is never closed) (at byte 2)",
-    ));
-    assert(parse("{1: 2}")! == some("expected Str or `}`, found `1` (at byte 1)"));
-    assert(parse("""{"a" 1}""")! == some("expected `:`, found `1` (at byte 5)"));
+    assert(parse("")!? == "expected a JSON value, found end of input (at byte 0)");
+    assert(
+        parse(
+            "[1",
+        )!? == "expected `,` or `]`, found end of input (`[` at line 1 is never closed) (at byte 2)",
+    );
+    assert(parse("{1: 2}")!? == "expected Str or `}`, found `1` (at byte 1)");
+    assert(parse("""{"a" 1}""")!? == "expected `:`, found `1` (at byte 5)");
     // Every token must be consumed: two documents is not one.
-    assert(parse("1 2")! == some("expected end of input, found `2` (at byte 2)"));
+    assert(parse("1 2")!? == "expected end of input, found `2` (at byte 2)");
     // A lex failure reports in the same shape as a parse failure.
-    assert(parse("@")! == some("unexpected character (at byte 0)"));
+    assert(parse("@")!? == "unexpected character (at byte 0)");
 }).benchmark({
     // What parsing costs is stated per byte of input and as a scaling, not as the exact
     // counts: the parser is many files' code, and an exact count would move with each. A

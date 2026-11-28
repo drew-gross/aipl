@@ -20,8 +20,8 @@ pub fn area(self: Shape) -> i64? {
     let Rect(w, h) = self.as_case::<Rect>()?;
     some(w * h)
 }.test({
-    assert(Rect(3, h=2).area() == some(6));
-    assert(Rect(3).area() == some(3));
+    assert(Rect(3, h=2).area()? == 6);
+    assert(Rect(3).area()? == 3);
     assert(Circle(1).area() == none);
     assert(Rect(1).is_case::<Rect>());
     assert(!Dot.is_case::<Rect>());

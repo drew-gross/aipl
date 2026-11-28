@@ -41,7 +41,7 @@ pub fn zip<T: any, U: any, V: any>(
     assert(zip([1, 2], [true, false]) == [(1, true), (2, false)]);
     // Reading a pair back out.
     let pairs = [10, 20].zip(["x", "y"]);
-    assert(pairs[1] == some((20, "y")));
+    assert(pairs[1]? == (20, "y"));
 
     // `with` combines each pair: a lambda or a named function.
     assert([1, 2, 3].zip([10, 20, 30], with=add) == [11, 22, 33]);

@@ -25,8 +25,8 @@ pub fn root_name(self: Expr) -> str? {
         _ => none,
     }
 }.test({
-    assert(ident("p").root_name() == some("p"));
-    assert(expr(Field(expr(Field(ident("p"), "a")), "b")).root_name() == some("p"));
+    assert(ident("p").root_name()? == "p");
+    assert(expr(Field(expr(Field(ident("p"), "a")), "b")).root_name()? == "p");
     assert(expr(Field(expr(Neg(ident("p"))), "a")).root_name() == none);
 })
 
@@ -71,8 +71,8 @@ pub fn place_text(self: Expr) -> str? {
     let Field(receiver, name) = self.kind.as_case::<Field>()?;
     some(`{receiver.place_text()?}.{name.slot_shown()}`)
 }.test({
-    assert(ident("p").place_text() == some("p"));
-    assert(expr(Field(expr(Field(ident("p"), "a")), "b")).place_text() == some("p.a.b"));
-    assert(expr(Field(ident("t"), "_0")).place_text() == some("t.0"));
+    assert(ident("p").place_text()? == "p");
+    assert(expr(Field(expr(Field(ident("p"), "a")), "b")).place_text()? == "p.a.b");
+    assert(expr(Field(ident("t"), "_0")).place_text()? == "t.0");
     assert(expr(Neg(ident("p"))).place_text() == none);
 })

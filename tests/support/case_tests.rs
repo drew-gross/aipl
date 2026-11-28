@@ -1013,6 +1013,7 @@ case_tests! {
     crates_aipl_codegen_src_lines = "crates/aipl-codegen/src/lines",
     crates_aipl_codegen_src_lint_accumulation = "crates/aipl-codegen/src/lint/accumulation",
     crates_aipl_codegen_src_lint_arm_block_value = "crates/aipl-codegen/src/lint/arm_block_value",
+    crates_aipl_codegen_src_lint_assert_some_equal = "crates/aipl-codegen/src/lint/assert_some_equal",
     crates_aipl_codegen_src_lint_case_match = "crates/aipl-codegen/src/lint/case_match",
     crates_aipl_codegen_src_lint_case_of_equal_is_case = "crates/aipl-codegen/src/lint/case_of_equal_is_case",
     crates_aipl_codegen_src_lint_char_set_literal = "crates/aipl-codegen/src/lint/char_set_literal",

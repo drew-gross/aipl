@@ -500,13 +500,13 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // `token_span` is `span` with the trivia at either edge left out. They agree
     // here because `t` opens and closes on a token...
     assert(t.extent() == 0..5);
-    assert(t.token_span() == some(0..5));
+    assert(t.token_span()? == 0..5);
 
     // ...and disagree the moment one edge is trivia, which is the whole reason
     // the tight one exists: another parser's spans start at the token.
     let padded = Tree(1, [Trivia(0..1), Leaf(1..2), Trivia(2..3)]);
     assert(padded.extent() == 0..3);
-    assert(padded.token_span() == some(1..2));
+    assert(padded.token_span()? == 1..2);
 
     // A node holding no token has no token span — an interior node for a
     // production that matched empty input.
@@ -536,7 +536,7 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(mended.text(src) == "1 +");
     assert(mended.token_leaves() == [0..1, 2..3]);
     assert(mended.extent() == 0..3);
-    assert(mended.token_span() == some(0..3));
+    assert(mended.token_span()? == 0..3);
     assert(mended.parts().children.is_empty());
     assert(mended.parts().tokens == [0..1, 2..3]);
     assert(mended.parts().slots() == [Tok(0..1), Tok(2..3)]);
@@ -588,12 +588,12 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // Reading a slot: a token gives its text and its span and names no child, a
     // child position the reverse.
     assert(Tok(0..1).slot_text(src) == "1");
-    assert(Tok(0..1).slot_span() == some(0..1));
+    assert(Tok(0..1).slot_span()? == 0..1);
     assert(Tok(0..1).slot_child() == none);
     let child: Slot = Sub(2);
     assert(child.slot_text(src) == "");
     assert(child.slot_span() == none);
-    assert(child.slot_child() == some(2));
+    assert(child.slot_child()? == 2);
 
     // The two span accessors a lowering reads off its `Parts`, against the tree's
     // own: `span` is the full extent, `tok_span` the token-tight one, and they

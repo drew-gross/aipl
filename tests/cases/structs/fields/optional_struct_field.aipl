@@ -23,17 +23,17 @@ fn present(n: i64) -> Holder {
     let e = absent(7);
 
     // Read the field back, whole and by its own fields.
-    assert(p.mid == some(Inner { a: 7, b: "here" }));
+    assert(p.mid? == Inner { a: 7, b: "here" });
     assert(e.mid == none);
     assert(p.mid.value_or(Inner { a: 0, b: "" }).b == "here");
 
     // An optional of a variant is a field the same way.
-    assert(p.tag == some(Blue(7)));
+    assert(p.tag? == Blue(7));
     assert(e.tag == none);
 
     // A doubly-nested optional shares the one value field, so `some(none)` and
     // `none` stay distinct.
-    assert(Holder { ..e, deep: some(none) }.deep == some(none));
+    assert(Holder { ..e, deep: some(none) }.deep? == none);
     assert(e.deep == none);
 
     // Whole-struct equality compares the optional field like any other.
@@ -47,7 +47,7 @@ fn present(n: i64) -> Holder {
     // Mutation through `set`, in both directions.
     mut m = e;
     set m.mid = some(Inner { a: 1, b: "x" });
-    assert(m.mid == some(Inner { a: 1, b: "x" }));
+    assert(m.mid? == Inner { a: 1, b: "x" });
     set m.mid = none;
     assert(m.mid == none);
 
@@ -55,7 +55,7 @@ fn present(n: i64) -> Holder {
     assert(Holder { ..p, lead: 9 }.mid == p.mid);
 
     // Unwrapping reaches the inner struct's own fields.
-    assert(p.mid$a == some(7));
+    assert(p.mid$a? == 7);
     assert(e.mid$a == none);
 
     // A statement `match` sees the payload as an ordinary inline struct.

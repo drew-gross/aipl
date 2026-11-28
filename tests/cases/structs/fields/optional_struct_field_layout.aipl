@@ -33,7 +33,7 @@ fn build(n: i64) -> Aaa {
     assert(full.lead == 11);
     assert(full.tail == "tail");
     assert(full.last == 44);
-    assert(full.mid == some(Zzz { p: 22, q: 33, r: "inner" }));
+    assert(full.mid? == Zzz { p: 22, q: 33, r: "inner" });
 
     assert(empty.lead == 11);
     assert(empty.tail == "tail");
@@ -52,7 +52,7 @@ fn build(n: i64) -> Aaa {
     set xs.push(empty);
     set xs.push(build(1));
     assert(xs.len() == 3);
-    assert(xs[2] == some(full));
+    assert(xs[2]? == full);
 
     // Built and dropped repeatedly: the `str` inside the optional payload is
     // retained and released through the optional's tag, so the case's

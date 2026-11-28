@@ -14,7 +14,7 @@ fn grid3() -> str[][] {
     assert(g2 == [["a", "b"], ["c"], ["d", "e", "f"]]);
     // index the outer array -> str[]?, then index the inner -> str?
     let row = g2[2].value_or([]);
-    assert(row[0] == some("d"));
+    assert(row[0]? == "d");
     mut cells = 0;
     for (let r : g2) {
         for (let c : r) {

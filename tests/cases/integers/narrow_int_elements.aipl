@@ -32,8 +32,8 @@ fn i8s() -> i8[] { [3, -128, 127] }.test({
     assert(i8s().to_str() == "[3, -128, 127]");
     assert(i8s().sort() == [-128, 3, 127]);
     assert(i8s().reverse() == [127, -128, 3]);
-    assert(i8s().minimum() == some(-128));
-    assert(i8s().maximum() == some(127));
+    assert(i8s().minimum()? == -128);
+    assert(i8s().maximum()? == 127);
     assert(i8s().contains(-128));
     assert(i8s().len() == 3);
 })
@@ -42,7 +42,7 @@ fn u8s() -> u8[] { [3, 255, 0] }.test({
     assert(u8s().to_str() == "[3, 255, 0]");
     // 255 is `-1`'s low byte: an unsigned element must sort *last*, not first.
     assert(u8s().sort() == [0, 3, 255]);
-    assert(u8s().maximum() == some(255));
+    assert(u8s().maximum()? == 255);
 })
 
 fn i16s() -> i16[] { [-32768, 32767] }.test({
@@ -69,7 +69,7 @@ fn u32s() -> u32[] { [4294967295, 1] }.test({
 // round-trip argument applies — including through `xs[i]`, which hands an
 // element back as `T?`.
 fn first(xs: u16[]) -> u16? { xs[0] }.test({
-    assert(first([65535]) == some(65535));
+    assert(first([65535])? == 65535);
     assert(first([]) == none);
     assert(first([]).value_or(7) == 7);
 })
@@ -92,14 +92,14 @@ fn grown() -> u32[] {
     xs
 }.test({
     assert(grown().len() == 10);
-    assert(grown()[9] == some(4294967295));
-    assert(grown().minimum() == some(4294967295));
+    assert(grown()[9]? == 4294967295);
+    assert(grown().minimum()? == 4294967295);
 })
 
 // Nested containers: an array of narrow arrays, an array of narrow optionals.
 fn nested() -> i8[][] { [[-128], [127, 0]] }.test({
     assert(nested().to_str() == "[[-128], [127, 0]]");
-    assert(nested()[0] == some([-128]));
+    assert(nested()[0]? == [-128]);
     assert([some(65535), none].to_str() == "[some(65535), none]");
 })
 

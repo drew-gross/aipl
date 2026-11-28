@@ -66,8 +66,8 @@ pub fn filter_map_reduce<T: any, U: any>(
     assert(!is_big(1));
 
     // Only the survivors are mapped and reduced.
-    assert([1, 2, 3, 4].filter_map_reduce(is_big, |x| x * 10, min) == some(30));
-    assert([1, 2, 3, 4].filter_map_reduce(is_big, |x| x * 10, max) == some(40));
+    assert([1, 2, 3, 4].filter_map_reduce(is_big, |x| x * 10, min)? == 30);
+    assert([1, 2, 3, 4].filter_map_reduce(is_big, |x| x * 10, max)? == 40);
     // It is `filter`, then `map`, then the reduction.
     assert(
         [5, 1, 4, 2].filter_map_reduce(is_big, |x| 9 - x, min) == [5, 1, 4, 2]
@@ -82,14 +82,14 @@ pub fn filter_map_reduce<T: any, U: any>(
             .maximum(),
     );
     // One survivor is itself; no step is taken.
-    assert([1, 7, 2].filter_map_reduce(is_big, |x| x + 1, min) == some(8));
+    assert([1, 7, 2].filter_map_reduce(is_big, |x| x + 1, min)? == 8);
     // Nothing survives, or nothing is there: `none`.
     assert([1, 2].filter_map_reduce(is_big, |x| x, min) == none);
     assert([1, 2].filter(is_big).filter_map_reduce(is_big, |x| x, min) == none);
     // The result type need not be the element type.
-    assert(["a", "", "bcd", ""].filter_map_reduce(is_nonempty, len, max) == some(3));
-    assert(["pear", "", "apple"].filter_map_reduce(is_nonempty, |s| s, min) == some("apple"));
-    assert(filter_map_reduce([2, 3], is_big, |x| x, max) == some(3)); // free-call form
+    assert(["a", "", "bcd", ""].filter_map_reduce(is_nonempty, len, max)? == 3);
+    assert(["pear", "", "apple"].filter_map_reduce(is_nonempty, |s| s, min)? == "apple");
+    assert(filter_map_reduce([2, 3], is_big, |x| x, max)? == 3); // free-call form
     let by = 100;
-    assert([1, 5].filter_map_reduce(is_big, |x| x + by, max) == some(105)); // a captured value
+    assert([1, 5].filter_map_reduce(is_big, |x| x + by, max)? == 105); // a captured value
 })

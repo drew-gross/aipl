@@ -55,17 +55,17 @@ pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
     );
 
     // The error type may change shape entirely: struct to str.
-    assert(lex("bad").map_err(|e| e.message)! == some("unexpected"));
+    assert(lex("bad").map_err(|e| e.message)!? == "unexpected");
 
     // ... or to a scalar of a different type.
-    assert(lex("bad").map_err(|e| e.span)! == some(3));
+    assert(lex("bad").map_err(|e| e.span)!? == 3);
 
     // Free-call form.
     assert(map_err(lex("bad"), to_fmt).is_err_and(|e| e.message == "unexpected"));
 
     // A captured value.
     let reason = "replaced";
-    assert(lex("bad").map_err(|e| reason)! == some("replaced"));
+    assert(lex("bad").map_err(|e| reason)!? == "replaced");
 
     // The ok type is generic too: a non-`str` ok side maps its error the same
     // way, and passes an ok value through.
@@ -73,7 +73,7 @@ pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
     assert("a"[0].value_or_err(404).map_err(|c| c == 404)? == 'a');
 
     // Chained: mapping twice composes, and the ok side still survives both.
-    assert(lex("bad").map_err(to_fmt).map_err(|e| e.span)! == some(3));
+    assert(lex("bad").map_err(to_fmt).map_err(|e| e.span)!? == 3);
     assert(lex("fine").map_err(to_fmt).map_err(|e| e.span)? == "fine");
 })
 

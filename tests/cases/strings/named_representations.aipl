@@ -52,13 +52,13 @@ fn round_trips(s: str) -> bool { heap_str(s) == s }.benchmark({
     assert(round_trips("banana"));
     assert(heap_str("banana") == "banana");
     assert(rope_str("ba", "nana") == "banana");
-    assert(inline_str("banana") == some("banana"));
+    assert(inline_str("banana")? == "banana");
 
     // Each one accepts what the others produce, so a representation is never a
     // dead end: all three spellings of "banana" compare equal.
     assert(heap_str(rope_str("ba", "nana")) == "banana");
     assert(rope_str(heap_str("ba"), inline_str("nana").value_or("")) == "banana");
-    assert(inline_str(heap_str("banana")) == some("banana"));
+    assert(inline_str(heap_str("banana"))? == "banana");
 
     // Only `inline_str` can fail to deliver: content past the inline capacity has
     // no inline form at all, and the optional says so rather than quietly handing

@@ -126,11 +126,11 @@ pub fn win_rate(self: Record) -> Float? {
     // Floats have no `==` of their own beside this file's, so the rate is rendered.
     fn rendered(record: Record) -> str? { record.win_rate()$to_str() }
     assert(rendered(Record {}) == none);
-    assert(rendered(Record { draw: 4 }) == some("0.5"));
-    assert(rendered(Record { win: 3, draw: 1 }) == some("0.875"));
-    assert(rendered(Record { win: 1, loss: 1 }) == some("0.5"));
-    assert(rendered(Record { win: 2, loss: 1, draw: 9 }) == some("0.5416666666666666"));
-    assert(rendered(Record { loss: 3 }) == some("0.0"));
+    assert(rendered(Record { draw: 4 })? == "0.5");
+    assert(rendered(Record { win: 3, draw: 1 })? == "0.875");
+    assert(rendered(Record { win: 1, loss: 1 })? == "0.5");
+    assert(rendered(Record { win: 2, loss: 1, draw: 9 })? == "0.5416666666666666");
+    assert(rendered(Record { loss: 3 })? == "0.0");
 })
 
 # `self` as a `Result`: `win`, `loss` or `draw`.
