@@ -1504,6 +1504,14 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
         if let Some(doc) = doc {
             print_doc(name, doc);
         }
+        // A parameter's docs are printed as `fn.parameter`, as a case's are under its variant.
+        if let aipl::ast::Item::Fn(f) = item {
+            for param in &f.sig.params {
+                if let Some(doc) = &param.doc {
+                    print_doc(&format!("{}.{}", f.name, param.name), doc);
+                }
+            }
+        }
         // A variant's cases carry docs of their own, printed as `Variant.Case`
         // so a case reads as the alternative of its type that it is.
         if let aipl::ast::Item::Variant(v) = item {

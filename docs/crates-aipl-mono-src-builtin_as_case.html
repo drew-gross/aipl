@@ -32,6 +32,7 @@
           <div class="doc"><p>What the tests convert.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Circle"><code>Circle(i64)</code>
@@ -63,6 +64,7 @@
           <pre class="signature"><code>pub fn as_case&#60;T: variant&#62;(self: T, arm: Case&#60;T&#62;) -&#62; T?</code></pre>
 
           <div class="doc"><p><code>self</code> as the case <code>arm</code>, or <code>none</code> when it is another. <code>arm</code> is a constructor name, payload-carrying or not: <code>shape.as_case::&lt;Circle&gt;()</code>.</p><p>See <code>collect_arms</code> for keeping the elements of an array that are one case, and <code>case_of</code> for reading which case a single value is.</p></div>
+
 
 
         </section>

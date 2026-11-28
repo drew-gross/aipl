@@ -1,0 +1,34 @@
+# A parameter takes `# ..` lines of its own, above it inside the parentheses. They document the
+# parameter, not the function, and a documented parameter changes nothing about how the function is
+# called: by position, by keyword, with its default.
+
+import { equal as ==, extend, wrapping_add as +, wrapping_mul as * } from builtins;
+
+# `n` scaled and shifted.
+fn scaled(
+    # The number to scale.
+    n: i64,
+    # How many times over.
+    #
+    # A second paragraph.
+    by: i64 = 2,
+    shift: i64 = 0,
+) -> i64 { n * by + shift }.test({
+    assert(scaled(3) == 6);
+    assert(scaled(3, by=4) == 12);
+    assert(scaled(3, shift=1) == 7);
+})
+
+# A documented `mut self` and a variadic.
+fn pushed(
+    # What is added to.
+    mut self: i64[],
+    # What is added.
+    more: i64*,
+) {
+    set self.extend(more);
+}.test({
+    mut xs = [1];
+    set xs.pushed([2, 3]);
+    assert(xs == [1, 2, 3]);
+})

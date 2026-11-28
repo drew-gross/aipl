@@ -32,6 +32,7 @@
           <div class="doc"><p>The name a place is rooted in: <code>p</code> for <code>p</code> and for <code>p.a.b</code>, and <code>none</code> for anything that is not a place.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn is_same_place(self: Expr, other: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> and <code>other</code> name the same place, however far apart they are written: the tree compared without the positions its nodes carry.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>A tuple slot is the field <code>_0</code>, written <code>0</code>; any other field is its own name.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>pub fn place_text(self: Expr) -&#62; str?</code></pre>
 
           <div class="doc"><p>The text that writes the place <code>self</code>, as a <code>set</code> would: <code>p</code> and <code>p.a.b</code>, a tuple slot by its number (<code>t.0</code>). <code>none</code> for anything that is not a place.</p></div>
+
 
 
         </section>

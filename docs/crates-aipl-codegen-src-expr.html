@@ -32,6 +32,7 @@
           <div class="doc"><p>block) where its <em>value</em> is.</p><p>The span is this node's <em>token</em> span: every token the node was built from, closing bracket and unary operator included. A span kept for diagnostics alone can be narrower than that — it only has to point somewhere useful — but a formatter needs the extent, so this one records it.</p><p><code>value_span</code> is a block's tail position: <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. It is recorded while the block is being built, where the tail is in hand, rather than re-walked at every diagnostic.</p><p>Rust spells it <code>Option&lt;Box&lt;Span&gt;&gt;</code>; here it is a plain <code>Span</code> with the <em>empty</em> one meaning &quot;none&quot;, which is the convention already in force for a location that does not exist (see <code>join_spans</code>). A struct field could not be an optional struct when this was written, so there was no choice; it can be one now, and the two spellings mean the same thing either way, since a recorded value span is never empty: the repair that fills it in runs first.</p><p><code>name_span</code> is where the node's <em>name</em> is written: the field in <code>p.x</code>/<code>p$x</code>, the callee in <code>f(a)</code>/<code>p.f(a)</code>, the identifier of an <code>Ident</code> or <code>Construct</code>, the binder of a <code>Let</code>. The node's own span covers the whole construct, which cannot say where inside it the name sits; a language server needs exactly that. Like <code>value_span</code> it is a plain <code>Span</code>, with the empty one meaning &quot;none&quot; (a synthesized node has no name written anywhere).</p><p><code>source</code> is the text <code>span</code> covers, so a lint can quote what the author wrote without being handed the file. It is the empty string on a node the parser synthesized, and on every node until <code>with_source_text</code> has filled it in. Rust has no such field: it is read only by the lints, which run on the AIPL side.</p><p><code>written</code> is where a destructuring <code>let</code> or <code>for</code> writes the names in its pattern (<code>LetPattern</code> and <code>ForPattern</code> only), kept for <code>desugar.aipl</code>, which turns them into bindings that carry the places.</p><p>The <code>ty</code> field <code>Expr</code> carries in Rust is absent — nothing the parser sets it.</p><p><code>K</code> is what <code>kind</code> is known to be. A bare <code>Expr</code> is <code>Expr&lt;ExprKind&gt;</code>, a node of any kind; <code>Expr&lt;Assign&gt;</code> is one known to be an <code>Assign</code>, as <code>descendants_of_kind</code> returns, so its kind is taken apart with no other case to handle. It goes wherever an <code>Expr</code> does.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>struct FieldInit</code></pre>
 
           <div class="doc"><p>One field of a struct literal. A <code>..base</code> spread rides as an init with an empty name whose <em>value</em> is the <code>Spread</code> — the value is what identifies it, exactly as an array-literal spread is identified by being a spread element.</p><p><code>name_span</code> is where the field name is written in <code>T { name: v }</code> or the shorthand <code>T { name }</code>; empty for a spread and for a synthesized init. <code>shorthand</code> is whether it is written as the shorthand, whose value is the identifier the field is named for.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>One parameter of a lambda. <code>ty</code> is the annotation from <code>|x: i64| ..</code>, absent for the bare <code>|x| ..</code> form.</p><p><code>binding</code> is what the parameter binds: a plain name (<code>|x| ..</code>) or the destructuring it was written as (<code>|Point { x, y }| ..</code>, <code>|(a, b)| ..</code>), which has no name of its own. <code>desugar.aipl</code> lowers a destructuring to a parameter called <code>synthesized_name</code> and the names bound off it at the top of the body; after that the binding is always a <code>Name</code>.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>struct Capture</code></pre>
 
           <div class="doc"><p>One entry of the capture list in front of a lambda, <code>[mut total, mut n = 0] |x| ..</code>: a variable the closure mutates. Without an initializer it names a variable of the enclosing function, which the closure takes over; with one it is state the closure starts with and owns.</p></div>
+
 
 
         </section>
@@ -88,6 +92,7 @@
           <div class="doc"><p>The name of the parameter <code>self</code> lowers to: see <code>name_at</code>.</p></div>
 
 
+
         </section>
 
 
@@ -100,6 +105,7 @@
           <pre class="signature"><code>pub fn name_at(self: Binding, __spat$5902: Span) -&#62; str</code></pre>
 
           <div class="doc"><p>The name of the variable a parameter bound as <code>self</code> is lowered to, for a parameter that starts at <code>span</code>: the name it was written with, and for a destructuring built from where it starts, which no source can spell.</p></div>
+
 
 
         </section>
@@ -116,6 +122,7 @@
           <div class="doc"><p>One name as it is written in a pattern, and where.</p></div>
 
 
+
         </section>
 
 
@@ -128,6 +135,7 @@
           <pre class="signature"><code>struct WrittenStruct</code></pre>
 
           <div class="doc"><p>The fields a struct pattern <code>T { a, b as c }</code> reads, in order, and the names it binds them as — <code>a</code> and <code>a</code> for a field bound under its own name.</p></div>
+
 
 
         </section>
@@ -144,6 +152,7 @@
           <div class="doc"><p>The names a pattern spells and where, so a language server can point at them. <code>Pat</code> keeps names as text, which is all the compiler needs; this is the part of the source it drops.</p><p><code>cases</code> are the constructors the pattern names, <code>binders</code> the names it binds (outside any struct pattern), and <code>structs</code> one entry per struct pattern, in source order.</p></div>
 
 
+
         </section>
 
 
@@ -156,6 +165,7 @@
           <pre class="signature"><code>pub fn span_named(self: WrittenName[], text: str) -&#62; Span</code></pre>
 
           <div class="doc"><p>Where <code>self</code> writes <code>text</code>, or the empty span for a name that is not written.</p></div>
+
 
 
         </section>
@@ -172,6 +182,7 @@
           <div class="doc"><p>Where a pattern writes the binder <code>text</code>, whether directly or in one of its struct patterns; the empty span if it does not.</p></div>
 
 
+
         </section>
 
 
@@ -184,6 +195,7 @@
           <pre class="signature"><code>pub fn struct_written(self: WrittenNames, i: u64) -&#62; WrittenStruct</code></pre>
 
           <div class="doc"><p>The <code>i</code>th struct pattern's part of <code>self</code>: nothing written if there is none.</p></div>
+
 
 
         </section>
@@ -200,6 +212,7 @@
           <div class="doc"><p>One arm of a <code>match</code>, and the <code>then</code> half of an <code>if let</code>. Its span is the <em>pattern's</em>, so a diagnostic points at what selected the arm rather than at everything it does. <code>written</code> is where the pattern's names are written.</p></div>
 
 
+
         </section>
 
 
@@ -214,6 +227,7 @@
           <div class="doc"><p>Where <code>self</code>'s pattern writes its names; nothing for an arm a pass made up.</p></div>
 
 
+
         </section>
 
 
@@ -226,6 +240,7 @@
           <pre class="signature"><code>variant ExprKind</code></pre>
 
           <div class="doc"><p><code>aipl_syntax::ast::ExprKind</code>, all 32 cases.</p><p>Several surface forms are gone by the time they get here, because the AST is where the language stops having them: an operator is an <code>Call</code> on its spelling, a range is an <code>Construct</code> of the builtin <code>Span</code>, a template is a chain of concat calls, and a block is a right-nested <code>Seq</code>. Each is done in the lowering, so nothing downstream has to know the surface form existed.</p><p><code>Call</code>'s <code>method_style</code> is the one bit that says which spelling was written: <code>recv.f(a)</code> is stored as the free call <code>f(recv, a)</code> with the flag set, so the receiver is <code>args[0]</code> either way.</p></div>
+
 
 
           <ul class="cases">
@@ -477,6 +492,7 @@
           <div class="doc"><p>What a <code>let</code>, a <code>for</code> or a parameter binds a value to, as written. A plain name is the simplest binding; the rest take the value apart. A tuple's slots are its positions, so only the names are kept; a case's payload is bound in order; a struct names the fields it reads and what each is bound as, and <code>mutable</code> is the <code>mut T { .. } = v</code> form.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Name"><code>Name(name: str)</code>
@@ -529,6 +545,7 @@
           <div class="doc"><p>Two spans as the one that covers both — <code>aipl_syntax::join_spans</code>, mirrored.</p><p>The rule that matters is the empty one: an <em>empty</em> span is the &quot;no location&quot; placeholder a construct with no text of its own carries (an empty block body, a synthesized node), and it must not take part in a join. Written naively as <code>a.start..b.end</code> it drags every enclosing construct's end back to offset 0, which is a span that ends before it starts — and a caret rendered from one is nonsense. Contributing nothing is the honest answer.</p></div>
 
 
+
         </section>
 
 
@@ -541,6 +558,7 @@
           <pre class="signature"><code>pub fn show_expr(self: Expr) -&#62; str</code></pre>
 
           <div class="doc"><p>An expression as a one-line structural dump. Spans are left out: they are what 5e has to settle and what would make every assertion unreadable in the meantime, and none of them is what a lowering test is asking about.</p><p>A free call renders <code>f(a, b)</code> and a method call <code>a.f(b)</code>, so the <code>method_style</code> flag is visible without a tag of its own — the two spellings are the two things it distinguishes.</p></div>
+
 
 
         </section>
@@ -557,6 +575,7 @@
           <div class="doc"><p>An <code>Expr</code> at an empty span — the shorthand this file's own tests are written with, and the one every synthesized node uses (a template's <code>Str</code> segments, An expression node at a span — the constructor every lowering uses.</p></div>
 
 
+
         </section>
 
 
@@ -569,6 +588,7 @@
           <pre class="signature"><code>pub fn expr(kind: ExprKind) -&#62; Expr</code></pre>
 
           <div class="doc"><p>an else-less <code>if</code>'s unit branch, an open slice's <code>0</code>).</p></div>
+
 
 
         </section>
@@ -585,6 +605,7 @@
           <div class="doc"><p><code>self</code> with the span of its name recorded — see <code>Expr</code>.</p></div>
 
 
+
         </section>
 
 
@@ -597,6 +618,7 @@
           <pre class="signature"><code>pub fn num(v: i64) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The two synthesized leaves that come up most.</p></div>
+
 
 
         </section>
@@ -613,6 +635,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -625,6 +648,7 @@
           <pre class="signature"><code>pub fn is_ident(self: ExprKind, name: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is the name <code>name</code> used as a value, whatever it is resolved to.</p></div>
+
 
 
         </section>
@@ -641,6 +665,7 @@
           <div class="doc"><p>One match arm as <code>pattern =&gt; body</code>.</p></div>
 
 
+
         </section>
 
 
@@ -653,6 +678,7 @@
           <pre class="signature"><code>pub fn show_exprs(self: Expr[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -669,6 +695,7 @@
           <div class="doc"><p><code>f</code> applied to each of <code>xs</code>. A binding as one line, for the dump: <code>x</code>, <code>(a, b)</code>, <code>Case(a, b)</code>, <code>T { x as a, y }</code> (and <code>mut T { .. }</code>). A field bound under its own name prints bare.</p></div>
 
 
+
         </section>
 
 
@@ -681,6 +708,7 @@
           <pre class="signature"><code>pub fn mapped(kind: ExprKind without X, f: (Expr) -&#62; Expr without X throughout) -&#62; ExprKind without X throughout</code></pre>
 
           <div class="doc"><p><code>kind</code> with <code>f</code> applied to each of its direct sub-expressions, and nothing else changed: not the names, types and patterns it carries, and not the sub-expressions' own children — a pass that wants to reach those recurses through <code>f</code>. The sub-expressions are the same ones Rust's <code>each_subexpr</code> walks: a <code>Shim</code>'s bindings name functions and a pattern binds names, so only a shim's body and an arm's body nest expressions.</p><p>What <code>f</code> leaves out of every expression it returns, the result leaves out: a case <code>kind</code> is not, <code>f</code> keeps out of the parts, and the parts are all there is to a node. So a pass that has dealt with some cases at the node itself gets a node with none of them in it.</p></div>
+
 
 
         </section>
@@ -697,6 +725,7 @@
           <div class="doc"><p><code>self</code> with <code>f</code> applied to each of its direct sub-expressions, and nothing else changed: not <code>self</code>'s own kind payload (names, types, patterns), not its spans, and not the sub-expressions' own children — see <code>mapped</code>.</p></div>
 
 
+
         </section>
 
 
@@ -709,6 +738,7 @@
           <pre class="signature"><code>pub fn is_spread(self: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is a <code>..xs</code> spread: an element of an array or set literal that splices a collection in, rather than an expression of its own.</p></div>
+
 
 
         </section>
@@ -725,6 +755,7 @@
           <div class="doc"><p>The direct sub-expressions of <code>self</code>, in the order Rust's <code>each_subexpr</code> visits them: not <code>self</code>'s own names, types or patterns, and not their children. A <code>Shim</code>'s bindings name functions and a pattern binds names, so only a shim's body and an arm's body nest expressions.</p></div>
 
 
+
         </section>
 
 
@@ -737,6 +768,7 @@
           <pre class="signature"><code>pub fn promoted_annotations(self: Expr, vars: str[]) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>self</code> and every expression under it with the declared type parameters in <code>vars</code> made <code>TypeVar</code>s in the annotations a body holds: a <code>let</code> or <code>mut</code> binding's, and a lambda parameter's.</p></div>
+
 
 
         </section>
@@ -753,6 +785,7 @@
           <div class="doc"><p>A field read off a plain name: <code>base.field</code>.</p></div>
 
 
+
         </section>
 
 
@@ -765,6 +798,7 @@
           <pre class="signature"><code>pub fn descendants(self: Expr) -&#62; Expr[]</code></pre>
 
           <div class="doc"><p><code>self</code> and every expression under it, outermost first.</p></div>
+
 
 
         </section>
@@ -781,6 +815,7 @@
           <div class="doc"><p><code>self</code> and every expression under it whose kind is the case <code>arm</code>, outermost first. The case is written as a type argument, as <code>collect_arms</code> takes it, and the result is typed as that case alone: <code>body.descendants_of_kind::&lt;Slice&gt;()</code> is a list of <code>Expr&lt;Slice&gt;</code>.</p></div>
 
 
+
         </section>
 
 
@@ -793,6 +828,7 @@
           <pre class="signature"><code>pub fn read(self: Expr) -&#62; Read?</code></pre>
 
           <div class="doc"><p>The field read <code>self</code> is, when it reads one off a plain name.</p></div>
+
 
 
         </section>
@@ -809,6 +845,7 @@
           <div class="doc"><p>Every field <code>self</code> and the expressions under it read off a plain name, with a read for each time it is read — the reads a destructuring pattern makes included, since taking a field apart is reading it.</p></div>
 
 
+
         </section>
 
 
@@ -823,6 +860,7 @@
           <div class="doc"><p>The fields <code>self</code> reads off <code>base</code>: a struct pattern's, none for the others.</p></div>
 
 
+
         </section>
 
 
@@ -835,6 +873,7 @@
           <pre class="signature"><code>pub fn binders(self: Binding) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The names a binding binds, in order.</p></div>
+
 
 
         </section>
@@ -858,6 +897,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -870,6 +910,7 @@
           <pre class="signature"><code>fn show_call(name: str, args: Expr[], method_style: bool) -&#62; str</code></pre>
 
           <div class="doc"><p>A call, in the spelling its <code>method_style</code> flag says was written: the receiver is <code>args[0]</code> for a method call and an ordinary argument for a free one.</p></div>
+
 
 
         </section>
@@ -886,6 +927,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -898,6 +940,7 @@
           <pre class="signature"><code>fn show_ann(self: Ty?) -&#62; str</code></pre>
 
           <div class="doc"><p><code>: T</code> when a binding or a lambda parameter was annotated, and nothing when it was not — so the dump reads like the source did.</p></div>
+
 
 
         </section>
@@ -914,6 +957,7 @@
           <div class="doc"><p>The capture list of a lambda in a dump: nothing when there is none, else <code>, [mut a, mut b = 0]</code>.</p></div>
 
 
+
         </section>
 
 
@@ -926,6 +970,7 @@
           <pre class="signature"><code>fn show_lambda_param(self: LambdaParam) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -942,6 +987,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -954,6 +1000,7 @@
           <pre class="signature"><code>fn show_field_inits(self: FieldInit[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -970,6 +1017,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -982,6 +1030,7 @@
           <pre class="signature"><code>fn show_binds(self: (str, str)[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -998,6 +1047,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1012,6 +1062,7 @@
           <div class="doc"><p><code>Neg(e)</code>: the node <code>map_subexprs</code>'s tests map with, easy to see in a dump.</p></div>
 
 
+
         </section>
 
 
@@ -1024,6 +1075,7 @@
           <pre class="signature"><code>fn pattern_reads(self: Expr) -&#62; Read[]</code></pre>
 
           <div class="doc"><p>The reads a destructuring <code>let</code> or <code>for</code> makes of the value it takes apart: one per field its pattern names, off a base of its own. A binding that is taken apart by field reads to the same names is not a place for a second pattern, so these count as reads like any other.</p></div>
+
 
 
         </section>

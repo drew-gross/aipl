@@ -32,6 +32,7 @@
           <div class="doc"><p>What a lint's advice needs the file to have: a builtin, by its tag.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Builtin"><code>Builtin(callee: Callee)</code>
@@ -55,6 +56,7 @@
           <div class="doc"><p>An import that makes a [<code>Spelling</code>] available: the item to import from <code>library</code>, as the import list writes it (<code>wrapping_increment as ++</code>).</p></div>
 
 
+
         </section>
 
 
@@ -67,6 +69,7 @@
           <pre class="signature"><code>struct Spelling</code></pre>
 
           <div class="doc"><p>What the file writes for a [<code>Need</code>], and the import it has still to make, if any.</p></div>
+
 
 
         </section>
@@ -83,6 +86,7 @@
           <div class="doc"><p>Whether <code>self</code> asks for the builtin whose import name is <code>name</code>. <code>table</code> is the builtin table.</p></div>
 
 
+
         </section>
 
 
@@ -95,6 +99,7 @@
           <pre class="signature"><code>pub fn spelled(self: Need, items: Item[], table: BuiltinEntry[]) -&#62; Spelling?</code></pre>
 
           <div class="doc"><p>The spelling of <code>self</code> in a file with these <code>items</code>, or <code>none</code> when the file cannot take any. <code>table</code> is the builtin table.</p></div>
+
 
 
         </section>
@@ -118,6 +123,7 @@
           <div class="doc"><p>The spelling of the builtin <code>entry</code> in a file with these <code>items</code>.</p></div>
 
 
+
         </section>
 
 
@@ -130,6 +136,7 @@
           <pre class="signature"><code>fn importable(self: Item[], library: str, name: str, preferred: str) -&#62; Spelling?</code></pre>
 
           <div class="doc"><p>The spelling of the builtin <code>name</code> of <code>library</code> that the file can import: <code>preferred</code>, or when something else in the file has that name, the builtin under a name that is free (<code>builtin_any</code>). An operator has no other name to take, so there is nothing.</p></div>
+
 
 
         </section>
@@ -146,6 +153,7 @@
           <div class="doc"><p><code>candidate</code>, or the first name made of it by adding <code>_</code> that nothing in the file has.</p></div>
 
 
+
         </section>
 
 
@@ -158,6 +166,7 @@
           <pre class="signature"><code>fn operator_provided(self: str) -&#62; str?</code></pre>
 
           <div class="doc"><p>The operator that the builtin <code>self</code> provides, when it provides one: <code>+</code> for <code>wrapping_add</code>.</p></div>
+
 
 
         </section>
@@ -174,6 +183,7 @@
           <div class="doc"><p>Every name the file binds itself: the locals of its imports, whatever they import, and its own functions.</p></div>
 
 
+
         </section>
 
 
@@ -186,6 +196,7 @@
           <pre class="signature"><code>fn imported_locals_of(self: Import) -&#62; str[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -202,6 +213,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -216,6 +228,7 @@
           <div class="doc"><p>What the file's imports from <code>library</code> bring the export <code>name</code> in as, each spelling.</p></div>
 
 
+
         </section>
 
 
@@ -228,6 +241,7 @@
           <pre class="signature"><code>fn locals_from(self: Import, library: str, name: str) -&#62; str[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>

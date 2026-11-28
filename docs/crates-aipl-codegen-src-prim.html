@@ -32,6 +32,7 @@
           <div class="doc"><p>The primitive types, <code>aipl_syntax::ast::Primitive</code> case for case.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-I8"><code>I8</code>
@@ -105,6 +106,7 @@
           <div class="doc"><p>The spelling that names this primitive in source. The inverse of <code>prim_from_name</code>, and the two are asserted to round-trip below.</p></div>
 
 
+
         </section>
 
 
@@ -117,6 +119,7 @@
           <pre class="signature"><code>pub fn prim_from_name(name: str) -&#62; Prim?</code></pre>
 
           <div class="doc"><p>The primitive a type identifier names, or <code>none</code> when it names something else — a struct, a variant, a type parameter, <code>Error</code>. Mirrors <code>Primitive::from_name</code>, which is what decides whether <code>base_ty</code>'s identifier lowers to <code>Primitive</code> or <code>Named</code>.</p></div>
+
 
 
         </section>

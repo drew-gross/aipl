@@ -32,6 +32,7 @@
           <div class="doc"><p>One keyword statement, after its own production has read it and before the rest of the block is in scope. <code>wrap_stmt</code> is what folds it together with that rest, and several of these fold into <em>several</em> nodes — which is why a statement cannot simply lower to an <code>Expr</code> the way an expression does.</p><p>Parser-local: the AST has no statement node, so this shape exists only between the production and the fold.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Let"><code>Let(name: str, name_span: Span, ty: Ty?, value: Expr)</code>
@@ -108,6 +109,7 @@
           <div class="doc"><p>A parsed function body, before the return type is in scope to name the struct the shorthand constructs. Parser-local: by the time a <code>Function</code> is built the sugar is gone.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Block"><code>Block(Expr)</code>
@@ -136,6 +138,7 @@
           <div class="doc"><p>One function attribute, <code>.test({ .. })</code> or <code>.benchmark({ .. })</code>: which one (<code>name</code>), its block, the functions declared inside the block, and the span of the attribute name, which is where a duplicate is reported.</p></div>
 
 
+
         </section>
 
 
@@ -150,6 +153,7 @@
           <div class="doc"><p>A <code>.test</code> block's contents as its production hands them up: the functions declared in it, and the statement chain — <code>none</code> while nothing has followed yet, which is how <code>test_tail</code> tells &quot;the expression before the <code>;</code> was the block's value&quot; from &quot;the rest of the block follows&quot;.</p></div>
 
 
+
         </section>
 
 
@@ -162,6 +166,7 @@
           <pre class="signature"><code>pub fn resolve_body(name: str, body: ParsedBody, return_ty: Ty?) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p>The body, with the struct-literal shorthand resolved. What it builds is exactly the <code>EConstruct</code> the long form parses to, so nothing downstream of the parser sees the sugar at all.</p></div>
+
 
 
         </section>
@@ -183,6 +188,7 @@
           <pre class="signature"><code>fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p>The shorthand names no type, so the return type has to. A generic return (<code>-&gt; Pair&lt;i64&gt;</code>) contributes its base name and infers its arguments, exactly as writing <code>Pair { .. }</code> would.</p></div>
+
 
 
         </section>

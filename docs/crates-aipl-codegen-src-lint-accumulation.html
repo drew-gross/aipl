@@ -38,6 +38,7 @@ for (let x : xs) {
           <div class="doc"><p>A binding <code>name</code> seeded at <code>seed</code> (annotated as <code>annotation</code>, when it is) and filled by the loop right after it, which binds each element as <code>variable</code> (and its position as <code>index</code>, for the two-binder form) and runs <code>body</code> for it.</p></div>
 
 
+
         </section>
 
 
@@ -50,6 +51,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn seeded_loops(self: Expr) -&#62; SeededLoop[]</code></pre>
 
           <div class="doc"><p>Every [<code>SeededLoop</code>] in <code>self</code> and under it whose loop is not indexed. The loop has to be the very next statement: one between the two could read the binding while it is still empty, which the rewrite would reorder. An <em>indexed</em> loop is not this shape: <code>map</code> and <code>filter</code> pass each element and have no index to pass with it, so the rewrite would silently drop whatever the body did with it. [<code>indexed_seeded_loops</code>] has those.</p></div>
+
 
 
         </section>
@@ -66,6 +68,7 @@ for (let x : xs) {
           <div class="doc"><p>Every [<code>SeededLoop</code>] in <code>self</code> and under it whose loop is indexed: the same shape as [<code>seeded_loops</code>], for the lints whose rewrite takes a position from somewhere other than the loop.</p></div>
 
 
+
         </section>
 
 
@@ -78,6 +81,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn plain_seeded_loop(self: LetMut) -&#62; SeededLoop?</code></pre>
 
           <div class="doc"><p><code>self</code> as a [<code>SeededLoop</code>], when it is one whose loop is not indexed (see [<code>seeded_loops</code>]).</p></div>
+
 
 
         </section>
@@ -94,6 +98,7 @@ for (let x : xs) {
           <div class="doc"><p>An array <code>name</code> seeded empty and filled by a loop over <code>iterable</code>, which binds each element as <code>variable</code>, and for each one (that passes <code>guard</code>, if there is one) adds <code>added</code> to it.</p></div>
 
 
+
         </section>
 
 
@@ -106,6 +111,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn accumulations(self: Expr, adder: Callee) -&#62; Accumulation[]</code></pre>
 
           <div class="doc"><p>Every [<code>Accumulation</code>] in <code>self</code> and under it whose loop fills the array with <code>adder</code> — the builtin that adds to it (<code>Push</code>, <code>Extend</code>), however the file spells it, and not a <em>user</em> function that happens to share the name.</p></div>
+
 
 
         </section>
@@ -122,6 +128,7 @@ for (let x : xs) {
           <div class="doc"><p><code>self</code> as an [<code>Accumulation</code>], when it is one.</p></div>
 
 
+
         </section>
 
 
@@ -134,6 +141,7 @@ for (let x : xs) {
           <pre class="signature"><code>struct Pushed</code></pre>
 
           <div class="doc"><p>What <code>adder</code> adds to <code>acc</code>, and what follows, when <code>self</code> is <code>set acc.adder(element); rest</code> — <code>acc = adder(acc, element)</code> — and nothing else.</p></div>
+
 
 
         </section>
@@ -150,6 +158,7 @@ for (let x : xs) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -162,6 +171,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn is_liftable(self: Expr, acc: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> can move into a lambda in a rewritten pipeline: it may not propagate with <code>?</code>, which would return from the lambda instead of the function, and it may not mention <code>acc</code>, the array being filled, which the rewrite no longer has.</p></div>
+
 
 
         </section>
@@ -178,6 +188,7 @@ for (let x : xs) {
           <div class="doc"><p>Whether the loop walks a range (<code>a..b</code>), which is not an array: only <code>map</code> takes one, so a guard has no <code>filter</code> to become and an element added unchanged is the range as an array, which has no spelling to advise.</p></div>
 
 
+
         </section>
 
 
@@ -190,6 +201,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn maps(self: Accumulation) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether the loop adds something derived from its element, rather than the element itself, which a pipeline just leaves out.</p></div>
+
 
 
         </section>
@@ -206,6 +218,7 @@ for (let x : xs) {
           <div class="doc"><p>Whether a pipeline over the loop's iterable can be advised. A range is not an array and only <code>map</code> takes one, so a guard has no <code>filter</code> to become, and an element added unchanged is the range as an array, which has no spelling.</p></div>
 
 
+
         </section>
 
 
@@ -218,6 +231,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn element_stages(self: Accumulation) -&#62; (Callee, str)[]</code></pre>
 
           <div class="doc"><p>The stages of the pipeline that select and derive the loop's elements: a <code>filter</code> for the guard, if there is one, then a <code>map</code> for what is added, if that is not the element itself. Each is a builtin and the arguments it is written with.</p></div>
+
 
 
         </section>
@@ -234,6 +248,7 @@ for (let x : xs) {
           <div class="doc"><p>The hit for an array filled by one loop that is the pipeline of <code>stages</code> over its iterable: each stage a builtin and the arguments it is written with.</p></div>
 
 
+
         </section>
 
 
@@ -246,6 +261,7 @@ for (let x : xs) {
           <pre class="signature"><code>pub fn pipeline_hit(self: SeededLoop, what: str, annotation: str, stages: (Callee, str)[]) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the binding: <code>what</code> is how the loop fills it, as the message says, and <code>annotation</code> what follows the binding's name in the advice. Each stage is a builtin and the arguments it is written with. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
+
 
 
         </section>
@@ -269,6 +285,7 @@ for (let x : xs) {
           <div class="doc"><p>The name of each [<code>indexed_seeded_loops</code>] the block <code>src</code> holds.</p></div>
 
 
+
         </section>
 
 
@@ -281,6 +298,7 @@ for (let x : xs) {
           <pre class="signature"><code>fn seeded_names(src: str) -&#62; str[]!ParseError</code></pre>
 
           <div class="doc"><p>The name of each [<code>seeded_loops</code>] the block <code>src</code> holds.</p></div>
+
 
 
         </section>
@@ -297,6 +315,7 @@ for (let x : xs) {
           <div class="doc"><p><code>self</code> as a [<code>SeededLoop</code>], when it is one.</p></div>
 
 
+
         </section>
 
 
@@ -311,6 +330,7 @@ for (let x : xs) {
           <div class="doc"><p>The name of each [<code>accumulations</code>] the block <code>src</code> holds.</p></div>
 
 
+
         </section>
 
 
@@ -323,6 +343,7 @@ for (let x : xs) {
           <pre class="signature"><code>fn block_pushes(src: str, acc: str, adder: Callee) -&#62; str[]!ParseError</code></pre>
 
           <div class="doc"><p>The element of the push <code>src</code>, a block, starts with, as the dump of its expression.</p></div>
+
 
 
         </section>

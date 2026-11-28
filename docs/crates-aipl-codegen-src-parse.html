@@ -32,6 +32,7 @@
           <div class="doc"><p>The furthest failure seen so far: the token position nothing could be matched at, and the deduped labels of everything that <em>was</em> expected there.</p><p>This is the reified form of what an LR table gives you for free — the state's expected-symbol set — and it is why <code>Production.expect_as</code> exists: under ordered choice a more specific alternative can fail deeper than the one that was really meant, so a label collapsing a family of rules to one word (&quot;an expression&quot;) is what keeps the message readable.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>struct Slip</code></pre>
 
           <div class="doc"><p>One <code>Expect</code> that found its rule absent: where it was wanted (a token index), what could have stood there, and the bracket left open at that point, if one was — the three things <code>error_at</code> words an error from, held until the source is at hand to word it with. The same three a <code>Missing</code> marker in the tree carries.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>Why the driver stopped rather than missed: the error, and every <code>Expect</code> that had been recorded before it. <code>?</code> carries it out of whatever was in the middle of matching, which is how a <code>Refuse</code> ends a parse — and why the recorded ones ride on it, since the frames it unwinds are the only other place they were held.</p><p><code>input</code> says whose fault it is. A <code>Refuse</code> is the input's: the error is an error in the source and is reported with the recorded ones. Anything else (an unresolved reference, a rule that would loop) is the grammar's, and is the call's own failure.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>struct Step</code></pre>
 
           <div class="doc"><p>One rule's result at one position: whether it matched, where it left off, the CST children it contributed to its parent, and the furthest failure so far.</p><p><code>hit: false</code> is an ordinary non-match — the caller backtracks and tries something else — and is <em>not</em> an error. An <code>Abort</code> is reserved for what no alternative could fix: a malformed grammar, or a <code>Refuse</code>.</p></div>
+
 
 
         </section>
@@ -88,6 +92,7 @@
           <div class="doc"><p>What the driver parses against: the tokens, the trivia the lexer set aside, the linked productions, and <code>end</code> — one byte past the source's last byte.</p><p>The source itself is <em>not</em> here. Every token carries its own text (a <code>SpanStr</code>, see <code>lexer.aipl</code>), so matching a rule spelling reads the token and nothing else. <code>end</code> is all that remains of the source: the empty span at end of input, which <code>error_at</code> reports when a rule ran off the token list and there is no token to point at.</p></div>
 
 
+
         </section>
 
 
@@ -100,6 +105,7 @@
           <pre class="signature"><code>pub fn parse_cst&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
 
           <div class="doc"><p>Parses <code>src</code> — already lexed into <code>lexed</code> — against grammar <code>g</code>, beginning at the production named <code>start</code>, and returns the lossless concrete syntax tree.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent, so a caller parsing repeatedly can <code>link</code> once and pay nothing again. Every token must be consumed: input left over after the start rule succeeds is an error, not a partial parse.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token — the <em>furthest</em> position anything was expected at, not the last one tried — or the empty span at the end of the source when the input simply ran out.</p></div>
+
 
 
         </section>
@@ -116,6 +122,7 @@
           <div class="doc"><p>What a parse that recovers from <code>Expect</code>s found: every error, in source order, and the tree when the parse reached the end of the input.</p><p><code>cst</code> is <code>none</code> exactly when the parse could not finish — the input ran out of grammar before it ran out of tokens, no rule matched at all, or a <code>Refuse</code> ended it. The last error is then that failure, the one a plain <code>parse_cst</code> would have reported, and any before it are <code>Expect</code>s met on the way there. A tree that is present may still be a tree of <em>broken</em> input (<code>errors</code> is not empty): it stands in the place of the missing text without holding it, so it is for finding more errors and for tools that want a best-effort shape — never for lowering.</p><p>What is in <code>errors</code> depends on whether there is a tree. With one, exactly the <code>Expect</code>s on the path the parse took: a miss recorded down an alternative that was then abandoned is not an error in the input, and the tree (which the alternative took its markers with it out of) is how that is known. Without one, every miss the parse met, abandoned paths included — there is no path to say which were the right ones, and for a parse that has already failed an error that is not quite the reader's is better than the one it hid.</p><p>A fault in the grammar itself — an unresolved reference, a rule that would loop — is not the input's, and is the <code>!ParseError</code> of the call.</p></div>
 
 
+
         </section>
 
 
@@ -128,6 +135,7 @@
           <pre class="signature"><code>pub fn parse_cst_recovering&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p><code>parse_cst</code> that goes on past a missing <code>Expect</code>: the tree it recovered to, and every error found on the way — see <code>Recovered</code>. Links <code>g</code> as <code>parse_cst</code> does.</p></div>
+
 
 
         </section>
@@ -144,6 +152,7 @@
           <div class="doc"><p>A grammar linked, and optionally analysed, ready to parse with.</p><p>Everything here is a function of the grammar <em>alone</em> — the linked rules, the FIRST sets, the expectation labels — so a caller parsing more than one source builds this once with <code>prepare</code> and hands it to <code>parse_prepared</code> for each.</p><p><code>firsts</code> and <code>labels</code> are empty when the grammar was linked but not analysed, which is what <code>parse_cst</code> does. The driver reads that as &quot;nothing to prune on&quot; and matches every production it reaches; the parse is identical, only slower. Analysis is a cost worth paying exactly once per grammar and never once per source.</p></div>
 
 
+
         </section>
 
 
@@ -156,6 +165,7 @@
           <pre class="signature"><code>pub fn prepare&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; Prepared&#60;K, A&#62;!ParseError</code></pre>
 
           <div class="doc"><p><code>g</code> linked and analysed — build it once, parse with it many times. Fails the way <code>link</code> does: an unresolved reference, or a duplicate rule name.</p></div>
+
 
 
         </section>
@@ -172,6 +182,7 @@
           <div class="doc"><p><code>parse_cst</code> against an already-prepared grammar — the same parse, without re-linking and re-analysing the grammar for every source.</p></div>
 
 
+
         </section>
 
 
@@ -184,6 +195,7 @@
           <pre class="signature"><code>pub fn parse_prepared_recovering&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, prep: Prepared&#60;K, A&#62;, start: str) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p><code>parse_prepared</code> that goes on past a missing <code>Expect</code>; see <code>Recovered</code>. The one parse the others are written over.</p></div>
+
 
 
         </section>
@@ -200,6 +212,7 @@
           <div class="doc"><p>Lowers a parsed tree to the caller's AST by calling each node's production <code>build</code>, depth first: a node's children are lowered before it, and only its <em>interior</em> children are passed (<code>Parts.children</code>) — a leaf has no lowered value, and its text is reachable from the node's own span.</p><p>Fails with whatever a <code>build</code> refused with, unchanged.</p></div>
 
 
+
         </section>
 
 
@@ -214,6 +227,7 @@
           <div class="doc"><p><code>parse_cst</code> followed by <code>lower</code>: the source's AST, with the concrete tree built and discarded in between. Use <code>parse_cst</code> when the tree itself is the point (a formatter, a highlighter), and this when only the AST is.</p></div>
 
 
+
         </section>
 
 
@@ -226,6 +240,7 @@
           <pre class="signature"><code>variant Tok</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -259,6 +274,7 @@
           <pre class="signature"><code>variant Node</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -296,6 +312,7 @@
           <div class="doc"><p>The <code>Abort</code> for a fault in the grammar, which no recorded error is about.</p></div>
 
 
+
         </section>
 
 
@@ -308,6 +325,7 @@
           <pre class="signature"><code>fn refused(error: ParseError, __spat$6801: Far) -&#62; Abort</code></pre>
 
           <div class="doc"><p>The <code>Abort</code> for a refusal: an error in the input, with what <code>far</code> had recorded.</p></div>
+
 
 
         </section>
@@ -324,6 +342,7 @@
           <div class="doc"><p><code>far</code> updated with &quot;<code>label</code> was expected at <code>pos</code>&quot;. Deeper wins outright; equally deep joins the expected set (deduped); shallower is discarded. An empty label is a <em>transparent</em> production and records nothing.</p></div>
 
 
+
         </section>
 
 
@@ -336,6 +355,7 @@
           <pre class="signature"><code>fn far_join(a: Far, b: Far) -&#62; Far</code></pre>
 
           <div class="doc"><p>Both failures in one: the deeper of the two, or — at equal depth — what either expected there, and everything either recorded. The merge <code>far_miss</code> makes one label at a time, for a whole record. <code>a</code>'s blamed bracket wins a tie, as the first to be blamed does.</p><p><code>b</code> is a failure record that began empty at this point (<code>match_expect</code> starts one so its error says what <em>it</em> wanted), but carrying <code>a</code>'s <code>recorded</code> — a refusal inside the rule it matched aborts with what <code>b</code> holds, and that has to be everything met so far. So <code>b</code>'s <code>recorded</code> is the whole of it, and <code>a</code>'s is a prefix of it.</p></div>
+
 
 
         </section>
@@ -352,6 +372,7 @@
           <div class="doc"><p><code>far</code> with the opening bracket that went unclosed at its position. Set by a bracketed repetition whose <code>open</code> matched and whose <code>close</code> did not, which is time anything knows a bracket was left hanging.</p><p>It rides on the furthest failure rather than aborting the parse, because under ordered choice a group failing to close is an ordinary non-match: <code>(a)</code> is parsed by trying the tuple <code>(a, b)</code> first and letting it fail at the comma. So this only reaches the reader when <em>no</em> alternative worked, which is exactly when a hanging bracket is the likely cause.</p><p><code>match_nested</code> sets it only when the close was wanted past the last token — see there for why a closer failure is not evidence of anything. The first bracket to be blamed at a position keeps it. Groups fail from the inside out, so the first to record is the innermost one — and closing that is the edit the reader has to make first, even when an outer bracket is hanging too.</p></div>
 
 
+
         </section>
 
 
@@ -364,6 +385,7 @@
           <pre class="signature"><code>fn no(far: Far, pos: u64) -&#62; Step</code></pre>
 
           <div class="doc"><p>A non-match that leaves <code>pos</code> where the rule started (the caller backtracks).</p></div>
+
 
 
         </section>
@@ -380,6 +402,7 @@
           <div class="doc"><p>The span of the first token in <code>kids</code> — where a group's opening bracket was written, for the message when it is never closed. Empty when there is none.</p><p>A one-element array rather than a <code>Span?</code> because that is what <code>Far</code> held when this was written: a struct field could then be an optional of an integer or an array, but not of another struct, and <code>Span</code> is one. A field may be an optional of a struct now, so <code>Far</code> could carry a <code>Span?</code> and this could return one — nought-or-one array and optional mean the same thing here.</p></div>
 
 
+
         </section>
 
 
@@ -392,6 +415,7 @@
           <pre class="signature"><code>fn miss(far: Far, pos: u64, label: str) -&#62; Step</code></pre>
 
           <div class="doc"><p>A non-match that also records what was expected.</p></div>
+
 
 
         </section>
@@ -408,6 +432,7 @@
           <div class="doc"><p>The source text of token <code>i</code>, or <code>&quot;&quot;</code> past the end. Empty is a safe sentinel because no matcher in <code>lexer.aipl</code> ever produces an empty token.</p></div>
 
 
+
         </section>
 
 
@@ -420,6 +445,7 @@
           <pre class="signature"><code>fn leaf_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; Cst[]</code></pre>
 
           <div class="doc"><p>The CST children consuming token <code>i</code> contributes: every trivia record between the previous token and this one, then the token's own leaf. Attaching trivia <em>before</em> its following token is what makes the leaf spans tile the source with no gaps, which is the whole losslessness property.</p><p>Looked up, not computed: a PEG asks this once per token <em>per attempt</em>, and it attempts a token many times. Filtering the whole trivia list on each ask was quadratic in the file — the largest compiler sources took a minute to parse, and this one call was most of it. <code>attach_trivia</code> does the same pairing once, by one merge over the two sorted lists.</p></div>
+
 
 
         </section>
@@ -436,6 +462,7 @@
           <div class="doc"><p>Every token's <code>leaf_at</code> children, in token order, and the trivia left after the last token. Both lists arrive sorted by position and never overlap, so one pass that advances through the trivia as it walks the tokens pairs them off exactly as the per-token filter did — each trivia record lands in front of the first token that starts after it.</p></div>
 
 
+
         </section>
 
 
@@ -448,6 +475,7 @@
           <pre class="signature"><code>fn trivia_starts_before&#60;K: variant&#62;(trivia: Token&#60;K&#62;[], j: u64, at: u64) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether trivia record <code>j</code> exists and starts before <code>at</code>.</p></div>
+
 
 
         </section>
@@ -464,6 +492,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -476,6 +505,7 @@
           <pre class="signature"><code>fn with_trailing&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, root: Cst) -&#62; Cst</code></pre>
 
           <div class="doc"><p>The trivia after the last token, appended to the root node so the tree still covers the source to its last byte.</p></div>
+
 
 
         </section>
@@ -492,6 +522,7 @@
           <div class="doc"><p>Match <code>r</code> at <code>pos</code>. <code>cur</code> is the index of the production being matched, which only <code>Climb</code> needs (each operator application nests under it).</p></div>
 
 
+
         </section>
 
 
@@ -504,6 +535,7 @@
           <pre class="signature"><code>fn refusal&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, what: Refusal, start: u64, end: u64) -&#62; ParseError</code></pre>
 
           <div class="doc"><p>The error a <code>Refuse</code> raises, over the tokens <code>start..end</code> — what the enclosing sequence accepted before refusing it. An empty range is a refusal reached with nothing in front of it, which points at the token at <code>end</code> (the empty span at end of input past the last one).</p><p>A <code>Fn</code> refusal is handed those tokens' text, run together with a single space wherever the source had a gap: the parser holds no source, only the tokens, and their spans say where the gaps were.</p></div>
+
 
 
         </section>
@@ -520,6 +552,7 @@
           <div class="doc"><p><code>toks</code> as one string: each token's text, with a space between two tokens the source did not write together.</p></div>
 
 
+
         </section>
 
 
@@ -532,6 +565,7 @@
           <pre class="signature"><code>fn match_term&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, k: Case&#60;K&#62;, pos: u64, far: Far) -&#62; Step</code></pre>
 
           <div class="doc"><p>Any one token whose kind is the case <code>k</code> — <code>Term(Name)</code> matches every identifier, whatever text it carries. <code>k</code> is a <code>Case&lt;K&gt;</code>: a case with no payload, so naming a kind needs no value of that kind.</p></div>
+
 
 
         </section>
@@ -548,6 +582,7 @@
           <div class="doc"><p>One token spelled exactly <code>s</code>.</p></div>
 
 
+
         </section>
 
 
@@ -560,6 +595,7 @@
           <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: LinkedRule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>Every rule in order; children concatenate. A failure anywhere rewinds the whole sequence to where it started — the caller decides what to try next.</p></div>
+
 
 
         </section>
@@ -576,6 +612,7 @@
           <div class="doc"><p>The first alternative that matches. Every alternative's expectations are kept in <code>far</code> whether it matched or not, which is what makes &quot;expected <code>(</code>, an identifier, or a number&quot; possible from a choice that failed on all three.</p></div>
 
 
+
         </section>
 
 
@@ -588,6 +625,7 @@
           <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, min: u64, max: u64?, sep: LinkedRule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, nested_in: (LinkedRule&#60;K&#62;, LinkedRule&#60;K&#62;)?, group: u64?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
+
 
 
         </section>
@@ -604,6 +642,7 @@
           <div class="doc"><p>A bracketed repetition: <code>open</code>, then the items, then <code>close</code>, kept as one <code>Group</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
 
 
+
         </section>
 
 
@@ -616,6 +655,7 @@
           <pre class="signature"><code>fn match_reps&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, min: u64, max: u64?, sep: LinkedRule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>The repetition itself, without brackets.</p></div>
+
 
 
         </section>
@@ -632,6 +672,7 @@
           <div class="doc"><p>The separator step: what <code>sep</code> matched, or an empty match when there is none.</p></div>
 
 
+
         </section>
 
 
@@ -644,6 +685,7 @@
           <pre class="signature"><code>fn match_leading_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: LinkedRule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>The optional separator in front of a list's first item: what <code>sep</code> matched, or the empty step when it is absent. Its expectations still reach <code>far</code>, as <code>match_maybe</code>'s do, so a leading separator that was started and went wrong still reports.</p></div>
+
 
 
         </section>
@@ -660,6 +702,7 @@
           <div class="doc"><p>A match that consumed nothing and succeeded — the identity step.</p></div>
 
 
+
         </section>
 
 
@@ -672,6 +715,7 @@
           <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: LinkedRule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p><code>sub</code>, or nothing. Always matches — but its expectations still reach <code>far</code>, so an optional part that was <em>started</em> and then went wrong still reports.</p></div>
+
 
 
         </section>
@@ -688,6 +732,7 @@
           <div class="doc"><p><code>sub</code>, which the grammar is committed to: when it does not match, the miss is recorded as an error in the input and the rule matches nothing instead, as though the missing text had been written. The sequence around it carries on, and no enclosing choice goes on to its next alternative — see <code>Expect</code>.</p><p>The miss is recorded twice, for two readers. A <code>Missing</code> marker goes in the tree, which is how the errors of a parse that <em>succeeds</em> are found: a marker belongs to the path that was taken and goes with it if that path is abandoned. And the slip goes on <code>far</code>, which is how a parse that does not succeed finds them: a miss or a refusal has no tree to look in, only the failure record every rule hands on.</p><p><code>sub</code> is matched against a failure record of its own, so the error says what <em>this</em> rule wanted where it stood. Passing <code>far</code> through would let a deeper failure left by an abandoned alternative speak for it, and the message would blame a place the reader has no reason to look. The two are joined afterwards, so what <code>far</code> goes on to report is what it would have been without the <code>Expect</code>.</p><p>The error is the rule's alone, and does <em>not</em> take on what <code>far</code> had already expected at the same token. The operators that could have continued the expression before a missing <code>;</code> are true of the token, but the grammar has said what it needs here: &quot;expected <code>;</code>&quot; is the answer, and a list that buries it among the things that were merely possible is the generic message <code>Expect</code> exists to improve on.</p></div>
 
 
+
         </section>
 
 
@@ -700,6 +745,7 @@
           <pre class="signature"><code>fn match_prod&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <div class="doc"><p>A reference to production <code>i</code> — and the only rule that builds a node. The production's own rule matches, and its children go into one <code>Tree(i, ..)</code>.</p><p>A labelled production that fails <em>without getting anywhere</em> reports as its label instead of as the expectations from inside it — the collapse <code>SYMBOL_DISPLAY_NAMES</code> performs for the LR parser, where <code>expr</code>/<code>term</code>/<code>atom</code> all render as &quot;expression&quot;. It matters more here than there: under ordered choice every alternative of a failed <code>OneOf</code> leaves its own expectation behind, so an uncollapsed message lists the grammar's internals.</p><p>&quot;Without getting anywhere&quot; is the operative test. When the production failed <em>deeper</em> than it started, that deeper expectation is the useful one and the label is not applied; when it failed at its own first token, the label replaces what it expected there — but only what <em>this</em> production contributed, since the incoming <code>far</code> (a sibling alternative's expectations at the same position) is what the label is merged into. A transparent production (empty <code>expect_as</code>) never collapses anything: its insides are the message.</p></div>
+
 
 
         </section>
@@ -716,6 +762,7 @@
           <div class="doc"><p>Whether production <code>i</code> could begin with the token at <code>pos</code> — its FIRST set asked about that token's kind and spelling.</p><p>True at end of input, where there is no token to rule anything out: a nullable production still matches there, and the cost of trying the rest is one failed token compare. <code>can_start</code> is conservative in the safe direction anyway, so the only thing a wrong answer here could cost is the pruning itself.</p></div>
 
 
+
         </section>
 
 
@@ -728,6 +775,7 @@
           <pre class="signature"><code>fn pruned&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, expect_as: str, far: Far) -&#62; Step</code></pre>
 
           <div class="doc"><p>The <code>Step</code> a pruned production yields — the one its rule would have produced, without running it.</p><p>A pruned production cannot consume the token at <code>pos</code>, so it cannot fail any deeper than <code>pos</code>; that is exactly the branch of <code>match_prod</code> where a label replaces what the production's insides expected. So for a <em>labelled</em> production this is observationally identical to attempting it.</p><p>A transparent one has no label to record, and what it would have recorded is its insides' expectations at <code>pos</code> — which pruning skips over. That is a real difference and it is confined to the expected-set of an error reported at this exact position; see <code>label_sets</code> in <code>ebnf.aipl</code> for the exact version.</p></div>
+
 
 
         </section>
@@ -744,6 +792,7 @@
           <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over <em>labels</em> rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned <em>labelled</em> production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is.</p><p>These really are sets, and are spelled as sets. That also makes the fixed point's own test exact: <code>#{str}</code> equality is membership, so a round that reaches the same labels by a different route ends the loop instead of spinning — where deduped arrays would have compared unequal on order alone.</p></div>
 
 
+
         </section>
 
 
@@ -756,6 +805,7 @@
           <pre class="signature"><code>fn rule_labels&#60;K: variant, A: any&#62;(r: LinkedRule&#60;K&#62;, prods: LinkedProduction&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The labels <code>r</code> would record at its own first token, given the round's <code>labels</code>.</p></div>
+
 
 
         </section>
@@ -772,6 +822,7 @@
           <div class="doc"><p><code>rule_labels</code> across a sequence: each element in turn, stopping after the first that cannot match nothing.</p></div>
 
 
+
         </section>
 
 
@@ -784,6 +835,7 @@
           <pre class="signature"><code>fn rule_nullable&#60;K: variant&#62;(r: LinkedRule&#60;K&#62;, firsts: First&#60;K&#62;[]) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>r</code> can match nothing at all — read off the FIRST sets for a reference, and structural everywhere else. Only <code>seq_labels</code> needs it, to know how far along a sequence the first token can still be expected.</p></div>
+
 
 
         </section>
@@ -800,6 +852,7 @@
           <div class="doc"><p>The precedence level <code>text</code> belongs to, if it binds at least as tightly as <code>min_power</code>. Levels are scanned in order, so a spelling listed twice takes the first. The empty string never matches — that is what <code>tok_text</code> returns past the end of the tokens, so running out of input simply ends the climb.</p></div>
 
 
+
         </section>
 
 
@@ -812,6 +865,7 @@
           <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: LinkedRule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!Abort</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -828,6 +882,7 @@
           <div class="doc"><p>Precedence climbing: an atom, then any operator binding at least as tightly as <code>min_power</code>, whose right-hand side is climbed at one power higher (or the same power, for a right-associative level).</p><p>Each application nests <em>both</em> operands under the enclosing production's index while leaving the outermost one flat, so <code>match_prod</code>'s own wrap completes the tree: <code>1 + 2 * 3</code> becomes <code>(expr (expr 1) + (expr (expr 2) * (expr 3)))</code> — one node per operand, shaped by precedence rather than a flat run the lowering would have to re-parse.</p></div>
 
 
+
         </section>
 
 
@@ -840,6 +895,7 @@
           <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, far: Far) -&#62; ParseError</code></pre>
 
           <div class="doc"><p>The error a furthest failure describes: what was expected there, and what was found instead. The span is the offending token's (or the empty span at the end of the source), which is what <code>caret_block.aipl</code> renders the underline from.</p></div>
+
 
 
         </section>
@@ -856,6 +912,7 @@
           <div class="doc"><p>The parenthetical naming the bracket that was never closed, or the empty string when no group got that far. The span stays on the <em>failure</em>, which is where the reader has to type something; the opener is named by line because pointing at two places at once is what a single-span error cannot do.</p><p>This is the whole reason <code>nested_in</code> exists on the parsing side: a flat <code>Then([Lit(&quot;(&quot;), .., Lit(&quot;)&quot;)])</code> fails at the close having forgotten there was an open, and reports &quot;expected <code>)</code>, found end of input&quot; a hundred lines away from the <code>(</code> that caused it.</p></div>
 
 
+
         </section>
 
 
@@ -868,6 +925,7 @@
           <pre class="signature"><code>fn finished&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, __spat$55939: Step) -&#62; Recovered!ParseError</code></pre>
 
           <div class="doc"><p>What a parse that ran to a result made of it: the tree and its errors, or the failure that ended it with the <code>Expect</code>s met on the way.</p></div>
+
 
 
         </section>
@@ -884,6 +942,7 @@
           <div class="doc"><p>A parse that a <code>Refuse</code> ended: the input's error, after the <code>Expect</code>s met before it. Anything else that aborts is the grammar's fault, and the call's.</p></div>
 
 
+
         </section>
 
 
@@ -896,6 +955,7 @@
           <pre class="signature"><code>fn missing_slips(node: Cst) -&#62; Slip[]</code></pre>
 
           <div class="doc"><p>Every <code>Missing</code> marker under <code>node</code>, as the slip it stands for, in source order.</p></div>
+
 
 
         </section>
@@ -912,6 +972,7 @@
           <div class="doc"><p><code>slips</code> worded, in the order of the source, then <code>last</code> — the failure that ended the parse, when one did.</p><p>One error to a token. Two slips at the same token are the same mistake seen twice (<code>Then([Expect(a), Expect(b)])</code> on a token that is neither), and so is the failure that ended the parse when it is at a token a slip is already reported at. Reporting each would make one slip read as several. Which of the two stays is <code>last_wins</code>: a refusal's message was written for the case, and replaces the generic &quot;expected&quot; a slip at the same token would have said; an ordinary miss says nothing more than the slip did, and the slip, being first, stays.</p></div>
 
 
+
         </section>
 
 
@@ -924,6 +985,7 @@
           <pre class="signature"><code>fn lower_node&#60;K: variant, A: any&#62;(src: str, node: Cst, prods: Production&#60;K, A&#62;[]) -&#62; A!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -940,6 +1002,7 @@
           <div class="doc"><p>The children in <code>parts</code> lowered, in order. <code>parts</code> is the one walk of a node's direct kids (<code>Cst.parts</code>), which splices groups away, so a production that wraps a bracket pair hands its <code>build</code> the same children it would without one — and walking once is what stops each <code>build</code> from rebuilding the same list.</p></div>
 
 
+
         </section>
 
 
@@ -952,6 +1015,7 @@
           <pre class="signature"><code>fn only_kid&#60;A: any&#62;(vals: A[], span: Span) -&#62; A!ParseError</code></pre>
 
           <div class="doc"><p>The single lowered child a <code>Kid</code> lowering declared, or a refusal naming what the node actually matched. Reaching this is a grammar bug rather than a bad program — the rule and its <code>build</code> disagree about the production's shape — so the message says both sides and leaves it there. A lowering that reads a child is the one place that disagreement can surface, and saying it once here is what spares every <code>Kid</code> lowering from checking.</p></div>
+
 
 
         </section>
@@ -968,6 +1032,7 @@
           <div class="doc"><p>Lower-case words, digit runs, and one-character punctuation. Whitespace is skipped, so most assertions above are about grammar rather than layout; <code>trivia_rules</code> is the same set with whitespace and comments <em>recorded</em>, which is what the losslessness assertion needs.</p></div>
 
 
+
         </section>
 
 
@@ -980,6 +1045,7 @@
           <pre class="signature"><code>fn lex_toks(src: str, rules: TokenRule&#60;Tok&#62;[]) -&#62; LexResult&#60;Tok&#62;!ParseError</code></pre>
 
           <div class="doc"><p>Lexing and parsing report failure in the same shape but not the same type, so the tests convert once here rather than at every call.</p></div>
+
 
 
         </section>
@@ -996,6 +1062,7 @@
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 
 
+
         </section>
 
 
@@ -1010,6 +1077,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1022,6 +1090,7 @@
           <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>

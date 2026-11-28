@@ -89,14 +89,16 @@ pub struct Symbol {
     pub name_span: Span,
     /// For a [`SymbolKind::Case`], the variant it belongs to.
     pub parent: Option<String>,
-    /// For a [`SymbolKind::Case`] whose payload documents any of its slots:
-    /// every slot, in order, as it is spelled in `detail`, with its own `# ..`
-    /// lines. Empty for every other kind — and for a case that documents no
-    /// slot, so a docs page lists slots only where there is something to say.
+    /// For a [`SymbolKind::Case`] whose payload documents any of its slots, or a
+    /// [`SymbolKind::Function`] that documents any of its parameters: every slot or
+    /// parameter, in order, as it is spelled in `detail`, with its own `# ..`
+    /// lines. Empty for every other kind — and for one that documents none, so a docs
+    /// page lists them only where there is something to say.
     pub slots: Vec<Slot>,
 }
 
-/// One payload slot of a documented case — see [`Symbol::slots`].
+/// One payload slot of a documented case, or parameter of a documented function — see
+/// [`Symbol::slots`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Slot {
     /// The slot as `detail` spells it: `min: u64 = ..`, or a bare type.
@@ -376,6 +378,26 @@ fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
                     continue;
                 }
                 let name_span = f.name.span.clone();
+                // The parameters are listed one by one only when one has docs of its own,
+                // as a case's slots are.
+                let slots = if f.sig.params.iter().any(|p| p.doc.is_some()) {
+                    f.sig
+                        .params
+                        .iter()
+                        .map(|p| Slot {
+                            detail: slot_detail(
+                                Some(&p.name),
+                                &p.ty,
+                                p.implicit_some,
+                                p.default.as_ref(),
+                                src,
+                            ),
+                            doc: p.doc.clone(),
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
                 out.push(Symbol {
                     name: f.name.text.clone(),
                     kind: SymbolKind::Function,
@@ -384,7 +406,7 @@ fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
                     is_pub: f.is_pub,
                     name_span,
                     parent: None,
-                    slots: Vec::new(),
+                    slots,
                 });
             }
             Item::Struct(s) => {
@@ -779,6 +801,30 @@ fn helper(n: i64) !prints -> i64 {
             "variant Shape<T: any>"
         );
         assert_eq!(idx.define("Point").expect("Point").detail, "struct Point");
+    }
+
+    /// A function that documents a parameter carries every parameter as a slot, as a case does;
+    /// one that documents none carries none.
+    #[test]
+    fn a_function_carries_its_documented_parameters() {
+        hosted();
+        let src = "# Scales.\nfn scaled(\n    n: i64,\n    # Times over.\n    by: i64 = 2,\n) -> i64 { n }\n\nfn plain(a: i64) -> i64 { a }\n";
+        let idx = FileIndex::parse("src/s.aipl", src).expect("indexes");
+        let scaled = idx.define("scaled").expect("scaled");
+        assert_eq!(
+            scaled.slots,
+            vec![
+                Slot {
+                    detail: "n: i64".to_string(),
+                    doc: None
+                },
+                Slot {
+                    detail: "by: i64 = 2".to_string(),
+                    doc: Some("Times over.".to_string())
+                },
+            ]
+        );
+        assert!(idx.define("plain").expect("plain").slots.is_empty());
     }
 
     #[test]

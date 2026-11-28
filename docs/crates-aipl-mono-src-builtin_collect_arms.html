@@ -32,6 +32,7 @@
           <div class="doc"><p>What the tests collect from.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Circle"><code>Circle(i64)</code>
@@ -63,6 +64,7 @@
           <pre class="signature"><code>pub fn collect_arms&#60;T: variant&#62;(self: T[], arm: Case&#60;T&#62;) -&#62; T[]</code></pre>
 
           <div class="doc"><p>The elements of <code>self</code> that are the case <code>arm</code>, in order. <code>arm</code> is a constructor name, payload-carrying or not: <code>shapes.collect_arms::&lt;Circle&gt;()</code>. An array with none of that case gives an empty one.</p><p>See <code>filter</code> for keeping elements by an arbitrary predicate, and <code>case_of</code> for reading which case a single value is.</p></div>
+
 
 
         </section>

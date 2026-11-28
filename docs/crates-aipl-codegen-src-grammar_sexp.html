@@ -34,6 +34,7 @@ item -&gt; Atom | list
           <div class="doc"><p>The token kinds. One terminal class carrying its text, and one bare kind for the parentheses — the grammar matches those by <code>Lit</code>, so their kind never has to be distinguished.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Atom"><code>Atom(str)</code>
@@ -62,6 +63,7 @@ item -&gt; Atom | list
           <div class="doc"><p>The S-expression grammar: <code>list -&gt; &quot;(&quot; item* &quot;)&quot;</code> and <code>item -&gt; Atom | list</code>, with <code>item</code> as the start rule so a bare atom is as much a program as a list is.</p><p><code>item</code> is labelled and <code>list</code> is transparent, so a failure inside a list reports as &quot;an s-expression&quot; rather than as the grammar's internals — the collapse <code>expect_as</code> exists for.</p></div>
 
 
+
         </section>
 
 
@@ -74,6 +76,7 @@ item -&gt; Atom | list
           <pre class="signature"><code>pub fn sexp_cst(src: str) -&#62; Cst!ParseError</code></pre>
 
           <div class="doc"><p>The lossless concrete tree for <code>src</code> — every byte of it under exactly one leaf, comments and whitespace included. Use this when the tree is the point; <code>parse_sexp</code> when only the <code>Sexp</code> is.</p></div>
+
 
 
         </section>
@@ -90,6 +93,7 @@ item -&gt; Atom | list
           <div class="doc"><p>The <code>Sexp</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token, from either half of the front end — a lex error is reported in the same shape.</p></div>
 
 
+
         </section>
 
 
@@ -102,6 +106,7 @@ item -&gt; Atom | list
           <pre class="signature"><code>pub fn format_sexp(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>Nothing here knows what an S-expression looks like. The layout is the two annotations on the grammar above, and everything else — where a list breaks, what happens to the author's blank lines, where a comment lands — is <code>format.aipl</code> reading them. That is the whole point of the exercise: a second hand-written walker over the same syntax is what this replaces.</p></div>
+
 
 
         </section>
@@ -125,6 +130,7 @@ item -&gt; Atom | list
           <div class="doc"><p>Whitespace and <code>;</code> comments are recorded as <strong>trivia</strong> rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly (asserted below). An atom is a run of the usual Lisp symbol characters, which includes digits — this grammar has no number type, so <code>12</code> is just an atom.</p></div>
 
 
+
         </section>
 
 
@@ -137,6 +143,7 @@ item -&gt; Atom | list
           <pre class="signature"><code>fn lower_item(src: str, __spat$3569: Parts, kids: Sexp[]) -&#62; Sexp</code></pre>
 
           <div class="doc"><p>An <code>item</code> is one of its two alternatives, told apart by whether it got an interior child: the <code>list</code> branch lowered one, and the <code>Atom</code> branch matched a bare token, whose spelling is the node's own text with trivia dropped.</p></div>
+
 
 
         </section>
@@ -153,6 +160,7 @@ item -&gt; Atom | list
           <div class="doc"><p>Lexing and parsing report failure in the same shape but not the same type, so the conversion happens once, here.</p></div>
 
 
+
         </section>
 
 
@@ -165,6 +173,7 @@ item -&gt; Atom | list
           <pre class="signature"><code>fn sexp_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>S-expressions have no spacing rule to speak of: every separation in the language is a list separating its elements, which the <code>Wrap</code> layout does. The rule still has to exist — <code>format.aipl</code> asks every language the same question — and answering &quot;never&quot; is the honest answer here.</p></div>
+
 
 
         </section>

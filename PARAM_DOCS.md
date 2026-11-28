@@ -33,17 +33,15 @@ fn remove_index<T: any>(
 
 ## Stages
 
-Stage 1 (the form parses, formats and reaches Rust as `ast::Param::doc`) is written and in the
-grammar's and the walker's own tests; the corpus and Rust tests can use the form once its handoff
-has regenerated the checked-in artifact.
+A parameter's docs reach `ast::Param::doc`, `aipl_index::Symbol::slots` (as a case's slots do), `aipl doc`
+(`fn.parameter`), the docs site (a list under the function's docs) and hover. `remove_index` is the
+one builtin that uses them.
 
-### 2. Using it
-- [ ] `aipl docs` lists each documented parameter's text; the LSP hover shows it.
-- [ ] Cases: a documented function round-trips through `check --fix`, shows in `aipl docs`.
-- [ ] The builtins whose parameters are not obvious (`join`'s separators, `map_join`,
-      `tabulate`'s `Column`, `remove_index`) document them; the `write-aipl` skill says how.
+### 1. The builtins
+- [ ] The builtins whose parameters are not obvious document them (`join`'s separators, `map_join`,
+      `tabulate`'s `Column`), as `remove_index` does.
 
 ## Done when
 
-A documented parameter formats, shows in `aipl docs` and in hover, and the builtins that need it
-use it; then delete this file and its `CLAUDE_TODO.txt` line.
+The builtins that need it use per-parameter docs; then delete this file and its `CLAUDE_TODO.txt`
+line.

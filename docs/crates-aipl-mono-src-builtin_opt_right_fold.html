@@ -32,6 +32,7 @@
           <div class="doc"><p>Combine the elements right to left with a <em>fallible</em> combiner, starting from <code>init</code>: <code>f</code> takes the element first and the accumulator second (the mirror of <code>opt_left_fold</code>) and returns <code>A?</code>; the first <code>none</code> ends the fold with <code>none</code>, and the elements to its left are never visited. An empty array folds to <code>some(init)</code>.</p><p>Prefer <code>opt_left_fold</code> (imported as plain <code>opt_fold</code>) unless the right-to-left order matters.</p></div>
 
 
+
         </section>
 
 

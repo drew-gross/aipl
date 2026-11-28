@@ -32,6 +32,7 @@
           <div class="doc"><p>Matched text together with where it was matched: the two halves every consumer of a token needs, carried in one value so they cannot be separated.</p><p>A <code>SpanStr</code> is built by <code>span_str</code> and nothing else, which is what makes its one invariant hold: <strong><code>text</code> is exactly <code>src[span]</code></strong> for the source it was sliced from. Consumers rely on that in both directions — a diagnostic renders <code>span</code> against the source it already has, and a parser reads <code>text</code> without needing the source at all.</p><p>It is a plain struct, not a language feature: <code>str</code> alone cannot carry the offset (a <code>str</code> is text, and two equal strings from different places are equal), so the span rides alongside. That costs 16 bytes over a bare <code>str</code>, and buys every function downstream one parameter instead of two.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn span_str(src: str, at: Span) -&#62; SpanStr</code></pre>
 
           <div class="doc"><p><code>src[at]</code> paired with <code>at</code> — the only way a <code>SpanStr</code> is made, so its text-matches-span invariant holds by construction. Slicing clamps, so an out-of-range or inverted <code>at</code> yields the empty text rather than failing; <code>span</code> is kept verbatim either way, since it is what a caret block underlines.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>What a token is: its <code>kind</code> — a caller-defined value carrying whatever the matched token means, produced by the rule's <code>emit</code> (see <code>Emit</code>) — and its <code>text</code>, the raw source it covers plus the span it covers (see <code>SpanStr</code>). A language pins <code>K</code> to its own <code>variant</code> whose arms <em>are</em> the token kinds, each carrying that kind's content (<code>Int(i64)</code>, <code>Str(str)</code>, a bare <code>Plus</code>, …) — rather than a stringly-typed label plus a separate value.</p><p>The text is carried rather than recovered by slicing (<code>src[t.span]</code>, as it used to be) so that holding a token is enough: a parser does not thread the source alongside its token list just to read a token back.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>variant Emit&#60;K: any&#62;</code></pre>
 
           <div class="doc"><p>How a rule turns its matched token into a kind <code>K</code>: a fixed set of options.</p><p>Four of the five are handed the token's <em>content string</em> — the delimiter-stripped text for a string matcher (<code>Delimited</code>/<code>Between</code>/<code>Nested</code>), or the raw matched text for everything else (identifiers, whose text is their content, and numeric <code>Int</code>/<code>Float</code> runs, whose emit parses the digits itself). The two never overlap — a matcher either strips delimiters or has none — so one notion serves both, always handing over the meaningful content.</p></div>
+
 
 
           <ul class="cases">
@@ -113,6 +117,7 @@
           <div class="doc"><p>Why a lex failed: what went wrong, and the span of the offending source (absolute into the lexed string — slice it to show the offender).</p></div>
 
 
+
         </section>
 
 
@@ -125,6 +130,7 @@
           <pre class="signature"><code>variant Matcher</code></pre>
 
           <div class="doc"><p>One token shape, as plain data. Char classes and fixed spellings are both spelled as strings (class membership via <code>contains</code>, a spelling matched whole); none of them ever match empty input, so <code>lex</code> always makes progress.</p><p>Every token has a <em>content string</em>, and that is what its rule's <code>emit</code> is handed (see <code>token_content</code>): the raw matched text, except for the three matchers that bracket their content, which strip their delimiters first. <code>Delimited</code> strips to the contents <em>un-decoded</em> (the rule's <code>emit</code> decodes — escape handling is the caller's, not the library's); <code>Between</code>/<code>Nested</code> strip to the contents verbatim (a raw string's de-denting is the caller's post-pass). Everything else — identifiers, punctuation, keywords, the <code>Int</code>/<code>Float</code> digit runs, every trivia record — is its own text, which an <code>Of</code> emit interprets. That is why a numeric literal's <em>parsing</em> is the rule's <code>emit</code>'s job, via the <code>int_parse</code> builtin or its own. The library provides no string-escape decoder: what a <code>\X</code> means is a language's own policy, so a consumer's <code>emit</code> decodes with its own (e.g. <code>lex_aipl.aipl</code>'s <code>unescape</code>, mapping <code>\n</code>/<code>\t</code>/<code>\r</code> to control chars and any other <code>\X</code> to X itself). A char literal is likewise not a matcher: a consumer lexes it as a single-quoted <code>Delimited</code> string and enforces the one-char shape in a <code>Try</code> emit (see <code>lex_aipl.aipl</code>'s <code>char_lit_emit</code>).</p></div>
+
 
 
           <ul class="cases">
@@ -247,6 +253,7 @@
           <div class="doc"><p>What matching a rule does to the lexer's mode stack.</p><p>A rule set is otherwise context-free at the token level: the rules are tried in order at every position, so the same bytes always lex the same way. That is what keeps a rule set plain data — and it is not enough for a language where the same bytes mean different things in different places, which is any language with string interpolation: in <code>`a{x}b`</code> the <code>b</code> is template text and the <code>x</code> is an identifier, and only what came before tells them apart.</p><p>A <strong>mode</strong> is a named subset of the rules, named by a <code>u64</code> the caller assigns. The lexer is always in one and only its rules are tried, so a rule can be invisible outside the context it belongs to. <code>Push</code> enters a mode and <code>Pop</code> leaves it.</p><p>The <strong>stack</strong> is what makes contexts nest. A single &quot;current mode&quot; could say where the lexer is but not what it returns to when the context ends; a stack answers both, at any depth. <code>{</code> inside a template pushes, and the <code>}</code> that balances it pops back into the template — and a template inside <em>that</em> interpolation simply pushes again. Nothing here counts depth: the stack is the depth.</p><p><code>Pop</code> at the base mode stays at the base rather than running off the bottom. A stray closer is a syntax error for a parser to report against a token, not a lexical one — the lexer's job is to hand over the tokens.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Stay"><code>Stay</code>
@@ -280,6 +287,7 @@
           <div class="doc"><p>One entry of the mode stack: the mode, where the token that pushed it started, and that rule's <code>unterminated</code> message. The span and the message are carried so that a mode still open at the end of the source is reported against its <em>opener</em> — which is where a reader has to go to fix it — rather than against the whole remaining source.</p></div>
 
 
+
         </section>
 
 
@@ -292,6 +300,7 @@
           <pre class="signature"><code>struct TokenRule&#60;K: any&#62;</code></pre>
 
           <div class="doc"><p>One prioritized entry of a rule set: the shape to match, how to turn a match into a kind (<code>emit</code>), and what becomes of its matches. A plain rule emits a token; <code>skip: true</code> consumes matches silently (whitespace); <code>trivia: true</code> consumes them but records each in the result's trivia side-channel — for matches a later pass wants located but not parsed, like comments (a formatter re-attaches them) or lint markers (<code>#[allow]</code>). Set at most one of the two flags (<code>skip</code> wins when both are set). Every rule of one set builds the same <code>K</code>. <code>unterminated</code> overrides the message used when this rule's token runs off the end of the source (a <code>Delimited</code>/<code>Between</code>/<code>Nested</code> scan that never closes), or that this rule's mode is still open there (see <code>Transition</code>). Empty means &quot;use the built-in default&quot; (a generic &quot;unterminated delimited token&quot;) — so a rule can name its token in the diagnostic (<code>&quot;unterminated string literal&quot;</code>) without every rule having to.</p><p><code>mode</code> and <code>go</code> are the rule's place in, and effect on, the lexer's mode stack — see <code>Transition</code>. A rule set that mentions neither is entirely in the base mode, which is how every rule set that predates modes keeps working.</p><p><code>scope</code> is the TextMate scope a syntax highlighter should paint this rule's matches — <code>&quot;keyword.control.aipl&quot;</code>, <code>&quot;string.quoted.double.aipl&quot;</code>. <code>lex</code> ignores it entirely: it is carried here so that one rule set describes a language's lexical structure <em>once</em>, for the lexer and the highlighter both (<code>highlight.aipl</code> generates the second from it), rather than the two drifting apart as separate descriptions. Empty means &quot;not highlighted&quot;, which is what a <code>skip</code> rule wants. The same hint on the syntactic half is <code>Production.scope</code> in <code>grammar.aipl</code>.</p></div>
+
 
 
         </section>
@@ -308,6 +317,7 @@
           <div class="doc"><p>What <code>lex</code> returns: the emitted tokens, and the trivia side-channel — the recorded matches of every <code>trivia: true</code> rule, in source order. Silent <code>skip</code> matches appear in neither.</p></div>
 
 
+
         </section>
 
 
@@ -320,6 +330,7 @@
           <pre class="signature"><code>pub fn keep_skipped&#60;K: any&#62;(self: TokenRule&#60;K&#62;[]) -&#62; TokenRule&#60;K&#62;[]</code></pre>
 
           <div class="doc"><p><code>self</code> with every <code>skip</code> rule turned into a <code>trivia</code> rule: nothing is dropped, so every byte of a lexed source is accounted for by some token or trivia record.</p><p>A compiler's rule set skips whitespace outright — it has no use for it, and recording it would cost every consumer something only one of them wants. A <em>lossless</em> consumer has the opposite need: a parser building a concrete syntax tree, or a formatter reproducing its input, must be able to put every byte back. Both read the one rule set through this, rather than the language keeping two of them.</p></div>
+
 
 
         </section>
@@ -336,6 +347,7 @@
           <div class="doc"><p>One lexing step's outcome: the one token the winning rule produced, whether that token is trivia, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p><p><strong>One token, or none — never two.</strong> A rule is a token rule or a <code>trivia</code> rule, and a <code>skip</code> rule is neither, so a step yields at most one token either way. That is why <code>trivia</code> is a flag on the token rather than a second token field: two optionals could represent &quot;both at once&quot;, which no step can produce, and the invariant then lived in this comment instead of in the type.</p><p>It cost real bytes, too. <code>Token&lt;AiplTok&gt;</code> is 80 wide, so a second <code>Token&lt;K&gt;?</code> field put 88 more bytes inline in a struct that is built and returned at every position of every lex — 248 bytes against 168 for this shape.</p><p>Both fields were <code>Token&lt;K&gt;[]</code> before struct fields could be optionals of structs, when an array of nought-or-one was the only way to spell &quot;maybe a token&quot;. Before that they were arrays for a stronger reason: <code>Matcher::Template</code> emitted a whole head/interpolation/tail run from a single step, and it was the only matcher that ever emitted more than one token. Modes replaced it, and each piece of a template is now its own step.</p></div>
 
 
+
         </section>
 
 
@@ -350,6 +362,7 @@
           <div class="doc"><p>The bytes a matcher can start a match with: any of <code>chars</code>, or, with <code>any</code>, any byte at all (a matcher whose first byte is whatever the text there is). It is the question &quot;could this rule match here&quot; asked of one byte instead of a whole scan, so it errs only on the side of yes: a byte outside it can never start a match, and a byte inside may still decline.</p></div>
 
 
+
         </section>
 
 
@@ -362,6 +375,7 @@
           <pre class="signature"><code>variant Kind</code></pre>
 
           <div class="doc"><p>A concrete token-kind variant for the <code>.test</code> block below — one example of the per-language <code>K</code> a caller pins <code>Token&lt;K&gt;</code>/<code>TokenRule&lt;K&gt;</code> to. Each arm is a kind; value-bearing kinds carry their content (<code>Int(i64)</code>, <code>Str(str)</code>, the template segments), text-recovered kinds are bare (their text is sliced from the span). A real consumer writes its own such variant.</p></div>
+
 
 
           <ul class="cases">
@@ -457,6 +471,7 @@
           <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token). One token's span and the scope its rule declares — the highlighting side-channel. <code>TokenRule.scope</code> exists so that one rule set describes a language's lexical structure <em>once</em>, for the lexer and the highlighter both; this is that hint read per token rather than per rule.</p></div>
 
 
+
         </section>
 
 
@@ -469,6 +484,7 @@
           <pre class="signature"><code>variant Collect</code></pre>
 
           <div class="doc"><p>What a drive of the rule set should gather. One loop serves every consumer, and this is what keeps each from paying for the others: a parse wants tokens and does not care what colour they are, the highlighter's oracle wants the reverse, and <code>lex_kinds</code> wants neither span nor trivia.</p></div>
+
 
 
           <ul class="cases">
@@ -504,6 +520,7 @@
           <div class="doc"><p>Everything a drive can produce. Whichever arrays the <code>Collect</code> did not ask for stay empty, and each entry point takes the one it wanted — so the three views can never disagree about what matched where, because there is one loop behind all of them.</p></div>
 
 
+
         </section>
 
 
@@ -516,6 +533,7 @@
           <pre class="signature"><code>pub fn lex_scoped&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; ScopeSpan[]!LexError</code></pre>
 
           <div class="doc"><p><code>lex</code>, plus the scope each token's rule declares — see <code>ScopeSpan</code>. The highlighter's oracle reads this: the grammar it generates has to paint every token with the scope the rule set already names for it, and asking the rule set beats restating the mapping somewhere else.</p></div>
+
 
 
         </section>
@@ -532,6 +550,7 @@
           <div class="doc"><p>Every token's <em>kind</em>, and nothing else: no spans, no trivia, and an error that is a bare message.</p><p>The <em>plain</em> path. A consumer that only asks &quot;what tokens are these&quot; reads the answer without walking into a token to find it — <code>lex_kinds(src, rules)? == [Let, Name(&quot;x&quot;)]</code> against <code>lex</code>'s <code>toks([tok(src, Let, 0..3), tok(src, Name(&quot;x&quot;), 4..5)])</code> — which is most of this file's own tests, and why they use it.</p><p><strong>It is not meaningfully faster, and it was written expecting to be.</strong> Measured over 460k tokens: <code>lex</code> spent 1.85s, this 1.82s, and a throwaway build that emitted kinds while constructing <em>no</em> token at all spent 1.79s. So the whole token-and-span apparatus is ~3% of a lex and this saves half of that: the other ~97% is matching a rule, slicing its content and running its <code>emit</code>, which both paths must do and neither can skip. A spanless lexer here buys a plainer call site, not throughput — look to the matchers if that is what you need.</p><p><strong>The errors are worse on purpose.</strong> A <code>str</code> carries no span, so a caller that wants to <em>report</em> one re-lexes with <code>lex</code> — the slow path only on the way to failing. Nothing is lost by refusing first and locating second: the two drive the same rules in the same order, so whatever this refuses <code>lex</code> refuses at the same byte.</p></div>
 
 
+
         </section>
 
 
@@ -544,6 +563,7 @@
           <pre class="signature"><code>pub fn lex&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexResult&#60;K&#62;!LexError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -567,6 +587,7 @@
           <div class="doc"><p>A rule's <code>push</code>/<code>pop</code> pair read as the one decision it is. The flags are a pair because a struct field's default must be a literal, so a <code>Transition</code> constructor cannot sit on <code>TokenRule</code>; classifying them here means the stack is driven by an exhaustive <code>match</code> on three cases rather than by two booleans checked in the right order at each site. (<code>Transition? = none</code> would be legal now that a field may be an optional of a variant — <code>none</code> is a literal — at the cost of an unwrap at each use.)</p></div>
 
 
+
         </section>
 
 
@@ -579,6 +600,7 @@
           <pre class="signature"><code>fn char_run_len(self: str, head: #{char}, cont: #{char}) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>CharRun</code>: length of the maximal run at the start of <code>self</code> — a <code>head</code> char, then <code>cont</code> chars. 0 when the first char isn't in <code>head</code>. (<code>head</code> rather than <code>first</code>, which is now a builtin this file calls.)</p></div>
+
 
 
         </section>
@@ -595,6 +617,7 @@
           <div class="doc"><p><code>OneChar</code>: 1 when <code>self</code> opens with a char in <code>chars</code>, else 0 — <code>char_run_len</code>'s single-character counterpart, and the reason a rule never has to spell that shape as a run with nothing to continue it. An empty set never matches.</p></div>
 
 
+
         </section>
 
 
@@ -607,6 +630,7 @@
           <pre class="signature"><code>fn exact_len(self: str, spelling: str) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>Exact</code>: length of <code>spelling</code> when it prefixes <code>self</code>, else 0. An empty spelling never matches.</p></div>
+
 
 
         </section>
@@ -623,6 +647,7 @@
           <div class="doc"><p><code>Keyword</code>: the length of <code>spelling</code> when it prefixes <code>self</code>, but only when the char after it is absent (end of source) or outside <code>boundary</code> — a keyword must not end in the middle of an identifier. 0 when it doesn't match (or the char after is a boundary char, as in <code>iffy</code> for <code>if</code>).</p></div>
 
 
+
         </section>
 
 
@@ -635,6 +660,7 @@
           <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: #{char}, escapes: #{char}, msg: str) -&#62; u64!LexError</code></pre>
 
           <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and so is a backslash with nothing after it — the end of the source cut the escape off. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
+
 
 
         </section>
@@ -651,6 +677,7 @@
           <div class="doc"><p>The message for a backslash the end of the source cut off. Shared by the <code>Delimited</code> and <code>UpToAny</code> scans, which handle escapes the same way.</p></div>
 
 
+
         </section>
 
 
@@ -663,6 +690,7 @@
           <pre class="signature"><code>fn unterminated_msg(msg: str) -&#62; str</code></pre>
 
           <div class="doc"><p>The message for an unterminated scan: a rule's own <code>unterminated</code> override, or the generic default when it left the field empty.</p></div>
+
 
 
         </section>
@@ -679,6 +707,7 @@
           <div class="doc"><p><code>Between</code>: the <code>open</code> spelling opens the token, which runs to just past the next full occurrence of <code>close</code>. ok(0) when <code>self</code> doesn't start with <code>open</code>. The close scan starts past the open and matches the whole <code>close</code> spelling, so a partial close inside (a lone <code>&quot;</code>/<code>&quot;&quot;</code> under a <code>&quot;&quot;&quot;</code> close) is content, not a terminator, and open/close may be multi-char and differ. No escapes — contents are verbatim. A token still open at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
 
 
+
         </section>
 
 
@@ -691,6 +720,7 @@
           <pre class="signature"><code>fn up_to_any_len(self: str, at: u64, stops: str[], escapes: #{char}, refuse_unknown_escape: bool) -&#62; u64!LexError</code></pre>
 
           <div class="doc"><p><code>UpToAny</code>: the length of the run before the first of <code>stops</code>, or the whole of <code>self</code> when none of them appears. <code>\X</code> escapes are consumed as a unit and validated as in <code>delimited_len</code>, so an escaped terminator does not end the run and an unknown or cut-off escape is the same hard error there.</p><p>0 when a stop spelling sits at the cursor — a decline, like every other matcher, which hands the position to the rule that matches the terminator.</p></div>
+
 
 
         </section>
@@ -707,6 +737,7 @@
           <div class="doc"><p><code>Nested</code>: the depth-tracked <code>Between</code>. The <code>open</code> spelling opens the token at depth 1; each further <code>open</code> raises the depth and each <code>close</code> lowers it, so the token ends just past the <code>close</code> that returns the depth to 0. ok(0) when <code>self</code> doesn't start with <code>open</code>. <code>open</code> is tested before <code>close</code> so an overlap can't misclassify, but the two must be distinct for nesting to mean anything. No escapes — contents are verbatim. Still open (depth &gt; 0) at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
 
 
+
         </section>
 
 
@@ -719,6 +750,7 @@
           <pre class="signature"><code>fn to_eol_len(self: str, marker: str) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>ToEol</code>: the marker, then everything up to (not including) the next newline. 0 when <code>self</code> doesn't start with the (non-empty) marker.</p></div>
+
 
 
         </section>
@@ -735,6 +767,7 @@
           <div class="doc"><p><code>ToEolUnless</code>: <code>to_eol_len</code>, refused when the character right after the marker is one <code>blocked</code> claims. End of input or a newline right after the marker is <em>not</em> blocked — an empty comment line is a comment.</p></div>
 
 
+
         </section>
 
 
@@ -747,6 +780,7 @@
           <pre class="signature"><code>fn number_end(self: str, int_end: u64) -&#62; u64</code></pre>
 
           <div class="doc"><p>The end of the number whose integer part ends at <code>int_end</code>: extends past a fraction (<code>.</code> then at least one digit), then past an exponent (<code>e</code> or <code>E</code>, an optional sign, then at least one digit). Either part may be absent; <code>int_end</code> comes back unchanged when neither matches.</p></div>
+
 
 
         </section>
@@ -763,6 +797,7 @@
           <div class="doc"><p><code>Float</code>: an optional leading <code>-</code> then a digit run that extends past a fraction and/or exponent. A bare digit run is 0 (no match) — it belongs to the int rule — and so is a <code>-</code> not immediately followed by a digit, as for <code>Int</code>, so the sign is part of a literal exactly where it is part of an integer one.</p></div>
 
 
+
         </section>
 
 
@@ -775,6 +810,7 @@
           <pre class="signature"><code>fn int_len(self: str) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>Int</code>: the length of an optional leading <code>-</code> then a digit run. 0 (no match) when there's no digit run — including a <code>-</code> <em>not</em> immediately followed by a digit (a <code>-</code> before a space or a letter is left for a <code>-</code> operator rule, so <code>- 5</code>/<code>-x</code> don't match). That decline is the entire sign-vs-operator disambiguation: with an <code>Int</code> rule before the <code>-</code> operator rule, <code>-5</code> is a signed literal while <code>- 5</code>/<code>-x</code> are the operator; put the operator first and every <code>-</code> is the operator and <code>Int</code> is unsigned.</p></div>
+
 
 
         </section>
@@ -791,6 +827,7 @@
           <div class="doc"><p>The content string a token of matcher <code>m</code> is built from: its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included), with the delimiters taken off by the three matchers that bracket their content — see the table on <code>Matcher</code>. Everything else is its own text, and its rule's <code>emit</code> interprets it.</p></div>
 
 
+
         </section>
 
 
@@ -803,6 +840,7 @@
           <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, span: Span, content: str) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its <code>content</code> string — what <code>token_content</code> made of the matched text. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>).</p></div>
+
 
 
         </section>
@@ -819,6 +857,7 @@
           <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — flagged as trivia for a <code>trivia</code> rule, or absent for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher's content string, which can fail on an emit/matcher mismatch.</p></div>
 
 
+
         </section>
 
 
@@ -831,6 +870,7 @@
           <pre class="signature"><code>fn stepped&#60;K: any&#62;(self: ModeFrame[], step: StepResult&#60;K&#62;, at: u64) -&#62; ModeFrame[]</code></pre>
 
           <div class="doc"><p>The mode stack after a step that consumed <code>at..step.end</code>: unchanged, one frame deeper, or one shallower. A <code>Pop</code> at the base stays at the base — see <code>Transition</code>.</p></div>
+
 
 
         </section>
@@ -847,6 +887,7 @@
           <div class="doc"><p>How far this matcher reaches at <code>at</code> in <code>src</code> — the number of chars it consumes, or 0 for a decline. No matcher matches empty input, so a nonzero length always means progress.</p><p>This is the whole of what the matchers differ by, which is the point: one arm per matcher naming its own <code>*_len</code> helper and nothing else, so adding a matcher is one line here beside one <code>*_len</code> function. <code>unterminated</code> is the rule's message for a construct still open at the end of the source, which only the bracketing matchers can report; <code>at</code> is passed alongside <code>rest</code> for the same reason, since a <code>LexError</code> is spanned in the whole source rather than in the slice being scanned.</p><p>The <code>ok(..)</code> on the infallible arms is the seam between the two kinds of helper — a length that cannot fail and a <code>u64!LexError</code> — in the one place that has to know the difference, exactly as <code>apply_emit</code> wraps its <code>Of</code> arm.</p></div>
 
 
+
         </section>
 
 
@@ -859,6 +900,7 @@
           <pre class="signature"><code>fn starts(self: Matcher) -&#62; Starts</code></pre>
 
           <div class="doc"><p>The bytes <code>self</code> can start a match with. <code>Int</code> and <code>Float</code> open with a digit or the <code>-</code> of a signed literal; the matchers that name a spelling open with its first byte; <code>CharRun</code> opens with its <code>first</code> class, which is what keeps a digit from opening an identifier; and <code>UpToAny</code> opens with anything its stops do not forbid, which is any byte.</p></div>
+
 
 
         </section>
@@ -875,6 +917,7 @@
           <div class="doc"><p>The one byte a spelling opens with, or any byte for an empty spelling (which no matcher should have, and which is not worth being wrong about).</p></div>
 
 
+
         </section>
 
 
@@ -887,6 +930,7 @@
           <pre class="signature"><code>fn candidates(firsts: Starts[], c: char) -&#62; u64[]</code></pre>
 
           <div class="doc"><p>The rules that could match at a byte <code>c</code>, as indices into <code>rules</code>, in the order they are tried: those whose matcher can start with it, given every rule's <code>firsts</code>. Trying a rule means measuring its matcher against the text, and most rules cannot start with the byte at hand, so these are the only ones worth trying. Every mode's rules are in the answer, and <code>lex_step</code> passes over the ones of another mode, which is one comparison; keeping the modes apart would make the answer depend on two things instead of one.</p></div>
+
 
 
         </section>
@@ -903,6 +947,7 @@
           <div class="doc"><p>One lexing step at absolute position <code>at</code> in <code>mode</code>: tries each of the rules in <code>chosen</code> that belong to it, in order (first match wins), and returns the winning rule's outcome — see <code>StepResult</code>. <code>chosen</code> is the rules the byte at <code>at</code> can start (see <code>candidates</code>), so a rule that cannot start with it is not measured against the text at all: a <code>{</code> or a <code>,</code> is tried against the rules that start with one rather than against every rule there is.</p><p>Every rule is tried the same way, which is what <code>step_len</code> and <code>step_result</code> are for: the first says how far this rule's matcher reaches, the second turns that length into the step. Neither the loop nor the first-match-wins rule has anything to say about <em>which</em> matcher it is. A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs.</p></div>
 
 
+
         </section>
 
 
@@ -915,6 +960,7 @@
           <pre class="signature"><code>fn toks(tokens: Token&#60;Kind&#62;[]) -&#62; LexResult&#60;Kind&#62;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -931,6 +977,7 @@
           <div class="doc"><p>What the highlighter paints for this step: the span of the token it produced, under the winning rule's scope. A skipped rule produces no token and so paints nothing; a trivia rule paints, since a comment is painted like anything else — which is why this does not consult <code>trivia</code>.</p></div>
 
 
+
         </section>
 
 
@@ -943,6 +990,7 @@
           <pre class="signature"><code>fn lex_all&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[], want: Collect) -&#62; LexAll&#60;K&#62;!LexError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>

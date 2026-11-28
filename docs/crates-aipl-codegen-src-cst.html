@@ -32,6 +32,7 @@
           <div class="doc"><p>An interior node is <code>Tree(prod, kids)</code>; a <code>Group</code> is the bracket pair a bracketed repetition matched, holding its opening kids, the kids between the and its closing kids as three runs.</p><p>A group is <em>transparent</em>: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>nested_in</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p><p><code>Missing(pos, expected, unclosed)</code> is where an <code>Expect</code> found its rule absent and carried on: a marker that takes no space in the source and holds no text. <code>pos</code> is the index of the token that stood where the rule was wanted (one past the last token, at the end of the input), <code>expected</code> what could have been there, and <code>unclosed</code> the bracket left hanging there, if any — everything <code>parse.aipl</code> needs to word the error once it has the source. It is not a token and not a child, so every walk below passes over it exactly as it does trivia, and a tree holding one is a tree of broken input: to find more errors in, and never to lower.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Leaf"><code>Leaf(Span)</code>
@@ -75,6 +76,7 @@
           <div class="doc"><p>Every leaf span under <code>self</code>, in source order — token leaves and trivia alike. The whole losslessness property is stated in terms of this list: the spans are contiguous and cover the parsed source, so <code>text</code> is just &quot;slice each one and join&quot;.</p></div>
 
 
+
         </section>
 
 
@@ -87,6 +89,7 @@
           <pre class="signature"><code>pub fn text(self: Cst, src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>The source text <code>self</code> covers, reconstructed from its leaf spans. For a whole parse this equals the input exactly; that identity is the cheapest regression test there is for the driver's trivia handling, so the <code>.test</code> blocks assert it directly.</p></div>
+
 
 
         </section>
@@ -103,6 +106,7 @@
           <div class="doc"><p>Every <em>token</em> leaf span under <code>self</code>, in source order — <code>leaves</code> with the trivia dropped. The two are the lossless/meaningful pair: <code>leaves</code> keeps the comments and whitespace because reconstructing the source needs them, and this one drops them because a lowering function reading a token's spelling does not want the blank line in front of it.</p></div>
 
 
+
         </section>
 
 
@@ -115,6 +119,7 @@
           <pre class="signature"><code>pub fn token_span(self: Cst) -&#62; Span?</code></pre>
 
           <div class="doc"><p>The span <code>self</code>'s own <em>tokens</em> cover: its first token leaf's start through its last token leaf's end, or <code>none</code> when it holds no token at all (an interior node for a production that matched empty input).</p><p><code>span</code> reaches back over the trivia in front of the first token, because trivia attaches to the token that follows it and losslessness needs it counted somewhere. That makes <code>span</code> the wrong thing to compare against another parser's spans, which are token-tight — every comparison is off by the leading whitespace. This is the tight one.</p><p>Found by descending to the leftmost and rightmost token rather than by collecting every token under <code>self</code> and taking the ends: <code>token_leaves</code> walks the whole subtree, and asking it at every node in a tree is quadratic in the tree. These two descend one edge at a time and stop at the first token.</p></div>
+
 
 
         </section>
@@ -131,6 +136,7 @@
           <div class="doc"><p>The text of the tokens under <code>self</code>, trivia dropped and nothing inserted between them — what a production's <code>build</code> reads a matched token's spelling from. Written for the single-token node that is the usual case; over a wider node the tokens run together (<code>( a b )</code> reads back as <code>(ab)</code>), which is why <code>text</code> and not this one is what reconstructs source.</p></div>
 
 
+
         </section>
 
 
@@ -143,6 +149,7 @@
           <pre class="signature"><code>pub fn extent(self: Cst) -&#62; Span</code></pre>
 
           <div class="doc"><p>The extent <code>self</code> covers: its first leaf's start through its last leaf's end. A node with no leaves at all — an interior node for a production that matched empty input, which <code>Maybe</code> and a zero-minimum <code>Many</code> can both produce — has no extent, and reports the empty <code>0..0</code>.</p><p>Named <code>extent</code> rather than <code>span</code> because <code>span</code> is what a lowering asks its <code>Node</code> for, and AIPL has no overloading. This is the tree's own answer, which the <code>Parts</code> one delegates to; trivia at either edge is counted in, so <code>token_span</code> is what lines up with another parser's spans.</p><p>By descent, like <code>token_span</code>, and for the same reason: this is asked at every node a lowering visits, and collecting every leaf beneath each of them is quadratic in the tree. A block is a right-recursive chain one node deep per statement, so on the largest compiler sources that was most of the lowering's time.</p></div>
+
 
 
         </section>
@@ -159,6 +166,7 @@
           <div class="doc"><p>What a <code>Mk</code>/<code>TryMk</code> lowering is handed: the node that matched, and the two lists every lowering reads off it — its interior children and its own token spans — already computed.</p><p>They are precomputed because they used to be three separate walks of the same kids. <code>lower_node</code> asked for the children, then the <code>build</code> asked for the own tokens, and more than half of them asked for the own <em>texts</em> as well; each ask rebuilt the flattened kid list from scratch, and rebuilt it by allocating a one-element array per kid and joining them. One walk fills both lists, and measured against the old shape on a nine-kid node it is a little under four times faster.</p><p><code>cst</code> is the node itself, for the accessors that have to descend — <code>span</code>, <code>tok_span</code>, <code>text</code>. Those stay lazy: each is asked at most once per lowering, so precomputing them would only move the same work earlier, and the ones that walk the whole subtree would then be paid by the lowerings that never ask.</p></div>
 
 
+
         </section>
 
 
@@ -173,6 +181,7 @@
           <div class="doc"><p><code>self</code> as the <code>Parts</code> a lowering is handed: one walk of its direct kids, splitting them into the interior children and the token leaves.</p><p>The two lists are the pair a production's <code>build</code> is written against, and between them they are everything the node matched <em>directly</em>:</p><ul><li><code>children</code> is one entry per <code>Named</code> reference the rule matched, in the order it matched them — the order and length are part of the contract between a grammar and its lowering functions. Leaves are dropped because the lowering pass has nothing to hand <code>build</code> for one: a leaf has no lowered value, and its text is reachable from the node's own span.</li><li><code>tokens</code> is the node's direct token leaves — where a lowering reads an operator or a keyword. A <code>Climb</code> node's two operands arrive as interior children and the operator between them is a direct leaf, so <code>tokens</code> is the operator and nothing else, where <code>token_text</code> would hand back the whole expression's tokens run together.</li></ul><p>Trivia is dropped from both. A <code>Group</code> is spliced in place rather than recorded — that splice is the one thing making a group transparent, so a production that gained a bracket pair hands its <code>build</code> the children it had before — and a group nested directly inside another flattens with it.</p></div>
 
 
+
         </section>
 
 
@@ -185,6 +194,7 @@
           <pre class="signature"><code>variant Slot</code></pre>
 
           <div class="doc"><p>One position of a production's rule, as the match filled it: the token a <code>Lit</code>/<code>Term</code> sub-rule consumed, or the index of the child a <code>Named</code> sub-rule produced — an index into <code>children</code>, and so into the lowered values a <code>build</code> is handed alongside.</p><p>This is the rule read back as a positional list, which is what lets a <code>build</code> <em>match</em> the shape it matched rather than reconstruct it. <code>field_decl</code>'s two alternatives are five sub-rules and three, so an arm binding five slots is the one with a default — where counting interior children or searching the token list for an <code>=</code> is the same question asked sideways.</p><p>A slot <em>names</em> a position rather than carrying its contents, which is the whole reason this type is not generic. Holding the lowered value instead — <code>Sub(A)</code>, with <code>A</code> the caller's AST — makes every slot a composite carrying a large recursive variant, and the refcount glue for it is generated at every site that touches one: measured, that made the accessor that reads a slot's child ten times the size of the <code>kids</code>-indexing version it replaced, and grew each converted production fivefold. An index costs a word and no glue.</p><p>A slot is one sub-rule only where that sub-rule matches exactly one kid, which is every <code>Lit</code>, <code>Term</code> and <code>Named</code>. A <code>Maybe</code> or a <code>Many</code> contributes as many slots as it matched kids, so a rule holding one does not line up position for position and its <code>build</code> still reads <code>children</code> and <code>tokens</code>.</p></div>
+
 
 
           <ul class="cases">
@@ -215,6 +225,7 @@
           <div class="doc"><p><code>self</code>'s direct kids in source order — the positional view a <code>build</code> matches on in place of deducing its shape.</p><p>Asked for by the builds that want it, off the <code>Parts</code> a <code>Mk</code>/<code>TryMk</code> build already holds, so wanting positions needs no <code>Build</code> case of its own. It is not what <code>parts</code> returns because the interleaving is the one thing <code>parts</code> throws away (it splits the kids two ways, losing the order between them), and recovering it costs a second walk of the direct kids — which most productions have no use for.</p></div>
 
 
+
         </section>
 
 
@@ -227,6 +238,7 @@
           <pre class="signature"><code>struct SlotWalk</code></pre>
 
           <div class="doc"><p>The slot list being built, and how many interior children have been numbered.</p></div>
+
 
 
         </section>
@@ -243,6 +255,7 @@
           <div class="doc"><p>The token text of a slot, or <code>&quot;&quot;</code> for a child position — what a <code>build</code> reads a name or a keyword out of a matched position with.</p></div>
 
 
+
         </section>
 
 
@@ -255,6 +268,7 @@
           <pre class="signature"><code>pub fn slot_span(self: Slot) -&#62; Span?</code></pre>
 
           <div class="doc"><p>The span of the token at a slot, or <code>none</code> for a child position — whose span is carried by the lowered value, not by the position.</p></div>
+
 
 
         </section>
@@ -271,6 +285,7 @@
           <div class="doc"><p>The index into <code>children</code> a slot names, or <code>none</code> when it holds a token. The caller resolves it against the lowered values it was handed; the refusal for a <code>none</code> is its own, since <code>ParseError</code> is declared in <code>grammar.aipl</code>, which imports this file.</p></div>
 
 
+
         </section>
 
 
@@ -283,6 +298,7 @@
           <pre class="signature"><code>pub fn span(self: Parts) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span <code>self</code> covers — its tree's, since the parts say nothing about extent.</p></div>
+
 
 
         </section>
@@ -299,6 +315,7 @@
           <div class="doc"><p>The span <code>self</code>'s <em>tokens</em> cover, falling back to its full extent when it matched no token at all. The span a lowering hands to the AST node it builds, and the one it blames in an error: token-tight, so it lines up with what another parser would report rather than reaching back over leading trivia.</p></div>
 
 
+
         </section>
 
 
@@ -311,6 +328,7 @@
           <pre class="signature"><code>pub fn own_texts(self: Parts, src: str) -&#62; str[]</code></pre>
 
           <div class="doc"><p>This node's own tokens as their text, one string per token. A <code>str</code> is a view into <code>src</code>, so this costs no more than the spans do, and a lowering that asks &quot;which token is second?&quot; gets a string to compare rather than a span to look up.</p></div>
+
 
 
         </section>
@@ -327,6 +345,7 @@
           <div class="doc"><p>The source text of <code>self</code>'s direct token leaves, run together with nothing between them — the operator of a binary node, the keyword that opened a form.</p></div>
 
 
+
         </section>
 
 
@@ -339,6 +358,7 @@
           <pre class="signature"><code>pub fn show(self: Cst, src: str, names: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> rendered as an S-expression against the grammar's production names (<code>prod_names</code>), for tests and for reading a tree by eye: a leaf as its source text, a trivia leaf prefixed with <code>~</code>, an interior node as <code>(name kid kid ...)</code>. A production index with no name in <code>names</code> renders as <code>?</code> rather than failing — this is a debug rendering, not a checked one.</p></div>
+
 
 
         </section>
@@ -362,6 +382,7 @@
           <div class="doc"><p>The span from <code>self</code>'s start through the other span's end — what two ends of a node, a first leaf and a last, cover between them. Nothing is checked about the order: a second span that ends before <code>self</code> starts gives a span that ends before it starts, exactly as <code>a.start..b.end</code> spelled out would.</p></div>
 
 
+
         </section>
 
 
@@ -374,6 +395,7 @@
           <pre class="signature"><code>fn first_token(self: Cst) -&#62; Span?</code></pre>
 
           <div class="doc"><p>The leftmost token span under <code>self</code>, or <code>none</code> if it holds none. A group's three parts are asked left to right; the first that holds a token answers.</p></div>
+
 
 
         </section>
@@ -390,6 +412,7 @@
           <div class="doc"><p>The rightmost token span under <code>self</code>, or <code>none</code> if it holds none — the mirror of <code>first_token</code>: a group's parts are asked right to left.</p></div>
 
 
+
         </section>
 
 
@@ -402,6 +425,7 @@
           <pre class="signature"><code>fn first_leaf(self: Cst) -&#62; Span?</code></pre>
 
           <div class="doc"><p>The leftmost leaf span under <code>self</code> — a token or trivia — or <code>none</code>. Laid out like <code>first_token</code>: a group's three parts are asked left to right.</p></div>
+
 
 
         </section>
@@ -418,6 +442,7 @@
           <div class="doc"><p>The mirror of <code>first_leaf</code>. <code>reverse_find_map</code> walks by index rather than reversing the list: this runs once per level of a descent, and a reversed view per level would be an allocation per level on the way down.</p></div>
 
 
+
         </section>
 
 
@@ -430,6 +455,7 @@
           <pre class="signature"><code>fn split_kids(kids: Cst[], acc: Parts) -&#62; Parts</code></pre>
 
           <div class="doc"><p><code>kids</code> split onto <code>acc</code>, in source order. The accumulator is a whole <code>Parts</code> rather than the two lists on their own so that one value threads through the loop and through a group's recursion.</p></div>
+
 
 
         </section>
@@ -446,6 +472,7 @@
           <div class="doc"><p>One kid onto the accumulator: a token leaf contributes its span, an interior node contributes itself, trivia contributes nothing, and a group contributes whatever its three runs hold — which is the splice that makes it transparent.</p></div>
 
 
+
         </section>
 
 
@@ -458,6 +485,7 @@
           <pre class="signature"><code>fn slot_walk(node: Cst, acc: SlotWalk) -&#62; SlotWalk</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -474,6 +502,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -486,6 +515,7 @@
           <pre class="signature"><code>fn slot_walk_kid(acc: SlotWalk, kid: Cst) -&#62; SlotWalk</code></pre>
 
           <div class="doc"><p>One kid as its slot. Trivia takes no position — it is not a sub-rule — and a group splices, exactly as it does for <code>parts</code>, so a bracketed repetition's contents take the positions rather than the group taking one. The child numbering therefore matches <code>children</code>, which splices the same way.</p></div>
+
 
 
         </section>

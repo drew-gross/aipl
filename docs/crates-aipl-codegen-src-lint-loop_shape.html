@@ -38,6 +38,7 @@ none
           <div class="doc"><p>The one statement a block consists of, or <code>none</code> when it holds anything else — no statements, or more than one. A block is a right-nested chain, and which node carries the rest of it depends on the statement: an expression statement is a <code>Seq</code> whose second operand is the remainder, while an assignment holds its own. Only those two forms are recognized, and each is &quot;lone&quot; exactly when what follows it is the block's tail.</p></div>
 
 
+
         </section>
 
 
@@ -52,6 +53,7 @@ none
           <div class="doc"><p>Whether <code>self</code> can move into a lambda in a rewritten pipeline: a <code>?</code> returns from the function it is written in, so moved into a lambda it would return from the lambda instead.</p></div>
 
 
+
         </section>
 
 
@@ -64,6 +66,7 @@ none
           <pre class="signature"><code>pub fn iterable_text(self: Expr) -&#62; str</code></pre>
 
           <div class="doc"><p>What advice quotes for the iterable <code>self</code> that a loop walks: what was written where its span covers its text, and a placeholder where it does not (a call's span stops before its closing paren).</p></div>
+
 
 
         </section>
@@ -81,6 +84,7 @@ none
 </code></pre><p><code>index</code> is the second binder of an indexed loop, and <code>statement</code> is the <code>return</code>. What the loop returns and what it falls through to are the lint's to read.</p></div>
 
 
+
         </section>
 
 
@@ -95,6 +99,7 @@ none
           <div class="doc"><p>Every [<code>SearchLoop</code>] in <code>self</code> and under it. A <code>for</code> is a statement of a block, so it is the first operand of a <code>Seq</code> whose second is what the loop falls through to. The body is an else-less <code>if</code> around a lone <code>return</code>: an <code>else</code>, or a second statement, is work a searching builtin has nowhere to put.</p></div>
 
 
+
         </section>
 
 
@@ -107,6 +112,7 @@ none
           <pre class="signature"><code>pub fn answers_none(self: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> — what a loop falls through to — is the not-found answer: a bare <code>none</code> as the block's tail, or an explicit <code>return none;</code>. Anything else, and the fall-through does work a searching builtin would skip.</p></div>
+
 
 
         </section>
@@ -130,6 +136,7 @@ none
           <div class="doc"><p>How many statements <code>src</code>, a block, consists of when it is a lone one (one or none).</p></div>
 
 
+
         </section>
 
 
@@ -142,6 +149,7 @@ none
           <pre class="signature"><code>fn is_block_tail(self: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is what the parser ends a statement-only block with: <code>()</code> for an ordinary block, and an <code>0</code> with no location of its own — the loop expression's result — for a loop body, which may not end in a value of its own at all. The loop's zero is told from a written one by its empty span, the way <code>redundant_slice_bound</code> tells an elided slice bound from a typed one.</p></div>
+
 
 
         </section>
@@ -158,6 +166,7 @@ none
           <div class="doc"><p>The variable of each [<code>search_loops</code>] the block <code>src</code> holds.</p></div>
 
 
+
         </section>
 
 
@@ -170,6 +179,7 @@ none
           <pre class="signature"><code>fn search_loop(self: Seq) -&#62; SearchLoop?</code></pre>
 
           <div class="doc"><p><code>self</code> as a [<code>SearchLoop</code>], when it is one.</p></div>
+
 
 
         </section>

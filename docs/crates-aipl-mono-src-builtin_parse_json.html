@@ -32,6 +32,7 @@
           <div class="doc"><p>The token kinds: three terminal classes that carry meaning, and one bare kind for the punctuation the grammar matches by <code>Lit</code>.</p><p><code>Str</code> keeps its delimiter-stripped contents (the lexer's <code>Delimited</code> computes them), but the concrete tree holds <em>spans</em>, not values — so lowering reads the quoted source text back out and strips it itself. The payload is what makes a string token tell itself apart from a number, which is all <code>Term</code> needs.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Str"><code>Str(str)</code>
@@ -68,6 +69,7 @@
           <pre class="signature"><code>variant Json</code></pre>
 
           <div class="doc"><p>The AST. <code>Number</code> keeps the source spelling (see the header); an <code>Object</code> keeps its members in source order, a repeated key included.</p></div>
+
 
 
           <ul class="cases">
@@ -118,6 +120,7 @@
           <div class="doc"><p>One <code>&quot;key&quot;: value</code> pair of an object.</p></div>
 
 
+
         </section>
 
 
@@ -130,6 +133,7 @@
           <pre class="signature"><code>pub fn json_grammar() -&#62; Grammar&#60;JsonTok, Json&#62;</code></pre>
 
           <div class="doc"><p>The JSON grammar, with <code>value</code> as the start rule.</p><p>Only <code>value</code> carries an <code>expect_as</code>, so a failure anywhere inside reports as &quot;a JSON value&quot; rather than as the six alternatives it is made of — the collapse that keeps a PEG's error messages readable.</p></div>
+
 
 
         </section>
@@ -146,6 +150,7 @@
           <div class="doc"><p>The lossless concrete tree for <code>src</code> — every byte of it under exactly one leaf, whitespace included. Use this when the tree is the point; <code>parse</code> when only the <code>Json</code> is.</p></div>
 
 
+
         </section>
 
 
@@ -158,6 +163,7 @@
           <pre class="signature"><code>pub fn parse(self: str) -&#62; Json!str</code></pre>
 
           <div class="doc"><p>The JSON <code>self</code> denotes: <code>ok(json)</code>, or <code>err(message)</code> saying what was expected, what was found and where (the message ends <code>(at byte N)</code>).</p><p>Strict JSON: no trailing commas, no comments, and one value per document. Numbers arrive as their source spelling (<code>Number(&quot;1e9&quot;)</code>), since JSON's number syntax is wider than any one AIPL type — reading one is the consumer's policy (<code>int_parse</code>). Strings are decoded for their escapes.</p></div>
+
 
 
         </section>
@@ -181,6 +187,7 @@
           <div class="doc"><p>Whitespace is recorded as <strong>trivia</strong> rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly. JSON has no comments, so trivia is whitespace and nothing else.</p><p>Rule order carries two decisions. <code>Float</code> sits ahead of <code>Int</code> because a bare digit run doesn't match <code>Float</code> and <code>1.5</code> would otherwise lex as <code>1</code> then a stray <code>.</code>. And <code>Exact(&quot;-&quot;)</code> sits ahead of both, which makes every <code>-</code> its own token and <code>Int</code> unsigned — so the sign is the <em>grammar's</em> business (<code>Maybe(Lit(&quot;-&quot;))</code> in <code>number</code>), one place, rather than split between a sign the lexer swallowed and one it didn't.</p></div>
 
 
+
         </section>
 
 
@@ -193,6 +200,7 @@
           <pre class="signature"><code>fn lower_member(src: str, node: Parts, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
           <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a <em>leaf</em> and so has no lowered value — the first of the node's own tokens is where it is read from. It lowers to the object holding just that member, which <code>object_of</code> joins with its siblings.</p></div>
+
 
 
         </section>
@@ -209,6 +217,7 @@
           <div class="doc"><p>The object holding every member of <code>members</code>, each a one-member object, in order.</p></div>
 
 
+
         </section>
 
 
@@ -221,6 +230,7 @@
           <pre class="signature"><code>fn unquote(s: str) -&#62; str</code></pre>
 
           <div class="doc"><p><code>s</code> without its first and last byte — a string token's surrounding quotes. The lexer guarantees both are there (a <code>Delimited</code> match spans them), so this needs no check of its own.</p></div>
+
 
 
         </section>
@@ -237,6 +247,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -249,6 +260,7 @@
           <pre class="signature"><code>fn parse_document(src: str) -&#62; Json!ParseError</code></pre>
 
           <div class="doc"><p>The <code>Json</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p></div>
+
 
 
         </section>

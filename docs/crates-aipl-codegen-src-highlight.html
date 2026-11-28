@@ -32,6 +32,7 @@
           <div class="doc"><p>One TextMate pattern, as data. Four shapes, which is every shape the grammars generated here use and every shape the oracle interprets.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Match"><code>Match(str, str)</code>
@@ -70,6 +71,7 @@
           <div class="doc"><p>One named repository entry: a list of patterns tried in order.</p></div>
 
 
+
         </section>
 
 
@@ -82,6 +84,7 @@
           <pre class="signature"><code>struct Tm</code></pre>
 
           <div class="doc"><p>A whole TextMate grammar. <code>top</code> is the pattern list applied to a file, and <code>repo</code> the named entries it and they reach through <code>Include</code> — including the conventional <code>main</code>, which is where a language's own patterns live so that a string interpolation can include the whole language back into itself.</p><p><code>note</code> becomes the top-level <code>comment</code> key, which the format reserves for exactly this and every consumer ignores. A generated file that does not say it is generated gets hand-edited, so it is not optional in practice.</p></div>
+
 
 
         </section>
@@ -98,6 +101,7 @@
           <div class="doc"><p><code>s</code> as a regex matching exactly <code>s</code>: every character the engine reads specially is backslash-escaped. Used for a rule's fixed spelling — an operator, a keyword, a delimiter.</p></div>
 
 
+
         </section>
 
 
@@ -110,6 +114,7 @@
           <pre class="signature"><code>pub fn re_escape_set(s: #{char}) -&#62; char[]</code></pre>
 
           <div class="doc"><p>The same escaping as <code>re_escape</code>, for a character <em>set</em> rather than a string: every character the engine reads specially is backslash-escaped. <code>set_map</code> rather than <code>map</code> because the receiver is a set, and <code>map</code> has no set form. The escaped pieces then <code>join</code> into the class body, in the set's own order.</p><p><code>set_map</code> may collapse, and here it provably doesn't: escaping is injective, so two distinct characters never produce the same piece.</p></div>
+
 
 
         </section>
@@ -126,6 +131,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -138,6 +144,7 @@
           <pre class="signature"><code>pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -&#62; Pat</code></pre>
 
           <div class="doc"><p>The TextMate pattern recognizing what <code>m</code> matches, painted <code>scope</code>. A matcher that scans between delimiters becomes a <code>Region</code>, and <code>esc_scope</code> is what its escape sequences are painted (<code>constant.character.escape.*</code>); every other matcher becomes a plain <code>Match</code>.</p><p>Total over <code>Matcher</code>, so a new matcher shape in <code>lexer.aipl</code> fails to compile here until it has a highlighting answer.</p></div>
+
 
 
         </section>
@@ -154,6 +161,7 @@
           <div class="doc"><p>The plain regex <code>m</code> matches, or <code>none</code> when <code>m</code> scans between delimiters and needs a whole region rather than one expression. The way to reuse a rule's own character classes in a pattern written by hand — a <code>fn NAME</code> declaration accepting exactly the names the identifier rule accepts.</p></div>
 
 
+
         </section>
 
 
@@ -166,6 +174,7 @@
           <pre class="signature"><code>pub fn template_inner(escapes: #{char}, esc_scope: str, punct_scope: str) -&#62; Pat[]</code></pre>
 
           <div class="doc"><p>What lies inside a template literal: its escapes and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The escapes always include the template's own <code>\{</code>/<code>\}</code>, listed ahead of the interpolation so an escaped brace is painted as one rather than opening it. The brace group comes first inside so a <code>{ .. }</code> <em>inside</em> the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p><p>The interpolation region is scoped as punctuation for the sake of its two braces — which are ordinary <code>{</code>/<code>}</code> tokens, and have to be painted as such — and every token between them is painted over by <code>main</code>'s own patterns. Same arrangement, and the same reason, as <code>brace_group_entry</code>.</p></div>
+
 
 
         </section>
@@ -182,6 +191,7 @@
           <div class="doc"><p>The repository entry an interpolation nests braces through: a <code>{ .. }</code> whose inside is the language again, itself included, so <code>{#{1, 2}}</code> and <code>{P { x: 1 }}</code> balance to the interpolation's own closing brace. A grammar with templates has to carry this entry, since <code>template_inner</code> refers to it.</p><p>The region is scoped as punctuation for the sake of its two braces — the only way to paint the closing one, since the model has no end capture — and every token between them is painted over by <code>main</code>'s own patterns.</p></div>
 
 
+
         </section>
 
 
@@ -194,6 +204,7 @@
           <pre class="signature"><code>struct Expansion</code></pre>
 
           <div class="doc"><p>What a rule set expands to: the patterns, in rule order, and the repository entries some of them need names for. A self-referential region can only be written as a named entry that includes itself, so the expansion cannot be a bare pattern list.</p></div>
+
 
 
         </section>
@@ -210,6 +221,7 @@
           <div class="doc"><p>One scoped rule reduced to what the merge below needs: its pattern, its scope, the regex when the pattern is a plain <code>Match</code>, and whether it has to become a named entry.</p></div>
 
 
+
         </section>
 
 
@@ -222,6 +234,7 @@
           <pre class="signature"><code>pub fn rule_pats&#60;K: any&#62;(rules: TokenRule&#60;K&#62;[], esc_scope: str) -&#62; Expansion</code></pre>
 
           <div class="doc"><p>The patterns <code>rules</code> describes, in rule order — one per rule, except that a run of consecutive rules sharing a scope collapses into a single ordered alternation, which is what turns twenty <code>Keyword</code> rules into one <code>\\bfn\\b|\\blet\\b|..</code>. Rules with no scope (whitespace, anything a highlighter should not paint) are dropped.</p><p>Order is preserved exactly, and regex alternation is ordered too, so a rule list written longest-spelling-first stays maximal munch. <code>esc_scope</code> paints the escape sequences inside delimited literals.</p><p>A self-referential region — a nestable block comment — comes back as an <code>Include</code> plus the named entry it refers to, since that shape cannot be written inline.</p></div>
+
 
 
         </section>
@@ -238,6 +251,7 @@
           <div class="doc"><p>A declaration: <code>keyword</code> then a name matching <code>name_re</code>, with the two halves painted <code>kw_scope</code> and <code>name_scope</code>. This is the one genuinely <em>syntactic</em> thing a highlighter does — a name means something different for standing after <code>fn</code> — and the only one a regex- and line-based target can express.</p><p>Pass <code>name_re</code> from the identifier rule's own matcher (<code>matcher_regex</code>) so the names a declaration accepts stay the names the lexer accepts. It must contain no capture groups of its own, which a character-class run never does.</p></div>
 
 
+
         </section>
 
 
@@ -250,6 +264,7 @@
           <pre class="signature"><code>pub fn word_pat(words: str[], scope: str) -&#62; Pat</code></pre>
 
           <div class="doc"><p>An alternation of whole words, all painted <code>scope</code> — for a class the lexer does not distinguish because it is decided after lexing, like the builtin type names that are lexically just identifiers.</p></div>
+
 
 
         </section>
@@ -266,6 +281,7 @@
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
 
+
         </section>
 
 
@@ -280,6 +296,7 @@
           <div class="doc"><p><code>s</code> as a JSON string literal, quotes included: backslashes and double quotes escaped, and the three whitespace control characters spelled as <code>\\n</code>, <code>\\t</code> and <code>\\r</code>. Nothing else in a generated grammar needs escaping — the regexes carry backslashes by the handful, which is the case that matters.</p></div>
 
 
+
         </section>
 
 
@@ -292,6 +309,7 @@
           <pre class="signature"><code>variant Kind</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -324,6 +342,7 @@
           <div class="doc"><p>The chars a regex reads specially outside a character class, and so that a literal spelling must escape. <code>-</code> is not among them: it is only special <em>inside</em> a class (see <code>class_char</code>).</p></div>
 
 
+
         </section>
 
 
@@ -336,6 +355,7 @@
           <pre class="signature"><code>let CLASS_META = &#34;&#34;&#34;\[]^-&#34;&#34;&#34;.to_set()</code></pre>
 
           <div class="doc"><p>The chars that must be escaped <em>inside</em> <code>[...]</code>, where the rules are different and much shorter.</p></div>
+
 
 
         </section>
@@ -352,6 +372,7 @@
           <div class="doc"><p>A regex character class accepting exactly the characters of <code>chars</code>, in the order given. Written out literally rather than collapsed into ranges: the class is data, the character set comes from a lexer rule that spells it out too, and a range is only a shorter way to say the same thing.</p></div>
 
 
+
         </section>
 
 
@@ -364,6 +385,7 @@
           <pre class="signature"><code>fn class_char(ch: char) -&#62; str</code></pre>
 
           <div class="doc"><p>One character inside a class: the control characters as their regex escapes (so the generated JSON carries no literal newline), the four class metacharacters backslashed, everything else verbatim.</p></div>
+
 
 
         </section>
@@ -380,6 +402,7 @@
           <div class="doc"><p>A backslash followed by one of <code>escapes</code> — what a delimited scan treats as an escape rather than as content.</p></div>
 
 
+
         </section>
 
 
@@ -392,6 +415,7 @@
           <pre class="signature"><code>fn stop_leaders(stops: str[]) -&#62; #{char}</code></pre>
 
           <div class="doc"><p>The first character of each stop spelling — what a negated class can be built from. Sliced rather than taken as a <code>char</code>, so the leaders arrive as the <code>str</code> a set is made from; a stop is never empty (a rule stopping on nothing would never advance), so every slice has a character in it.</p></div>
+
 
 
         </section>
@@ -408,6 +432,7 @@
           <div class="doc"><p>A negated character class: <code>[^ab]</code>, matching one character that is none of them.</p></div>
 
 
+
         </section>
 
 
@@ -420,6 +445,7 @@
           <pre class="signature"><code>fn escape_alternative(escapes: #{char}) -&#62; str</code></pre>
 
           <div class="doc"><p>The <code>\X|</code> alternative that lets an escaped stop stay inside a run, or nothing when the rule scans verbatim.</p></div>
+
 
 
         </section>
@@ -436,6 +462,7 @@
           <div class="doc"><p>The repository entry name a scope makes: its parts joined with <code>-</code>, without the trailing language suffix — <code>comment.block.aipl</code> becomes <code>comment-block</code>. Only a self-referential region needs one, so this is the whole naming scheme.</p></div>
 
 
+
         </section>
 
 
@@ -448,6 +475,7 @@
           <pre class="signature"><code>fn items_of&#60;K: any&#62;(rules: TokenRule&#60;K&#62;[], esc_scope: str) -&#62; Item[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -464,6 +492,7 @@
           <div class="doc"><p>One scoped rule as an <code>Item</code>: a plain regex match keeps its pattern text beside it (so a run of them can be merged into one alternation); any other pattern is carried whole.</p></div>
 
 
+
         </section>
 
 
@@ -476,6 +505,7 @@
           <pre class="signature"><code>fn merge_runs(items: Item[]) -&#62; Item[]</code></pre>
 
           <div class="doc"><p><code>items</code> with each maximal run of consecutive plain items sharing a scope collapsed into one alternation. Alternation is ordered, so the collapse preserves the priority the rule order encoded.</p></div>
+
 
 
         </section>
@@ -492,6 +522,7 @@
           <div class="doc"><p>How many of the items at the front of <code>items</code> merge into one: 1 unless the first is a plain <code>Match</code> and the items after it are too and share its scope (and 0 for no items at all).</p></div>
 
 
+
         </section>
 
 
@@ -504,6 +535,7 @@
           <pre class="signature"><code>fn self_referential(m: Matcher) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether a matcher's pattern has to refer to itself — a depth-tracked region, which is the only shape that cannot be written inline. Exhaustive on purpose: a new matcher shape has to answer this before it compiles.</p></div>
+
 
 
         </section>
@@ -520,6 +552,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -532,6 +565,7 @@
           <pre class="signature"><code>fn pat_json(p: Pat) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -548,6 +582,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -560,6 +595,7 @@
           <pre class="signature"><code>fn fld(key: str, value: str) -&#62; str</code></pre>
 
           <div class="doc"><p>One <code>&quot;key&quot;: value</code> line, where <code>value</code> is already JSON.</p></div>
+
 
 
         </section>
@@ -576,6 +612,7 @@
           <div class="doc"><p><code>&quot;key&quot;: [ .. ]</code>, one item per line. Items arrive rendered at column 0 and are indented here, which is what keeps every renderer below indentation-free.</p></div>
 
 
+
         </section>
 
 
@@ -588,6 +625,7 @@
           <pre class="signature"><code>fn obj_fld(key: str, entries: str[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -604,6 +642,7 @@
           <div class="doc"><p><code>&quot;key&quot;: { &quot;&lt;base&gt;&quot;: { &quot;name&quot;: &quot;..&quot; }, .. }</code> — the capture-scope map, whose keys are group numbers counting from <code>base</code> (1 for <code>captures</code>, 0 for <code>beginCaptures</code>, which scopes the whole opening match).</p></div>
 
 
+
         </section>
 
 
@@ -616,6 +655,7 @@
           <pre class="signature"><code>fn inline_arr(items: str[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -632,6 +672,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -644,6 +685,7 @@
           <pre class="signature"><code>fn json_char(ch: char) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>

@@ -32,6 +32,7 @@
           <div class="doc"><p>A <code>match</code> of exactly an <code>ok(ok_binder)</code> arm and an <code>err(err_binder)</code> arm, in either order: the value matched, and each arm's binder and body.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn result_match(self: Match) -&#62; ResultMatch?</code></pre>
 
           <div class="doc"><p><code>self</code> as a [<code>ResultMatch</code>], when it is one. Each side binds exactly its payload; a catch-all, a third arm, <code>ok(..)</code> or a payload-less <code>ok</code> make it something else.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>Whether <code>self</code> is <code>constructor(binder)</code>: the arm hands its own binding straight back to the constructor it came from.</p></div>
 
 
+
         </section>
 
 
@@ -74,6 +77,7 @@
           <div class="doc"><p>Whether <code>self</code> is <code>constructor(..)</code> of something other than <code>binder</code>: the arm builds a new value for the side it came from.</p></div>
 
 
+
         </section>
 
 
@@ -86,6 +90,7 @@
           <pre class="signature"><code>pub fn wraps_with(self: Expr, constructor: Callee) -&#62; Expr?</code></pre>
 
           <div class="doc"><p>The one argument of <code>self</code>, when it is a call to <code>constructor</code>.</p></div>
+
 
 
         </section>
@@ -107,6 +112,7 @@
           <pre class="signature"><code>fn ok_arm_flags(body: str) -&#62; str!ParseFailure</code></pre>
 
           <div class="doc"><p>What [<code>passes_through</code>] and [<code>rebuilds</code>] say of the <code>ok</code> arm's body <code>body</code>, in a <code>match</code> over a result.</p></div>
+
 
 
         </section>

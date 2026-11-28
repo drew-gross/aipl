@@ -32,6 +32,7 @@
           <div class="doc"><p>Where a rule sits in its parent, which is all that decides whether it needs parentheses. <code>Alt</code> is a production's whole right-hand side, where nothing binds looser and even a choice renders bare; <code>Seq</code> is one element of a sequence, where a choice needs parentheses but a nested sequence does not (concatenation is associative, so it flattens); <code>Item</code> is the operand of a postfix <code>?</code>/<code>*</code>/<code>+</code>, where both need them.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Alt"><code>Alt</code>
@@ -65,6 +66,7 @@
           <div class="doc"><p><code>g</code> rendered as EBNF: one <code>name = rule ;</code> line per production, in grammar order, with no trailing newline.</p><p>Sequence is juxtaposition, choice is <code>|</code>, and repetition is the postfix <code>?</code> (<code>Maybe</code>), <code>*</code> (<code>Many</code> with minimum 0) and <code>+</code> (<code>Many</code> with minimum 1); a higher minimum renders as <code>{n,}</code>. A separated <code>Many</code> and a <code>Climb</code> have no EBNF operator and are expanded — the list into its separator longhand, the climb into <code>atom (op atom)*</code> plus a <code>(* precedence: ... *)</code> note, since EBNF cannot express binding power.</p><p>Total, like <code>cst.aipl</code>'s <code>show</code>: a grammar may be dumped linked or unlinked, and a reference that resolves to nothing renders as <code>?</code> rather than failing.</p></div>
 
 
+
         </section>
 
 
@@ -77,6 +79,7 @@
           <pre class="signature"><code>struct First&#60;K: variant&#62;</code></pre>
 
           <div class="doc"><p>What one production (or one rule) can begin with: the token <em>kinds</em> (as <code>Term</code> matches them) and the exact <em>spellings</em> (as <code>Literal</code> does) a match can start on, and whether it can match nothing at all. Kinds and spellings are kept apart because the two tests are different — a kind ignores the token's text, a spelling ignores its kind — so a set holding the kind <code>Num</code> and one holding the spelling <code>&quot;1&quot;</code> are not the same set even where they accept the same token. <code>nullable</code> is not a property of the sets — empty sets with <code>nullable: true</code> are a rule that matches only emptiness, and non-empty ones with it are a rule that may or may not consume — so all three travel together.</p><p>Every field defaults to &quot;nothing&quot;: <code>First {}</code> is the set that begins with no token and cannot match empty — a dead rule, and the seed a fixed point starts from — and a literal names only what a rule contributes (<code>First { kinds: #{k} }</code>, <code>First { nullable: true }</code>).</p></div>
+
 
 
         </section>
@@ -93,6 +96,7 @@
           <div class="doc"><p>The FIRST set of every production of <code>g</code>, in grammar order: the terminals a match of that production can begin with, and whether it can match nothing.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent. Fails only the way <code>link</code> fails — an unresolved reference, or a duplicate rule name.</p><p>Computed as a fixed point, so a reference reaching back through the production it started from is fine, left recursion included: the sets only grow, and the loop stops on the round that changes nothing.</p></div>
 
 
+
         </section>
 
 
@@ -105,6 +109,7 @@
           <pre class="signature"><code>pub fn rule_first&#60;K: variant&#62;(r: LinkedRule&#60;K&#62;, sets: First&#60;K&#62;[]) -&#62; First&#60;K&#62;!ParseError</code></pre>
 
           <div class="doc"><p>What an arbitrary rule can begin with, given <code>sets</code> — the FIRST sets of the grammar's productions, as <code>first_sets</code> returns them.</p><p>This is the piece a driver would prune a <code>OneOf</code> with: <code>first_sets</code> once per grammar, then this per alternative. Fails on a <code>Named</code> reference, which means the rule came from an unlinked grammar, and on a <code>NamedIdx</code> pointing past the end of <code>sets</code>.</p><p>Takes a <em>linked</em> rule, which is also a desugared one: a <code>Many</code> still carrying <code>nested_in</code> would report what its items begin with rather than its opening bracket. <code>link</code> writes the shorthand out, so anything that has been through it is safe here.</p></div>
+
 
 
         </section>
@@ -121,6 +126,7 @@
           <div class="doc"><p>Whether a token of kind <code>kind</code> spelled <code>text</code> could begin a match of <code>self</code> — the test a driver skips an alternative on.</p><p>A nullable rule accepts anything, because it can match without consuming the token at all; otherwise the token's kind is looked for among the set's kinds and its spelling among the set's spellings. Conservative in the direction that matters: it is never false for a token that could in fact start a match, so pruning on it cannot lose a parse.</p></div>
 
 
+
         </section>
 
 
@@ -133,6 +139,7 @@
           <pre class="signature"><code>pub fn show_first&#60;K: variant&#62;(self: First&#60;K&#62;) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> as one readable line: the kinds by case name, then the spellings in double quotes, each set in its own order — with <code>&lt;empty&gt;</code> appended when the rule is nullable. A debug rendering, like <code>cst.aipl</code>'s <code>show</code>.</p></div>
+
 
 
         </section>
@@ -149,6 +156,7 @@
           <div class="doc"><p><code>first_sets</code> rendered one <code>name = terminals</code> line per production, in grammar order, with no trailing newline — the FIRST-set counterpart of <code>ebnf</code>, and what makes a whole grammar's sets one readable assertion.</p></div>
 
 
+
         </section>
 
 
@@ -161,6 +169,7 @@
           <pre class="signature"><code>variant Tok</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -194,6 +203,7 @@
           <pre class="signature"><code>variant Node</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -231,6 +241,7 @@
           <div class="doc"><p>One production's line, plus the precedence note if its rule climbs. The note hangs off the <em>line</em> rather than off the climb it describes, so a <code>Climb</code> nested inside a sequence still reads as one uninterrupted rule.</p></div>
 
 
+
         </section>
 
 
@@ -243,6 +254,7 @@
           <pre class="signature"><code>fn desugared&#60;K: variant, A: any&#62;(p: Production&#60;K, A&#62;) -&#62; Production&#60;K, A&#62;</code></pre>
 
           <div class="doc"><p><code>p</code> with its rule's shorthand written out; the rule unchanged if desugaring refuses it, since a dump is a debug rendering and should not fail.</p></div>
+
 
 
         </section>
@@ -259,6 +271,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -271,6 +284,7 @@
           <pre class="signature"><code>fn rep_suffix(min: u64, max: u64?) -&#62; str</code></pre>
 
           <div class="doc"><p><code>*</code>, <code>+</code>, <code>?</code>, or the <code>{n,}</code> / <code>{n,m}</code> longhand for the bounds EBNF has no operator for.</p><p>A repetition bounded at one item is not a repetition: <code>min=1, max=1</code> is the body written on its own, and <code>min=0, max=1</code> is <code>?</code> — the same thing <code>Maybe</code> renders as, because it is the same rule.</p></div>
+
 
 
         </section>
@@ -287,6 +301,7 @@
           <div class="doc"><p>A separated list, longhand: the first item, then as many <code>sep item</code> pairs as the minimum demands and more — with an optional <code>sep</code> in front when the list allows a leading one, and one behind when it allows a trailing one. The outer <code>?</code> on a zero-minimum list is not decoration — an empty list is a list, so the whole thing is optional.</p></div>
 
 
+
         </section>
 
 
@@ -299,6 +314,7 @@
           <pre class="signature"><code>fn render_climb&#60;K: variant&#62;(atom: Rule&#60;K&#62;, precs: Prec[], names: str[], ctx: Ctx) -&#62; str</code></pre>
 
           <div class="doc"><p>A climb, flattened: every operator of every level in one alternation. The nesting that binding power produces is stated in <code>prec_note</code> instead — writing it structurally would need one EBNF production per level, and inlining those doubles the atom's text per level.</p></div>
+
 
 
         </section>
@@ -315,6 +331,7 @@
           <div class="doc"><p>Every operator spelling in <code>precs</code>, each once.</p></div>
 
 
+
         </section>
 
 
@@ -327,6 +344,7 @@
           <pre class="signature"><code>fn climb_precs&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; Prec[]</code></pre>
 
           <div class="doc"><p>The precedence levels of the first <code>Climb</code> in <code>r</code>, or <code>[]</code> when it has none. A rule holding two climbs is not a shape any grammar here writes; the first is what the note describes.</p></div>
+
 
 
         </section>
@@ -343,6 +361,7 @@
           <div class="doc"><p>The levels of the first rule in <code>rs</code> that holds a climb, or <code>[]</code>.</p></div>
 
 
+
         </section>
 
 
@@ -355,6 +374,7 @@
           <pre class="signature"><code>fn prec_note(precs: Prec[]) -&#62; str</code></pre>
 
           <div class="doc"><p><code>(* precedence: &quot;*&quot; &gt; &quot;+&quot; &quot;-&quot; *)</code> — the levels loosest-last, each one its operators, with a right-associative level marked. Empty when there is nothing to say.</p></div>
+
 
 
         </section>
@@ -371,6 +391,7 @@
           <div class="doc"><p>The distinct binding powers in <code>precs</code>, tightest first — an ordered set, so the dedup and the order are the type's: <code>to_set</code> builds the <code>#&gt;{u64}</code> the return type asks for.</p></div>
 
 
+
         </section>
 
 
@@ -383,6 +404,7 @@
           <pre class="signature"><code>fn level_text(precs: Prec[], power: u64) -&#62; str</code></pre>
 
           <div class="doc"><p>One level: its operators, gathered across every <code>Prec</code> sharing that power, since a power written twice is one level as far as binding goes.</p></div>
+
 
 
         </section>
@@ -399,6 +421,7 @@
           <div class="doc"><p>Everything either of <code>self</code> and <code>other</code> can begin with — the union of both sets, nullable when either is: what a choice between the two can begin with, and what a sequence can once its head has been found nullable.</p></div>
 
 
+
         </section>
 
 
@@ -411,6 +434,7 @@
           <pre class="signature"><code>fn linked_first_sets&#60;K: variant, A: any&#62;(g: LinkedGrammar&#60;K, A&#62;) -&#62; First&#60;K&#62;[]!ParseError</code></pre>
 
           <div class="doc"><p>The fixed point itself, over an already-linked grammar. Split out because the loop reads whole productions and <code>link</code> returns a whole grammar, and a <code>let</code> binding that only ever has its fields read is a lint.</p></div>
+
 
 
         </section>
@@ -427,6 +451,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -439,6 +464,7 @@
           <pre class="signature"><code>fn fixture() -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
 
           <div class="doc"><p>A grammar with one production per shape worth rendering: a separated list, a sequence, a precedence climb over two levels, an ordered choice with a nested sequence in it, and an optional prefix in front of a one-or-more.</p></div>
+
 
 
         </section>

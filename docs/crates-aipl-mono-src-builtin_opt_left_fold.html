@@ -32,6 +32,7 @@
           <div class="doc"><p>Combine the elements left to right with a <em>fallible</em> combiner, starting from <code>init</code>: <code>f</code> returns <code>A?</code>, and the first <code>none</code> ends the fold with <code>none</code> — the remaining elements are never visited. All-<code>some</code> folds to <code>some(result)</code>, exactly as <code>left_fold</code> would; an empty array folds to <code>some(init)</code>.</p><p>Since the combiner's body may use <code>?</code>, a fold that can fail reads as one expression: <code>s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))</code>.</p><p>Import it as plain <code>opt_fold</code> — <code>import { opt_left_fold as opt_fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>opt_left_fold</code> only in a file that also imports <code>opt_right_fold</code>.</p></div>
 
 
+
         </section>
 
 

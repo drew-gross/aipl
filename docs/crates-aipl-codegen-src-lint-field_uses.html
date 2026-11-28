@@ -32,6 +32,7 @@
           <div class="doc"><p>How a name is used inside an expression. <code>mentions == field_reads</code> is the whole question: it says the value itself is never used, only its parts, which is exactly when a pattern can replace it.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn uses_of(self: Expr, name: str) -&#62; Uses</code></pre>
 
           <div class="doc"><p>How <code>name</code> is used inside <code>self</code>.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>The fields <code>self</code> reads off <code>name</code>, when every use of <code>name</code> in it is a field read and nothing holds a pattern back: the name is not rebound, no field is also read off another value, none is a tuple position, and no field's name is already spoken for in <code>self</code>. <code>reads</code> are the field reads in scope of <code>name</code>, which is what tells a field read off two values apart.</p><p><code>value</code> is what a <code>let</code> binds <code>name</code> to. It runs before the pattern binds anything, so the reads in it do not count against a field and no name in it is exempt; a parameter or a slot has none.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>pub fn is_name(self: Expr, name: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is the bare name <code>name</code>.</p></div>
+
 
 
         </section>
@@ -88,6 +92,7 @@
           <div class="doc"><p>Whether <code>self</code> mentions any of <code>names</code> as a bare identifier, ignoring <code>skip</code>.</p></div>
 
 
+
         </section>
 
 
@@ -102,6 +107,7 @@
           <div class="doc"><p>Whether one of <code>self</code> is read off more than one base, discounting the reads in <code>inside</code> — a <code>let</code>'s own right-hand side, whose reads run before the pattern binds anything. A pair read as often inside as anywhere has no read outside it, so it counts for nothing.</p></div>
 
 
+
         </section>
 
 
@@ -114,6 +120,7 @@
           <pre class="signature"><code>pub fn is_tuple_field(self: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is a tuple position (<code>t._0</code>).</p><p>No struct pattern can take a tuple apart — there is no type name to write — and <code>let (a, b) = t;</code> has to name every position, where the lints see only the ones that were read. So tuples are left alone rather than advised into a pattern that would not compile.</p></div>
+
 
 
         </section>
@@ -137,6 +144,7 @@
           <div class="doc"><p>Whether <code>self</code> introduces a binding called <code>name</code>, in any of the positions that can: the two <code>let</code> forms, a lambda parameter, a loop variable, a destructuring pattern's binders, and a match arm's payload binders.</p></div>
 
 
+
         </section>
 
 
@@ -149,6 +157,7 @@
           <pre class="signature"><code>fn bases_outside(field: str, everywhere: Read[], inside: Read[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The distinct bases <code>field</code> is read off, counting only those read somewhere other than <code>inside</code>.</p></div>
+
 
 
         </section>

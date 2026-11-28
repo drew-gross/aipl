@@ -32,6 +32,7 @@
           <div class="doc"><p>One entry of a <code>#{ .. }</code> literal, before it is known whether the literal is a set or a dict. Every entry has to be one or the other consistently, and the entries are not all in scope until the whole body is lowered — so the decision belongs to <code>atom</code>, and this is what <code>brace_body</code> hands it.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Key"><code>Key(Expr)</code>
@@ -60,6 +61,7 @@
           <div class="doc"><p><code>#{ .. }</code> — a set, a dict, or an empty of either, which is both until its use site says. Mixing the two spellings is refused here, where the whole body is in scope for the first time. An ordered <code>#&gt;{ .. }</code> / <code>#&lt;{ .. }</code> is a set and nothing else: a pair in one is refused too.</p></div>
 
 
+
         </section>
 
 
@@ -81,6 +83,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -95,6 +98,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -107,6 +111,7 @@
           <pre class="signature"><code>fn brace_mix_message() -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>

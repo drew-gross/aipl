@@ -32,6 +32,7 @@
           <div class="doc"><p>Add <code>element</code> to the set <code>self</code> names. A set that already holds it is left as it was.</p><p>It is a <code>mut self</code> method, so it is written as a statement — <code>set seen.insert(source);</code> — and writes the grown set back into the place it was given, a name or a field path off one. It is <code>set seen = #{..seen, source};</code> said once: the element added is the only thing the line names, and the set's other contents never come up. A set literal that spreads in another set (<code>#{..seen, ..more}</code>) adds a whole set at a time, which this does not; <code>union</code> is that.</p><p>An ordered set (<code>#&gt;{T}</code>, <code>#&lt;{T}</code>) is refused: the grown set is written back as an unordered one, and the checker reports it does not fit the ordered binding.</p></div>
 
 
+
         </section>
 
 

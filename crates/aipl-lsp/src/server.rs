@@ -585,6 +585,17 @@ impl Server {
             markdown.push_str("\n\n");
             markdown.push_str(doc);
         }
+        // The documented parameters of a function, each with its own lines, as the docs page
+        // lists them.
+        for slot in &symbol.slots {
+            if let Some(doc) = &slot.doc {
+                markdown.push_str(&format!(
+                    "\n\n- `{}` — {}",
+                    slot.detail,
+                    doc.split_whitespace().collect::<Vec<_>>().join(" ")
+                ));
+            }
+        }
         json!({
             "contents": { "kind": "markdown", "value": markdown },
             "range": LineIndex::new(text).range(&span),

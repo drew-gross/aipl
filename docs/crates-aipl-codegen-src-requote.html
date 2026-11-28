@@ -32,6 +32,7 @@
           <div class="doc"><p>A string token's source text, respelled as whichever of the four string spellings — <code>&quot;…&quot;</code>, <code>`…`</code>, <code>&quot;&quot;&quot;…&quot;&quot;&quot;</code>, <code>```…```</code> — needs the fewest escapes for its value. Ties go to a single-line form over a block (one line rather than three, or one delimiter rather than three), and then to the family the token already has (quotes or backticks), so a literal with nothing to gain is never rewritten. A value holding a newline is what the block forms are for: a block keeps its lines, and a <code>&quot;…&quot;</code>/<code>`…`</code> with <code>\n</code> escapes only ever swaps between those two (<code>reswap</code>).</p></div>
 
 
+
         </section>
 
 
@@ -46,6 +47,7 @@
           <div class="doc"><p>One way of spelling a value, and what it costs: the escapes it needs, whether it is a block, and whether it changes the token's family (quotes to backticks or back). <code>text</code> is the spelling itself.</p></div>
 
 
+
         </section>
 
 
@@ -58,6 +60,7 @@
           <pre class="signature"><code>pub fn retemplate(raw: bool, segs: str[], interps: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p>An interpolated template respelled between its two forms — <code>`…{e}…`</code> and <code>```…{e}…```</code> — by the same rule as a string: fewest escapes, then the single-backtick form, then the form it has. <code>segs</code> are the source texts of the template's literal segments (between the delimiters and the interpolation braces), <code>interps</code> the interpolations' source, which is the same in both forms and is copied through; <code>raw</code> says which form the source used. A template holding a newline stays as written.</p><p>The two forms share the brace escapes <code>\{</code>/<code>\}</code>; a single-backtick segment also escapes <code>\\</code>, <code>\`</code> and the control characters, which a raw segment holds verbatim — so a raw segment can become a single one when it holds no backslash (beyond a brace escape) and no backtick, and a single segment can become a raw one when its only escapes are braces, backslashes and backticks (a control-character escape has no raw spelling), which saves every backslash and backtick escape it has.</p></div>
+
 
 
         </section>
@@ -81,6 +84,7 @@
           <div class="doc"><p>Whether <code>self</code> must be written escaped inside a single-line literal delimited by <code>delim</code>: the delimiter itself, plus <code>{</code>/<code>}</code> under a backtick, where a bare brace would open an interpolation. Every other escape (<code>\n</code>, <code>\t</code>, <code>\r</code>, <code>\\</code>) is spelled the same under both delimiters.</p></div>
 
 
+
         </section>
 
 
@@ -93,6 +97,7 @@
           <pre class="signature"><code>fn is_shared_escape(self: char) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>\X</code> with <code>self</code> as X is an escape both delimiters share — so a swap copies it as-is rather than deciding it afresh for the new delimiter.</p></div>
+
 
 
         </section>
@@ -109,6 +114,7 @@
           <div class="doc"><p>How many escapes <code>body</code> — the source text between a literal's delimiters, escapes undecoded — would need under <code>delim</code>. A <code>\X</code> pair counts as the one char X, so <code>\&quot;</code> costs one under <code>&quot;</code> and nothing under a backtick, exactly as a bare <code>&quot;</code> does.</p></div>
 
 
+
         </section>
 
 
@@ -121,6 +127,7 @@
           <pre class="signature"><code>fn redelimit(body: str, delim: char) -&#62; str</code></pre>
 
           <div class="doc"><p><code>body</code> respelled for <code>delim</code>: an escape the old delimiter needed and this one doesn't is dropped (<code>\&quot;</code> → <code>&quot;</code> under a backtick), a bare char this one needs escaped gains its backslash (<code>{</code> → <code>\{</code>), and everything else — the shared escapes, plain text — copies verbatim. Respelling for the delimiter <code>body</code> already has is the identity.</p></div>
+
 
 
         </section>
@@ -137,6 +144,7 @@
           <div class="doc"><p>Whether a token spells a <code>&quot;&quot;&quot;</code>/<code>```</code> block.</p></div>
 
 
+
         </section>
 
 
@@ -149,6 +157,7 @@
           <pre class="signature"><code>fn reswap(self: str) -&#62; str</code></pre>
 
           <div class="doc"><p>The <code>&quot;</code>/<code>`</code> swap for a single-line literal whose value holds a newline — the one case not spelled from the value, because <code>&quot;a\nb&quot;</code> and a block are not the same number of lines and the escape is what keeps it on one. Copies the source and moves only the delimiter-specific escapes (<code>redelimit</code>); a tie keeps the delimiter it has.</p></div>
+
 
 
         </section>
@@ -165,6 +174,7 @@
           <div class="doc"><p>Whether a one-line <code>value</code> can be the content of a single-line block opened and closed by three <code>delim</code>s: it must not start or end with the delimiter or contain the triple (the block's scan would close early), must not start with a space (de-denting strips it), and must hold no control character (a block has no escapes to spell one with).</p></div>
 
 
+
         </section>
 
 
@@ -177,6 +187,7 @@
           <pre class="signature"><code>fn better(self: Spelling, other: Spelling) -&#62; Spelling</code></pre>
 
           <div class="doc"><p>The better of <code>self</code> and <code>other</code>: fewer escapes, then not a block, then the family the token already has — <code>self</code> on a tie, so the caller's order is the last word.</p></div>
+
 
 
         </section>
@@ -193,6 +204,7 @@
           <div class="doc"><p><code>value</code> as the content of a raw template: verbatim but for its braces, the one escape that form decodes (<code>unescape_braces</code>) — a bare one would open an interpolation.</p></div>
 
 
+
         </section>
 
 
@@ -205,6 +217,7 @@
           <pre class="signature"><code>fn single_cost(value: str, delim: char) -&#62; u64</code></pre>
 
           <div class="doc"><p>How many escapes <code>value</code> needs as a single-line literal under <code>delim</code>: the delimiter's own (<code>needs_escape</code>) plus the ones every single-line form spells — a backslash, a tab, a carriage return — which a block spells with none.</p></div>
+
 
 
         </section>
@@ -221,6 +234,7 @@
           <div class="doc"><p><code>value</code> as the body of a single-line literal delimited by <code>delim</code>: the shared escapes for a backslash, tab and carriage return, and the delimiter's own escapes (<code>needs_escape</code>); everything else verbatim.</p></div>
 
 
+
         </section>
 
 
@@ -233,6 +247,7 @@
           <pre class="signature"><code>fn raw_seg_fits_single(self: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether a raw template segment's source can be a single-backtick segment as it is: no backtick, no control character, and no backslash but a brace escape's — anything else would need an escape the raw form never wrote.</p></div>
+
 
 
         </section>
@@ -249,6 +264,7 @@
           <div class="doc"><p>Whether a single-backtick segment's source can be a raw segment: its only escapes are braces and backslashes, and no backslash it spells lands next to a brace — the interpolation's, at the segment's end, or an escaped one within — where the raw form would read the pair as its brace escape. A control-character escape has no raw spelling, and a backtick escape is refused too: a bare backtick next to the closing delimiter would read as part of it.</p></div>
 
 
+
         </section>
 
 
@@ -261,6 +277,7 @@
           <pre class="signature"><code>fn single_seg_saves(self: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether going raw would save a single-backtick segment an escape: it spells a backslash.</p></div>
+
 
 
         </section>
@@ -277,6 +294,7 @@
           <div class="doc"><p>A single-backtick segment respelled raw: its backslash escapes become the backslash; the brace escapes stay, being the raw form's own.</p></div>
 
 
+
         </section>
 
 
@@ -289,6 +307,7 @@
           <pre class="signature"><code>fn join_template(raw: bool, segs: str[], interps: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The template's source text from its parts: the delimiter, the segments with each interpolation braced between them, the delimiter.</p></div>
+
 
 
         </section>

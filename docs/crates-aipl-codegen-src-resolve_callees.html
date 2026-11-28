@@ -32,6 +32,7 @@
           <div class="doc"><p>The tree the lints are handed: a program whose every call says what it is to.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>variant ResolvedItem = Item without Unresolved throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>variant ResolvedKind = ExprKind without Unresolved throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -88,6 +92,7 @@
           <div class="doc"><p><code>self</code> with the <code>callee</code> of each call in it decided.</p></div>
 
 
+
         </section>
 
 
@@ -100,6 +105,7 @@
           <pre class="signature"><code>pub fn resolve_with_every_builtin(self: Program) -&#62; ResolvedProgram</code></pre>
 
           <div class="doc"><p><code>self</code> resolved as if the file imported every builtin under its own name, and each operator as the first named builtin that provides it, besides whatever it does import. A function of the file's own hides a builtin of the same name. A lint's own tests read the calls this way, so they say what the lint does with a shape and nothing about what the file imports.</p></div>
+
 
 
         </section>
@@ -116,6 +122,7 @@
           <div class="doc"><p><code>self</code> resolved as in a file that imports each of <code>names</code> from builtins under its own name and has nothing else in scope: what a test of a helper over a bare block needs.</p></div>
 
 
+
         </section>
 
 
@@ -128,6 +135,7 @@
           <pre class="signature"><code>pub fn imported_callees(self: Item[]) -&#62; #{str: Callee}</code></pre>
 
           <div class="doc"><p>What each import from a builtins library brings, by the name the file calls it.</p></div>
+
 
 
         </section>
@@ -144,6 +152,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -156,6 +165,7 @@
           <pre class="signature"><code>variant ResolvedParam = Param without Unresolved throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -172,6 +182,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -184,6 +195,7 @@
           <pre class="signature"><code>variant ResolvedCaseParam = CaseParam without Unresolved throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -200,6 +212,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -212,6 +225,7 @@
           <pre class="signature"><code>variant ResolvedCallee = Callee without Unresolved</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -228,6 +242,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -240,6 +255,7 @@
           <pre class="signature"><code>variant ResolvedMatchArm = MatchArm without Unresolved throughout</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -263,6 +279,7 @@
           <div class="doc"><p>The name of the function <code>self</code> declares.</p></div>
 
 
+
         </section>
 
 
@@ -275,6 +292,7 @@
           <pre class="signature"><code>fn callees_called(self: Item[]) -&#62; Callee[]</code></pre>
 
           <div class="doc"><p>The callee of each call in the program's functions and defaults, outermost first.</p></div>
+
 
 
         </section>
@@ -291,6 +309,7 @@
           <div class="doc"><p>Every expression a declaration holds at its top: a function's body and parameter defaults, a struct field's default, a variant case slot's default, a constant's value.</p></div>
 
 
+
         </section>
 
 
@@ -303,6 +322,7 @@
           <pre class="signature"><code>fn own_method_pairs(self: Item[]) -&#62; (str, Callee)[]</code></pre>
 
           <div class="doc"><p>The file's own functions that take <code>self</code> first, as <code>(name, callee)</code>: a call to one can be written <code>recv.f(..)</code>.</p></div>
+
 
 
         </section>
@@ -319,6 +339,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -331,6 +352,7 @@
           <pre class="signature"><code>fn imported_pairs(self: Import, table: BuiltinEntry[]) -&#62; (str, Callee)[]</code></pre>
 
           <div class="doc"><p>The builtins <code>self</code> imports, as <code>(local name, callee)</code>.</p></div>
+
 
 
         </section>
@@ -347,6 +369,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -359,6 +382,7 @@
           <pre class="signature"><code>fn imported_pair(self: ImportName, library: str, table: BuiltinEntry[]) -&#62; (str, Callee)?</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -375,6 +399,7 @@
           <div class="doc"><p><code>self</code> with every call in it resolved against <code>imported</code>. A declaration's defaults are expressions too, and no local is in scope for them.</p></div>
 
 
+
         </section>
 
 
@@ -387,6 +412,7 @@
           <pre class="signature"><code>fn resolved_function(self: Function, imported: #{str: Callee}) -&#62; ResolvedFunction</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -403,6 +429,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -415,6 +442,7 @@
           <pre class="signature"><code>fn resolved_field(self: FieldDecl, imported: #{str: Callee}) -&#62; ResolvedFieldDecl</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -431,6 +459,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -443,6 +472,7 @@
           <pre class="signature"><code>fn resolved_slot(self: CaseParam, imported: #{str: Callee}) -&#62; ResolvedCaseParam</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -459,6 +489,7 @@
           <div class="doc"><p><code>self</code>, which the import table gives, as a callee that is decided: the table lists no <code>Unresolved</code>, so the case here only keeps the type honest.</p></div>
 
 
+
         </section>
 
 
@@ -471,6 +502,7 @@
           <pre class="signature"><code>fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedCallee</code></pre>
 
           <div class="doc"><p>What the call to <code>name</code> is to, where <code>locals</code> are the names in scope that hold a value.</p></div>
+
 
 
         </section>
@@ -487,6 +519,7 @@
           <div class="doc"><p><code>self</code> with every call resolved: against <code>imported</code>, except where a name in <code>locals</code> hides it.</p></div>
 
 
+
         </section>
 
 
@@ -499,6 +532,7 @@
           <pre class="signature"><code>fn resolved_kind(self: ExprKind, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedKind</code></pre>
 
           <div class="doc"><p><code>self</code> with every call under it resolved. A name is hidden by the binders in scope, which a construct that binds adds for the part it binds over.</p></div>
+
 
 
         </section>
@@ -515,6 +549,7 @@
           <div class="doc"><p>The names an optional loop index binds.</p></div>
 
 
+
         </section>
 
 
@@ -529,6 +564,7 @@
           <div class="doc"><p><code>self</code> with its value resolved.</p></div>
 
 
+
         </section>
 
 
@@ -541,6 +577,7 @@
           <pre class="signature"><code>fn resolved_arm(self: MatchArm, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedMatchArm</code></pre>
 
           <div class="doc"><p><code>self</code> with its body resolved where the names its pattern binds are in scope.</p></div>
+
 
 
         </section>

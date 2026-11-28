@@ -32,6 +32,7 @@
           <div class="doc"><p><code>program</code> with every <code>.test</code> block and its helpers, and every <code>.benchmark</code> block, moved out to top-level functions of their own.</p></div>
 
 
+
         </section>
 
 
@@ -53,6 +54,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -65,6 +67,7 @@
           <pre class="signature"><code>fn lowered(self: Function) -&#62; Item</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -81,6 +84,7 @@
           <div class="doc"><p><code>f</code>, then its helpers, then the function standing for its <code>.benchmark</code> block and that block's helpers, each followed by the function its own <code>.test</code> block is.</p></div>
 
 
+
         </section>
 
 
@@ -93,6 +97,7 @@
           <pre class="signature"><code>fn benchmark_function(self: Function, span: Span) -&#62; Function</code></pre>
 
           <div class="doc"><p>The function standing for a <code>.benchmark</code> block on <code>self</code>, with an empty body: the block itself is its <code>.test</code> body. Named at the attribute, which is where a diagnostic about the function itself points.</p></div>
+
 
 
         </section>
@@ -109,6 +114,7 @@
           <div class="doc"><p><code>self</code> followed by the functions declared in its <code>.test</code> block, renamed, each with the function its own block is. A function with no helpers is itself.</p></div>
 
 
+
         </section>
 
 
@@ -121,6 +127,7 @@
           <pre class="signature"><code>fn with_test_function(self: Function, test_body: Expr?) -&#62; Function[]</code></pre>
 
           <div class="doc"><p><code>self</code>, and the function its <code>.test</code> block is: <code>__test$&lt;self&gt;</code>, with no parameters and the block as its body, which declares <code>measure</code> when it is a <code>.benchmark</code> block and no effect otherwise. For a top-level <code>test({ .. })</code>, whose carrier has nothing else to say, it is only that function.</p></div>
+
 
 
         </section>
@@ -137,6 +144,7 @@
           <div class="doc"><p>What <code>name</code> is renamed to by <code>renames</code>, or <code>name</code> itself.</p></div>
 
 
+
         </section>
 
 
@@ -149,6 +157,7 @@
           <pre class="signature"><code>fn rename_uses(self: Expr, renames: #{str: str}) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>self</code> with every call to, and every value use of, a name in <code>renames</code> renamed.</p></div>
+
 
 
         </section>

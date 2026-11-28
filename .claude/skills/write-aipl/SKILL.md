@@ -21,6 +21,7 @@ pub fn f<T: any>(self: T[], n: i64 = 0, sep: str* = []) !prints -> T? { .. }.tes
 struct P { x: i64, y: i64 = 0 }
 variant Shape = Circle(r: i64) | Square(i64) | Empty
 ```
+- A parameter takes `# ..` doc lines of its own, above it inside the parentheses (one per line once any has them): `fn f(\n    # What it is.\n    n: i64,\n)`; `aipl doc` prints them as `f.n`, the docs site and hover list them.
 - Unused imports are errors. `.test`/`.benchmark` blocks follow the body; helper `fn`s inside a block come first.
 - Bounds: `any`, `ord`, `variant`. First param named `self` makes `x.f(y)` ≡ `f(x, y)`. Predicates: `fn is_x(self: T) -> bool`.
 - Param/let destructuring: `fn f(P { x, y as b })`, `let (a, b) = t;`, `let Circle(r) = s else { return none; };`.

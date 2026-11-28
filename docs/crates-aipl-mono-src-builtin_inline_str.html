@@ -32,6 +32,7 @@
           <div class="doc"><p>The content of <code>self</code> packed into the value's own words — no allocation and no refcount — or <code>none</code> when it is longer than an inline value can hold.</p><p>The optional is the capacity: <code>heap_str</code> and <code>rope_str</code> answer at every length, and this one cannot, so it says so rather than quietly handing back the representation <code>self</code> already had. Asking for an inline value and getting a buffer is the failure the whole family exists to rule out.</p></div>
 
 
+
         </section>
 
 

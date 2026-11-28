@@ -32,6 +32,7 @@
           <div class="doc"><p>One element of a simple array pattern, and where it was written: a binder name (<code>_</code> included) or a literal. It holds no expression, so a pattern cannot hold a node of the expression tree; the Rust side reads each as the identifier or literal expression codegen compiles.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>variant ElementKind</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -82,6 +84,7 @@
           <pre class="signature"><code>variant Pat</code></pre>
 
           <div class="doc"><p><code>aipl_syntax::ast::Pattern</code>, less its <code>Bind</code> case. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>Ctor</code> and <code>Nested</code> split one source shape between them: a constructor whose slots are all plain names is the <code>Ctor</code> it always was, so an arm written the old way lowers as it always did, and only a constructor over real sub-patterns is <code>Nested</code> — <code>nested_or_ctor</code> makes that choice. Whether a bare name in a nested slot binds or names a case is decided on the Rust side (<code>Pattern::normalized</code>, the <code>Bind</code> case this declaration lacks), by the same rule <code>is_binder_name</code> states here.</p></div>
+
 
 
           <ul class="cases">
@@ -217,6 +220,7 @@
           <div class="doc"><p>Whether a bare name in a nested pattern slot is a binder rather than a case: everything but <code>none</code> and a capitalised name. The one rule that needs no type, stated once here and once in <code>aipl_syntax::ast::is_binder_name</code>.</p></div>
 
 
+
         </section>
 
 
@@ -229,6 +233,7 @@
           <pre class="signature"><code>pub fn nested_or_ctor(name: str, args: Pat[]) -&#62; Pat</code></pre>
 
           <div class="doc"><p>A constructor over sub-patterns, as the simplest <code>Pat</code> that spells it: the plain <code>Ctor</code> when every slot is a bare binder name, else <code>Nested</code>. A nullary sub-pattern arrives as a nullary <code>Ctor</code> (the parser cannot tell a binder from a case by shape alone), which is what the binder test reads.</p></div>
+
 
 
         </section>
@@ -245,6 +250,7 @@
           <div class="doc"><p>A pattern as a one-line dump, in the spelling that produced it: <code>Ctor(a, b)</code>, <code>Ctor(..)</code>, a bare name, <code>_</code>. The two literal forms are tagged, because their whole point is that they are values rather than names and <code>&quot;1&quot;</code> against <code>1</code> would otherwise read the same.</p></div>
 
 
+
         </section>
 
 
@@ -257,6 +263,7 @@
           <pre class="signature"><code>pub fn pat_text(self: Pat) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> as the pattern was written, where <code>show_pat</code> is a dump: a string or char literal is quoted with the escapes its text needs, so what comes back parses to the pattern it was made from.</p></div>
+
 
 
         </section>
@@ -273,6 +280,7 @@
           <div class="doc"><p><code>self</code> between <code>quote</code> marks, with the escapes its characters need.</p></div>
 
 
+
         </section>
 
 
@@ -285,6 +293,7 @@
           <pre class="signature"><code>pub fn pat_bindings(self: Pat) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The names a pattern binds, in order — <code>Pattern::bindings</code> in Rust. It is what an arm's alternatives must agree on, so that a shared body means the same thing whichever alternative matched.</p><p>An array pattern binds its <code>Ident</code> elements and nothing else: a literal element is a value to match, not a name to bind.</p></div>
+
 
 
         </section>
@@ -301,6 +310,7 @@
           <div class="doc"><p>How a pattern is named in the &quot;alternatives must bind the same names&quot; diagnostic: the constructor for a constructor pattern, and a description for the literal forms, which bind nothing and so only ever appear on the side that binds nothing.</p></div>
 
 
+
         </section>
 
 
@@ -313,6 +323,7 @@
           <pre class="signature"><code>pub fn binder_list(self: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The binder list as the same diagnostic writes it: each name quoted, or the word &quot;nothing&quot; when there are none.</p></div>
+
 
 
         </section>
@@ -336,6 +347,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -348,6 +360,7 @@
           <pre class="signature"><code>fn binder_name(self: Pat) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -364,6 +377,7 @@
           <div class="doc"><p>A struct pattern's field as written: <code>x</code>, or <code>x as name</code> when it is bound under another name.</p></div>
 
 
+
         </section>
 
 
@@ -376,6 +390,7 @@
           <pre class="signature"><code>fn show_pats(self: Pat[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The elements of a pattern list, comma-separated.</p></div>
+
 
 
         </section>
@@ -392,6 +407,7 @@
           <div class="doc"><p>One element of a simple array pattern as it was written.</p></div>
 
 
+
         </section>
 
 
@@ -404,6 +420,7 @@
           <pre class="signature"><code>fn nested_bindings(self: Pat) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The binders of one nested slot: a bare binder name is itself, a case or a literal nothing, and a deeper pattern its own binders.</p></div>
+
 
 
         </section>
@@ -420,6 +437,7 @@
           <div class="doc"><p>The empty binding list, which <code>#{}</code>'s sibling problem makes worth naming: an empty array literal does not flex through a generic parameter, so a <code>[]</code> written in argument or return position needs somewhere to be annotated.</p></div>
 
 
+
         </section>
 
 
@@ -432,6 +450,7 @@
           <pre class="signature"><code>fn is_ident(self: PatElement) -&#62; bool</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -448,6 +467,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -460,6 +480,7 @@
           <pre class="signature"><code>fn element(kind: ElementKind) -&#62; PatElement</code></pre>
 
           <div class="doc"><p>An element at no particular place, for tests.</p></div>
+
 
 
         </section>
@@ -476,6 +497,7 @@
           <div class="doc"><p>An element as it is written: a name, <code>_</code>, or a tagged literal.</p></div>
 
 
+
         </section>
 
 
@@ -488,6 +510,7 @@
           <pre class="signature"><code>fn show_elements(self: PatElement[]) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>

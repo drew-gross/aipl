@@ -225,6 +225,7 @@ case_tests! {
     cases_docs_err_test_wrong_arg = "cases/docs/err_test_wrong_arg",
     cases_docs_err_unknown_attr = "cases/docs/err_unknown_attr",
     cases_docs_module_docs = "cases/docs/module_docs",
+    cases_docs_parameter_docs = "cases/docs/parameter_docs",
     cases_effects_declaring_prints_allows_print_call = "cases/effects/declaring_prints_allows_print_call",
     cases_effects_err_effectful_function_to_higher_order = "cases/effects/err_effectful_function_to_higher_order",
     cases_effects_err_effects = "cases/effects/err_effects",

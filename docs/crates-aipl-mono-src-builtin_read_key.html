@@ -32,6 +32,7 @@
           <div class="doc"><p>One key press: an arrow key, or the byte of any other key.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-UpArrow"><code>UpArrow</code>
@@ -75,6 +76,7 @@
           <div class="doc"><p>The next key press, without waiting for Enter: <code>some(key)</code>, or <code>none</code> once input is exhausted. An arrow key is the three bytes <code>ESC [ A</code>..<code>D</code> that <code>read_byte</code> returns, and arrives as <code>UpArrow</code>, <code>DownArrow</code>, <code>RightArrow</code> or <code>LeftArrow</code>; any other key is <code>Other</code> with its first byte, and an escape sequence that is not an arrow ends at the byte that breaks it. Carries <code>!read_stdin_raw</code>, like <code>read_byte</code>.</p></div>
 
 
+
         </section>
 
 
@@ -96,6 +98,7 @@
           <div class="doc"><p>The first two bytes of an arrow key's three, <code>ESC [ A</code> for up.</p></div>
 
 
+
         </section>
 
 
@@ -108,6 +111,7 @@
           <pre class="signature"><code>let BRACKET: u8 = 91</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -124,6 +128,7 @@
           <div class="doc"><p>The arrow key whose escape sequence ends in <code>last</code>, or <code>Other(last)</code>.</p></div>
 
 
+
         </section>
 
 
@@ -136,6 +141,7 @@
           <pre class="signature"><code>fn keys_from(typed: u8[], count: u64) -&#62; Key?[]</code></pre>
 
           <div class="doc"><p>The first <code>count</code> answers of <code>read_key</code> when <code>typed</code> is all that is typed, one byte after another.</p></div>
+
 
 
         </section>

@@ -32,6 +32,7 @@
           <div class="doc"><p>One child of a node, reduced to what layout needs from it.</p><p>Whitespace never becomes a piece: the formatter decides the spacing, so the author's is read only where it changes meaning — which is the flag on a comment, and nowhere else.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Tok"><code>Tok(str)</code>
@@ -65,6 +66,7 @@
           <div class="doc"><p>The <code>Doc</code> that lays <code>node</code> out, given the grammar it was parsed with.</p><p><code>space</code> answers the one question a grammar cannot: whether a space belongs between two adjacent tokens. It is asked with the spellings on either side of the gap — <code>space(&quot;+&quot;, &quot;1&quot;)</code> while laying out <code>1 + 1</code>, <code>space(&quot;(&quot;, &quot;a&quot;)</code> while laying out <code>(a)</code> — so a language brings one small function instead of a layout function per production. Where a production wants no spaces at all, that is <code>Tight</code> and the rule is never consulted.</p><p><code>g</code> is linked here, so it may be handed over unlinked, exactly as <code>parse_cst</code> takes it. That is not a convenience: a group's style lives in <code>groups</code>, which only <code>link</code> fills, so an unlinked grammar would lay every bracket pair out against a table that is not there. Linking is idempotent, so a caller that linked already pays one walk and nothing else.</p><p>Fails only on a tree that does not belong to <code>g</code> — a node naming a production or a group index the grammar has no entry for, which a tree from <code>parse_cst</code> cannot be.</p></div>
 
 
+
         </section>
 
 
@@ -77,6 +79,7 @@
           <pre class="signature"><code>pub fn render_cst&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool, width: u64) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p><code>src</code> laid out at <code>width</code> — <code>format_cst</code> and <code>print</code>, which is what every caller wants and neither half should assume.</p></div>
+
 
 
         </section>
@@ -93,6 +96,7 @@
           <div class="doc"><p>One item of a bracketed list: its layout, and what a sorted list orders it by.</p></div>
 
 
+
         </section>
 
 
@@ -105,6 +109,7 @@
           <pre class="signature"><code>variant FKind</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -137,6 +142,7 @@
           <div class="doc"><p><code>format_cst</code> once the grammar is linked — the recursive half, so a call links once rather than once per node.</p></div>
 
 
+
         </section>
 
 
@@ -149,6 +155,7 @@
           <pre class="signature"><code>fn missing_token(node: Cst) -&#62; ParseError</code></pre>
 
           <div class="doc"><p>The refusal for a tree holding a <code>Missing</code> marker: formatting it would print the source without the token the grammar wanted, which is a different program.</p></div>
+
 
 
         </section>
@@ -165,6 +172,7 @@
           <div class="doc"><p>A node's children, each reduced to a <code>Piece</code>. Interior children are laid out first, so every layout below works on finished <code>Doc</code>s and never recurses.</p></div>
 
 
+
         </section>
 
 
@@ -177,6 +185,7 @@
           <pre class="signature"><code>fn breaks_after(src: str, at: u64) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether the source puts a line break right after position <code>at</code>, with only blanks in between — the end of a source line, in other words.</p><p>This tells a line comment from a block one without asking the language: a comment the author ended their line with must still end a line, or it swallows whatever the formatter puts after it. End of input counts, there being nothing left to swallow.</p></div>
+
 
 
         </section>
@@ -193,6 +202,7 @@
           <div class="doc"><p>The text of a token span, or <code>&quot;&quot;</code> for a child that matched no tokens.</p></div>
 
 
+
         </section>
 
 
@@ -205,6 +215,7 @@
           <pre class="signature"><code>fn is_sep(self: Piece, sep: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code> is the separator token <code>sep</code>. Only a token can be one, so a child that happens to render as <code>,</code> is not mistaken for it.</p></div>
+
 
 
         </section>
@@ -221,6 +232,7 @@
           <div class="doc"><p>Whether <code>self</code> begins a new item in a list with no separator token. Everything but a comment does: a comment belongs to the item it was written against.</p></div>
 
 
+
         </section>
 
 
@@ -233,6 +245,7 @@
           <pre class="signature"><code>fn leading(self: Piece) -&#62; str</code></pre>
 
           <div class="doc"><p>The spelling <code>self</code> leads with, or <code>&quot;&quot;</code> for a comment — which is why a sorted item's key skips past its comments to the first thing that is not one.</p></div>
+
 
 
         </section>
@@ -249,6 +262,7 @@
           <div class="doc"><p>What a sorted list orders an item by: its leading token. A comment in front of the item is not it — it rides along, but the key is what it was written against. An item that is nothing but comments keys as <code>&quot;&quot;</code>, which puts it first; there is no better answer for a comment with nothing to attach to.</p></div>
 
 
+
         </section>
 
 
@@ -261,6 +275,7 @@
           <pre class="signature"><code>fn tight(ps: Piece[]) -&#62; Doc</code></pre>
 
           <div class="doc"><p><code>Tight</code>: the children run together, the spacing rule not consulted.</p><p>A comment still ends its line where the author ended theirs — that is not spacing, it is what the comment means.</p></div>
+
 
 
         </section>
@@ -277,6 +292,7 @@
           <div class="doc"><p>One piece as a <code>Doc</code>, with nothing added around it.</p></div>
 
 
+
         </section>
 
 
@@ -289,6 +305,7 @@
           <pre class="signature"><code>fn inline_doc(ps: Piece[], space: (str, str) -&#62; bool) -&#62; Doc</code></pre>
 
           <div class="doc"><p><code>Inline</code>: the children in order, with a space wherever the language's rule says one belongs between the spellings on either side of the gap.</p><p>Nothing goes in front of the first piece, and nothing goes beside a child that matched no tokens — an empty <code>Maybe</code> must not leave a space behind it.</p></div>
+
 
 
         </section>
@@ -305,6 +322,7 @@
           <div class="doc"><p>Whether a space belongs between two adjacent pieces: not in front of the first, not beside a child that matched no tokens, and otherwise the language's rule.</p></div>
 
 
+
         </section>
 
 
@@ -317,6 +335,7 @@
           <pre class="signature"><code>fn group_doc&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, gi: u64, open: Cst[], body: Cst[], close: Cst[], space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
 
           <div class="doc"><p>A <code>Group</code> laid out: its brackets around its contents, on one line while they fit and otherwise one item per indented line.</p><p>The brackets are read off the node, not inferred from it. That is the whole difference a group makes here: it says which of its kids opened it and which closed it, so <code>#{a}</code> (a two-token bracket), <code>|a, b|</code> (the same token both ends) and <code>match (e) { .. }</code> (two pairs in one production) are all just groups, with nothing to guess and nothing to be wrong about.</p></div>
+
 
 
         </section>
@@ -333,6 +352,7 @@
           <div class="doc"><p>A bracketed list: <code>open</code>, the items, <code>close</code> — flat while it fits, otherwise one item per indented line with the brackets on their own.</p><p>The bracket runs are laid out <code>Inline</code> rather than concatenated raw, so a comment written against a bracket survives and the language's spacing rule still gets asked about a bracket spelled as several tokens.</p></div>
 
 
+
         </section>
 
 
@@ -345,6 +365,7 @@
           <pre class="signature"><code>fn list_items(mid: Piece[], __spat$24664: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline — in the order the style asks for.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p><p>A <code>sorted</code> style orders the items by their leading token, in ordinary <code>str</code> order. The sort is stable, so two items with one key keep the author's order — a duplicate JSON key, say, stays a duplicate in the order it was written.</p></div>
+
 
 
         </section>
@@ -361,6 +382,7 @@
           <div class="doc"><p>One item, laid out and keyed.</p></div>
 
 
+
         </section>
 
 
@@ -373,6 +395,7 @@
           <pre class="signature"><code>fn grammar_of(layouts: Layout[], groups: ListStyle[]) -&#62; Grammar&#60;FKind, str&#62;</code></pre>
 
           <div class="doc"><p>A grammar of one production per layout, in order, so a hand-built <code>Tree(i, ..)</code> picks a layout by its index — followed by one throwaway production per group style, so a hand-built <code>Group(i, ..)</code> picks a style by its index too.</p><p>The styles cannot simply be handed over: <code>groups</code> is <code>link</code>'s output, rebuilt from the rules every time, so the only way to put a style in the table is to write a rule that has one. The carrier productions are never matched against anything; they exist to be linked.</p></div>
+
 
 
         </section>
@@ -389,6 +412,7 @@
           <div class="doc"><p>A production whose whole purpose is to carry one group style into <code>groups</code>.</p></div>
 
 
+
         </section>
 
 
@@ -401,6 +425,7 @@
           <pre class="signature"><code>fn prod_of(i: u64, l: Layout) -&#62; Production&#60;FKind, str&#62;</code></pre>
 
           <div class="doc"><p>Distinct names because <code>format_cst</code> links, and <code>link</code> refuses a grammar with two productions of one name.</p></div>
+
 
 
         </section>
@@ -417,6 +442,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -431,6 +457,7 @@
           <div class="doc"><p>A space after a colon and nowhere else — the smallest rule that is not a constant, which is what <code>inline_doc</code>'s tests need.</p></div>
 
 
+
         </section>
 
 
@@ -443,6 +470,7 @@
           <pre class="signature"><code>fn at(self: Doc, width: u64) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>Doc</code> at a width, for the assertions above.</p></div>
+
 
 
         </section>

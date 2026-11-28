@@ -32,6 +32,7 @@
           <div class="doc"><p>Every element of <code>self</code> through <code>f</code>, as a set.</p><p>This is <code>map</code> for a set: a set in, a set out. Which means the result can be <strong>smaller</strong> than the receiver — an <code>f</code> sending two elements to the same answer yields one element, because that is what a set is. That is the honest reason this is its own builtin rather than another receiver <code>map</code> accepts: <code>map</code> says &quot;one element out per element in&quot;, and over a set it cannot keep that promise, so the set version is spelled differently and a reader sees which one they are looking at.</p><p>Callable as a method (<code>chars.set_map(escape)</code>). The receiver is a set of any order; the result is always unordered, because <code>f</code> changes the very values an order would be over. Ask for one explicitly when you want it — <code>s.to_array().map(f).to_set()</code> with the binding annotated <code>#&lt;{U}</code> — so the re-sorting is written down rather than inferred.</p><p>See <code>map</code> for the array and optional forms.</p></div>
 
 
+
         </section>
 
 

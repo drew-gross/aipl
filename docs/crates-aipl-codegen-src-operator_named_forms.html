@@ -30,6 +30,7 @@
           <div class="doc"><p>The named builtins that provide the operator <code>self</code> — the names it is imported under (<code>wrapping_add as +</code>) — in the order the compiler declares them, or <code>[]</code> for a spelling that is not an operator. Where an operator has more than one semantics every flavor is listed, and the first is the one a diagnostic suggests first.</p><p>Mirrors <code>OPERATOR_BUILTINS</code> in <code>aipl-syntax</code>, which is where the compiler itself reads the pairing from; the two tables are kept in the same order so a diff between them reads line for line. <code>is_operator_name</code> is this table's question of whether the answer is empty, so the AIPL side states the pairing once.</p></div>
 
 
+
         </section>
 
 
@@ -42,6 +43,7 @@
           <pre class="signature"><code>pub fn operator_spellings() -&#62; str[]</code></pre>
 
           <div class="doc"><p>Every operator spelling that has named forms, in the order <code>operator_named_forms</code> lists them. A name that provides an operator is found by asking each of these.</p></div>
+
 
 
         </section>

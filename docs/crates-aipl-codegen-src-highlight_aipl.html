@@ -33,6 +33,7 @@
           <div class="doc"><p>AIPL's TextMate grammar as <code>.tmLanguage.json</code> text — what <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> holds. Derived from <code>aipl_rules()</code> plus the four patterns a lexer cannot describe; see the file header.</p></div>
 
 
+
         </section>
 
 
@@ -54,6 +55,7 @@
           <div class="doc"><p>One template literal as a region: the delimiter opens and closes it, and inside are its escapes and the <code>{ .. }</code> interpolation that includes the whole language back into itself. <code>template_inner</code> builds the inside — the one piece of this that is not AIPL-specific, so it stays in <code>highlight.aipl</code>.</p></div>
 
 
+
         </section>
 
 
@@ -66,6 +68,7 @@
           <pre class="signature"><code>fn escape_scope() -&#62; str</code></pre>
 
           <div class="doc"><p>What an escape sequence inside a string, char or template literal is painted. One scope for all of them, since a <code>\n</code> means the same thing wherever it is.</p></div>
+
 
 
         </section>
@@ -82,6 +85,7 @@
           <div class="doc"><p>The identifier regex, built from the very classes the identifier <em>rule</em> is built from (<code>lex_aipl.aipl</code>), so <code>fn NAME</code> accepts exactly the names AIPL accepts. <code>matcher_regex</code> answers <code>none</code> only for the delimiter-scanning matchers, which a <code>CharRun</code> is not.</p></div>
 
 
+
         </section>
 
 
@@ -94,6 +98,7 @@
           <pre class="signature"><code>fn builtin_types() -&#62; str[]</code></pre>
 
           <div class="doc"><p>The builtin type names. Lexically these are plain identifiers — the AIPL lexer emits <code>Name</code> for them and <code>classify_lexed</code> (<code>crates/aipl-parser/src/lib.rs</code>) is what separates them out — so there is no rule to derive this from, and this list has to stay in step with that one by hand.</p></div>
+
 
 
         </section>
@@ -110,6 +115,7 @@
           <div class="doc"><p>An effect declaration — <code>!prints</code> in a signature. The effect names are spelled out rather than matched as any <code>!ident</code>, which would mis-scope the unary <code>!</code> in <code>!true</code> / <code>!ready</code>; they must stay in step with <code>KNOWN_EFFECTS</code>.</p></div>
 
 
+
         </section>
 
 
@@ -122,6 +128,7 @@
           <pre class="signature"><code>fn section_tail() -&#62; Pat</code></pre>
 
           <div class="doc"><p>A test-case file's <code>--- name ---</code> markers and everything after the first one. The tail is expected output, not AIPL, so it is scoped as plain content and only the markers themselves are painted — as comments, which is the closest thing a theme has to &quot;not code&quot;. <code>\z</code> never matches inside the text, so the region runs to end of file.</p></div>
+
 
 
         </section>

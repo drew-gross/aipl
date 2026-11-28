@@ -32,6 +32,7 @@
           <div class="doc"><p>A hit for each <code>map</code> in the program whose function is a <code>$</code> projection.</p></div>
 
 
+
         </section>
 
 
@@ -46,6 +47,7 @@
           <div class="doc"><p>What the rule says about a <code>map</code> call, and the span of the lambda it advised on (none for a function name), so that a lint about lambdas can leave that lambda alone.</p></div>
 
 
+
         </section>
 
 
@@ -58,6 +60,7 @@
           <pre class="signature"><code>pub fn projections(self: Function) -&#62; Projection[]</code></pre>
 
           <div class="doc"><p>The [<code>Projection</code>] of each <code>map</code> in <code>self</code>.</p></div>
+
 
 
         </section>
@@ -81,6 +84,7 @@
           <div class="doc"><p><code>self</code> as the projection for <code>recv.map(arg)</code>, if <code>arg</code> is a function name or a lambda <code>$</code> can say.</p></div>
 
 
+
         </section>
 
 
@@ -93,6 +97,7 @@
           <pre class="signature"><code>fn chain(self: Expr, parameter: str) -&#62; str[]?</code></pre>
 
           <div class="doc"><p>The <code>$</code> steps <code>self</code> is made of, outermost last, when it is <code>parameter</code> taken through member reads and calls and nothing else; <code>none</code> otherwise. A call has to be one <code>$</code> can make — its callee's <code>is_method_callable</code> — or already be written as a method call.</p></div>
+
 
 
         </section>

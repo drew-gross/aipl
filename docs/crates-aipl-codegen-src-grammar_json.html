@@ -32,6 +32,7 @@
           <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse</code> — <code>parse(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn format_json(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The whole of JSON's layout is the eight annotations on the grammar above plus <code>json_space</code> below. There is no second walker over JSON's syntax, and adding a ninth production would need no more than a ninth annotation — which is the claim this stage exists to make good on. Key order is part of that claim: the members of every object come out sorted, and the only place that is said is <code>sorted=true</code> on the object's <code>Many</code>.</p></div>
+
 
 
         </section>
@@ -67,6 +69,7 @@
           <div class="doc"><p>One <code>&quot;key&quot;:value</code> of an object.</p></div>
 
 
+
         </section>
 
 
@@ -81,6 +84,7 @@
           <div class="doc"><p>The inverse of the <code>unescape</code> lowering applies: the two characters JSON <em>requires</em> escaping, plus the control characters that have short forms. Enough for the round trip, and for anything this library will parse back.</p></div>
 
 
+
         </section>
 
 
@@ -93,6 +97,7 @@
           <pre class="signature"><code>fn json_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>JSON's whole spacing rule: a space after the <code>:</code> of a member, and nowhere else. Everything else that looks like spacing — between members, inside braces — is a list breaking or not breaking, which the layouts decide.</p></div>
+
 
 
         </section>

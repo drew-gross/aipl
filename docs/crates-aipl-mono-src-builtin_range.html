@@ -32,6 +32,7 @@
           <div class="doc"><p>Every index of <code>self</code>, as the <code>Span</code> <code>0..self.len()</code> — the half-open range its elements sit in, empty for an empty receiver.</p><p>Its reason to exist is <code>map</code>: a <code>Span</code> is mappable, so <code>xs.range().map(|i| ..)</code> is the index-wise counterpart of <code>xs.map(|x| ..)</code>, and replaces the <code>mut acc</code> plus counted-<code>for</code> longhand. <code>self</code> is unread apart from its length — the point is the <em>positions</em>, so the element type never reaches the result.</p></div>
 
 
+
         </section>
 
 

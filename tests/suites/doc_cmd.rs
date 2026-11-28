@@ -106,3 +106,22 @@ variant Maybe =
         "undocumented case leaked:\n{out}"
     );
 }
+
+/// A documented parameter is printed as `fn.parameter`, under the function's own docs; an
+/// undocumented one is skipped.
+#[test]
+fn prints_a_parameters_documentation_under_its_function() {
+    let src = "\
+# Scales.
+fn scaled(
+    n: i64,
+    # How many times over.
+    by: i64,
+) -> i64 { n }
+";
+    let out = run_doc_named("params", src);
+    assert_eq!(
+        out,
+        "scaled\n    Scales.\n\nscaled.by\n    How many times over.\n\n"
+    );
+}

@@ -407,6 +407,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/dicts/values | 13 | 892 | 284 | 2056 | 8968 |
 | tests/cases/docs/doc_comments | 15 | 1043 | 1043 | 2248 | 7052 |
 | tests/cases/docs/module_docs | 3 | 193 | 193 | 617 | 4712 |
+| tests/cases/docs/parameter_docs | 1 | 40 | 40 | 465 | 1696 |
 | tests/cases/effects/declaring_prints_allows_print_call | 1 | 88 | 88 | 478 | 4184 |
 | tests/cases/effects/function_value_call_order | 16 | 840 | 420 | 898 | 3460 |
 | tests/cases/effects/function_value_effects | 11 | 333 | 157 | 1045 | 5108 |

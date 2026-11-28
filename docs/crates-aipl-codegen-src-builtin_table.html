@@ -32,6 +32,7 @@
           <div class="doc"><p>What a call is to. The importable builtins have a case each, named as the Rust <code>Callee</code> arm is; <code>Some</code>, <code>Ok</code>, <code>Err</code> and <code>Assert</code> are the names the language reserves; a call to a name the file does not import from a builtins library is <code>User</code> (<code>is_method</code> says whether the file's own function it names takes <code>self</code> first, so <code>recv.f(..)</code> can call it), or <code>Local</code> where a local holding a function hides the name. <code>Unresolved</code> is what the parser writes, before <code>resolve_callees</code> decides.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Print"><code>Print</code>
@@ -1157,6 +1158,7 @@
           <div class="doc"><p>Whether a call to <code>self</code> can be written with the first argument as its receiver: a function of the file's own that takes <code>self</code> first, or a builtin. A local that holds a function, a reserved name and an unresolved call cannot.</p></div>
 
 
+
         </section>
 
 
@@ -1169,6 +1171,7 @@
           <pre class="signature"><code>variant BuiltinDefinition</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -1204,6 +1207,7 @@
           <div class="doc"><p><code>arm</code> is the callee as a case and <code>callee</code> is its canonical name (<code>__builtin_len</code>); <code>exports</code> are the other names its source makes importable; <code>library</code> is the namespace an import names; <code>public_name</code> is the spelling inside the library when it is not the callee's own (<code>parse</code> for <code>__builtin_parse_json</code>).</p></div>
 
 
+
         </section>
 
 
@@ -1216,6 +1220,7 @@
           <pre class="signature"><code>pub fn import_name(self: BuiltinEntry) -&#62; str</code></pre>
 
           <div class="doc"><p>The spelling an import from <code>self</code>'s library uses for it.</p></div>
+
 
 
         </section>
@@ -1232,6 +1237,7 @@
           <div class="doc"><p>The builtin that <code>import { name } from library;</code> brings in, if there is one.</p></div>
 
 
+
         </section>
 
 
@@ -1246,6 +1252,7 @@
           <div class="doc"><p>The table the lints read: the importable builtins, and the operator builtins that Rust resolves to another's callee. Each is a builtin the file imports under its operator (<code>wrapping_increment as ++</code>), so a lint can say which one a call is, and what to advise, without the written name.</p></div>
 
 
+
         </section>
 
 
@@ -1258,6 +1265,7 @@
           <pre class="signature"><code>pub fn builtin_table() -&#62; BuiltinEntry[]</code></pre>
 
           <div class="doc"><p>The whole table.</p></div>
+
 
 
         </section>

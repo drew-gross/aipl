@@ -256,6 +256,8 @@ struct SymbolSection {
     doc: String,
     has_doc: bool,
     cases: Vec<CaseRow>,
+    /// A function's parameters, listed only when one of them has docs of its own.
+    slots: Vec<SlotRow>,
 }
 
 struct CaseRow {
@@ -278,6 +280,21 @@ struct SlotRow {
     has_doc: bool,
 }
 
+/// The rows of a case's slots or a function's parameters.
+fn slot_rows(slots: &[aipl_index::Slot]) -> Vec<SlotRow> {
+    slots
+        .iter()
+        .map(|slot| {
+            let doc = slot.doc.as_deref().unwrap_or_default();
+            SlotRow {
+                detail: slot.detail.clone(),
+                doc: doc_html(doc),
+                has_doc: !doc.trim().is_empty(),
+            }
+        })
+        .collect()
+}
+
 impl FilePage {
     fn build(file: &FileIndex, root: &Path, project: &str, slug: &str) -> FilePage {
         let display = display_path(&file.path, root);
@@ -295,18 +312,7 @@ impl FilePage {
                         detail: sym.detail.clone(),
                         doc: doc_html(doc),
                         has_doc: !doc.trim().is_empty(),
-                        slots: sym
-                            .slots
-                            .iter()
-                            .map(|slot| {
-                                let doc = slot.doc.as_deref().unwrap_or_default();
-                                SlotRow {
-                                    detail: slot.detail.clone(),
-                                    doc: doc_html(doc),
-                                    has_doc: !doc.trim().is_empty(),
-                                }
-                            })
-                            .collect(),
+                        slots: slot_rows(&sym.slots),
                     });
                     continue;
                 }
@@ -322,6 +328,7 @@ impl FilePage {
                 doc: doc_html(doc),
                 has_doc: !doc.trim().is_empty(),
                 cases: Vec::new(),
+                slots: slot_rows(&sym.slots),
             });
         }
         let _ = slug;
@@ -729,6 +736,13 @@ variant Shape =
 # Rounded down, always.
 pub fn area(s: Shape) -> i64 { 0 }
 
+# Scales `n`.
+pub fn scaled(
+    n: i64,
+    # How many times over.
+    by: i64,
+) -> i64 { n }
+
 fn private_helper() -> i64 { 1 }
 "#;
 
@@ -837,6 +851,31 @@ fn private_helper() -> i64 { 1 }
         assert!(rect < w && w < doc && doc < h, "{page}");
         // `Circle` documents no slot, so its `r` is not listed on its own.
         assert!(!page.contains("<code>r: i64</code>"), "{page}");
+    }
+
+    /// A function with a documented parameter lists its parameters one by one under its docs.
+    #[test]
+    fn a_function_lists_its_documented_parameters() {
+        let (_d, out) = site();
+        let page = read(&out, "src-shapes.html");
+        let scaled = page
+            .find("<p>Scales <code>n</code>.</p>")
+            .expect("the function doc");
+        let by = page
+            .find("<code>by: i64</code>")
+            .expect("the documented parameter");
+        let doc = page
+            .find("<p>How many times over.</p>")
+            .expect("the parameter doc");
+        let n = page
+            .find("<code>n: i64</code>")
+            .expect("the bare parameter");
+        assert!(
+            scaled < by && by < doc && doc < n || scaled < n && n < by && by < doc,
+            "{page}"
+        );
+        // `area` documents no parameter, so its `s` is not listed on its own.
+        assert!(!page.contains("<code>s: Shape</code>"), "{page}");
     }
 
     /// The two sections, and which side of the line each declaration lands on.

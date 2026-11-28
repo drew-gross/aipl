@@ -32,6 +32,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn companion_files(src: str) -&#62; Companion[]!str</code></pre>
 
           <div class="doc"><p>The <code>--- file: &lt;path&gt; ---</code> sections of <code>src</code>, in order, as <code>path</code>/<code>contents</code> pairs. Everything outside such a section — the program text and the other section kinds — is ignored, and a section body keeps its inner blank lines but drops trailing newlines.</p><p>A <code>file:</code> section whose path is empty, or contains a backslash, is an <code>err</code>: both would resolve unpredictably when staged, and staging a case somewhere unintended is worse than refusing to stage it at all.</p></div>
+
 
 
         </section>
@@ -65,6 +67,7 @@
           <pre class="signature"><code>fn companion_path(header: str) -&#62; str!str</code></pre>
 
           <div class="doc"><p>The path a <code>file:</code> section names, rejected when it can't be staged. Mirrors the corpus harness's own checks on these markers, so a fixture that would be staged one way by <code>aipl check</code> and another way by the harness is refused by both instead of being silently skipped by one.</p></div>
+
 
 
         </section>

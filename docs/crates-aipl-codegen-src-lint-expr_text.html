@@ -32,6 +32,7 @@
           <div class="doc"><p>The text that writes <code>self</code>.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn operand_text(self: Expr) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> as an operand of a postfix form or an operator: its text, in parentheses where it is itself an operator use or anything else that binds looser than what is applied to it.</p></div>
+
 
 
         </section>
@@ -67,6 +69,7 @@
           <div class="doc"><p>The operators written between two operands.</p></div>
 
 
+
         </section>
 
 
@@ -79,6 +82,7 @@
           <pre class="signature"><code>fn is_compound(self: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>The operators of <code>set target op= value;</code>.</p></div>
+
 
 
         </section>
@@ -95,6 +99,7 @@
           <div class="doc"><p>Whether <code>self</code> can be the receiver of a postfix form, or an operand, as it is written.</p></div>
 
 
+
         </section>
 
 
@@ -107,6 +112,7 @@
           <pre class="signature"><code>fn texts(self: Expr[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The text of each of <code>self</code>, comma-separated.</p></div>
+
 
 
         </section>
@@ -123,6 +129,7 @@
           <div class="doc"><p>The text of a slice bound, which is nothing where the bound is left out.</p></div>
 
 
+
         </section>
 
 
@@ -135,6 +142,7 @@
           <pre class="signature"><code>fn call_text(self: Call, type_args: str) -&#62; str</code></pre>
 
           <div class="doc"><p>A call, written the way it is: infix for an operator, <code>recv.f(..)</code> for a method call, <code>f(..)</code> otherwise, with <code>type_args</code> (<code>::&lt;T&gt;</code>, or nothing) after the name.</p></div>
+
 
 
         </section>
@@ -151,6 +159,7 @@
           <div class="doc"><p><code>name(args)</code>, or <code>receiver.name(args)</code> for a call written in method style.</p></div>
 
 
+
         </section>
 
 
@@ -163,6 +172,7 @@
           <pre class="signature"><code>fn type_args_text(self: Expr, types: Ty[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The call <code>self</code> with the types written between angle brackets after its name.</p></div>
+
 
 
         </section>
@@ -179,6 +189,7 @@
           <div class="doc"><p><code>self</code> as the inside of a pair of braces: the statements of a block, then its value. A loop's body ends in the <code>0</code> the parser gives a block with no value, which <code>loop_body</code> leaves out.</p></div>
 
 
+
         </section>
 
 
@@ -191,6 +202,7 @@
           <pre class="signature"><code>fn braced(self: Expr) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> between braces: a block, or the value of a branch.</p></div>
+
 
 
         </section>
@@ -207,6 +219,7 @@
           <div class="doc"><p>The body of a loop between braces.</p></div>
 
 
+
         </section>
 
 
@@ -219,6 +232,7 @@
           <pre class="signature"><code>fn braced_as(self: Expr, loop_body: bool) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -235,6 +249,7 @@
           <div class="doc"><p><code>self</code> where a lambda's body or a match arm's value stands: bare, unless it is a block or a loop.</p></div>
 
 
+
         </section>
 
 
@@ -247,6 +262,7 @@
           <pre class="signature"><code>fn followed_by(self: str, rest: Expr, loop_body: bool) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> followed by what <code>rest</code> holds, a space between when both have text.</p></div>
+
 
 
         </section>
@@ -263,6 +279,7 @@
           <div class="doc"><p><code>self</code> as a statement of a block: the text, ended with <code>;</code> unless it is a loop or already ends in one.</p></div>
 
 
+
         </section>
 
 
@@ -275,6 +292,7 @@
           <pre class="signature"><code>fn set_text(self: Expr, value: Expr) -&#62; str</code></pre>
 
           <div class="doc"><p>The <code>set</code> statement that assigns <code>value</code> to <code>self</code>, in the short form it was written in when the value is the target updated by an operator or a method: <code>set n++;</code>, <code>set n += 2;</code>, <code>set xs.push(x);</code>.</p></div>
+
 
 
         </section>
@@ -291,6 +309,7 @@
           <div class="doc"><p>What follows an <code>if</code>'s then-branch: nothing for an <code>if</code> with no <code>else</code>, and the chain <code>else if</code> for an <code>else</code> that is itself an <code>if</code>.</p></div>
 
 
+
         </section>
 
 
@@ -303,6 +322,7 @@
           <pre class="signature"><code>fn arm_text(self: MatchArm) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>match</code> arm, <code>pattern =&gt; value</code>.</p></div>
+
 
 
         </section>
@@ -319,6 +339,7 @@
           <div class="doc"><p>The <code>: T</code> that follows a binding annotated with a type.</p></div>
 
 
+
         </section>
 
 
@@ -331,6 +352,7 @@
           <pre class="signature"><code>fn index_text(self: str?) -&#62; str</code></pre>
 
           <div class="doc"><p>What a loop's index binder adds before the element binder: <code>i, </code>.</p></div>
+
 
 
         </section>
@@ -347,6 +369,7 @@
           <div class="doc"><p>What a <code>let</code>, a <code>for</code> or a parameter binds, as written.</p></div>
 
 
+
         </section>
 
 
@@ -359,6 +382,7 @@
           <pre class="signature"><code>fn captures_text(self: Capture[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The capture list in front of a lambda, <code>[mut total, mut n = 0] </code>, and nothing for none.</p></div>
+
 
 
         </section>
@@ -375,6 +399,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -387,6 +412,7 @@
           <pre class="signature"><code>fn field_init_text(self: FieldInit) -&#62; str</code></pre>
 
           <div class="doc"><p>A field of a struct literal: <code>name: value</code>, the name alone for the shorthand, and the value alone for the spread (<code>..base</code>), which has no name.</p></div>
+
 
 
         </section>
@@ -403,6 +429,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -415,6 +442,7 @@
           <pre class="signature"><code>fn bind_text(self: (str, str)) -&#62; str</code></pre>
 
           <div class="doc"><p>An operation a <code>shim</code> stands in for, and what stands in for it.</p></div>
+
 
 
         </section>

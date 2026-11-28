@@ -32,6 +32,7 @@
           <div class="doc"><p>Why a parse failed: a message, and the span of the offending source (absolute into the parsed string — slice it to show the offender, or hand it to <code>caret_block.aipl</code> for the rustc-style underline). Mirrors <code>lexer.aipl</code>'s <code>LexError</code>, and for the same reason: the two halves of a front end should report failure in one shape.</p><p>A <em>grammar</em> error — an unresolved rule reference, a rule that can loop forever — has no source to point at and carries the empty <code>0..0</code>.</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn failure_message(self: str!ParseError) -&#62; str</code></pre>
 
           <div class="doc"><p>What a failed parse said — or, when it unexpectedly <em>succeeded</em>, a note carrying what it produced, so a broken assertion says which way it broke.</p><p>For <code>.test</code> blocks, which is where the distinction matters: an assertion on a message that silently parses instead reads as a mismatched string with no clue why. Pairs with <code>map_ok</code>, which is what turns a parse of any AST type into the <code>str!ParseError</code> this takes: <code>parse_x(src).map_ok(render_x).failure_message()</code>.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>One precedence level of a <code>Climb</code>: the operators that share it, how tightly they bind (<code>power</code>, higher wins), and whether they associate to the right. Levels are matched in order, so a spelling belongs to exactly one.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>variant Rule&#60;K: variant&#62;</code></pre>
 
           <div class="doc"><p>One rule shape, as plain data. Ordered choice makes this a PEG, not a CFG: <code>OneOf</code> commits to the first alternative that matches, so alternatives are tried in the order written and there is no ambiguity to resolve.</p></div>
+
 
 
           <ul class="cases">
@@ -239,6 +243,7 @@
           <div class="doc"><p>What a <code>Refuse</code> says: a fixed message, or one computed from what was matched in front of it — the tokens the enclosing sequence accepted before reaching the refusal, run together with single spaces. <code>Fn</code> is what lets the message name the offender: refusing <code>import { + }</code>, it is handed <code>+</code> and can say which aliases to write instead. A refusal reached with nothing in front of it is handed <code>&quot;&quot;</code>.</p><p><code>Fn</code> is a function value, so a <code>Refusal</code> — and any <code>Rule</code> holding one — has no <code>==</code>; see <code>Build</code> for the same constraint on lowerings.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Msg"><code>Msg(str)</code>
@@ -265,6 +270,7 @@
           <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
           <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Four shapes, by what the lowering reads — the whole node, its children, its one child, or its text. All but <code>Kid</code> come in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key); <code>Kid</code> hands its child back unchanged, so it has nothing to refuse. A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Declaring the child <em>count</em> is what <code>Kid</code> adds over <code>Kids</code>: a production that is exactly one other thing — an alternation between named productions, a pass-through, a grouping — <em>is</em> its child, rather than a one-element array a lowering would have to index. The driver refuses a node that matched any other number, so the mismatch between a rule and its lowering is named once, in one place, instead of in every lowering that reaches for a child that might not be there.</p><p>Every arm but <code>Kid</code> carries an <code>A</code> — a function returning one, or the value itself — and so pins the type parameter on its own. <code>Kid</code> carries nothing and takes <code>A</code> from where it is written: the <code>Production</code> field, the <code>Grammar</code> around that, the enclosing function's return type. That search is what lets <code>Build</code> have a payload-free arm at all; until it existed there was no way to write one, which is why there is still no <code>NoLower</code>-style arm on anything else.</p><p>Function values are non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda — whose parameter types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. A production whose value <em>is</em> its children under one case wants that constructor and nothing around it — <code>Kids(List)</code>, never a <code>fn keep(kids) { List(kids) }</code> wrapper, which is only the constructor spelled out longhand. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar <em>parses</em>, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
+
 
 
           <ul class="cases">
@@ -341,6 +347,7 @@
           <div class="doc"><p>How a bracketed list lays out: what separates its items, whether the brackets take inner spaces while the list stays on one line (<code>{ a, b }</code> against <code>(a, b)</code>), and whether a separator is written after the last item once it breaks.</p><p>The brackets themselves are not here: they are the <code>open</code> and <code>close</code> rules of the repetition this style belongs to, matched from the source like anything else. A style is only the handful of decisions the brackets cannot answer. An empty <code>sep</code> is the juxtaposed list, where items are separated by nothing but the space between them: <code>(a b c)</code>, and every S-expression ever written. A group holding one thing rather than a list — <code>(expr)</code> — is the same shape with no separator ever reached.</p><p><code>sorted</code> is the one decision that is not about where the items go but which order they go in: the printer orders them by their leading token rather than keeping the author's order. A JSON object's members, an import's names.</p><p><code>wraps: false</code> is the group that is a bracket pair and nothing more. A block <code>{ .. }</code> is one: it is a pair the parser should know about, so an unclosed brace is reported against the brace that opened it, but its contents are statements rather than a list and breaking them at a width is not what a formatter does with them. Such a group lays out <code>Inline</code>, like any other run of children.</p><p>In the <code>nested_in</code> shorthand it is not written by hand: a <code>Many</code> bounded at one item is not a list, so <code>desugar</code> reads <code>wraps: false</code> off <code>max=1</code>.</p></div>
 
 
+
         </section>
 
 
@@ -353,6 +360,7 @@
           <pre class="signature"><code>variant Layout</code></pre>
 
           <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about <em>this</em> language and do not fall out of any grammar. What these two do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p><p>Wrapping is not here, and that is the point of <code>nested_in</code>. Where a list breaks is a property of the bracket pair holding it, not of the production the pair happens to sit in, so it is written at the brackets and read back off the <code>Group</code> node they build. A production may hold several groups, each with its own style — <code>match (e) { .. }</code> is two — which is exactly what a single field on the production could not say.</p></div>
+
 
 
           <ul class="cases">
@@ -383,6 +391,7 @@
           <div class="doc"><p>One named production: its rule, and what each downstream pass needs from it.</p><p><code>name</code> is both the reference target (<code>Named(&quot;expr&quot;)</code>) and the CST node's name. <code>expect_as</code> is the label an error blames when this production fails having matched nothing — the reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which collapses <code>expr</code>/<code>term</code>/<code>unary</code>/<code>atom</code> to one word. Empty means <em>transparent</em>: a plumbing production never surfaces in a message, and the finer expectations from inside it are what the reader sees. <code>scope</code> is the highlighter hint; it is carried, not yet consumed. <code>layout</code> is how the formatter joins what this production matched.</p><p><code>layout</code> has no default, unlike the two hints above it, and that is the compiler's decision rather than the design's: a struct field's default must be a literal, and <code>Layout</code> has no literal form. A bare <code>= Inline</code> is refused (&quot;unknown identifier&quot;), <code>Layout?</code> is refused as a field type because <code>Layout</code> is not recursive and so is not boxed, and a <code>= inline()</code> call <em>is</em> accepted but is then resolved in every file that constructs a <code>Production</code> — so a grammar that never mentions layout would have to import a function it never names, and the error when it forgets points at an unrelated line. Spelling the layout out is the honest version of that, and a grammar saying how each production prints beside how it parses is the whole point of the field.</p></div>
 
 
+
         </section>
 
 
@@ -395,6 +404,7 @@
           <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
 
           <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>Tree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p><p><code>groups</code> is the same idea for bracket pairs: <code>link</code> collects every bracketed <code>ListStyle</code> into it, in the order the rules mention them, and stamps the rule with the entry's index. A <code>Group</code> node then carries that index rather than a style, which keeps the CST as free of layout as it is of production names. It is empty on an unlinked grammar and written only by <code>link</code>, so no grammar file ever spells it out.</p></div>
+
 
 
         </section>
@@ -411,6 +421,7 @@
           <div class="doc"><p>A rule with no <code>Named</code> reference left in it, at any depth: what <code>link</code> returns. It is a <code>Rule</code> at run time, and a <code>LinkedRule</code> goes wherever a <code>Rule</code> is wanted; the other way needs <code>link</code>. A <code>match</code> on one needs no <code>Named</code> arm, so the driver cannot meet an unresolved reference.</p></div>
 
 
+
         </section>
 
 
@@ -423,6 +434,7 @@
           <pre class="signature"><code>variant LinkedProduction&#60;K: variant, A: any&#62; = Production&#60;K, A&#62; without Named throughout</code></pre>
 
           <div class="doc"><p>A production whose rule is a <code>LinkedRule</code>.</p></div>
+
 
 
         </section>
@@ -439,6 +451,7 @@
           <div class="doc"><p>A grammar every rule of which is a <code>LinkedRule</code>: what <code>link</code> returns.</p></div>
 
 
+
         </section>
 
 
@@ -451,6 +464,7 @@
           <pre class="signature"><code>pub fn prod_names&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The production names of <code>g</code>, in index order — the table <code>show</code> renders a tree against, and what <code>link</code> resolves references through.</p></div>
+
 
 
         </section>
@@ -467,6 +481,7 @@
           <div class="doc"><p><code>r</code> written back out as the constructor calls that build it — the debug view of a rule, and how a test asserts on one. A <code>Rule</code> cannot be compared with <code>==</code> (a <code>Refuse</code> may hold a function value) or rendered with <code>to_str</code>, so this is the one way to look at one. Defaulted arguments of a <code>Many</code> are written only where they differ from the default, so what is shown is what a grammar author would have written.</p></div>
 
 
+
         </section>
 
 
@@ -479,6 +494,7 @@
           <pre class="signature"><code>pub fn show_style(__spat$29232: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
+
 
 
         </section>
@@ -495,6 +511,7 @@
           <div class="doc"><p><code>r</code> with every bracketed repetition's style settled: stated, or read off the rule it belongs to.</p><p>Run before anything else looks at a rule, so the style a group carries is already the one it means by the time the driver, the formatter, the EBNF dump or the FIRST sets see it. The rule shape is unchanged — a bracketed <code>Many</code> is the storage form as well as the written one — so this only ever fills the slot a caller left empty.</p><p>The style is derived here — <code>sep</code> from the list's own separator, <code>trailing</code> from <code>trailing_sep</code>, <code>spaced</code> as given — so a grammar states each of those once. <code>wraps</code> comes from <code>max</code>: a <code>Many</code> in brackets is a list by construction and lists wrap, <em>unless</em> it is bounded at one item, which makes it a bracket pair holding one thing (<code>(expr)</code>, a block's braces) rather than a list. There is nothing to break at a width in that case, so it lays out inline.</p></div>
 
 
+
         </section>
 
 
@@ -509,6 +526,7 @@
           <div class="doc"><p><code>g</code> with every rule reference resolved: each <code>Named(name)</code> rewritten to the <code>NamedIdx(index)</code> of the production it names, so the driver resolves a reference by indexing rather than by comparing strings. Fails when a reference names no production, or when two productions share a name.</p><p>Idempotent — a <code>NamedIdx</code> passes through — so a grammar may be linked once and reused, or handed to <code>parse</code> unlinked and linked per call.</p></div>
 
 
+
         </section>
 
 
@@ -521,6 +539,7 @@
           <pre class="signature"><code>variant Kind</code></pre>
 
           <div class="doc"><p>A token-kind type and an AST type for the <code>.test</code> block above. A real consumer declares its own pair; these exist because a <code>Grammar&lt;K, A&gt;</code> cannot be written down without both. (<code>Kind</code> rather than a <code>Kind</code> <em>constructor</em>: a constructor colliding with another top-level name in the same file is silently dropped.)</p></div>
+
 
 
           <ul class="cases">
@@ -554,6 +573,7 @@
           <pre class="signature"><code>variant Node</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
           <ul class="cases">
@@ -591,6 +611,7 @@
           <div class="doc"><p>Every group style in <code>r</code>, in the order the rules mention them: a group's own style first, then the styles inside its brackets. That order is the contract with <code>link_rule</code>, which hands out indices by walking the same tree the same way — get the two out of step and a <code>Group</code> names another group's style.</p><p>Both spellings answer, so an already-linked rule reports the same list as the rule it was linked from, which is what makes <code>link</code> idempotent.</p></div>
 
 
+
         </section>
 
 
@@ -603,6 +624,7 @@
           <pre class="signature"><code>fn opt_group_styles&#60;K: variant&#62;(r: Rule&#60;K&#62;?) -&#62; ListStyle[]</code></pre>
 
           <div class="doc"><p><code>group_styles</code> reaching inside an optional.</p></div>
+
 
 
         </section>
@@ -619,6 +641,7 @@
           <div class="doc"><p>How many groups <code>r</code> holds — the amount <code>base</code> advances past it.</p></div>
 
 
+
         </section>
 
 
@@ -631,6 +654,7 @@
           <pre class="signature"><code>fn sep_spelling&#60;K: variant&#62;(sep: Rule&#60;K&#62;?) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p>How the printer should write this list's separator: the spelling of the <code>Many</code>'s own separator, or the empty string for a juxtaposed list with none.</p><p>A separator that is not a literal has no spelling to write back, so a grammar that brackets such a list is refused rather than guessed at — the alternative is a formatter that silently drops the separator when the list breaks.</p></div>
+
 
 
         </section>
@@ -647,6 +671,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -659,6 +684,7 @@
           <pre class="signature"><code>fn desugar_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -675,6 +701,7 @@
           <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code> and every bracketed repetition given its entry in the grammar's <code>groups</code> table. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p><p><code>base</code> is the index the first group in <code>r</code> takes; the rest follow in <code>group_styles</code> order. It is threaded by arithmetic rather than by a running counter because a rule is a tree and <code>try_map</code> has nowhere to keep one.</p></div>
 
 
+
         </section>
 
 
@@ -687,6 +714,7 @@
           <pre class="signature"><code>fn opt_group_count&#60;K: variant&#62;(r: Rule&#60;K&#62;?) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>group_count</code> reaching inside an optional, which <code>map</code> cannot.</p></div>
+
 
 
         </section>
@@ -703,6 +731,7 @@
           <div class="doc"><p>A <code>Many</code>'s separator, linked — <code>none</code> stays <code>none</code>. Its own function because <code>?</code> cannot reach inside an optional.</p></div>
 
 
+
         </section>
 
 
@@ -715,6 +744,7 @@
           <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[], base: u64) -&#62; LinkedRule&#60;K&#62;[]!ParseError</code></pre>
 
           <div class="doc"><p>Each rule in <code>rs</code>, linked, with <code>base</code> advancing past the groups each one holds.</p></div>
+
 
 
         </section>
@@ -731,6 +761,7 @@
           <div class="doc"><p>A rule of the fixture kind: a construction that no payload gives a <code>Kind</code> (<code>Literal(..)</code>, <code>Refuse(..)</code>) takes it from this parameter.</p></div>
 
 
+
         </section>
 
 
@@ -743,6 +774,7 @@
           <pre class="signature"><code>fn echo(matched: str) -&#62; str</code></pre>
 
           <div class="doc"><p>A message function for the <code>Refuse(Fn(..))</code> fixtures: what was matched, back.</p></div>
+
 
 
         </section>

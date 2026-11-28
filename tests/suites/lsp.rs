@@ -731,6 +731,26 @@ fn hover_shows_the_signature_then_the_docs() {
     assert_eq!(hover["range"]["start"], cursor_on(ROOT, "add(2, 3)"));
 }
 
+/// A parameter's own `# ..` lines follow the function's docs in a hover, one line each.
+#[test]
+fn hover_lists_the_documented_parameters() {
+    let source = "# Scales.\nfn scaled(\n    n: i64,\n    # How many\n    # times over.\n    by: i64,\n) -> i64 { n }\n\nfn main() { scaled(1, 2); }\n";
+    let workspace = Workspace::new("hover_params", &[("main.aipl", source)]);
+    let mut server = opened(&workspace, "main.aipl");
+    let hover = request(
+        &mut server,
+        "textDocument/hover",
+        json!({
+            "textDocument": { "uri": workspace.uri("main.aipl") },
+            "position": cursor_on(source, "scaled(1, 2)"),
+        }),
+    );
+    assert_eq!(
+        hover["contents"]["value"],
+        json!("```aipl\nfn scaled(n: i64, by: i64) -> i64\n```\n\nScales.\n\n- `by: i64` — How many times over."),
+    );
+}
+
 /// A file using one builtin written in AIPL, one the compiler expands, and an
 /// operator imported under its alias.
 const USES_BUILTINS: &str = "import { equal as ==, first, len } from builtins;\n\

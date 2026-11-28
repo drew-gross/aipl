@@ -32,6 +32,7 @@
           <div class="doc"><p><code>aipl_syntax::ast::Type</code>, less the four checker sentinels (see the header).</p><p>A type parameter is written as an ordinary identifier and reaches the parser's output as <code>Named</code>; <code>promoted</code> is what turns the ones a declaration declared into <code>TypeVar</code>s afterwards.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Unit"><code>Unit</code>
@@ -127,6 +128,7 @@
           <div class="doc"><p>What a <code>T without X</code> type leaves out — the <code>X</code>. One case per kind of value the checker knows how to exclude: the empty array literal, <code>[]</code>, or a case of a variant, by its declared name, or such a case left out of everything the type holds too (<code>C throughout</code>).</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-EmptyArray"><code>EmptyArray</code>
@@ -160,6 +162,7 @@
           <div class="doc"><p>The excluded value as the user writes it after <code>without</code>.</p></div>
 
 
+
         </section>
 
 
@@ -172,6 +175,7 @@
           <pre class="signature"><code>variant SetOrder</code></pre>
 
           <div class="doc"><p>How a set orders its elements: <code>#{T}</code> promises no order, <code>#&gt;{T}</code> walks largest first, <code>#&lt;{T}</code> smallest first. The two ordered forms require an <code>ord</code> element type; all three are distinct types.</p></div>
+
 
 
           <ul class="cases">
@@ -207,6 +211,7 @@
           <div class="doc"><p>The dump suffix for an order: nothing for the unordered set, so the plain <code>Set(i64)</code> reads as it always has.</p></div>
 
 
+
         </section>
 
 
@@ -219,6 +224,7 @@
           <pre class="signature"><code>pub fn type_text(self: Ty) -&#62; str</code></pre>
 
           <div class="doc"><p>A type as it is written in source: <code>i64[]</code>, <code>str?</code>, <code>#&gt;{i64}</code>, <code>(i64, str) -&gt; bool</code>. The structural dump below keeps which way a type nested; this is the spelling a diagnostic quotes back, and it is the one <code>aipl_syntax::type_name</code> gives.</p></div>
+
 
 
         </section>
@@ -235,6 +241,7 @@
           <div class="doc"><p>What follows the <code>#</code> of a set type to say how it is ordered: nothing for the unordered set, <code>&gt;</code> for largest first and <code>&lt;</code> for smallest first.</p></div>
 
 
+
         </section>
 
 
@@ -247,6 +254,7 @@
           <pre class="signature"><code>pub fn show_ty(self: Ty) -&#62; str</code></pre>
 
           <div class="doc"><p>A type as a one-line structural dump: constructors named, leaves bare. It is the oracle the lowering's tests assert against, so it is deliberately <em>not</em> the source spelling — <code>Array(Optional(i64))</code> says which way <code>i64?[]</code> nested, where re-rendering the source could not.</p></div>
+
 
 
         </section>
@@ -263,6 +271,7 @@
           <div class="doc"><p><code>self</code> with every <code>Named</code> whose name is one of <code>vars</code> made a <code>TypeVar</code>, at any depth. A declared type parameter shadows a type of the same name, so the promotion is by name alone.</p></div>
 
 
+
         </section>
 
 
@@ -275,6 +284,7 @@
           <pre class="signature"><code>pub fn show_tys(self: Ty[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The elements of a type list, comma-separated. An empty list renders empty, which is what <code>() -&gt; R</code> and <code>Foo&lt;&gt;</code> would need if either could be written.</p></div>
+
 
 
         </section>
@@ -298,6 +308,7 @@
           <div class="doc"><p>What follows a function type's parameters, as written: <code> mut !prints !reads_files</code>, and nothing for a type that mutates nothing and performs no effect.</p></div>
 
 
+
         </section>
 
 
@@ -312,6 +323,7 @@
           <div class="doc"><p>What a function type's <code>mut</code> and effects add to <code>show_ty</code>'s form: <code>, mut !prints</code>, and nothing for none.</p></div>
 
 
+
         </section>
 
 
@@ -324,6 +336,7 @@
           <pre class="signature"><code>fn suffix_operand(self: Ty) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> as the operand of a postfix <code>?</code>, <code>[]</code> or <code>!E</code>: parenthesized when it is a <code>without</code> refinement, which binds looser than every suffix.</p></div>
+
 
 
         </section>

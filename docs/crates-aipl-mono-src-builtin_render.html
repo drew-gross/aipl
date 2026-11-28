@@ -32,6 +32,7 @@
           <div class="doc"><p>The float <code>self</code> as text. With no options that is <code>to_str(self)</code>: the shortest decimal that reads back as the same value.</p><ul><li><code>digits</code>: for a float, write exactly that many digits after the point, correctly rounded</li></ul><p>from the float's exact value (halves to even: <code>0.25</code> is <code>0.2</code> to one digit, <code>2.5</code> is <code>2</code> to none), so <code>render(1.0 / 3.0, digits=3)</code> is <code>0.333</code>. A count past the 1074 digits a float's exact value has gives the rest as zeros. <code>NaN</code> and <code>inf</code> have no digits.</p><ul><li><code>significant</code>: for a float, write that many significant digits, correctly rounded from</li></ul><p>the exact value the same way (a count of 0 is 1), with zeros where the digits run out before the point: <code>12345.0</code> is <code>12000</code> to two, <code>12.345</code> is <code>12</code>, <code>1.2345</code> is <code>1.2</code> and <code>0.0012345</code> is <code>0.0012</code>. Trailing zeros are kept (<code>1.0</code>), and zero is <code>0</code>. It is used instead of <code>digits</code> when both are given.</p></div>
 
 
+
         </section>
 
 
@@ -51,6 +52,7 @@
           <pre class="signature"><code>fn round_significant(self: str, count: u64) -&#62; str</code></pre>
 
           <div class="doc"><p>The decimal text <code>self</code> (digits, a point, digits, no sign) rounded to <code>count</code> significant digits, halves to even on the exact digits that follow.</p></div>
+
 
 
         </section>

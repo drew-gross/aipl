@@ -32,6 +32,7 @@
           <div class="doc"><p>The AST an S-expression lowers to: a bare atom, or a list of them. Recursive through an array, so a <code>Sexp</code> is a refcounted heap block — the shape a <code>build</code> function value had to be proven able to return.</p></div>
 
 
+
           <ul class="cases">
 
             <li id="item-Atom"><code>Atom(str)</code>
@@ -60,6 +61,7 @@
           <div class="doc"><p><code>self</code> printed back as S-expression source, in the one canonical spelling: atoms as themselves, a list as its elements joined by single spaces.</p><p>Round-trips with <code>parse_sexp</code> — <code>parse_sexp(render_sexp(v)) == v</code> for every <code>v</code> — which is what makes the pair a usable end-to-end check of the library.</p></div>
 
 
+
         </section>
 
 
@@ -79,6 +81,7 @@
           <pre class="signature"><code>fn depth(self: Sexp) -&#62; u64</code></pre>
 
           <div class="doc"><p>How deeply <code>self</code> nests: an atom is 0, a list one more than its deepest element. The deep-nesting assertion's whole content — a parse that silently stopped early would show up here as a shallower tree.</p></div>
+
 
 
         </section>

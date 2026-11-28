@@ -30,6 +30,7 @@
           <div class="doc"><p>If <code>line</code> is a <code>--- name ---</code> test-section marker, returns <code>some(name)</code> with the trimmed inner name; otherwise — or when the inner name is empty — returns <code>none</code>. A line is a marker iff it starts with <code>---</code> with <strong>no leading whitespace</strong> (the marker must begin at column 0), and, once trailing whitespace is trimmed, ends with <code>---</code> and is at least 6 bytes long. The cases test harness uses these markers to delimit sections; the compiler treats any such marker as a hard cutoff (see <code>strip_test_sections</code>).</p></div>
 
 
+
         </section>
 
 

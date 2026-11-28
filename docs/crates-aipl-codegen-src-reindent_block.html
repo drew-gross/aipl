@@ -32,6 +32,7 @@
           <div class="doc"><p>Re-lays-out a multi-line raw-string / template atom around <code>base</code> columns. The closing-delimiter line is re-indented to <code>base</code> — but only when it is whitespace followed by a bare triple-quote / triple-backtick delimiter (the inert blank closing line); otherwise the atom is returned unchanged. For a bare-opening block (its opening line is exactly the delimiter), the content is <code>dedent</code>-ed and then re-indented (via <code>indent</code>) so its common indent becomes <code>base + 4</code> — one level deeper than the delimiters — while each line keeps its indentation relative to that common base. A content-bearing opening keeps its content byte-for-byte; only the closing delimiter moves.</p></div>
 
 
+
         </section>
 
 

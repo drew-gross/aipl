@@ -32,6 +32,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>pub fn hit(message: str, span: Span) -&#62; FilledHit</code></pre>
 
           <div class="doc"><p>A hit at <code>span</code>.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>A hit whose message names builtins the way the file that was linted spells them. A lint cannot say how: it reads one function, and the spelling is in the import list, so it reports the message in parts — each stretch of text followed by the builtin its rewrite uses, then a closing stretch — and the framework writes each in the way the file can take (see <code>spelling.aipl</code>), adding the import the file lacks.</p><p>The <code>span</code> is where the hit points. A lint that says nothing about it leaves it empty (an empty span is no location), and the framework that ran the lint over a node points the hit at the whole node (<code>run_lints</code>), or over a function at the function's name ([<code>unfilled_hits</code>]).</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>struct Named</code></pre>
 
           <div class="doc"><p>Some text and what its message goes on to name.</p></div>
+
 
 
         </section>
@@ -88,6 +92,7 @@
           <div class="doc"><p>An unfilled hit at <code>span</code> for a message <code>before</code> + the builtin's spelling + <code>after</code>.</p></div>
 
 
+
         </section>
 
 
@@ -100,6 +105,7 @@
           <pre class="signature"><code>pub fn lint_message(message: str, span: Span = 0..0) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>A hit that names no builtin: the whole of its message is the <code>tail</code>, so filling it in changes nothing. It points at <code>span</code>, or where the lint was run when there is none.</p></div>
+
 
 
         </section>
@@ -116,6 +122,7 @@
           <div class="doc"><p>An advice for a message <code>before</code> + the builtin's spelling + <code>after</code>.</p></div>
 
 
+
         </section>
 
 
@@ -128,6 +135,7 @@
           <pre class="signature"><code>pub fn at(self: LintHit, span: Span) -&#62; LintHit</code></pre>
 
           <div class="doc"><p>The hit that <code>self</code> is when it is about what spans <code>span</code>: where it points already, or there.</p></div>
+
 
 
         </section>
@@ -144,6 +152,7 @@
           <div class="doc"><p><code>self</code> as the hit it is for a file that writes each thing it names as <code>spell</code> says, or <code>none</code> when some of them cannot be written: the advice is dropped.</p></div>
 
 
+
         </section>
 
 
@@ -156,6 +165,7 @@
           <pre class="signature"><code>pub fn filled_assuming(self: LintHit, spelled: str?) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> with each thing it names written as <code>spelled</code>, the spelling a file that imports them has (<code>none</code>: it imports none, and the advice names the import). For a lint's own test of the message it gives.</p></div>
+
 
 
         </section>
@@ -172,6 +182,7 @@
           <div class="doc"><p><code>self</code> filled in for the file whose items are <code>items</code>.</p></div>
 
 
+
         </section>
 
 
@@ -184,6 +195,7 @@
           <pre class="signature"><code>pub fn lint_hits(src: str, lint: (ResolvedProgram) -&#62; LintHit[]) -&#62; LintHit[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What the program lint <code>lint</code> says of the program <code>src</code> parses to, as it says it. The one way the program lints' <code>.test</code> blocks run a lint over source text: pass the lint function itself.</p></div>
+
 
 
         </section>
@@ -200,6 +212,7 @@
           <div class="doc"><p>[<code>lint_hits</code>], keeping only the messages.</p></div>
 
 
+
         </section>
 
 
@@ -212,6 +225,7 @@
           <pre class="signature"><code>pub fn spans_its_text(self: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>self</code>'s span covers exactly the text that spells it, so the source can be spliced back into advice. Only a name and a field path off one qualify: their spans run from the first character to the last. Most other forms do not — a call's span stops before its closing paren, so <code>f(x)</code> splices back as <code>f(x</code>, which doesn't parse — and the ones that might are left out rather than each having to be re-checked whenever a span moves.</p></div>
+
 
 
         </section>
@@ -228,6 +242,7 @@
           <div class="doc"><p>Lints come in two kinds. A <em>program</em> lint is a function of the whole <code>Program</code> (<code>unused_imports</code>, which compares the imports with every name the file mentions). A <em>function</em> lint is a function of one <code>Function</code>, and [<code>hits</code>] and its variants run it over the program's [<code>functions</code>], so no function lint decides for itself which bodies to look at. A function lint that needs to know the file's imports takes its <code>items</code> beside the function.</p><p>The program is read after hoisting, so every body that is code to check is a function: each function, the <code>.test</code> and <code>.benchmark</code> blocks as the functions they became, and the helpers declared in a block.</p><p>Every function of the program, in the order it is written.</p></div>
 
 
+
         </section>
 
 
@@ -240,6 +255,7 @@
           <pre class="signature"><code>variant LintRun</code></pre>
 
           <div class="doc"><p>A lint of one function, by what it reads: the function (once), or each node of one kind in its body, or each of the <code>match</code> and <code>if let</code> expressions whose value is the function's (<code>tail_matches</code>). A lint of the kind reads the kind's payload; one that needs the node itself (its source, or its span) is the <code>Node</code> case, and a tail match is always the node. What each says is a list of hits, which a lint that finds at most one writes as <code>[..hit]</code>.</p></div>
+
 
 
           <ul class="cases">
@@ -320,6 +336,7 @@
           <div class="doc"><p>A lint, under the name of its file.</p></div>
 
 
+
         </section>
 
 
@@ -332,6 +349,7 @@
           <pre class="signature"><code>pub fn run_lints(self: Function, lints: Lint[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>What each of <code>lints</code> says of <code>self</code>: a lint of one kind of node is run over every node of that kind in the body, and what it says points at its node unless it points somewhere in particular.</p></div>
+
 
 
         </section>
@@ -348,6 +366,7 @@
           <div class="doc"><p>What the function lint <code>lint</code> reports for each of <code>self</code>, the hits [<code>filled</code>] fills in.</p></div>
 
 
+
         </section>
 
 
@@ -360,6 +379,7 @@
           <pre class="signature"><code>pub fn unfilled_hits_of(self: Function[], lints: Lint[]) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>What <code>lints</code> report for each of <code>self</code>: each function's hits, those of a function that point nowhere in particular at its name. Not [<code>unfilled_hits</code>] with a lambda: a lambda cannot capture lints.</p></div>
+
 
 
         </section>
@@ -376,6 +396,7 @@
           <div class="doc"><p>What <code>lints</code> say of the program <code>src</code> parses to, as they say it: the [<code>LintHit</code>]s, before any file's imports decide how they are written. Every builtin counts as imported.</p></div>
 
 
+
         </section>
 
 
@@ -388,6 +409,7 @@
           <pre class="signature"><code>pub fn lint_lints_filled_messages(src: str, lints: Lint[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>What <code>lints</code> report for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
+
 
 
         </section>
@@ -404,6 +426,7 @@
           <div class="doc"><p>What the function lint <code>lint</code> reports for the program <code>src</code> parses to, filled in for the imports <code>src</code> has.</p></div>
 
 
+
         </section>
 
 
@@ -416,6 +439,7 @@
           <pre class="signature"><code>pub fn lint_function_unfilled_messages(src: str, lint: (Function) -&#62; LintHit[]) -&#62; str[]!ParseFailure</code></pre>
 
           <div class="doc"><p>[<code>lint_function_unfilled_hits</code>], keeping only the messages.</p></div>
+
 
 
         </section>
@@ -432,6 +456,7 @@
           <div class="doc"><p>What the function lint <code>lint</code> says of the program <code>src</code> parses to, as it says it: the [<code>LintHit</code>]s, before any file's imports decide how they are written. Every builtin counts as imported, so a lint's own tests are about the shape it finds and nothing about imports.</p></div>
 
 
+
         </section>
 
 
@@ -446,6 +471,7 @@
           <div class="doc"><p>[<code>lint_function_unfilled</code>], shown as messages.</p></div>
 
 
+
         </section>
 
 
@@ -458,6 +484,7 @@
           <pre class="signature"><code>pub fn shown(self: LintHit[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p><code>self</code> as messages: each stretch of text followed by the builtin it names as <code>to_str</code> shows it, then the closing stretch. Not what a file's author is shown, which is <code>filled</code>'s, but enough for a lint's tests to say what advice it gives.</p></div>
+
 
 
         </section>
@@ -481,6 +508,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -495,6 +523,7 @@
           <div class="doc"><p><code>hits</code> less those that advise the builtin <code>self</code> is itself: a function written to be <code>any</code> holds the longhand that <code>any</code> replaces, and advising it to call <code>any</code> would have it call itself.</p></div>
 
 
+
         </section>
 
 
@@ -507,6 +536,7 @@
           <pre class="signature"><code>fn quoted_list(self: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p><code>self</code> as backquoted names, read as a sentence: <code>a</code>, <code>a</code> and <code>b</code>, or <code>a</code>, <code>b</code> and <code>c</code>.</p></div>
+
 
 
         </section>

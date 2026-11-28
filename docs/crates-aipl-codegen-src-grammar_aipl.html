@@ -32,6 +32,7 @@
           <div class="doc"><p>AIPL's grammar: the productions the driver in <code>parse.aipl</code> parses AIPL with, starting at <code>program</code>.</p><p>Split across five builder functions purely for reading — the array they concatenate to is one flat production list, and position in it is identity (a linked <code>NamedIdx</code> and a <code>Tree</code> both name a production by its index).</p></div>
 
 
+
         </section>
 
 
@@ -44,6 +45,7 @@
           <pre class="signature"><code>struct ShimTarget</code></pre>
 
           <div class="doc"><p>A shim binding: the operation, the name of the function it is bound to, and the closure that function is made of, when it is bound to one. A closure is bound under a name of its own, so everything after the parser sees every binding as the name of a function.</p></div>
+
 
 
         </section>
@@ -60,6 +62,7 @@
           <div class="doc"><p>What follows a callee's name in <code>name::&lt;A, B&gt;(args)</code>: the types between the angles and then the argument list. They arrive as the call's children in that order, the arguments last.</p></div>
 
 
+
         </section>
 
 
@@ -72,6 +75,7 @@
           <pre class="signature"><code>struct ShimHead</code></pre>
 
           <div class="doc"><p><code>shim &lt;effect&gt;</code>: the effect's name, and the span over both tokens, which is where a diagnostic about the form points.</p></div>
+
 
 
         </section>
@@ -88,6 +92,7 @@
           <div class="doc"><p>The fields a struct pattern reads and the names it binds them as, in order — read off the tokens of its braces, which start at <code>first</code>. <code>x</code> binds <code>x</code> and <code>x as px</code> binds <code>px</code>; either way the field is the one written first.</p><p>Told apart by the <code>as</code> after a field rather than by counting: a field may itself be called <code>as</code> (<code>{ as }</code> and <code>{ as as a }</code> both read as written), because what decides is the token that <em>follows</em> it.</p></div>
 
 
+
         </section>
 
 
@@ -100,6 +105,7 @@
           <pre class="signature"><code>struct DocSplit</code></pre>
 
           <div class="doc"><p>A run of <code># ..</code> lines split at the last blank line in it: the part written directly above the declaration, and everything detached from it.</p></div>
+
 
 
         </section>
@@ -116,6 +122,7 @@
           <div class="doc"><p>A binding written with a type or case name: what it binds, the name of the type or case, and the index of that name among the tokens, where the names it spells begin.</p></div>
 
 
+
         </section>
 
 
@@ -128,6 +135,7 @@
           <pre class="signature"><code>pub fn aipl_source(src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>The part of <code>src</code> that is AIPL: everything before the first <code>--- section ---</code> marker, which is where a test-case file stops being source and starts being expected output. <code>aipl_parser::parse</code> strips exactly this, and <code>aipl_parse_cst</code> parses exactly this — so a losslessness assertion is against this string, not the whole file.</p></div>
+
 
 
         </section>
@@ -144,6 +152,7 @@
           <div class="doc"><p>The lossless concrete syntax tree for AIPL source <code>src</code>, parsed by the library against <code>aipl_grammar()</code>.</p><p>Every byte of <code>aipl_source(src)</code> is under exactly one leaf. That needs the lexer's rule set read <em>losslessly</em> (<code>keep_skipped</code>): the compiler's own lexing skips whitespace outright, having no use for it, and a concrete tree has to be able to put it back. Nothing else needs putting back — every other byte, the braces around a template interpolation included, already sits inside some token's span.</p></div>
 
 
+
         </section>
 
 
@@ -156,6 +165,7 @@
           <pre class="signature"><code>pub fn format_aipl_ty(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p>One AIPL <strong>type</strong>, laid out by the generated formatter.</p><p>This is the stage-4 claim, stated where it can be checked. <code>walker.aipl</code> lays out a type with six hand-written functions — <code>ty</code>, <code>paren_ty</code>, <code>ty_list</code>, <code>base_ty</code>, <code>set_or_dict_ty</code>, <code>dict_value_ty</code>, <code>named_ty</code>, <code>type_suffixes</code>, <code>array_suffixes</code> — about ninety lines of cursor-walking that mirror, by hand, productions this file already describes. Here the same layouts are four annotations on those productions plus <code>aipl_space</code> below, and the assertions under this function are <code>walker.aipl</code>'s own type assertions copied verbatim: same inputs, same expected strings, including the broken-list case. Both sides lex with <code>lex_aipl</code>, so the inputs mean the same thing to both.</p><p>What that does <em>not</em> say: the rest of AIPL is not this tractable. Statements want a hard-broken block layout that <code>format.aipl</code> does not have an arm for yet, and expressions want call hugging and chain breaking, which are not layout at all. The types are the honest measure of the mechanical part — and the mechanical part is most of the grammar-shaped half of the walker.</p></div>
+
 
 
         </section>
@@ -172,6 +182,7 @@
           <div class="doc"><p>One AIPL <strong>import statement</strong>, laid out by the generated formatter — the <code>Doc</code> rather than the text, because the caller is <code>walker.aipl</code>, which splices it into the file's layout and prints the whole thing once.</p><p>This is the first piece of AIPL's own formatter to move from the walker to the grammar, and it moved for the sake of one rule: the names sort. That used to be a comparator and a sort in the walker; it is now <code>sorted=true</code> on the <code>import_decl</code> production's <code>Many</code>, and the walker calls this instead of knowing. Everything else about an import's layout — the spaced braces, the trailing comma once it breaks, the <code>from</code> and the <code>;</code> — was already a fact the grammar stated, read back here through <code>format_cst</code> as it is for a type.</p><p><code>src</code> is the statement alone, <code>import</code> through <code>;</code>. Comments inside it are trivia the concrete tree keeps, so they come out inside the statement, beside the name they were written against; the walker skips past them so they are not emitted a second time.</p></div>
 
 
+
         </section>
 
 
@@ -184,6 +195,7 @@
           <pre class="signature"><code>pub fn lower_aipl_ty(src: str) -&#62; Ty!ParseError</code></pre>
 
           <div class="doc"><p>One AIPL <strong>type</strong>, lowered to the AST — the stage-5d claim for the slice that is finished, stated where it can be checked.</p><p><code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this is the whole pipeline: the concrete tree is built and discarded, and what comes back is a <code>Ty</code> that means the same thing <code>aipl_parser</code>'s build actions mean by it. The assertions below are written against <code>show_ty</code>'s structural dump rather than against a re-rendering of the source, because the question a lowering has to answer is which way <code>i64?[]</code> nested, and a re-rendering gives that back either way.</p></div>
+
 
 
         </section>
@@ -200,6 +212,7 @@
           <div class="doc"><p>One AIPL <strong>pattern</strong>, lowered to the AST.</p><p>Patterns are the second slice that closes over itself: nothing under <code>pattern</code> reaches an expression, which is why the destructuring <code>[a, b]</code> arm — the one pattern shape that holds expressions — belongs to <code>match_arm</code> rather than here.</p></div>
 
 
+
         </section>
 
 
@@ -212,6 +225,7 @@
           <pre class="signature"><code>pub fn lower_aipl_expr(src: str) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p>One AIPL <strong>expression</strong>, lowered to the AST.</p><p>This is most of the language: statements lower to expressions too, and the <code>atom</code> production reaches blocks, match arms and patterns, so what parses here is nearly everything but a declaration. The one thing it cannot do yet is a block holding a keyword statement — that slice is next, and a block that holds one refuses rather than dropping it.</p></div>
+
 
 
         </section>
@@ -228,6 +242,7 @@
           <div class="doc"><p>One AIPL <strong>block</strong>, lowered to the AST — the statement slice's entry point.</p><p>A block is not a node: it is the right-nested chain its statements fold to, so what comes back is an ordinary expression and the assertions read as the desugarings they are.</p></div>
 
 
+
         </section>
 
 
@@ -240,6 +255,7 @@
           <pre class="signature"><code>pub fn lower_aipl_block_surface(src: str) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>lower_aipl_block</code>, before the destructuring forms are lowered: the tree the lints read.</p></div>
+
 
 
         </section>
@@ -256,6 +272,7 @@
           <div class="doc"><p>A whole AIPL <strong>program</strong>, lowered to the AST — the end of the road for stage 5d's AIPL half. <code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this builds the concrete tree, lowers it and throws the tree away.</p></div>
 
 
+
         </section>
 
 
@@ -268,6 +285,7 @@
           <pre class="signature"><code>pub fn lex_lossless(text: str) -&#62; LexResult&#60;AiplTok&#62;!ParseError</code></pre>
 
           <div class="doc"><p>The whole rule set, read losslessly — every byte accounted for by a token or a trivia record. Lexing and parsing report failure in the same shape but not the same type, so the conversion happens once, here.</p><p>Public because the two halves are worth having apart: a caller parsing many sources prepares the grammar once (<code>prepare</code>) and then pays only this and <code>parse_prepared</code> per file. <code>aipl_parse_cst</code> is the one-shot convenience.</p></div>
+
 
 
         </section>
@@ -284,6 +302,7 @@
           <div class="doc"><p><code>src</code> lowered to the AST, as the AST — the FFI entry the Rust side rebuilds an <code>aipl_syntax::ast::Program</code> from. This is the bridge stage 5a chose: lower in AIPL, marshal the result, reconstruct on the other side.</p></div>
 
 
+
         </section>
 
 
@@ -296,6 +315,7 @@
           <pre class="signature"><code>struct ParsedFile</code></pre>
 
           <div class="doc"><p>What a source file parses to: its program, and the spans of every <code>#[allow]</code> lint-squelch marker in it.</p><p>The markers are the parser's one <em>side-channel</em> — they are trivia, so no production ever sees one, and the loader's lint pass still needs them to drop a hit squelched on the same line. They ride out on the return value rather than through a sink the caller has to arm first.</p></div>
+
 
 
         </section>
@@ -312,6 +332,7 @@
           <div class="doc"><p>A file parsed and lowered: its attributes are functions of their own and its destructuring forms are bound.</p></div>
 
 
+
         </section>
 
 
@@ -324,6 +345,7 @@
           <pre class="signature"><code>struct ParseFailure</code></pre>
 
           <div class="doc"><p>Why a source file has no program: every syntax error in it, in source order — the ones the grammar recovered from (a missing <code>;</code> after a statement, say; see <code>Expect</code>) and the one it could not. Never empty. A file with several slips reports all of them, where <code>aipl_parse_cst</code> stops at the first.</p><p>Only syntax errors recover. A lexing failure, trailing whitespace, a build that refuses (a duplicate <code>.test</code>) and a <code>Refuse</code> each end the parse where they are, and are the last error, after those met before them.</p></div>
+
 
 
         </section>
@@ -340,6 +362,7 @@
           <div class="doc"><p>The whole of <code>aipl_parser::parse_and_lint</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is what follows a parse but is no part of one: <code>parse_and_partial_load</code> hoists test functions and promotes type variables, and the loader bakes the locations of <code>assert</code> and <code>trace</code>.</p><p>A tree that recovered from a missing token is a tree of broken input, and is never lowered: the errors come back instead.</p></div>
 
 
+
         </section>
 
 
@@ -352,6 +375,7 @@
           <pre class="signature"><code>pub fn aipl_parse_surface_file(src: str) -&#62; ParsedFile!ParseFailure</code></pre>
 
           <div class="doc"><p><code>aipl_parse_file</code>, stopping before the destructuring forms are lowered: the program as written, which is what the lints read. Everything else wants the lowered one.</p></div>
+
 
 
         </section>
@@ -368,6 +392,7 @@
           <div class="doc"><p>Why <code>src</code> does not parse, or <code>none</code> when it does — the FFI entry the error-message comparison reads. A refusal from a <code>build</code> (a mixed <code>#{ .. }</code>, a duplicate <code>.test</code>) comes back the same way a syntax error does, since both are reasons a source has no AST.</p></div>
 
 
+
         </section>
 
 
@@ -382,6 +407,7 @@
           <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses <em>and</em> its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes).</p><p>The FFI entry the corpus test calls — one crossing and one parse per file, checking both properties at once. Rejection is half of it: a grammar that accepts everything says nothing about what the language is.</p></div>
 
 
+
         </section>
 
 
@@ -394,6 +420,7 @@
           <pre class="signature"><code>pub fn aipl_parses(src: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>src</code> parses as AIPL. The FFI entry the corpus differential test calls: it compares this against <code>aipl_parser::parse</code> succeeding, file by file, over every <code>.aipl</code> in the repository.</p></div>
+
 
 
         </section>
@@ -417,6 +444,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -429,6 +457,7 @@
           <pre class="signature"><code>fn types() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -445,6 +474,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -457,6 +487,7 @@
           <pre class="signature"><code>fn expressions() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -473,6 +504,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -485,6 +517,7 @@
           <pre class="signature"><code>fn child_span(self: Cst) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span a lowered node takes: this node's <em>tokens</em>, with the trivia in front of the first one left out. <code>span</code> reaches back over that trivia, which is what losslessness needs and the opposite of what a diagnostic wants. The tight token span of an interior child, which a lowering holds as a bare <code>Cst</code> rather than as the <code>Parts</code> its own node arrives as. The counterpart of <code>tok_span</code>, which answers the same question about the node itself.</p></div>
+
 
 
         </section>
@@ -501,6 +534,7 @@
           <div class="doc"><p>The token span of interior child <code>i</code>, for the nodes whose parts want their own spans — a match arm's pattern, one step of a postfix chain.</p></div>
 
 
+
         </section>
 
 
@@ -513,6 +547,7 @@
           <pre class="signature"><code>fn as_expr(v: Ast, span: Span) -&#62; Expr!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -529,6 +564,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -541,6 +577,7 @@
           <pre class="signature"><code>fn as_suffix(v: Ast, span: Span) -&#62; Suffix!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -557,6 +594,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -569,6 +607,7 @@
           <pre class="signature"><code>fn as_lambda_param(v: Ast, span: Span) -&#62; LambdaParam!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -585,6 +624,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -597,6 +637,7 @@
           <pre class="signature"><code>fn as_entries(v: Ast, span: Span) -&#62; BraceEntry[]!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -613,6 +654,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -625,6 +667,7 @@
           <pre class="signature"><code>fn as_bind(v: Ast, span: Span) -&#62; ShimTarget!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -641,6 +684,7 @@
           <div class="doc"><p>Child <code>i</code> as an expression, which most of this file wants.</p></div>
 
 
+
         </section>
 
 
@@ -653,6 +697,7 @@
           <pre class="signature"><code>fn lower_expr(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>expr</code> — the <code>Climb</code> node. A bare operand climbed to itself has one interior child and no token of its own; an application has two children with its operator as a direct leaf between them.</p></div>
+
 
 
         </section>
@@ -669,6 +714,7 @@
           <div class="doc"><p><code>unary</code> — <code>-x</code>, <code>!x</code>, or the postfix it wraps. Unary <code>-</code> is the one operator with no named builtin to resolve to, so it stays a node of its own; <code>!</code> is an ordinary call like every other operator.</p></div>
 
 
+
         </section>
 
 
@@ -681,6 +727,7 @@
           <pre class="signature"><code>fn lower_postfix(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>postfix</code> — an atom and the run of suffixes applied to it, left to right, each step spanning from the atom's start to that suffix's end.</p></div>
+
 
 
         </section>
@@ -697,6 +744,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -709,6 +757,7 @@
           <pre class="signature"><code>fn lower_suffix(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>suffix</code> — the seven postfix steps. <code>.</code> opens the three member forms, <code>[</code> the three bracket forms, and <code>?</code> is the whole of the seventh.</p></div>
+
 
 
         </section>
@@ -725,6 +774,7 @@
           <div class="doc"><p>The suffix forms that carry no token of their own to tell them apart: <code>?</code>, a field, <code>.name(args)</code> and the bracket forms, by the shape of the positions.</p></div>
 
 
+
         </section>
 
 
@@ -737,6 +787,7 @@
           <pre class="signature"><code>fn map_step(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Suffix!ParseError</code></pre>
 
           <div class="doc"><p><code>$name</code>, <code>$0</code> and <code>$name(args)</code> — the three member forms, each mapped over the receiver. The shapes are the <code>.</code> forms', so the slots say which one matched.</p></div>
+
 
 
         </section>
@@ -753,6 +804,7 @@
           <div class="doc"><p><code>.name</code> names a field and <code>.0</code> a tuple slot, which the AST spells as the field <code>_0</code> — so the two syntaxes become one here and nothing downstream knows tuples have a second way to name their fields. A negative index is refused here rather than in the lexer: the <code>Int</code> matcher claims the sign, so <code>p.-1</code> does lex.</p></div>
 
 
+
         </section>
 
 
@@ -765,6 +817,7 @@
           <pre class="signature"><code>fn is_float_literal(self: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether the token text <code>self</code> is a float literal rather than an integer one: it opens like a number (a digit, or a <code>-</code> and a digit) and carries a fraction or an exponent, which no integer literal does. The lexer has already decided; this is how the token's kind is read back from its text.</p></div>
+
 
 
         </section>
@@ -781,6 +834,7 @@
           <div class="doc"><p>The name a slot holds, with where it was written; <code>fallback</code> when the slot is a child position, which has no token of its own.</p></div>
 
 
+
         </section>
 
 
@@ -793,6 +847,7 @@
           <pre class="signature"><code>fn lower_atom(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>atom</code> — the twenty alternatives, dispatched on the first token each matched. The template is the one alternative that matches no token of its own, which is what identifies it without a comparison.</p></div>
+
 
 
         </section>
@@ -809,6 +864,7 @@
           <div class="doc"><p><code>match (e) { .. }</code> — every arm child is already a <em>list</em> of arms, since an alternation expands to one arm per pattern, so they concatenate. The scrutinee is every leading expression child: one is matched as it is, several are the tuple <code>match (a, b)</code> spells without its own parentheses.</p></div>
 
 
+
         </section>
 
 
@@ -821,6 +877,7 @@
           <pre class="signature"><code>fn is_block_kid(kid: Ast?, sp: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>kid</code> is an expression, as the first block of <code>shim &lt;effect&gt; { provider } { body }</code> is, rather than a <code>name = name</code> binding.</p></div>
+
 
 
         </section>
@@ -837,6 +894,7 @@
           <div class="doc"><p><code>shim &lt;effect&gt; { op = f, .. } { body }</code>. Spanned over <code>shim &lt;effect&gt;</code> rather than over the whole form: the body's span is empty when it ends in a <code>;</code>.</p></div>
 
 
+
         </section>
 
 
@@ -851,6 +909,7 @@
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -863,6 +922,7 @@
           <pre class="signature"><code>fn provider_head(src: str, node: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <div class="doc"><p>The head of a shim that names a provider rather than listing bindings. Only <code>random</code> has providers, so any other effect is refused here.</p></div>
+
 
 
         </section>
@@ -883,6 +943,7 @@ shim random seeded_with_clock() { body }
 </code></pre></div>
 
 
+
         </section>
 
 
@@ -895,6 +956,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn provider_block_shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>shim random { provider } { body }</code>: the first block is any expression of type <code>RandomProvider</code>, so which provider to use can be decided at run time. It is the provider <code>seeded_with_provider</code>, applied to that expression: <code>desugar.aipl</code> lowers it like the other providers.</p></div>
+
 
 
         </section>
@@ -911,6 +973,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>if (..) { .. }</code> and <code>if (let p = e) { .. }</code>, with or without an <code>else</code>. Both are written in two places — an atom, and the tail of an <code>else</code> — and build identically wherever they appear, so one lowering serves both.</p></div>
 
 
+
         </section>
 
 
@@ -923,6 +986,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn else_or_unit(kids: Ast[], i: u64, tsp: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p>The <code>else</code> branch, or the synthetic unit an else-less <code>if</code> gets — so it is typed and lowered exactly like <code>if (..) { .. } else {}</code>.</p></div>
+
 
 
         </section>
@@ -939,6 +1003,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>else_branch</code> — a block, or another <code>if</code> in the else position. The block form is the one with no token of its own.</p></div>
 
 
+
         </section>
 
 
@@ -951,6 +1016,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_template(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>template</code> — the delimiters, the text runs and the braces, as one concat chain. The segments are decoded here, together: a raw template is de-dented across the whole literal, so no segment can be read on its own — which is why the lexer leaves them as written (see <code>raw_tpl_text</code> in <code>lex_aipl.aipl</code>).</p></div>
+
 
 
         </section>
@@ -967,6 +1033,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p>A template's text slots, as written: one per gap, with an empty string where the source had no text there at all. A template alternates text and interpolation and begins and ends with text, so there is always one more slot than interpolation — which is the shape <code>template_chain</code> folds.</p><p><code>toks</code> is every token this production matched: the two delimiters at the ends, and between them the text runs and the braces (the interpolated expressions are children, not tokens, so a <code>{</code> is always followed by its <code>}</code>).</p><p>An opening brace is told from text by its spelling — an unescaped <code>{</code> always lexes as a brace, and a literal one is written <code>\{</code>, two characters long. A <em>closing</em> brace is not: <code>}</code> needs no escape in template text, so a text run holding exactly <code>}</code> reads the same as the token. It is found by pairing instead — the token after a <code>{</code> is its <code>}</code> — which is what <code>`\{{x}}`</code> needs to keep its trailing <code>}</code> as text.</p></div>
 
 
+
         </section>
 
 
@@ -979,6 +1046,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn template_chain(segs: str[], exprs: Expr[], sp: Span) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The concat chain a template lowers to. A template alternates segments and interpolations and always begins and ends with a segment, so there is exactly one more segment than interpolation: <code>zip_with</code> pairs each interpolation with the segment in front of it (stopping at the shorter side, which is <code>exprs</code>), and the one segment left over is the tail the fold starts from.</p><p>Right-associated — <code>concat(concat(s0, i0), concat(concat(s1, i1), .. sN))</code> — because that is the tree the parser's right-recursive <code>template_rest</code> produces, and the concat chain has to agree with it.</p></div>
+
 
 
         </section>
@@ -995,6 +1063,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p>One link of the chain: the segment in front of an interpolation, joined to the interpolation itself.</p></div>
 
 
+
         </section>
 
 
@@ -1007,6 +1076,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn interp_call(e: Expr) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The <code>{e}</code> of a template, as written. <code>desugar.aipl</code> lowers it to <code>__template_interp</code>.</p></div>
+
 
 
         </section>
@@ -1023,6 +1093,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1035,6 +1106,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_args(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>args</code> — the comma-separated list every call, array literal and array pattern is built on.</p></div>
+
 
 
         </section>
@@ -1051,6 +1123,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p>A <code>..</code> spread that is not a direct element of an array literal. <code>args</code> is shared by calls, the mutating writeback and array patterns, so the grammar admits one everywhere and only the array literal leaves it in place.</p></div>
 
 
+
         </section>
 
 
@@ -1063,6 +1136,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_arg(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>arg</code> — a spread, a keyword argument, or an ordinary expression. The three pass-through alternatives (an expression, a lambda, a bare operator) match no token of their own.</p></div>
+
 
 
         </section>
@@ -1079,6 +1153,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1091,6 +1166,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_op_value(src: str, node: Parts, kids: Ast[]) -&#62; Ast</code></pre>
 
           <div class="doc"><p><code>op_value</code> — an operator passed as a value (<code>apply(2, 3, +)</code>) is a binary lambda whose body is that operator's call, which reuses every lambda mechanism and leaves the operator gated like any other use.</p></div>
+
 
 
         </section>
@@ -1107,6 +1183,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>lambda</code> — <code>|a, b| body</code>, or the no-parameter <code>|| body</code>. The <code>||</code> is one token, so its presence is what says the parameter list is empty.</p></div>
 
 
+
         </section>
 
 
@@ -1119,6 +1196,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lambda_of(written: Ast[], span: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>|a, b| body</code> — the parameters are every child but the last, which is the body. Shared with the value-position lambda in <code>atom</code>, which is the same shape with a block for a body.</p></div>
+
 
 
         </section>
@@ -1135,6 +1213,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p>The capture list a lambda's children start with, if it has one, and the rest.</p></div>
 
 
+
         </section>
 
 
@@ -1147,6 +1226,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_captures(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>captures</code> — the <code>[..]</code> list of a lambda: its entries, in order.</p></div>
+
 
 
         </section>
@@ -1163,6 +1243,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>capture</code> — <code>mut name</code> or <code>mut name = init</code>: the name is the second token, and the initializer, if there is one, the only child.</p></div>
 
 
+
         </section>
 
 
@@ -1175,6 +1256,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1191,6 +1273,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>field_init</code> — <code>name: value</code>, the shorthand <code>name</code>, or a <code>..base</code> spread. A spread names no field, so it rides as an init with an empty name whose <em>value</em> is the spread. The three alternatives are three, two and one position, so the shape is what identifies each.</p></div>
 
 
+
         </section>
 
 
@@ -1203,6 +1286,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_brace_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1219,6 +1303,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1231,6 +1316,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1247,6 +1333,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1259,6 +1346,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn repair_block_value(e: Expr, brace: Span) -&#62; (Expr, Span)</code></pre>
 
           <div class="doc"><p>A block's chain with its <em>value</em> located, and that location — the two halves of <code>with_block_span</code> in <code>aipl-parser</code>, which does both in one walk for the same reason.</p><p><strong>Repairing it.</strong> A block with no trailing expression — <code>{}</code>, or one ending in <code>f();</code> — has a unit value the parser cannot locate: the empty production it comes from matches no text. Left at the empty span, every diagnostic about that value reports at line 1 of the file. The block's <code>{</code> is the honest location, and this is the first place it is in scope.</p><p><strong>Recording it.</strong> <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. The tail is in hand here, so it is stored once rather than re-walked at every diagnostic.</p><p>The value can sit arbitrarily deep in the chain a block is, so this walks the four kinds that pass a value along and rebuilds the spine. Depth is one frame per statement in <em>this</em> block — nested blocks repair their own, so the total work is one pass over the program rather than one per nesting level.</p></div>
+
 
 
         </section>
@@ -1275,6 +1363,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p>The block's value, once the walk above has found it. An empty span is the unit value of a block with no trailing expression — the empty production it comes from matched no text — and the block's <code>{</code> is the honest location for it. Anything else already knows where it is.</p></div>
 
 
+
         </section>
 
 
@@ -1287,6 +1376,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_block_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>block_body</code> — a statement and the rest of the block, an expression and whatever the <code>;</code> after it decided, or nothing at all.</p></div>
+
 
 
         </section>
@@ -1303,6 +1393,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>block_tail</code> — the <code>; rest</code> that turns the expression before it into a statement, as a list so that &quot;nothing followed&quot; and &quot;this followed&quot; are the empty and one-element cases of one shape.</p></div>
 
 
+
         </section>
 
 
@@ -1315,6 +1406,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn binder_names(toks: str[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The identifier tokens of a binder-led statement: everything this production matched directly, less the fixed spellings around them. A <code>let</code> statement's type is a child node rather than a token, so what is left is exactly the names — one for <code>let x</code>, two or more for <code>let (a, b)</code>, and the struct name followed by its fields for <code>let T { x, y }</code>.</p></div>
+
 
 
         </section>
@@ -1331,6 +1423,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1343,6 +1436,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn binder_punct() -&#62; str[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1359,6 +1453,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>let_stmt</code> — the plain binding, the annotated one, and the three destructuring forms. The token after <code>let</code> says which: <code>(</code> opens a tuple pattern; after a name, <code>(</code> opens a case pattern, <code>{</code> a struct pattern, <code>:</code> an annotation.</p></div>
 
 
+
         </section>
 
 
@@ -1371,6 +1466,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn lower_mut_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>mut_stmt</code> — the same three shapes a <code>let</code> has, less the tuple pattern, which <code>mut</code> does not take.</p></div>
+
 
 
         </section>
@@ -1387,6 +1483,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1399,6 +1496,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn let_else(pattern: Pat, value: Expr, otherwise: Expr, sp: Span, written: WrittenNames) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>let PATTERN = value else { .. };</code>. The block is what runs when the pattern does not match, and the rest of the block cannot be reached from it, so it has to leave the function: otherwise the binding the pattern makes would be missing below it.</p></div>
+
 
 
         </section>
@@ -1415,6 +1513,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p>Whether running <code>self</code> always ends in a <code>return</code>: it is one, or a sequence one of whose steps is, or a branching form each of whose branches is.</p></div>
 
 
+
         </section>
 
 
@@ -1427,6 +1526,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn named_binding(mutable: bool, name: str, name_span: Span, ty: Ty?, value: Expr) -&#62; Stmt</code></pre>
 
           <div class="doc"><p><code>let name = e;</code> and <code>mut name = e;</code>, with the annotation when one was written.</p></div>
+
 
 
         </section>
@@ -1443,6 +1543,7 @@ shim random seeded_with_clock() { body }
           <div class="doc"><p><code>assign_stmt</code> — eight alternatives on one target, told apart by the token after it. The target is a name or a <code>.</code>-led field path (<code>p</code>, <code>p.a.b</code>), read off the token run as a <code>Field</code> chain exactly as <code>p.a.b</code> parses in expression position; every form then desugars around that chain the way it does around a bare name, so <code>set p.n++</code> is <code>set p.n = p.n ++ 1</code> and <code>set p.xs.push(x)</code> is <code>set p.xs = p.xs.push(x)</code>. The field-path store itself is not desugared here: the rewrite into nested constructs needs the structs' field lists, which only mono's <code>infer</code> knows.</p></div>
 
 
+
         </section>
 
 
@@ -1457,6 +1558,7 @@ shim random seeded_with_clock() { body }
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1469,6 +1571,7 @@ shim random seeded_with_clock() { body }
           <pre class="signature"><code>fn unhandled_index_write() -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1489,6 +1592,7 @@ if (let some(..) = target[__iset$N]) {
 </code></pre><p>A grid takes two indexes, <code>target[row, column]</code>, and <code>grid_get</code> / <code>grid_try_set</code>. The value is evaluated only when the element exists. An index that is not a literal, a name or a field is bound first so that it is evaluated once; those three are read twice, which costs nothing and keeps a literal's type open to the index it is used as (<code>let</code> would have made it an <code>i64</code>).</p></div>
 
 
+
         </section>
 
 
@@ -1501,6 +1605,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn is_plain_index(__spat$118506: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
+
 
 
         </section>
@@ -1517,6 +1622,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>for_stmt</code> — the plain loop and the two patterns a <code>let</code> takes apart a value with, tuple and struct, each with or without an index in front: <code>for (let x</code>, <code>for (let (a, b)</code>, <code>for (let T { a, b }</code>, and <code>for (let i, </code> before any of the three. A comma after the first name says an index was written; the pattern then starts after it, and what follows the pattern's first token — a <code>(</code>, or a name and then <code>{</code> — says which it is.</p></div>
 
 
+
         </section>
 
 
@@ -1529,6 +1635,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span, written: WrittenNames) -&#62; Stmt!ParseError</code></pre>
 
           <div class="doc"><p><code>for (let (a, b) : xs) { body }</code>, and its struct and case twins, with an optional index in front: the pattern as written, for <code>desugar.aipl</code> to lower. A tuple pattern needs two names or more, which is checked here, where the span of the written pattern is at hand.</p></div>
+
 
 
         </section>
@@ -1545,6 +1652,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1557,6 +1665,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn wrap_stmt(stmt: Stmt, acc: Expr) -&#62; Expr</code></pre>
 
           <div class="doc"><p><code>wrap_stmt</code> — one statement and the rest of the block, folded into the chain the block is. Every arm here is a node whose last slot is that rest, or a <code>Seq</code> in front of it for the statements that produce no binding.</p></div>
+
 
 
         </section>
@@ -1573,6 +1682,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1585,6 +1695,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn for_chain(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, for_span: Span, acc: Expr) -&#62; Expr</code></pre>
 
           <div class="doc"><p>The <code>for</code> loop and the rest of the block. Both binders are carried on the node — the element one and, for <code>for (let i, x : xs)</code>, the index one — and nothing is desugared here: what an index <em>is</em> depends on what is being iterated (a position over an array or a <code>str</code>, the key over a dict, which is indexed by its key exactly as an array is by its position), and the parser has no types. Mono is the first pass that knows, and <code>lower_for</code> there is where the index becomes whatever it is.</p></div>
+
 
 
         </section>
@@ -1601,6 +1712,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>while (cond) { body }</code>. No keyword or paren token carries a span of its own, so the statement is spanned from its condition through its body — the same choice <code>for</code> makes with its loop variable.</p></div>
 
 
+
         </section>
 
 
@@ -1613,6 +1725,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_while_let(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>while (let p = e) { body }</code> runs <code>body</code> for as long as <code>e</code> matches <code>p</code>. There is no <code>break</code>, so the loop is spelled with a flag that the non-matching case clears: <code>mut more = true; while (more) { if (let p = e) { body } else { set more = false; } }</code>. The flag's name cannot be written in source, and a nested loop's flag shadows the outer one only inside the inner loop, where the outer one is never read.</p></div>
+
 
 
         </section>
@@ -1629,6 +1742,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1641,6 +1755,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_loop_inner(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>loop_inner</code> — a loop body admits no trailing expression, so every expression in it is an <code>expr;</code> statement and the body's own value is never read. An at-end body is a synthetic <code>0</code>, matching the loop expression's own result.</p></div>
+
 
 
         </section>
@@ -1657,6 +1772,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>match_arm</code> — one written arm becomes one <em>or more</em> arms: an alternation <code>A | B =&gt; body</code> expands here into one arm per pattern, so no later stage ever sees an or-pattern. The body is shared, which is what makes the same-bindings check below necessary.</p></div>
 
 
+
         </section>
 
 
@@ -1669,6 +1785,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn array_pattern(elems: Pat[], subs: Cst[], rest: bool, span: Span) -&#62; Pat!ParseError</code></pre>
 
           <div class="doc"><p>An array-destructuring arm's pattern: the simple <code>Array</code> when every element is a plain binder or a literal — the form codegen compiles directly, and the one that carries a span per element — and the nested <code>ArrayNested</code> otherwise. The same split <code>nested_or_ctor</code> makes between <code>Ctor</code> and <code>Nested</code>, for the same reason: an arm written the old way lowers exactly as it always did.</p><p>With a trailing <code>..</code> the elements must be plain: the length test of &quot;at least&quot; is the simple form's, and the decision tree that compiles the nested form dispatches on exact lengths.</p></div>
+
 
 
         </section>
@@ -1685,6 +1802,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1697,6 +1815,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn is_plain_elem(self: Pat) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether an element needs no sub-pattern machinery: a binder name, <code>_</code>, or a literal. A bare name that is <em>not</em> a binder — <code>none</code>, or a capitalised case — is a constructor, so it is not plain and forces the nested form, where it means the case rather than a name to bind.</p></div>
+
 
 
         </section>
@@ -1713,6 +1832,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>A plain element as the simple <code>Array</code> form holds it, spanned where it was written. Total over what <code>is_plain_elem</code> admits; anything else has already taken the nested path.</p></div>
 
 
+
         </section>
 
 
@@ -1725,6 +1845,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn arm_span(pat: Pat, subs: Cst[], i: u64, tsp: Span, alone: bool) -&#62; Span</code></pre>
 
           <div class="doc"><p>An arm's span is its <em>pattern's</em>, so a diagnostic points at what selected the arm rather than at everything it does. The one exception is a char pattern, whose span is a single quoted byte — too narrow to read — so it takes the whole arm.</p></div>
+
 
 
         </section>
@@ -1741,6 +1862,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>Every alternative of one arm must bind the same names in the same order, so the shared body means the same thing whichever matched. Two cases whose payloads line up may therefore group by naming them alike; alternatives that disagree are refused here rather than left to fail as an unbound name somewhere in the body.</p></div>
 
 
+
         </section>
 
 
@@ -1753,6 +1875,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn starts_pub(toks: str[]) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether a declaration's own tokens open with <code>pub</code>.</p></div>
+
 
 
         </section>
@@ -1769,6 +1892,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The span of a node's first own token, or <code>fallback</code> for a node that matched none.</p></div>
 
 
+
         </section>
 
 
@@ -1781,6 +1905,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn second_tok(self: Parts, fallback: Span) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span of a node's second own token — the name after a declaration's keyword.</p></div>
+
 
 
         </section>
@@ -1797,6 +1922,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
 
+
         </section>
 
 
@@ -1809,6 +1935,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn sub_written(subs: Cst[], i: u64, src: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the pattern child <code>i</code> of <code>subs</code>.</p></div>
+
 
 
         </section>
@@ -1825,6 +1952,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>self</code>, less the first <code>skip</code> tokens and everything from the first one spelled <code>stop</code>.</p></div>
 
 
+
         </section>
 
 
@@ -1837,6 +1965,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_pat(v: Ast, span: Span) -&#62; Pat!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1853,6 +1982,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>V.A</code> is one name with a dot in it — the qualification is not a separate field on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a <code>.</code> in second position means this pattern was not qualified.</p></div>
 
 
+
         </section>
 
 
@@ -1865,6 +1995,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_ctor_payload(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ctor_payload</code> — <code>Ctor(p, q)</code> matches each slot against a pattern, <code>Ctor(..)</code> says the case carries a payload this arm does not read. The <code>..</code> alternative has no child and is read off this node's own token; the other's slots are its <code>pattern</code> children.</p></div>
+
 
 
         </section>
@@ -1881,6 +2012,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>pattern</code> — the seven alternatives, told apart by the first token they matched.</p><p>A literal is what its delimiter says it is; everything else opens with an identifier or <code>none</code>, after which the payload child (present or not) and the <code>.</code> (present or not) settle the rest. <code>_</code> lexes as an ordinary identifier, so the wildcard arrives here as a nullary name and is recognised by spelling — and only when nullary, since <code>_(x)</code> is a constructor named <code>_</code>.</p></div>
 
 
+
         </section>
 
 
@@ -1893,6 +2025,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_name(v: Ast, span: Span) -&#62; str!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1909,6 +2042,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1921,6 +2055,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_import(v: Ast, span: Span) -&#62; ImportDecl!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1937,6 +2072,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1949,6 +2085,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_type_params(v: Ast, span: Span) -&#62; TypeParam[]!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1965,6 +2102,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -1977,6 +2115,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_field_decl(v: Ast, span: Span) -&#62; FieldDecl!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -1993,6 +2132,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -2005,6 +2145,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_case_param(v: Ast, span: Span) -&#62; CaseParam!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2021,6 +2162,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>program</code> — every item in the file, and the file's own documentation.</p><p>The module doc block arrives here rather than being matched here: <code>item</code> is what holds the <code># ..</code> lines, and it hands up any block a blank line detached from its declaration (see <code>lower_item</code>). This is where that block can be judged, because documenting the <em>file</em> is only open to the block at the top of it; a detached block anywhere below documents nothing and is refused.</p><p>A single parsed file has no merged-source map; the loader fills one in when it flattens several files together.</p></div>
 
 
+
         </section>
 
 
@@ -2033,6 +2175,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn number_unattached_blocks(self: WrittenItem[]) -&#62; WrittenItem[]</code></pre>
 
           <div class="doc"><p>The items with each top-level <code>test({ .. })</code> block, and each top-level <code>benchmark({ .. })</code> block, named by its order among its own kind, from 1, so a block's name is stable under edits elsewhere in the file.</p></div>
+
 
 
         </section>
@@ -2049,6 +2192,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>item</code> — a declaration and the <code># ..</code> lines in front of it. The lines are this production's own tokens, which is what makes documentation attach here rather than in each declaration.</p><p>Attachment is adjacency: a blank line under a block detaches it, and a detached block documents the file rather than the declaration below it. So the lines are split at the last blank line — the run written directly above the declaration documents it, and anything in front of that goes up to <code>program</code>, the only production that can see whether it sits at the top of the file.</p></div>
 
 
+
         </section>
 
 
@@ -2061,6 +2205,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -&#62; WrittenItem!ParseError</code></pre>
 
           <div class="doc"><p>The declaration under an <code>item</code>, carrying the <code># ..</code> lines written directly above it. Every kind but an <code>import</code> has somewhere to put them; an <code>import</code> declares nothing, so a block adjacent to one documents nothing — and the fix is the blank line that would make it the file's own documentation, which is what the message says.</p></div>
+
 
 
         </section>
@@ -2077,6 +2222,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>Split the <code># ..</code> lines an <code>item</code> matched against the declaration starting at <code>decl_at</code>. Read from the back, since it is the <em>last</em> blank line that decides: one between the block and the declaration leaves nothing attached, which is how a file's leading block comes to document the file rather than its first declaration.</p></div>
 
 
+
         </section>
 
 
@@ -2089,6 +2235,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn blank_line_follows(src: str, at: u64) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether a blank line follows byte <code>at</code>: two newlines before any other character. This is the whole of what detaches a <code># ..</code> block from what follows it — and it reads <em>whitespace only</em>, so a <code>//</code> comment written in the gap neither makes a blank line nor hides one.</p></div>
+
 
 
         </section>
@@ -2105,6 +2252,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The detached lines as one doc block. Like <code>doc_block</code>, but the blank lines that separated its runs are kept as empty lines: two runs above a file's first item read as two paragraphs, exactly as a bare <code>#</code> line inside one run does.</p></div>
 
 
+
         </section>
 
 
@@ -2117,6 +2265,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn doc_block(lines: str[]) -&#62; str?</code></pre>
 
           <div class="doc"><p>A run of <code># text</code> lines, joined by newline and nothing else — so a blank <code>#</code> line contributes an empty line, which is what lets a doc block have paragraphs. <code>doc_line_value</code> strips the marker, beside the lexer rule that strips it on the way in.</p></div>
+
 
 
         </section>
@@ -2133,6 +2282,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>import_decl</code> — the names, and where they come from. The source is the token after <code>from</code>, which is the second-to-last this production matched. <code>const_decl</code> — <code>pub let NAME: T = &lt;literal&gt;;</code>. The annotation is a child when one was written, so the value is the last child either way; <code>pub</code> and the name are read off this production's own tokens. The two rules a constant has — ALL_CAPS, and a literal value — are the loader's, which is where a name is resolved and where the substitution that makes them matter happens.</p></div>
 
 
+
         </section>
 
 
@@ -2145,6 +2295,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_import_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2161,6 +2312,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>What refusing a bare operator import says: the operator, and the aliased import to write instead — every flavor where there is a choice to make (<code>wrapping_add as +</code> or <code>saturating_add as +</code>), the one form where there is not (<code>equal as ==</code>). The alternatives come from <code>operator_named_forms</code>, so a new operator or flavor keeps its own diagnostic correct without touching this.</p></div>
 
 
+
         </section>
 
 
@@ -2173,6 +2325,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn missing_semicolon(next: str) -&#62; str</code></pre>
 
           <div class="doc"><p>What a statement-opening token straight after an expression means: the <code>;</code> between them is missing. <code>next</code> is that token, which the error underlines.</p></div>
+
 
 
         </section>
@@ -2189,6 +2342,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>import_name</code> — a name, or an aliased name. The span covers the <em>exported</em> name, which is where an &quot;is not exported&quot; error points. A bare operator never gets here: the grammar refuses it before lowering.</p></div>
 
 
+
         </section>
 
 
@@ -2201,6 +2355,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_effect(src: str, node: Parts, kids: Ast[]) -&#62; Ast</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2217,6 +2372,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -2229,6 +2385,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_type_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>type_param</code> — <code>name</code>, <code>name: bound</code>, or <code>name: variant</code>, with a default type after <code>=</code> for any of them. A bare name takes the <code>any</code> bound, which almost every generic uses.</p></div>
+
 
 
         </section>
@@ -2245,6 +2402,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>param</code> — the eight shapes. The two destructuring ones carry a field list for the body to bind off the argument, and the unnamed one also introduces a scrutinee the caller never named. <code>documented_param</code> — a parameter under the <code># ..</code> lines written above it.</p></div>
 
 
+
         </section>
 
 
@@ -2257,6 +2415,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2273,6 +2432,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The parameter a pattern makes when it is written in place of a name — <code>Point { x, y }</code>, <code>Wrap(inner)</code>, or <code>p: Point { x, y }</code> with the name — typed as the struct or case it names. <code>none</code> for any other parameter. These are the alternatives holding a repetition, so their positions do not line up one per sub-rule and they are recognised by the <code>{</code> or <code>(</code> after a type name rather than by their shape.</p></div>
 
 
+
         </section>
 
 
@@ -2285,6 +2445,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn generic_pattern_param(src: str, node: Parts, kids: Ast[], sp: Span, type_at: u64) -&#62; Param!ParseError</code></pre>
 
           <div class="doc"><p>The parameter <code>T&lt;A, B&gt; { x, y }</code> makes: a struct pattern over a type that takes arguments, which are the node's children. Without them the pattern's type would be the bare name, and the arguments a bare name defaults to would be what the fields are read off.</p></div>
+
 
 
         </section>
@@ -2301,6 +2462,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The pattern <code>case_name(..slots..)</code> writes: its <code>payload</code> child holds the slots, or says they are ignored.</p></div>
 
 
+
         </section>
 
 
@@ -2313,6 +2475,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn written_binding(toks: str[], at: u64, kids: Ast[], sp: Span) -&#62; WrittenBinding?!ParseError</code></pre>
 
           <div class="doc"><p>The binding written from token <code>at</code>: <code>T { x, y }</code> or <code>Case(x, y)</code>, or a name bound to one of them, <code>p: T { x, y }</code>. <code>none</code> when the tokens there are neither, as for a plain name, a tuple or an annotation. A case's payload is the first child.</p></div>
+
 
 
         </section>
@@ -2329,6 +2492,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>A pattern as the binding it makes: a case whose slots are all plain names is the <code>ByCase</code> form, and anything else is taken as the pattern it is.</p></div>
 
 
+
         </section>
 
 
@@ -2341,6 +2505,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn named_param_by_shape(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p>The six named shapes. Every sub-rule is one position, and <em>which</em> positions hold a lowered child is what tells them apart — <code>name: T*</code> puts its type third and <code>mut name: T</code> fourth, <code>name?: T = d</code> puts its type fourth where <code>name: T* = d</code> puts it third. So no arm counts tokens, hunts for a <code>*</code> or an <code>=</code>, or shifts an index past an optional <code>mut</code>.</p></div>
+
 
 
         </section>
@@ -2357,6 +2522,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>A named parameter, from the pieces its shape supplied: the name token, whether a <code>mut</code> or a <code>?</code> preceded it, the variadic marker if one was written, and whether a default followed. The type is always the first interior child and a default the second, in every one of the six shapes.</p><p>The stored type is what the <em>body</em> sees: a variadic stores the sequence its elements arrive in, and a <code>k?: T</code> stores the <code>T?</code> a caller's bare <code>T</code> is wrapped into.</p></div>
 
 
+
         </section>
 
 
@@ -2369,6 +2535,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn variadic_seq_ty(elem: Ty) -&#62; Ty</code></pre>
 
           <div class="doc"><p><code>x: T*</code> stores the sequence type: <code>str</code> when the element is <code>char</code> (an AIPL string <em>is</em> the char sequence), otherwise <code>T[]</code>. The element type stays recoverable from it.</p></div>
+
 
 
         </section>
@@ -2385,6 +2552,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>x: T+</code> stores the sequence type refined to what the body may rely on: <code>T[] without []</code>. A <code>char+</code> stays <code>str</code>, since a <code>str</code> has no refinement to take yet — the call site is still held to one element or more.</p></div>
 
 
+
         </section>
 
 
@@ -2397,6 +2565,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_fn_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>fn_body</code> — a value block, or the struct-literal shorthand, whose type name comes from the declared return type rather than from the source.</p></div>
+
 
 
         </section>
@@ -2413,6 +2582,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>construct_fields</code> — the shorthand body's field list. Its first field is spelled by the alternative that matched; the rest are ordinary <code>field_init</code>s.</p></div>
 
 
+
         </section>
 
 
@@ -2425,6 +2595,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>fn_attr</code> — <code>.test({ .. })</code> or <code>.benchmark({ .. })</code>, the only two. The argument shape is fixed by the production; what is checked here is that the name matches it. Every string-argument attribute is refused, which is the whole reason that alternative parses: so each can be refused <em>by name</em>.</p></div>
+
 
 
         </section>
@@ -2441,6 +2612,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>test_block</code> — the braces around a <code>test_body</code>: the chain's value is located the way <code>block</code> does it, and the functions ride along.</p></div>
 
 
+
         </section>
 
 
@@ -2453,6 +2625,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_test_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>test_body</code> — <code>block_body</code> with one more alternative: a function declaration, which is set aside rather than folded into the chain. A <code>pub</code> helper, or one carrying a <code>.test</code> of its own, is refused: the block is the only place the function exists, so neither could mean anything.</p></div>
+
 
 
         </section>
@@ -2469,6 +2642,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>test_tail</code> — <code>block_tail</code>'s twin: nothing followed (the expression before it was the value), or the rest of the block, which is a chain even when empty.</p></div>
 
 
+
         </section>
 
 
@@ -2481,6 +2655,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_test_block(v: Ast, span: Span) -&#62; TestBlock!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2497,6 +2672,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>test_item</code> — a top-level <code>test({ .. })</code>. It is lowered to a function with a name made for it and an empty body, whose <code>.test</code> body is the block, which is how the rest of the compiler already knows to run it.</p></div>
 
 
+
         </section>
 
 
@@ -2509,6 +2685,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_benchmark_item(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>benchmark_item</code> — a top-level <code>benchmark({ .. })</code>. Lowered to a function with a name made for it and an empty body, carrying the block as its <code>.benchmark</code>, exactly as if the block were written on that function.</p></div>
+
 
 
         </section>
@@ -2525,6 +2702,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -2537,6 +2715,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_struct_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2553,6 +2732,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -2565,6 +2745,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn slot_kid(self: Slot, kids: Ast[], span: Span) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p>The lowered child a slot names, or a refusal — <code>kid</code>'s counterpart for a positional match, where a slot that should name a <code>Named</code> reference holds a token instead. A slot carries the child's <em>index</em>, so this is <code>kid</code> with the index read off the position rather than written out by hand.</p></div>
+
 
 
         </section>
@@ -2581,6 +2762,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>slot_kid</code> as an expression, the way <code>kid_expr</code> is <code>kid</code> as one.</p></div>
 
 
+
         </section>
 
 
@@ -2593,6 +2775,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>variant_decl</code> — the name, the type parameters, and the cases. The cases' <code># ..</code> lines are this node's own tokens (they ride with the <code>|</code> separator, see the rule), so each case is given the lines written between the previous case and itself here, where both are in hand.</p></div>
+
 
 
         </section>
@@ -2609,6 +2792,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>refinement_decl</code> — the name, the type parameters, the refined head and what each clause leaves out. The name is the second token, as in <code>variant_decl</code>; the type is rebuilt as the <code>Without</code> the clauses spell, which is the whole of what the declaration stands for.</p></div>
 
 
+
         </section>
 
 
@@ -2621,6 +2805,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn doc_lines_between(src: str, __spat$182495: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
+
 
 
         </section>
@@ -2637,6 +2822,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>variant_case</code> — the name and the payload slots as children. Its docs are filled in by <code>lower_variant_decl</code>, which holds them.</p></div>
 
 
+
         </section>
 
 
@@ -2649,6 +2835,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_case_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>case_param</code> — a bare type, or a named slot with an optional default, under any <code># ..</code> lines of its own. <code>k?: T</code> stores the <code>T?</code> a match arm binds, with the <code>none</code> that was written as its default. The doc lines are the node's own tokens too, in front of the slot's; they are told apart by their marker.</p></div>
+
 
 
         </section>
@@ -2665,6 +2852,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>function</code> — the one production whose children are told apart by what they lowered to rather than by position: a type parameter list, some parameters, some effects, a return type, a body and some attributes all arrive in one list, and each is a different <code>Ast</code> case.</p></div>
 
 
+
         </section>
 
 
@@ -2677,6 +2865,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_program(v: Ast, span: Span) -&#62; WrittenProgram!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2693,6 +2882,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>A lowered expression as text, or the refusal that stopped it.</p></div>
 
 
+
         </section>
 
 
@@ -2705,6 +2895,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn aipl_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>The spacing rule for the productions the generated formatter lays out so far — types and imports: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and in an import a space after <code>import</code> and <code>from</code> and either side of <code>as</code>. Nothing anywhere else.</p><p>Everything else a reader would call spacing is a list separating its items, which the group layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest. It is asked about the spellings on either side of a gap, so <code>import</code> then <code>{</code> is one question (yes) and <code>#</code> then <code>{</code> in a set type is another (no).</p></div>
+
 
 
         </section>
@@ -2721,6 +2912,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>e</code> as the failure it is by itself.</p></div>
 
 
+
         </section>
 
 
@@ -2733,6 +2925,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>let GRAMMAR: Grammar&#60;AiplTok, Ast&#62; = aipl_grammar()</code></pre>
 
           <div class="doc"><p>The grammar of AIPL, built the first time a file is parsed and shared by every parse after it.</p></div>
+
 
 
         </section>
@@ -2749,6 +2942,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The grammar linked and analysed (<code>prepare</code>), likewise built once. Both are a function of the grammar alone, so a process that parses many files — the compiler parses the program, everything it imports and every builtin it reaches — does the work once instead of per file.</p></div>
 
 
+
         </section>
 
 
@@ -2761,6 +2955,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn reject_trailing_whitespace(src: str) -&#62; str!ParseError</code></pre>
 
           <div class="doc"><p><code>src</code> unchanged, or a refusal locating its first run of trailing whitespace. The locator is <code>find_trailing_whitespace.aipl</code>, which is the same function <code>aipl_parser::reject_trailing_whitespace</code> reaches through the FFI — so the two parsers do not merely agree here, they run the same code.</p></div>
+
 
 
         </section>
@@ -2777,6 +2972,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>Every <code>#[allow]</code> marker's span, in source order. The lexer records them as trivia under a kind of their own, so this is a filter rather than a re-scan.</p></div>
 
 
+
         </section>
 
 
@@ -2789,6 +2985,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn type_leaves(self: Cst, names: str[], inside: bool) -&#62; Span[]</code></pre>
 
           <div class="doc"><p>Every token written inside a type annotation, in source order, and every name a pattern puts in front of its slots: the names a language server resolves to declarations. A token is in a type when some <code>ty</code> node holds it, at any depth, so <code>Pair&lt;i64&gt;[]</code> yields <code>Pair</code>, <code>&lt;</code>, <code>i64</code>, <code>&gt;</code> and the brackets. A refinement declaration (<code>variant W = V without C</code>) is all of it a type, so its tokens are yielded too, <code>without</code> among them: the name after a <code>without</code> is a case of the variant before it. The loader keeps the ones that name something.</p></div>
+
 
 
         </section>
@@ -2812,6 +3009,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The productions that hold a pattern's own tokens: a parameter, a pattern, a binding statement (<code>let Point { x } = p;</code>) and a lambda parameter.</p></div>
 
 
+
         </section>
 
 
@@ -2824,6 +3022,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn constructor_names(self: Cst[]) -&#62; Span[]</code></pre>
 
           <div class="doc"><p>The names among <code>kids</code> that open a payload: <code>Fn</code> in <code>Fn(Function { body })</code> and <code>Function</code> in <code>Function { body }</code>, a name directly followed by a bracketed group. Trivia between the two does not separate them.</p></div>
+
 
 
         </section>
@@ -2840,6 +3039,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>One production, laid out <code>Inline</code>. <code>build</code> takes the wrapped <code>Build</code>, not the function — a function value may be <em>called</em> through a parameter but not stored into a field or a constructor from one, so <code>Mk</code> has to be written at the call site where the name is still a name.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pt</code> below.</p></div>
 
 
+
         </section>
 
 
@@ -2852,6 +3052,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn pl(name: str, rule: Rule&#60;AiplTok&#62;, expect_as: str, build: Build&#60;Ast&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
           <div class="doc"><p>The same, labelled: what an error blames when this production fails having matched nothing. The reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which is why only the handful of rules a reader would name are labelled and every plumbing rule stays transparent.</p></div>
+
 
 
         </section>
@@ -2868,6 +3069,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The bracket pairs, for <code>Many</code>'s <code>nested_in</code>. A pair rather than two arguments because that is what a bracket is, and naming them here keeps the lists below reading as lists: <code>Many(param, sep=comma, nested_in=parens())</code>.</p></div>
 
 
+
         </section>
 
 
@@ -2880,6 +3082,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn braces() -&#62; (Rule&#60;AiplTok&#62;, Rule&#60;AiplTok&#62;)</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2896,6 +3099,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -2908,6 +3112,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn angles() -&#62; (Rule&#60;AiplTok&#62;, Rule&#60;AiplTok&#62;)</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -2924,6 +3129,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The same token both ends, which a lambda's parameter list is.</p></div>
 
 
+
         </section>
 
 
@@ -2936,6 +3142,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn nest(open: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
           <div class="doc"><p>A bracketed group: <code>open</code>, whatever it holds, <code>close</code>, and how that lays out. Shorter than the <code>Many</code> it builds, because a grammar this size writes a lot of them and the four arguments matter more than the spelling.</p><p><code>min=1, max=1</code> is &quot;exactly one thing in brackets&quot; — the body is a single rule, not a list. The layout still is a list's, and <code>style</code> says so outright: what these groups hold is usually a production that is itself a list (<code>(args)</code>), and the <code>Many</code> holding it has no separator of its own to read one off.</p></div>
+
 
 
         </section>
@@ -2952,6 +3159,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The same for a bracket written as two tokens (<code>#{</code>), which is a bracket like any other — the group says where it ends, so nothing downstream counts tokens to find out.</p></div>
 
 
+
         </section>
 
 
@@ -2964,6 +3172,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn nest3(open1: str, open2: str, open3: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
           <div class="doc"><p>And for one written as three (<code>#&gt;{</code>, <code>#&lt;{</code> — the ordered-set brackets).</p></div>
+
 
 
         </section>
@@ -2980,6 +3189,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The braces of a struct pattern: the fields it reads, each optionally bound under another name — <code>Point { x, y as py }</code>. The field leads and the name it is bound as follows <code>as</code>, so the pattern reads like the import that renames (<code>wrapping_add as +</code>) and a reader can tell which side is the struct's. <code>(a, b)</code> after a case's name: one binder per payload slot, <code>_</code> for a slot not wanted. Only a <code>let</code>, a <code>for</code> and a parameter take one, and only over a value that can be nothing but that case.</p></div>
 
 
+
         </section>
 
 
@@ -2992,6 +3202,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn let_condition() -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -3008,6 +3219,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -3020,6 +3232,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn arm_binders() -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -3036,6 +3249,7 @@ if (let some(..) = target[__iset$N]) {
           <p class="undocumented">Undocumented.</p>
 
 
+
         </section>
 
 
@@ -3048,6 +3262,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn unread_field_binder() -&#62; str</code></pre>
 
           <div class="doc"><p>What a struct pattern says to <code>field as _</code>.</p></div>
+
 
 
         </section>
@@ -3064,6 +3279,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The order a <code>#</code>-led bracket names, from the token after the <code>#</code>: <code>&gt;</code> is largest first, <code>&lt;</code> smallest first, and the plain <code>{</code> promises none.</p></div>
 
 
+
         </section>
 
 
@@ -3076,6 +3292,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn set_order(after_hash: str) -&#62; SetOrder</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -3092,6 +3309,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>Exactly one thing, in a bracket pair — a condition's parentheses, a block's braces, an index's brackets. <code>Many</code> bounded at one, and spelled like one: <code>one(body, nested_in=parens())</code>, <code>nested_in</code> declared exactly as <code>Many</code> declares its own. <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
 
 
+
         </section>
 
 
@@ -3104,6 +3322,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn strict() -&#62; ListStyle</code></pre>
 
           <div class="doc"><p>A comma-separated list that takes no trailing comma when it breaks, which most of AIPL's bracketed positions want.</p></div>
+
 
 
         </section>
@@ -3120,6 +3339,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>A comma-separated list that gains a trailing comma once it breaks — argument lists, array literals, struct literals.</p></div>
 
 
+
         </section>
 
 
@@ -3132,6 +3352,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn braced() -&#62; ListStyle</code></pre>
 
           <div class="doc"><p>The same, in braces that read as words and so take inner spaces while flat: <code>{ a, b }</code> against <code>(a, b)</code>.</p></div>
+
 
 
         </section>
@@ -3148,6 +3369,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>A production whose parts are written against each other with no space between them, whatever the spacing rule would otherwise say: <code>i64?[]</code>, <code>#{</code>.</p></div>
 
 
+
         </section>
 
 
@@ -3160,6 +3382,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn wrong_kind(want: str, got: Ast, span: Span) -&#62; ParseError</code></pre>
 
           <div class="doc"><p>What a production lowered, where something else was wanted. Every one of these is a lowering bug rather than a bad program — the grammar guarantees the shape — so the message names both sides and leaves it there.</p></div>
+
 
 
         </section>
@@ -3176,6 +3399,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The projections out of <code>Ast</code>, one per case a <code>build</code> reads. Each is an <code>if let</code> rather than a <code>match</code>: a <code>match</code> on a fourteen-case variant has to spell every other case out, once per projection, and what they all do is the same refusal.</p></div>
 
 
+
         </section>
 
 
@@ -3188,6 +3412,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn as_exclusions(v: Ast, span: Span) -&#62; Exclusion[]!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
 
 
         </section>
@@ -3204,6 +3429,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>Child <code>i</code>, or a refusal. A <code>build</code> reads its children positionally, and a missing one means the rule and the lowering disagree about the production's shape — the failure mode this exists to name.</p></div>
 
 
+
         </section>
 
 
@@ -3216,6 +3442,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn tuple_ty(ts: Ty[], example: str, span: Span) -&#62; Ty!ParseError</code></pre>
 
           <div class="doc"><p>A parenthesized list used as a tuple — or, with one element, as a grouping: <code>(T[] without [])?</code> is how a refined type takes a suffix, since <code>without</code> binds looser than any. The arity is validated in the lowering rather than in the grammar: <code>(A)</code> and <code>()</code> are parenthesized lists that parse, and only what follows them says whether they were meant as a tuple or as a function type's parameters. <code>example</code> completes the advice with the suffix that was actually written.</p></div>
+
 
 
         </section>
@@ -3232,6 +3459,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>What a bare type identifier names: a primitive, the anonymous bound <code>any</code>, or something declared elsewhere — a struct, a variant, a type parameter, <code>Error</code>. The same three-way decision <code>BaseTy::Named</code>'s action makes, in the same order.</p></div>
 
 
+
         </section>
 
 
@@ -3244,6 +3472,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_ty(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ty</code> — a head, refined by each <code>without</code> clause that followed it, the first clause innermost: the kids are the head and then what each clause excludes.</p></div>
+
 
 
         </section>
@@ -3260,6 +3489,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>exclusion</code> — what a <code>without</code> clause leaves out: <code>[]</code>, a case by name, a case by name followed by <code>throughout</code>, or a parenthesized list of case names, which <code>throughout</code> may follow to apply to each. The first token tells the array from the others, since a name is the only form that starts with one.</p></div>
 
 
+
         </section>
 
 
@@ -3272,6 +3502,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_ty_head(src: str, node: Parts, written: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ty_head</code> — the eight alternatives, told apart by their left child's <code>Ast</code> case and by the tokens this node matched itself.</p><p><code>!E</code> is the one alternative with no left operand at all: a result whose ok side is unit, which is why a single child under a <code>!</code> lowers to <code>TyResult(TyUnit, ..)</code>.</p></div>
+
 
 
         </section>
@@ -3288,6 +3519,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>ty_parens</code> — the parenthesized list every <code>(</code>-led type form opens with. It is the one production whose value is a list rather than a type, and that is what <code>lower_ty</code> reads to tell those forms from the unparenthesized ones.</p></div>
 
 
+
         </section>
 
 
@@ -3300,6 +3532,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>base_ty</code> — a core and its <code>?</code>/<code>[]</code> suffix run, applied in source order, so <code>i64?[]</code> is an array of optionals and <code>i64[]?</code> an optional array. The suffixes are literals inside a <code>Many</code> and so are this node's own tokens; <code>[</code> contributes nothing and <code>]</code> is what closes an array suffix.</p></div>
+
 
 
         </section>
@@ -3316,6 +3549,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p><code>ty_core</code> — <code>#{K: V}</code>, <code>#{T}</code>, <code>Name&lt;A, B&gt;</code> and a bare <code>Name</code>. The <code>#</code> is what separates the two brace forms from the two name forms, and after that the child count says which of each pair matched.</p><p><code>Case&lt;V&gt;</code> borrows the generic-application syntax but is a type of its own: one case of a variant, carrying no payload. Spelled out here so nothing downstream has to know that one base name is special.</p></div>
 
 
+
         </section>
 
 
@@ -3330,6 +3564,7 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>Test shorthand, so an assertion reads as the source it is about.</p></div>
 
 
+
         </section>
 
 
@@ -3342,6 +3577,7 @@ if (let some(..) = target[__iset$N]) {
           <pre class="signature"><code>fn why(src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>Why a source failed to parse, for the diagnostic assertions.</p></div>
+
 
 
         </section>
