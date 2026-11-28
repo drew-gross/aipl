@@ -46,7 +46,7 @@
 ; variant __m31__Prim 8 I8 I16 I32 I64 U8 U16 U32 U64 Bool Char Str
 ; variant __m32__SetOrder 8 Unordered Desc Asc
 ; variant __m32__Exclusion 32 EmptyArray NamedCase(8:str) Throughout(8:str)
-; struct __m38__Param 152 binding@0:__m33__Binding ty@8:__m32__Ty mutable@16:bool arity@24:__m38__Arity default@32:__m33__Expr$__m33__ExprKind? implicit_some@48:bool written@56:__m33__WrittenNames? name_span@136:__builtin_Span
+; struct __m38__Param 184 binding@0:__m33__Binding ty@8:__m32__Ty mutable@16:bool arity@24:__m38__Arity default@32:__m33__Expr$__m33__ExprKind? implicit_some@48:bool written@56:__m33__WrittenNames? name_span@136:__builtin_Span doc@152:str?
 ; variant __m33__Binding 88 boxed Name(8:str) ByTuple(8:str[]) ByCase(8:str,32:str[]) ByStruct(8:str,32:str[],56:str[],80:bool) ByPattern(8:__m34__Pat) Alias(8:str,32:__m33__Binding)
 ; variant __m34__Pat 80 boxed Ctor(8:str,32:str[],56:bool) Str(8:str) Char(8:char) Array(8:__m34__PatElement[]) ArrayRest(8:__m34__PatElement[]) ArrayNested(8:__m34__Pat[]) Wildcard Tuple(8:__m34__Pat[]) Nested(8:str,32:__m34__Pat[]) Int(8:i64) Struct(8:str,32:str[],56:str[])
 ; struct __m34__PatElement 48 kind@0:__m34__ElementKind span@32:__builtin_Span
@@ -664,4 +664,4 @@
 ; data 504 __tostr_lit_101 66616c7365
 
 ; __m19__builtin_table
-; source-fingerprint 5029520894736530704
+; source-fingerprint 11556773680225130449

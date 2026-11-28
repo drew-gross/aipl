@@ -315,6 +315,7 @@ impl Mono<'_> {
                 .resolve_generic_ty(&ty)
                 .unwrap_or_else(|e| panic!("a parameter type is settled: {e:?}"));
             params.push(Param {
+                doc: None,
                 name_span: p.name_span.clone(),
                 name: p.name.clone(),
                 ty,
@@ -482,6 +483,7 @@ impl Mono<'_> {
                         // A parameter name only has to be unique within this callee's own list.
                         let cap = format!("$cap{}", new_params.len());
                         new_params.push(Param {
+                            doc: None,
                             name_span: Default::default(),
                             name: cap.clone(),
                             ty: ct.clone(),

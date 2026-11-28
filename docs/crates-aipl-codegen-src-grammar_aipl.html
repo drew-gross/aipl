@@ -846,7 +846,7 @@
             <a class="anchor" href="#item-shim_head">shim_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_head(src: str, __spat$76839: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_head(src: str, __spat$77243: Parts, sp: Span) -&#62; ShimHead!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1498,7 +1498,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-is_plain_index">is_plain_index</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn is_plain_index(__spat$118102: Expr) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_plain_index(__spat$118506: Expr) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>e</code> is cheap and pure enough to read more than once.</p></div>
 
@@ -1792,7 +1792,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$134851: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$135255: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
           <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
 
@@ -2235,6 +2235,20 @@ if (let some(..) = target[__iset$N]) {
 
 
 
+        <section class="item" id="item-lower_documented_param">
+          <h3>
+            <a class="anchor" href="#item-lower_documented_param">lower_documented_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_documented_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>param</code> — the eight shapes. The two destructuring ones carry a field list for the body to bind off the argument, and the unnamed one also introduces a scrutinee the caller never named. <code>documented_param</code> — a parameter under the <code># ..</code> lines written above it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_param">
           <h3>
             <a class="anchor" href="#item-lower_param">lower_param</a>
@@ -2242,7 +2256,7 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn lower_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>param</code> — the eight shapes. The two destructuring ones carry a field list for the body to bind off the argument, and the unnamed one also introduces a scrutinee the caller never named.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -2604,7 +2618,7 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$181705: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$182495: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

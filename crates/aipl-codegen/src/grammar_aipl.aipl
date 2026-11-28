@@ -534,7 +534,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("fn"),
         Term(Name),
         Named("type_params"),
-        Many(Named("param"), sep=Lit(","), nested_in=parens()),
+        Many(Named("documented_param"), sep=Lit(","), nested_in=parens()),
         Many(Named("effect")),
         Maybe(Then([Lit("->"), Named("ty")])),
         Named("fn_body"),
@@ -580,6 +580,11 @@ fn items() -> Production<AiplTok, Ast>[] {
     // and no variadic marker. The variadic marker is `*` (zero or more) or `+`
     // (one or more).
     let variadic: Rule<AiplTok> = OneOf([Lit("*"), Lit("+")]);
+
+    // A parameter takes `# ..` lines of its own, above it inside the parentheses. They are the
+    // wrapper's tokens rather than the shape's, because the shapes read their own tokens by
+    // position.
+    let documented_param: Rule<AiplTok> = Then([Many(Term(DocComment)), Named("param")]);
     let param: Rule<AiplTok> = OneOf([
         Then([Lit("mut"), Term(Name), Lit(":"), Named("ty")]),
         // `self: Span { start, end }` — a named parameter destructured as well.
@@ -762,6 +767,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         pl("effect", effect, "an effect", Mk(lower_effect)),
         p("type_params", type_params, TryMk(lower_type_params)),
         p("type_param", type_param, TryMk(lower_type_param)),
+        pl("documented_param", documented_param, "a parameter", TryMk(lower_documented_param)),
         pl("param", param, "a parameter", TryMk(lower_param)),
         p("fn_body", fn_body, TryMk(lower_fn_body)),
         pl("construct_fields", construct_fields, "a field", TryMk(lower_construct_fields)),
@@ -3803,6 +3809,15 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # `param` — the eight shapes. The two destructuring ones carry a field list for
 # the body to bind off the argument, and the unnamed one also introduces a
 # scrutinee the caller never named.
+# `documented_param` — a parameter under the `# ..` lines written above it.
+fn lower_documented_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let AParam(param) = kid(kids, 0, sp)? else {
+        return err(wrong_kind("a parameter", kid(kids, 0, sp)?, sp));
+    };
+    ok(AParam(Param { ..param, doc: doc_block(node.own_texts(src)) }))
+}
+
 fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     if (let some(param) = pattern_param(src, node, kids, sp)?) { return ok(AParam(param)); };
@@ -5865,6 +5880,36 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
             "variant V =\n    # d\n    A | B",
         ) == "error: expected DocComment or `|`, found `A`",
     );
+    // A parameter's docs, whatever shape the parameter is.
+    assert(
+        program_dump(
+            "fn f(\n    # The count.\n    a: i64,\n    b: str,\n) { }",
+        ) == "fn f(doc(The count.) a: i64, b: str) = ()",
+    );
+    assert(
+        program_dump(
+            "fn f(\n    # One.\n    #\n    # Two.\n    a: i64 = 1,\n) { }",
+        ) == "fn f(doc(One.\n\nTwo.) a: i64 = 1) = ()",
+    );
+    assert(
+        program_dump(
+            "fn f(\n    # Self.\n    mut self: i64,\n    # Rest.\n    xs: i64*,\n) { }",
+        ) == "fn f(doc(Self.) mut self: i64, doc(Rest.) xs: Array(i64)*) = ()",
+    );
+    assert(program_dump("fn f(\n    # Point.\n    Point { x, y },\n) { }").starts_with(
+        "fn f(doc(Point.) ",
+    ));
+    assert(program_dump("fn f(\n    # Docs.\n    p: Point { x },\n) { }").starts_with(
+        "fn f(doc(Docs.) ",
+    ));
+    // A function's docs and its parameters' are separate.
+    assert(
+        program_dump(
+            "# Fn.\nfn f(\n    # Arg.\n    a: i64,\n) { }",
+        ) == "doc(Fn.) fn f(doc(Arg.) a: i64) = ()",
+    );
+    // A lambda's parameters have nowhere to put them.
+    assert(!parses("fn f() { let g = |\n    # No.\n    a| a; }"));
     // Doc lines after the last case belong to the next item, not to a case.
     assert(program_dump("variant V = A | B\n# Docs f.\nfn f() { }") == """
         variant V(A | B)
@@ -6471,7 +6516,8 @@ pub fn aipl_parses(src: str) -> bool {
     assert(parses("#\nfn f() { }")); // a bare `#` is an empty doc line
     // Not inside a body, where a `//` banner lives instead.
     assert(!parses("fn f() {\n    # nope\n    g();\n}"));
-    assert(!parses("fn f(\n    # nope\n    a: i64,\n) { }"));
+    // A parameter takes them too, above it inside the parentheses.
+    assert(parses("fn f(\n    # Docs.\n    a: i64,\n) { }"));
     // `(A, B)?` — an optional tuple, alongside the other `(`-led type forms.
     assert(parses("fn f() -> (i64, str)? { none }"));
     assert(parses("fn f(p: (i64, str)?) { }"));

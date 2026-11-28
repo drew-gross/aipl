@@ -1595,6 +1595,7 @@ fn rewrite_item(
                     let mut params = Vec::with_capacity(f.sig.params.len());
                     for p in &f.sig.params {
                         params.push(Param {
+                            doc: None,
                             name_span: p.name_span.clone(),
                             name: p.name.clone(),
                             ty: rewrite_type(&p.ty, view, &f.sig.type_vars),

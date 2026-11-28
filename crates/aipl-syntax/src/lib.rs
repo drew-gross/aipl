@@ -1017,6 +1017,9 @@ pub mod ast {
         /// all but a forwarded one, which is already an optional — so nothing
         /// downstream can tell the two spellings apart.
         pub implicit_some: bool,
+        /// The `# ..` doc comment above the parameter, lines joined with newlines — written
+        /// inside the parentheses, one parameter per line. `None` when it carries none.
+        pub doc: Option<String>,
     }
 
     /// The language's built-in scalar primitive types: the fixed-width integers
@@ -3850,6 +3853,7 @@ pub fn with_reduction_signatures(mut items: Vec<ast::Item>) -> Vec<ast::Item> {
                 case_params: decl.sig.case_params.clone(),
                 arm_params: decl.sig.arm_params.clone(),
                 params: vec![ast::Param {
+                    doc: None,
                     name_span: Default::default(),
                     name: "self".to_string(),
                     ty: ast::Type::Array(Box::new(element.clone())),

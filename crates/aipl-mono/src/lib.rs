@@ -313,6 +313,7 @@ fn ctor_wrapper_fn(w: &CtorWrapper, ctor: &str) -> Function {
         .iter()
         .enumerate()
         .map(|(i, ty)| Param {
+            doc: None,
             name_span: Default::default(),
             name: format!("__ctor{i}"),
             ty: ty.clone(),
@@ -1793,6 +1794,7 @@ pub fn monomorphize(
                             (_, _, t) => t,
                         };
                         Param {
+                            doc: None,
                             name_span: p.name_span.clone(),
                             name: p.name.clone(),
                             ty,
@@ -2103,6 +2105,7 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
         .params
         .iter()
         .map(|p| Param {
+            doc: None,
             name_span: p.name_span.clone(),
             name: p.name.clone(),
             ty: subst_vars(&p.ty, &map),
@@ -3922,6 +3925,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
     for p in &f.sig.params {
         let ty = normalize_param_ty(&p.ty, &mut var_names, &mut counter, &f.name)?;
         params.push(Param {
+            doc: None,
             name_span: p.name_span.clone(),
             name: p.name.clone(),
             ty,

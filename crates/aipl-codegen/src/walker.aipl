@@ -1403,7 +1403,7 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: acc })
 }
 
-# One parameter: its leading comments, then either a name with its type and the
+# One parameter: its leading comments and doc lines, then either a name with its type and the
 # `mut` / `*` / `= default` markers, or one of the destructuring forms.
 #
 # `Point { x, y }` names no parameter, so it has no `: T` after it — the pattern
@@ -1413,10 +1413,14 @@ fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 # `p: Import(decl)`, whose pattern names the one case the value can be.
 fn one_param(self: W) -> WDoc!FmtError {
     let l = self.lead();
-    let m = if (l.w.peek_text() == "mut") {
-        WDocs { w: l.w.bump().w, docs: [l.doc, Text("mut ")] }
+
+    // The parameter's `# ..` lines, each a hard line, so a documented one breaks the list to a
+    // parameter per line.
+    let d = l.w.doc_lines([]);
+    let m = if (d.w.peek_text() == "mut") {
+        WDocs { w: d.w.bump().w, docs: [l.doc, ..d.docs, Text("mut ")] }
     } else {
-        WDocs { w: l.w, docs: [l.doc] }
+        WDocs { w: d.w, docs: [l.doc, ..d.docs] }
     };
     let written = m.w.bump();
     // `Expr<Assign> { kind }`: the type's arguments sit between the name and the fields.
@@ -4103,6 +4107,23 @@ fn walker_of(src: str) -> W!FmtError {
             .rendered(
                 100,
             )? == "variant V =\n    | A(\n        # Rule.\n        str,\n        # Fewest.\n        min: u64 = 0,\n        max?: u64 = none\n    )\n",
+    );
+
+    // A parameter's `# ..` lines sit above it inside the parentheses and break the list to a
+    // parameter per line; undocumented ones ride along, and a `mut self` keeps its docs above it.
+    assert(
+        walker_of("fn f(# Count.\na: i64, b: str) { }")?
+            .item()
+            .rendered(100)? == "fn f(\n    # Count.\n    a: i64,\n    b: str,\n) {}\n",
+    );
+    assert(
+        walker_of(
+            "fn f(\n    # One.\n    #\n    # Two.\n    mut self: i64,\n    # Rest.\n    xs: i64*,\n) { }",
+        )?
+            .item()
+            .rendered(
+                100,
+            )? == "fn f(\n    # One.\n    #\n    # Two.\n    mut self: i64,\n    # Rest.\n    xs: i64*,\n) {}\n",
     );
 })
 

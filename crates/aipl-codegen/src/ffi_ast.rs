@@ -252,6 +252,11 @@ fn param(v: &FfiValue) -> R<ast::Param> {
         arity: arity(field(v, "arity")?)?,
         default: maybe(field(v, "default")?, expr)?,
         implicit_some: flag(field(v, "implicit_some")?)?,
+        // The AIPL struct's last slot; an older artifact has none.
+        doc: match v_field(v, "doc") {
+            Some(doc) => maybe(doc, text)?,
+            None => None,
+        },
     })
 }
 

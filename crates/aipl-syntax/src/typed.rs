@@ -1096,6 +1096,7 @@ pub struct TProgram {
 impl<T: TyRepr> TParam<T> {
     fn erase(&self) -> Param {
         Param {
+            doc: None,
             name: self.name.clone(),
             name_span: self.name_span.clone(),
             ty: self.ty.to_type(),

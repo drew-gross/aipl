@@ -191,6 +191,7 @@ struct Expansion {
 
 fn parameter(name: &str, ty: &ConcreteType) -> Param {
     Param {
+        doc: None,
         name_span: Default::default(),
         name: name.to_string(),
         ty: ty.to_type(),

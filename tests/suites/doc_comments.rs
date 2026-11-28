@@ -110,7 +110,6 @@ fn joins_lines_and_keeps_blank_ones() {
 fn is_refused_anywhere_but_in_front_of_a_declaration() {
     for src in [
         "fn f() {\n    # not here\n    g();\n}",
-        "fn f(\n    # nor here\n    a: i64,\n) {}",
         "struct P {\n    # nor here\n    x: i64,\n}",
         "fn f() -> i64 {\n    1\n}\n# trailing, documenting nothing\n",
     ] {
@@ -120,6 +119,19 @@ fn is_refused_anywhere_but_in_front_of_a_declaration() {
             "expected a complaint about the `#` line, got {message:?} for:\n{src}"
         );
     }
+}
+
+/// A parameter takes `# ..` lines of its own, above it inside the parentheses; they land on
+/// `Param::doc` and not on the function.
+#[test]
+fn attaches_to_a_parameter() {
+    let program = parse("# The fn.\nfn f(\n    # The count.\n    a: i64,\n    b: str,\n) {}");
+    let Item::Fn(f) = program.items.into_iter().next().expect("an item") else {
+        panic!("a function");
+    };
+    assert_eq!(f.doc.as_deref(), Some("The fn."));
+    let docs: Vec<Option<&str>> = f.sig.params.iter().map(|p| p.doc.as_deref()).collect();
+    assert_eq!(docs, [Some("The count."), None]);
 }
 
 /// `//` comments are untouched — including the `////////` section banners this

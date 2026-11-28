@@ -6727,6 +6727,7 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
         }
         match f.sig.params.as_slice() {
             [] => f.sig.params.push(Param {
+                doc: None,
                 name_span: Default::default(),
                 name: "__cli_args".to_string(),
                 ty: injected_cli_args_ty(),

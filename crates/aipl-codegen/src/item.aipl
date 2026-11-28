@@ -123,6 +123,8 @@ struct Param {
     written: WrittenNames? = none,
     // Where the binding is written; empty for one a pass made up.
     name_span: Span = 0..0,
+    // The `# ..` lines written above the parameter.
+    doc: str? = none,
 }
 
 # The name of the variable the parameter is, see `name_at`.
@@ -381,7 +383,7 @@ fn show_type_param(self: TypeParam) -> str {
 fn show_param(self: Param) -> str {
     let prefix = if (self.mutable) { "mut " } else { "" };
     let opt = if (self.implicit_some) { "?" } else { "" };
-    `{prefix}{self.synthesized_name()}{opt}: {self.ty.show_ty()}{self.arity.arity_marker()}{show_default(self.default)}`
+    `{show_doc(self.doc)}{prefix}{self.synthesized_name()}{opt}: {self.ty.show_ty()}{self.arity.arity_marker()}{show_default(self.default)}`
 }
 
 fn show_default(self: Expr?) -> str { self.map(|e| ` = {e.show_expr()}`).value_or("") }
