@@ -62,31 +62,33 @@ test({
     );
 })
 --- report ---
-allocations       389
-deallocations     389
-reallocations     0
-bytes allocated   23820
-peak live bytes   23820
-instructions      19610
-binary size       11520 bytes (code 7344, data 495, metadata 3681)
+allocations       566
+deallocations     566
+reallocations     18
+bytes allocated   31500
+peak live bytes   24746
+instructions      117444
+binary size       16808 bytes (code 11784, data 513, metadata 4511)
 
-function                   calls  code bytes
-__arr_drop_Rule               59         144
-__arr_retain_Rule              0          80
-__rec_drop_Rule              306         164
-__test$__test_block_1          1        5648
-__to_str_u64                  10         200
-aipl_array_dec                59    external
-aipl_array_new                59    external
-aipl_assert                    3    external
-aipl_rec_alloc               306    external
-aipl_rec_dec_strong          306    external
-aipl_rec_dec_weak            178    external
-aipl_test_begin                1    external
-aipl_test_end                  1    external
-aipl_test_summary              1    external
-aipl_u64_len                  20    external
-aipl_write_u64                10    external
-deep                         179         724
-main                           1         104
-styles$len                   306         280
+function                                    calls  code bytes
+__arr_drop_Rule                                59         144
+__arr_retain_Rule                               0          80
+__builtin_map_join$Rule$i64$lam$styles         60        2196
+__rec_drop_Rule                               306         164
+__test$__test_block_1                           1        5648
+__to_str_u64                                   10         200
+aipl_array_dec                                236    external
+aipl_array_new                                 59    external
+aipl_assert                                     3    external
+aipl_rec_alloc                                306    external
+aipl_rec_dec_strong                           306    external
+aipl_rec_dec_weak                             178    external
+aipl_test_begin                                 1    external
+aipl_test_end                                   1    external
+aipl_test_summary                               1    external
+aipl_u64_len                                   20    external
+aipl_write_u64                                 10    external
+deep                                          179         724
+main                                            1         104
+styles                                        293        2220
+styles$len                                     13         304

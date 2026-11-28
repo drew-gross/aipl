@@ -420,6 +420,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_set_union_by" => sig(10, false),
         "aipl_dict_insert" | "aipl_dict_remove" | "aipl_dict_set" => sig(6, false),
         "aipl_arr_join" => sig(8, false),
+        "aipl_arr_join_edged" => sig(9, false),
         "aipl_arr_settle" => sig(4, false),
         // The parts, `join`'s three separators, and the element type's three
         // descriptors; the joined array comes back in a register.
@@ -467,6 +468,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_concat" | "aipl_str_rope" => sig(3, false),
         // The out pointer, the parts, and `join`'s three separators.
         "aipl_str_join" => sig(5, false),
+        "aipl_str_join_edged" => sig(6, false),
         "aipl_str_split_len"
         | "aipl_read_file_to_string"
         | "aipl_write_string_to_file"

@@ -27,9 +27,9 @@
             <a class="anchor" href="#item-join_is_empty">join_is_empty</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn join_is_empty&#60;T: any&#62;(self: T[][], sep: T[] = [], final_sep: T[] = sep, only_sep: T[] = sep) -&#62; bool</code></pre>
+          <pre class="signature"><code>pub fn join_is_empty&#60;T: any&#62;(self: T[][], sep: T[] = [], final_sep: T[] = sep, only_sep: T[] = sep, leading_sep: bool = false, trailing_sep: bool = false) -&#62; bool</code></pre>
 
-          <div class="doc"><p>True when <code>self.join(sep=sep, final_sep=final_sep, only_sep=only_sep)</code> has no elements: every piece is empty and so is every separator <code>join</code> would write between them. Exactly the negation of <code>join_is_nonempty</code>, which owns the rule.</p></div>
+          <div class="doc"><p>True when <code>self.join(..)</code> with these separators has no elements: every piece is empty and so is every separator <code>join</code> would write between or around them. Exactly the negation of <code>join_is_nonempty</code>, which owns the rule.</p></div>
 
 
         </section>

@@ -729,6 +729,25 @@ pub(crate) extern "C" fn aipl_arr_join(
     retain_fn: i64,
     elem_size: i64,
 ) {
+    aipl_arr_join_edged(
+        out, parts, sep, final_sep, only_sep, 0, drop_fn, retain_fn, elem_size,
+    )
+}
+
+/// [`aipl_arr_join`] with `edges`: `str24::JOIN_LEADING` and `JOIN_TRAILING`, the `sep` written
+/// before the first part and after the last, when there are parts.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_arr_join_edged(
+    out: *mut ArrValue,
+    parts: *const ArrValue,
+    sep: *const ArrValue,
+    final_sep: *const ArrValue,
+    only_sep: *const ArrValue,
+    edges: i64,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) {
     let bits = elem_size == super::array_layout::ELEM_BITPACKED;
     let w = if bits { 0 } else { elem_size as usize };
     let (parts_first, parts_step, n) = elements(unsafe { &*parts }, ARR_SIZE);
@@ -746,7 +765,16 @@ pub(crate) extern "C" fn aipl_arr_join(
         };
         elements(unsafe { &*s }, w)
     };
+    let leading = n > 0 && edges as usize & super::str24::JOIN_LEADING != 0;
+    let trailing = n > 0 && edges as usize & super::str24::JOIN_TRAILING != 0;
+    let edge = elements(unsafe { &*sep }, w);
     let mut total = 0usize;
+    if leading {
+        total += edge.2;
+    }
+    if trailing {
+        total += edge.2;
+    }
     for i in 0..n {
         if i > 0 {
             total += gap(i).2;
@@ -759,18 +787,27 @@ pub(crate) extern "C" fn aipl_arr_join(
         return;
     }
     let mut pos = 0usize;
-    for i in 0..n {
-        let runs = [if i > 0 { Some(gap(i)) } else { None }, Some(part(i))];
-        for (first, step, len) in runs.into_iter().flatten() {
-            if bits {
-                for k in 0..len {
-                    set_bit(dst, pos + k, bit_at(first, k));
-                }
-            } else {
-                unsafe { copy_run(first, step, len, w, dst.add(pos * w)) };
+    let mut copy = |(first, step, len): (*const u8, isize, usize)| {
+        if bits {
+            for k in 0..len {
+                set_bit(dst, pos + k, bit_at(first, k));
             }
-            pos += len;
+        } else {
+            unsafe { copy_run(first, step, len, w, dst.add(pos * w)) };
         }
+        pos += len;
+    };
+    if leading {
+        copy(edge);
+    }
+    for i in 0..n {
+        if i > 0 {
+            copy(gap(i));
+        }
+        copy(part(i));
+    }
+    if trailing {
+        copy(edge);
     }
     unsafe { super::elem_rc(retain_fn, dst, total) };
 }
@@ -785,6 +822,19 @@ pub(crate) extern "C" fn aipl_str_join(
     final_sep: *const super::str24::Str,
     only_sep: *const super::str24::Str,
 ) {
+    aipl_str_join_edged(out, parts, sep, final_sep, only_sep, 0)
+}
+
+/// [`aipl_str_join`] with `edges`, as [`aipl_arr_join_edged`] takes them.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_join_edged(
+    out: *mut super::str24::Str,
+    parts: *const ArrValue,
+    sep: *const super::str24::Str,
+    final_sep: *const super::str24::Str,
+    only_sep: *const super::str24::Str,
+    edges: i64,
+) {
     let w = super::str24::STR_SIZE;
     let (first, step, n) = elements(unsafe { &*parts }, w);
     unsafe {
@@ -795,6 +845,7 @@ pub(crate) extern "C" fn aipl_str_join(
             *sep,
             *final_sep,
             *only_sep,
+            edges as usize,
         );
         core::ptr::write(out, joined);
     }

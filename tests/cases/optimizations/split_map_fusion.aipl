@@ -68,12 +68,12 @@ deallocations     34
 reallocations     0
 bytes allocated   2480
 peak live bytes   2026
-instructions      2835
-binary size       14112 bytes (code 9184, data 710, metadata 4218)
+instructions      2856
+binary size       14608 bytes (code 9640, data 710, metadata 4258)
 
 function                   calls  code bytes
 __eq_str$arr                   1         308
-__test$__test_block_1          1        7656
+__test$__test_block_1          1        8112
 __to_str_bool                  1         220
 __to_str_u64                   1         200
 __to_str_u64$arr               2         696

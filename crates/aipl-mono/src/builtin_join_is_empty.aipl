@@ -12,15 +12,24 @@
 
 import { join_is_nonempty, logical_not as ! } from builtins;
 
-# True when `self.join(sep=sep, final_sep=final_sep, only_sep=only_sep)` has no
-# elements: every piece is empty and so is every separator `join` would write
-# between them. Exactly the negation of `join_is_nonempty`, which owns the rule.
+# True when `self.join(..)` with these separators has no elements: every piece is empty and so is
+# every separator `join` would write between or around them. Exactly the negation of `join_is_nonempty`, which owns the rule.
 pub fn join_is_empty<T: any>(
     self: T[][],
     sep: T* = [],
     final_sep: T* = sep,
     only_sep: T* = sep,
-) -> bool { !self.join_is_nonempty(sep=sep, final_sep=final_sep, only_sep=only_sep) }.test({
+    leading_sep: bool = false,
+    trailing_sep: bool = false,
+) -> bool {
+    !self.join_is_nonempty(
+        sep=sep,
+        final_sep=final_sep,
+        only_sep=only_sep,
+        leading_sep=leading_sep,
+        trailing_sep=trailing_sep,
+    )
+}.test({
     // No piece has anything in it.
     assert(["", "", ""].join_is_empty());
     assert(["", ""].join_is_empty());
@@ -37,6 +46,9 @@ pub fn join_is_empty<T: any>(
     assert(["", ""].join_is_empty(sep="-", only_sep=""));
     assert(!["", "", ""].join_is_empty(final_sep="&"));
     assert(["", "", ""].join_is_empty(only_sep="+"));
+    // The ends write `sep` beside a part.
+    assert(!["", ""].join_is_empty(sep="-", only_sep="", leading_sep=true));
+    assert(["", ""].join_is_empty(only_sep="", leading_sep=true));
     // Free-call form, and a non-`char` element type.
     assert(!join_is_empty([[1, 2], [3]]));
     assert(join_is_empty(["", ""]));

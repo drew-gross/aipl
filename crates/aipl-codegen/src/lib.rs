@@ -3962,6 +3962,14 @@ fn new_jit_module(frame_pointers: bool) -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_dict_remove", arr24::aipl_dict_remove as *const u8);
     jit_builder.symbol("aipl_dict_set", arr24::aipl_dict_set as *const u8);
     jit_builder.symbol("aipl_arr_join", arr24::aipl_arr_join as *const u8);
+    jit_builder.symbol(
+        "aipl_arr_join_edged",
+        arr24::aipl_arr_join_edged as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_str_join_edged",
+        arr24::aipl_str_join_edged as *const u8,
+    );
     jit_builder.symbol("aipl_arr_new", arr24::aipl_arr_new as *const u8);
     jit_builder.symbol("aipl_arr_with_cap", arr24::aipl_arr_with_cap as *const u8);
     jit_builder.symbol("aipl_str_split", arr24::aipl_str_split as *const u8);
@@ -7822,9 +7830,12 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         "aipl_set_union_by" => (10, Ret::None),
         "aipl_dict_insert" | "aipl_dict_remove" | "aipl_dict_set" => (6, Ret::None),
         "aipl_arr_join" => (8, Ret::None),
+        // `aipl_arr_join` with the `edges` flags after the separators.
+        "aipl_arr_join_edged" => (9, Ret::None),
         // The parts and `join`'s three separators; the `str` comes back through
         // the out pointer, as `aipl_str_join`'s does.
         "aipl_str_join" => (4, Ret::Str),
+        "aipl_str_join_edged" => (5, Ret::Str),
         "aipl_arr_settle" => (4, Ret::None),
         // ---- a `str` back, through the out pointer ----
         "aipl_next_event" => (0, Ret::Str),
@@ -18645,15 +18656,22 @@ fn compile_call_expr_direct<M: Module>(
             // The three separators are keyword parameters, so the loader has
             // already filled every omitted one — `final_sep` and `only_sep`
             // default to `sep`, which is how an ordinary join stays an ordinary
-            // join.
-            let [receiver, sep, final_sep, only_sep] = args else {
-                return Err(arity_bug(name, 4, args.len(), &span));
+            // join. `leading_sep` and `trailing_sep` are bools, passed on as one word of
+            // flags: `sep` before the first part, and after the last.
+            let [receiver, sep, final_sep, only_sep, leading_sep, trailing_sep] = args else {
+                return Err(arity_bug(name, 6, args.len(), &span));
             };
             let (parts, pt) = compile_expr(module, builder, cx, scopes, receiver)?;
             let mut seps: Vec<(Value, ConcreteType)> = Vec::with_capacity(3);
             for a in [sep, final_sep, only_sep] {
                 seps.push(compile_expr(module, builder, cx, scopes, a)?);
             }
+            let edges = {
+                let (leading, _) = compile_expr(module, builder, cx, scopes, leading_sep)?;
+                let (trailing, _) = compile_expr(module, builder, cx, scopes, trailing_sep)?;
+                let trailing = builder.ins().ishl_imm_u(trailing, 1);
+                builder.ins().bor(leading, trailing)
+            };
             // Both runtime entry points borrow their arguments.
             let inner = match &pt {
                 // A set of parts joins exactly as an array of them: `join` only
@@ -18703,8 +18721,8 @@ fn compile_call_expr_direct<M: Module>(
                 let out = builtins.call(
                     module,
                     builder,
-                    "aipl_str_join",
-                    &[parts, vals[0], vals[1], vals[2]],
+                    "aipl_str_join_edged",
+                    &[parts, vals[0], vals[1], vals[2], edges],
                 );
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
@@ -18782,9 +18800,9 @@ fn compile_call_expr_direct<M: Module>(
                 builtins.call_void(
                     module,
                     builder,
-                    "aipl_arr_join",
+                    "aipl_arr_join_edged",
                     &[
-                        out, parts, vals[0], vals[1], vals[2], drop_fn, retain_fn, esz,
+                        out, parts, vals[0], vals[1], vals[2], edges, drop_fn, retain_fn, esz,
                     ],
                 );
                 scopes

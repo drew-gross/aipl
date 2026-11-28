@@ -27,9 +27,9 @@
             <a class="anchor" href="#item-join_is_nonempty">join_is_nonempty</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn join_is_nonempty&#60;T: any&#62;(self: T[][], sep: T[] = [], final_sep: T[] = sep, only_sep: T[] = sep) -&#62; bool</code></pre>
+          <pre class="signature"><code>pub fn join_is_nonempty&#60;T: any&#62;(self: T[][], sep: T[] = [], final_sep: T[] = sep, only_sep: T[] = sep, leading_sep: bool = false, trailing_sep: bool = false) -&#62; bool</code></pre>
 
-          <div class="doc"><p>True when <code>self.join(sep=sep, final_sep=final_sep, only_sep=only_sep)</code> has any element: some piece is non-empty, or — when every piece is empty — a separator that would be written between them is. The three separators are <code>join</code>'s, all defaulting to empty, and which one applies is <code>join</code>'s rule: <code>only_sep</code> in the sole gap of a two-piece join, <code>final_sep</code> in the last gap and <code>sep</code> in every other. Stops at the first non-empty piece; an empty <code>self</code> is false.</p></div>
+          <div class="doc"><p>True when <code>self.join(sep=sep, final_sep=final_sep, only_sep=only_sep, leading_sep=leading_sep, trailing_sep=trailing_sep)</code> has any element: some piece is non-empty, or — when every piece is empty — a separator that would be written between or around them is. The three separators are <code>join</code>'s, all defaulting to empty, and which one applies is <code>join</code>'s rule: <code>only_sep</code> in the sole gap of a two-piece join, <code>final_sep</code> in the last gap and <code>sep</code> in every other; <code>sep</code> is also what <code>leading_sep</code> and <code>trailing_sep</code> write at the ends. Stops at the first non-empty piece; an empty <code>self</code> is false.</p></div>
 
 
         </section>

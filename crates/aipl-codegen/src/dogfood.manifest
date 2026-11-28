@@ -85,7 +85,7 @@
 ; import 3 aipl_arr_elem_ptr
 ; import 4 aipl_arr_extend_from
 ; import 5 aipl_arr_inc
-; import 6 aipl_arr_join
+; import 6 aipl_arr_join_edged
 ; import 7 aipl_arr_new
 ; import 8 aipl_arr_push
 ; import 9 aipl_arr_push_from
@@ -139,7 +139,7 @@
 ; import 57 aipl_str_grew
 ; import 58 aipl_str_iter_init
 ; import 59 aipl_str_iter_next
-; import 60 aipl_str_join
+; import 60 aipl_str_join_edged
 ; import 61 aipl_str_push_byte
 ; import 62 aipl_str_reserve
 ; import 63 aipl_str_slice
@@ -664,4 +664,4 @@
 ; data 504 __tostr_lit_101 66616c7365
 
 ; __m19__builtin_table
-; source-fingerprint 11347427484182308654
+; source-fingerprint 5029520894736530704

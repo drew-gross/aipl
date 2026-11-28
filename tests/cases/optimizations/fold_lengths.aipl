@@ -73,21 +73,21 @@ test({
     assert(`{xs.map(double).len()} {[0, ..xs.map(|n| n + 1)].len()}` == "4 5");
 })
 --- report ---
-allocations       22
-deallocations     22
+allocations       23
+deallocations     23
 reallocations     0
-bytes allocated   1154
-peak live bytes   1154
-instructions      2049
-binary size       10472 bytes (code 6504, data 700, metadata 3268)
+bytes allocated   1234
+peak live bytes   1234
+instructions      2754
+binary size       12688 bytes (code 8424, data 700, metadata 3564)
 
 function                                                                 calls  code bytes
 __builtin_count_if$i64$lam$is_big                                            2         148
 __builtin_extend_map$i64$i64$lam$__test$__test_block_1$lambda1$own0          1         652
-__test$__test_block_1                                                        1        5200
+__test$__test_block_1                                                        1        7120
 __to_str_i64                                                                 2         200
 __to_str_u64                                                                 8         200
-aipl_array_dec                                                               2    external
+aipl_array_dec                                                               3    external
 aipl_array_with_cap                                                          1    external
 aipl_assert                                                                  5    external
 aipl_i64_len                                                                 4    external

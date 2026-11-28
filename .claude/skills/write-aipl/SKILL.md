@@ -43,7 +43,7 @@ xs$f()  ≡ xs.map(|e| e.f())      xs$field  ≡ xs.map(|e| e.field)
 ```
 - Blocks: statements end in `;`, optional trailing expression is the value. A construct used as a value
   (`let v = match ..`) may not assign to outer bindings; as a statement (`match ..;`) it may.
-- `.join(sep=", ", final_sep=" and ", only_sep=" and ")` writes English lists. `T?[]` flattens with
+- `.join(sep=", ", final_sep=" and ", only_sep=" and ")` writes English lists; `leading_sep=true` / `trailing_sep=true` write `sep` before the first part and after the last (`cells.join(sep="|", leading_sep=true, trailing_sep=true)` is `"|a|b|"`). `T?[]` flattens with
   `.collect_ok()` (`xs$f().collect_ok()`); a function that finds at most one thing returns `T?`, never `T[]`.
 - `return` inside a lambda leaves the lambda.
 - An array pattern may stand inside a ctor or tuple pattern (`let TupleLit([left, right]) = e else { .. };`, `Pair([a, b]) => ..`), but without a trailing `..`; `return` not allowed inside a match arm expression; a bare `none` can't be a tuple slot.

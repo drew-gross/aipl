@@ -283,7 +283,15 @@ fn appends(v: &str, receiver_ty: &Ty, src: &P, arrays: &mut ArrayReceivers) -> O
                 (Callee::Join, [xs, seps @ ..]) => (xs, None, seps),
                 _ => return None,
             };
-            if !seps.iter().all(|s| arrays.is_empty_sequence(s)) {
+            // The three separators are empty, and the two ends are not asked for.
+            let [empties @ .., leading, trailing] = seps else {
+                return None;
+            };
+            let unasked = |e: &TExpr<Ty>| matches!(e.kind, TExprKind::Bool(false));
+            if !empties.iter().all(|s| arrays.is_empty_sequence(s))
+                || !unasked(leading)
+                || !unasked(trailing)
+            {
                 return None;
             }
             let Ty::Array(element_ty) = &xs.ty else {

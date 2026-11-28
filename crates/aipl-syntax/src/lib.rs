@@ -3374,7 +3374,12 @@ fn __builtin_split_len(self: str, sep: str) -> u64 { 0 }
 # them is what writes an English list in one call:
 # `xs.join(sep=", ", final_sep=", or ", only_sep=" or ")` gives `"a"`,
 # `"a or b"`, `"a, b, or c"`.
-fn __builtin_join<T: any>(self: T[][], sep: T* = [], final_sep: T* = sep, only_sep: T* = sep) -> T[] { [] }
+#
+# `leading_sep` and `trailing_sep` write `sep` before the first part and after the last, so a
+# list of cells is a row: `cells.join(sep="|", leading_sep=true, trailing_sep=true)` is
+# `"|a|b|"`. They write nothing when there are no parts, and never change which gap is the
+# final or the only one.
+fn __builtin_join<T: any>(self: T[][], sep: T* = [], final_sep: T* = sep, only_sep: T* = sep, leading_sep: bool = false, trailing_sep: bool = false) -> T[] { [] }
 
 # The file builtins return a Result; the `ok(..)` body coerces to the declared
 # `..!Error` (codegen builds the real ok/err).

@@ -35,6 +35,7 @@ import {
     extend,
     len,
     less_than as <,
+    logical_and as &&,
     reserve,
     saturating_divide as /,
     saturating_sub as -,
@@ -44,11 +45,12 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-# `self.map(f).join(sep=sep, final_sep=final_sep, only_sep=only_sep)` — every
-# `f(x)` flattened into one sequence with the separators between — computed in
-# a single pass into a single buffer. The three separators are `join`'s (`sep`
-# between consecutive pieces, `final_sep` in the last gap, `only_sep` in the
-# sole gap of a two-piece join), all defaulting to empty. For a `str`-valued
+# `self.map(f).join(sep=sep, final_sep=final_sep, only_sep=only_sep, leading_sep=leading_sep,
+# trailing_sep=trailing_sep)` — every `f(x)` flattened into one sequence with the separators
+# between — computed in a single pass into a single buffer. The three separators are `join`'s
+# (`sep` between consecutive pieces, `final_sep` in the last gap, `only_sep` in the sole gap of a
+# two-piece join), all defaulting to empty, and `leading_sep` and `trailing_sep` write `sep`
+# before the first piece and after the last. For a `str`-valued
 # `f` the result is the string join; a `str` receiver iterates its chars.
 pub fn map_join<T: any, U: any>(
     self: T[],
@@ -56,12 +58,15 @@ pub fn map_join<T: any, U: any>(
     sep: U* = [],
     final_sep: U* = sep,
     only_sep: U* = sep,
+    leading_sep: bool = false,
+    trailing_sep: bool = false,
 ) -> U[] {
     let n = self.len();
     mut out: U[] = [];
     // The guess: the separators, plus two per piece.
     mut cap = (n - 1) * sep.len() + 2 * n;
     set out.reserve(cap);
+    if (leading_sep && 0 < n) { set out.extend(sep); };
     for (let i, x : self) {
         if (0 < i) {
             set out.extend(if (n == 2) {
@@ -81,6 +86,7 @@ pub fn map_join<T: any, U: any>(
         };
         set out.extend(piece);
     }
+    if (trailing_sep && 0 < n) { set out.extend(sep); };
     out
 }.test({
     fn same(self: str) -> str { self }
@@ -89,6 +95,11 @@ pub fn map_join<T: any, U: any>(
     assert([1, 2, 3].map_join(to_str, sep=", ") == "1, 2, 3");
     assert([1].map_join(to_str, sep=", ") == "1");
     assert([1, 2][..0].map_join(to_str, sep=", ") == "");
+    // The ends write `sep`, when there is a piece to put it beside.
+    assert(["a", "b"].map_join(same, sep="|", leading_sep=true, trailing_sep=true) == "|a|b|");
+    assert(["a"].map_join(same, sep="|", leading_sep=true) == "|a");
+    assert(["a"].map_join(same, sep="|", trailing_sep=true) == "a|");
+    assert([].map_join(same, sep="|", leading_sep=true, trailing_sep=true) == "");
     // No separator: a plain concatenation.
     assert(["a", "b"].map_join(same) == "ab");
     // The English-list separators, exactly as `join` places them.

@@ -1229,7 +1229,7 @@ pub(crate) unsafe fn join_from(
     final_sep: Str,
     only_sep: Str,
 ) -> Str {
-    unsafe { join_run(elems, 1, len, sep, final_sep, only_sep) }
+    unsafe { join_run(elems, 1, len, sep, final_sep, only_sep, 0) }
 }
 
 /// [`join_from`] over a run of `str` values `step` elements apart — negative
@@ -1244,8 +1244,19 @@ pub(crate) unsafe fn join_run(
     sep: Str,
     final_sep: Str,
     only_sep: Str,
+    edges: usize,
 ) -> Str {
+    // `edges` is [`JOIN_LEADING`] and [`JOIN_TRAILING`]: `sep` before the first part and after the
+    // last, when there are parts at all.
+    let leading = len > 0 && edges & JOIN_LEADING != 0;
+    let trailing = len > 0 && edges & JOIN_TRAILING != 0;
     let mut total = 0;
+    if leading {
+        total += sep.len();
+    }
+    if trailing {
+        total += sep.len();
+    }
     for i in 0..len {
         if i > 0 {
             total += gap_sep(i, len, sep, final_sep, only_sep).len();
@@ -1253,6 +1264,12 @@ pub(crate) unsafe fn join_run(
         total += unsafe { core::ptr::read(elems.offset(step * i as isize)) }.len();
     }
     let mut b = Builder::with_capacity(total);
+    if leading {
+        for_each_chunk(sep, &mut |chunk| {
+            b.push(chunk);
+            true
+        });
+    }
     for i in 0..len {
         if i > 0 {
             for_each_chunk(gap_sep(i, len, sep, final_sep, only_sep), &mut |chunk| {
@@ -1266,8 +1283,19 @@ pub(crate) unsafe fn join_run(
             true
         });
     }
+    if trailing {
+        for_each_chunk(sep, &mut |chunk| {
+            b.push(chunk);
+            true
+        });
+    }
     b.finish()
 }
+
+/// `join`'s `leading_sep`: `sep` is written before the first part.
+pub(crate) const JOIN_LEADING: usize = 1;
+/// `join`'s `trailing_sep`: `sep` is written after the last part.
+pub(crate) const JOIN_TRAILING: usize = 2;
 
 // ---------- Entry points (the `aipl_*` ABI) ----------
 //

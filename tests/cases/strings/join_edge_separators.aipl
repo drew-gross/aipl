@@ -1,0 +1,31 @@
+# `leading_sep` writes `sep` before the first part and `trailing_sep` after the last, so a list of
+# cells is a row: `|a|b|`. They write nothing when there are no parts, and they do not change which
+# gap is the final or the only one.
+
+import { equal as ==, is_empty, join } from builtins;
+
+fn row(cells: str[]) -> str { cells.join(sep="|", leading_sep=true, trailing_sep=true) }.test({
+    assert(row(["a", "b"]) == "|a|b|");
+    assert(row(["a"]) == "|a|");
+    assert(row([]) == "");
+    // Either end alone.
+    assert(["a", "b"].join(sep=", ", leading_sep=true) == ", a, b");
+    assert(["a", "b"].join(sep=", ", trailing_sep=true) == "a, b, ");
+    // The gaps keep their own separators.
+    assert(
+        ["a", "b", "c"].join(
+            sep=",",
+            final_sep="&",
+            leading_sep=true,
+            trailing_sep=true,
+        ) == ",a,b&c,",
+    );
+    assert(["a", "b"].join(sep=",", only_sep="&", leading_sep=true) == ",a&b");
+    // The array half, and a bit-packed `bool[]`.
+    assert([[1, 2], [3]].join(sep=0, leading_sep=true, trailing_sep=true) == [0, 1, 2, 0, 3, 0]);
+    assert([[true], [false]].join(sep=false, trailing_sep=true) == [true, false, false, false]);
+    assert([[1]][..0].join(sep=0, leading_sep=true, trailing_sep=true).is_empty());
+    // Chosen at run time.
+    let wanted = ["a"].join(sep="-") == "a";
+    assert(["a"].join(sep="-", leading_sep=wanted) == "-a");
+})
