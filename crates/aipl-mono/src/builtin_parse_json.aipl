@@ -25,8 +25,8 @@
 # members of its children, so `Json` has no case that only means "a member".
 
 import {
+    collect_arms,
     equal as ==,
-    extend,
     first,
     join,
     len,
@@ -89,7 +89,13 @@ variant JsonTok = Str(str) | Num | Kw | Punct
 
 # The AST. `Number` keeps the source spelling (see the header); an `Object` keeps
 # its members in source order, a repeated key included.
-variant Json = Null | Bool(bool) | Number(str) | String(str) | Array(Json[]) | Object(Member[])
+variant Json =
+    | Null
+    | Bool(bool)
+    | Number(str)
+    | String(str)
+    | Array(Json[])
+    | Object(members: Member[])
 
 # One `"key": value` pair of an object.
 struct Member { key: str, value: Json }
@@ -105,7 +111,7 @@ struct Member { key: str, value: Json }
 # (`Maybe(Lit("-"))` in `number`), one place, rather than split between a
 # sign the lexer swallowed and one it didn't.
 fn json_rules() -> TokenRule<JsonTok>[] {
-    let alnum: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".to_set();
     [
         TokenRule { matcher: CharRun(" \t\r\n".to_set()), emit: Bare(Punct), trivia: true },
         TokenRule {
@@ -115,9 +121,9 @@ fn json_rules() -> TokenRule<JsonTok>[] {
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
         TokenRule { matcher: Float, emit: Bare(Num) },
         TokenRule { matcher: Int, emit: Bare(Num) },
-        TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("false", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("null", alnum.to_set()), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("true", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("false", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("null", alnum), emit: Bare(Kw) },
         TokenRule { matcher: OneChar("{}[]:,".to_set()), emit: Bare(Punct) },
     ]
 }
@@ -148,16 +154,7 @@ fn lower_member(src: str, node: Parts, kids: Json[]) -> Json!ParseError {
 # The object holding every member of `members`, each a one-member object, in
 # order.
 fn object_of(members: Json[]) -> Json {
-    mut all: Member[] = [];
-    for (let m : members) {
-        match (m) {
-            Object(one) => {
-                set all.extend(one);
-            },
-            Null | Bool(..) | Number(..) | String(..) | Array(..) => {},
-        };
-    }
-    Object(all)
+    Object(members.collect_arms::<Object>()$members.join())
 }.test({
     let a = Member { key: "a", value: Null };
     let b = Member { key: "b", value: Bool(true) };

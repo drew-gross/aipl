@@ -397,6 +397,8 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  maybe make ! like ? except for getting errors? I don't really like the message_of helpers. Then it sorta becomes a !? operator which I kinda like
+  allow accessing variant arm fields by index so e.g. Object(members.collect_arms::<Object>()$0.join()) works of Object is defined as Object(Member[]) (instead of Object(members: Member[]))
   Braces: a lambda given as a keyword argument needs braces, so it's l.zip(with=|x, y| { x + y }). The unbraced form works positionally but not after with=.
   syntax for required keyword arguments
   syntax for multiple without should be variant CoreKind = ExprKind without (A, B, C) throughout
@@ -467,6 +469,9 @@ matrices:
   no named operator for matmul probably, user can import matmul as * if they want
   option to put the shape in the type e.g. T[5,] or T[5,10] (make this work for 1d too? i.e. T[5])
   support more than 2 dimensions
+
+json:
+  at byte error should say at index (for 0/1 based indexing clarity)
 
 types:
   rust-style one writer at a time thing that works through closures i.e. if a function returns a closure that mutates it's argument, the caller can no longer mutate the argument

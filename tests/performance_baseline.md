@@ -42,7 +42,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/grammar | 653 | 72678 | 37768 | 102774 | 127684 |
 | crates/aipl-codegen/src/grammar_aipl | 2927070 | 715079702 | 1900885 | 1275021387 | 8351820 |
 | crates/aipl-codegen/src/grammar_calc | 9748 | 1015354 | 41210 | 5099948 | 480688 |
-| crates/aipl-codegen/src/grammar_json | 14304 | 1570432 | 32625 | 6261951 | 493192 |
+| crates/aipl-codegen/src/grammar_json | 14316 | 1571264 | 32657 | 5981754 | 494224 |
 | crates/aipl-codegen/src/grammar_sexp | 5861 | 551005 | 14064 | 2768553 | 460048 |
 | crates/aipl-codegen/src/highlight | 457 | 41551 | 6967 | 118639 | 124572 |
 | crates/aipl-codegen/src/highlight_aipl | 3645 | 374168 | 111206 | 1502573 | 178072 |
@@ -214,7 +214,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_only | 2 | 88 | 88 | 648 | 3080 |
 | crates/aipl-mono/src/builtin_opt_fold | 15 | 1016 | 576 | 6435 | 22256 |
 | crates/aipl-mono/src/builtin_pad | 6 | 528 | 528 | 2323 | 3964 |
-| crates/aipl-mono/src/builtin_parse_json | 3687 | 539114 | 24095 | 2145305 | 326648 |
+| crates/aipl-mono/src/builtin_parse_json | 3693 | 539418 | 24167 | 1901724 | 328008 |
 | crates/aipl-mono/src/builtin_range | 2 | 120 | 120 | 810 | 2296 |
 | crates/aipl-mono/src/builtin_read_key | 22 | 1000 | 1120 | 17411 | 9076 |
 | crates/aipl-mono/src/builtin_reduce | 3 | 240 | 240 | 3255 | 6996 |
@@ -515,7 +515,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/imports/duplicate_import_source_allowed | 2 | 105 | 105 | 557 | 4404 |
 | tests/cases/imports/import_alias | 4 | 282 | 282 | 906 | 4616 |
 | tests/cases/imports/imports_pull_named_items_into_scope | 2 | 105 | 105 | 557 | 4404 |
-| tests/cases/imports/library_import | 254 | 40188 | 16168 | 138008 | 317700 |
+| tests/cases/imports/library_import | 254 | 40188 | 16168 | 110651 | 319060 |
 | tests/cases/imports/operator_alias | 2 | 105 | 105 | 594 | 4592 |
 | tests/cases/imports/operator_builtin_bare | 0 | 0 | 0 | 127 | 608 |
 | tests/cases/imports/operator_imports | 2 | 106 | 106 | 594 | 4596 |
