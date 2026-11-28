@@ -28,7 +28,7 @@ the button as a closure that names the list it changes, made where the list is a
 the components as a callback, as React hands down a `setTodos`:
 
 ```
-todo.item([mut todos] || { set todos = todos.removing(index) })
+todo.item([mut todos] || { set todos = todos.remove_index(index) })
 ```
 
 Cmd-W and the close button close the window, and Cmd-Q quits, ending the program with exit 0. The

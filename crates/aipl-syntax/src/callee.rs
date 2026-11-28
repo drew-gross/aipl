@@ -115,6 +115,8 @@ pub enum Callee {
     DropLast,
     DropN,
     DropLastN,
+    /// `remove_index(self: T[], index: u64) -> T[]` — the array without the element at `index`.
+    RemoveIndex,
     ToStr,
     /// `to_str_len(self: T) -> u64` — the length `to_str(self)` would have,
     /// without building it. What the operation-fusion pass writes for
@@ -519,6 +521,7 @@ impl Callee {
         Callee::DropLast,
         Callee::DropN,
         Callee::DropLastN,
+        Callee::RemoveIndex,
         Callee::ToStr,
         Callee::ToStrLen,
         Callee::Map,
@@ -769,6 +772,7 @@ impl Callee {
             Callee::DropLast => "__builtin_drop_last",
             Callee::DropN => "__builtin_drop_n",
             Callee::DropLastN => "__builtin_drop_last_n",
+            Callee::RemoveIndex => "__builtin_remove_index",
             Callee::ToStr => "__builtin_to_str",
             Callee::ToStrLen => "__builtin_to_str_len",
             Callee::Map => "__builtin_map",

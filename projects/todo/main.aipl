@@ -18,6 +18,7 @@ import {
     not_equal as !=,
     print,
     push,
+    remove_index,
     starts_with,
     value_or,
     wrapping_add as +,
@@ -54,20 +55,6 @@ variant Command = Show | Gallery
 # What a run came to: a window to show, with its title and what is in it, or the list to use in
 # a window.
 variant Outcome = Window(str, str) | Interact
-
-# `self` with the item at `index` removed.
-fn removing(self: Todo[], index: u64) -> Todo[] { [..self[..index], ..self[(index + 1)..]] }.test({
-    let list = [
-        Todo { text: "a", done: false },
-        Todo { text: "b", done: true },
-        Todo { text: "c", done: false },
-    ];
-    assert(list.removing(1) == [Todo { text: "a", done: false }, Todo { text: "c", done: false }]);
-    assert(list.removing(0).len() == 2);
-    assert(list.removing(2).len() == 2);
-    // An index past the end leaves the list as it is.
-    assert(list.removing(7) == list);
-})
 
 # `self` as a row of the window: a checkbox for whether it is done, its text, struck through and
 # muted once it is, and a button that calls `remove`.
@@ -220,7 +207,7 @@ fn interact() !gui {
             mut rows: Element[] = [];
             for (let index, todo : todos) {
                 set rows.push(todo.item([mut todos] || {
-                    set todos = todos.removing(index);
+                    set todos = todos.remove_index(index);
                 }));
             }
             set view = todos.todo_app(rows, add);

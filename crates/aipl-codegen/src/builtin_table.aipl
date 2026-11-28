@@ -70,6 +70,7 @@ variant Callee =
     | DropLast
     | DropN
     | DropLastN
+    | RemoveIndex
     | ToStr
     | ToStrLen
     | Map
@@ -558,6 +559,11 @@ pub fn builtin_table() -> BuiltinEntry[] {
             arm: DropLastN,
             callee: "__builtin_drop_last_n",
             definition: Written("builtin_drop_last_n.aipl"),
+        },
+        BuiltinEntry {
+            arm: RemoveIndex,
+            callee: "__builtin_remove_index",
+            definition: Written("builtin_remove_index.aipl"),
         },
         BuiltinEntry { arm: ToStr, callee: "__builtin_to_str", definition: Declared },
         BuiltinEntry { arm: ToStrLen, callee: "__builtin_to_str_len", definition: Declared },
