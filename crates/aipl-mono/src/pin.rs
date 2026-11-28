@@ -2774,18 +2774,36 @@ impl Pinner<'_> {
                 };
                 let ty = body.ty.clone();
                 if cell {
+                    // A declared type reaches a literal through an annotated binding of it.
+                    let (initial, temporary) = match declared {
+                        Some(_) => {
+                            let temp = format!("{name}$initial");
+                            let read = self.node(K::Ident(temp.clone()), held.clone(), e);
+                            (read, Some((temp, v)))
+                        }
+                        None => (v, None),
+                    };
                     let made = self.cell_call(
                         Callee::CellNew,
                         &held,
-                        vec![v],
+                        vec![initial],
                         It::Arr(Box::new(held.clone())),
                         e,
                     );
-                    return Ok(self.node(
+                    let node = self.node(
                         K::Let(Self::cell_handle(name), Box::new(made), Box::new(body)),
-                        ty,
+                        ty.clone(),
                         e,
-                    ));
+                    );
+                    return Ok(match temporary {
+                        Some((temp, v)) => {
+                            let mut outer =
+                                self.node(K::Let(temp, Box::new(v), Box::new(node)), ty, e);
+                            outer.annotation = declared;
+                            outer
+                        }
+                        None => node,
+                    });
                 }
                 let kind = if mutable {
                     K::LetMut(name.clone(), Box::new(v), Box::new(body))

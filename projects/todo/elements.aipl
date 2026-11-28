@@ -1,15 +1,14 @@
 # The elements a window is made of, and the text form `show_view` is given them in.
 #
-# An element is a case of `Element<M>`, built like any variant, with what it leaves out at its
+# An element is a case of `Element`, built like any variant, with what it leaves out at its
 # default: `Label("Todo", size=24, bold=true)`, `Column([..], padding=16)`. A `Column` or `Row`
-# holds elements, which is how a view is composed. `M` is the model the view is of, and a `Button`
-# holds what a click does to it, `|model| { .. }`, as the function that answers the model
-# after the click, the way React's `setState(model => ..)` is given one. What names an element in
-# the events it causes is its `key`, which it need not be given: it is where the element is in the
-# tree, until one is written. The root takes an `icon`, a glyph the window draws as the
-# application's icon.
+# holds elements, which is how a view is composed. A `Button` holds what a click does, a closure
+# that names the variables it changes, `[mut todos] || { set todos = .. }`, which share them with
+# the code that made it, the way React's `setTodos` does. What names an element in the events it
+# causes is its `key`, which it need not be given: it is where the element is in the tree, until
+# one is written. The root takes an `icon`, a glyph the window draws as the application's icon.
 # `to_text` writes a view as the lines the runtime reads, one element a line with its children
-# indented two spaces under it, and `click` applies the handler of the button an event names. The
+# indented two spaces under it, and `click` calls the handler of the button an event names. The
 # runtime's reader (`gui_cocoa.rs`) says what each element means.
 
 import {
@@ -21,12 +20,14 @@ import {
     repeat,
     split,
     wrapping_add as +,
+    wrapping_increment as ++,
     wrapping_mul as *,
+    wrapping_mul_assign as *=,
 } from builtins;
 
-variant Element<M> =
+variant Element =
     | Column(
-        children: Element<M>[],
+        children: Element[],
         spacing: u64 = 8,
         padding: u64 = 0,
         width: u64 = 0,
@@ -34,7 +35,7 @@ variant Element<M> =
         icon: str = ""
     )
     | Row(
-        children: Element<M>[],
+        children: Element[],
         spacing: u64 = 8,
         padding: u64 = 0,
         width: u64 = 0,
@@ -49,7 +50,7 @@ variant Element<M> =
         strike: bool = false,
         key: str = ""
     )
-    | Button(text: str, on_click: (M) -> M, key: str = "")
+    | Button(text: str, on_click: () mut -> (), key: str = "")
     | Checkbox(text: str, checked: bool = false, key: str = "")
     | Field(value: str = "", placeholder: str = "", width: u64 = 0, key: str = "")
     | Separator(key: str = "")
@@ -100,13 +101,7 @@ fn line(self: str[], depth: u64) -> str { `{" ".repeat(depth * 2)}{self.join(sep
 
 # The lines of a container at `path`: its own, then those of its children one level in, each at
 # its place in the tree.
-fn container<M>(
-    name: str,
-    children: Element<M>[],
-    attributes: str[],
-    depth: u64,
-    path: str,
-) -> str[] {
+fn container(name: str, children: Element[], attributes: str[], depth: u64, path: str) -> str[] {
     mut out = [[name, ..attributes].line(depth)];
     for (let index, child : children) {
         set out.extend(child.lines(depth + 1, `{path}.{index}`));
@@ -122,7 +117,7 @@ fn event_key(key: str, path: str) -> str { if (key.is_empty()) { `b{path}` } els
 })
 
 # `self` as lines of the text form, indented `depth` levels, at `path` in the tree.
-fn lines<M>(self: Element<M>, depth: u64, path: str) -> str[] {
+fn lines(self: Element, depth: u64, path: str) -> str[] {
     match (self) {
         Column(children, spacing, padding, width, key, icon) => container(
             "column",
@@ -184,91 +179,97 @@ fn lines<M>(self: Element<M>, depth: u64, path: str) -> str[] {
         Separator(key) => [["separator", ..text_attribute("key", key)].line(depth)],
     }
 }.test({
-    // What a view of no model in particular is a view of.
-    fn numbers(view: Element<i64>) -> Element<i64> { view }
-
-    assert(numbers(Label("Todo")).lines(0, "0") == [`label "Todo"`]);
-    assert(numbers(Label("Todo", size=24, bold=true)).lines(1, "0") == [
-        `  label "Todo" size=24 bold`,
-    ]);
-    assert(numbers(Label("x", muted=true, strike=true, key="k")).lines(0, "0") == [
+    assert(Label("Todo").lines(0, "0") == [`label "Todo"`]);
+    assert(Label("Todo", size=24, bold=true).lines(1, "0") == [`  label "Todo" size=24 bold`]);
+    assert(Label("x", muted=true, strike=true, key="k").lines(0, "0") == [
         `label "x" muted strike key="k"`,
     ]);
-    assert(Button("Add", |n: i64| { n }, key="add").lines(0, "0") == [`button "Add" key="add"`]);
-    assert(numbers(Checkbox("Milk", checked=true)).lines(0, "0") == [`checkbox "Milk" checked`]);
-    assert(numbers(Checkbox("Milk")).lines(0, "0") == [`checkbox "Milk"`]);
-    assert(numbers(Field(placeholder="Name", width=220)).lines(0, "0") == [
+    assert(Button("Add", || {}, key="add").lines(0, "0") == [`button "Add" key="add"`]);
+    assert(Checkbox("Milk", checked=true).lines(0, "0") == [`checkbox "Milk" checked`]);
+    assert(Checkbox("Milk").lines(0, "0") == [`checkbox "Milk"`]);
+    assert(Field(placeholder="Name", width=220).lines(0, "0") == [
         `field placeholder="Name" width=220`,
     ]);
-    assert(numbers(Field(value="x")).lines(0, "0") == [`field value="x"`]);
-    assert(numbers(Separator()).lines(0, "0") == ["separator"]);
+    assert(Field(value="x").lines(0, "0") == [`field value="x"`]);
+    assert(Separator().lines(0, "0") == ["separator"]);
 
     // A container is its own line and then its children, a level in, and a button that was given
     // no key is named by its place.
-    assert(Column([Label("a"), Row([Button("b", |n: i64| { n })], spacing=4)], padding=16).lines(
-        0,
-        "0",
-    ) == [
+    assert(Column([Label("a"), Row([Button("b", || {})], spacing=4)], padding=16).lines(0, "0") == [
         "column spacing=8 padding=16",
         `  label "a"`,
         "  row spacing=4",
         `    button "b" key="b0.1.0"`,
     ]);
-    assert(numbers(Column([])).lines(0, "0") == ["column spacing=8"]);
+    assert(Column([]).lines(0, "0") == ["column spacing=8"]);
     // The root's icon is a text attribute like the key.
-    assert(numbers(Column([], icon="✓")).lines(0, "0") == [`column spacing=8 icon="✓"`]);
-    assert(numbers(Row([], key="r", icon="T")).lines(0, "0") == [`row spacing=8 key="r" icon="T"`]);
+    assert(Column([], icon="✓").lines(0, "0") == [`column spacing=8 icon="✓"`]);
+    assert(Row([], key="r", icon="T").lines(0, "0") == [`row spacing=8 key="r" icon="T"`]);
 })
 
 # `self` in the text form `show_view` is given.
-pub fn to_text<M>(self: Element<M>) -> str { `{self.lines(0, "0").join(sep="\n")}\n` }.test({
-    // What a view of no model in particular is a view of.
-    fn numbers(view: Element<i64>) -> Element<i64> { view }
-
+pub fn to_text(self: Element) -> str { `{self.lines(0, "0").join(sep="\n")}\n` }.test({
     assert(
-        numbers(Column([
+        Column([
             Label("a"),
             Separator(),
-        ])).to_text() == `column spacing=8\n  label "a"\n  separator\n`,
+        ]).to_text() == `column spacing=8\n  label "a"\n  separator\n`,
     );
 })
 
-# `model` after the click the event `key` names: what the handler of the button of that name
-# answers, or `model` when no button has the name.
-fn click_at<M>(self: Element<M>, key: str, model: M, path: str) -> M {
+# Call the handler of the button the event `key` names, if `self` or what it holds has one.
+fn click_at(self: Element, key: str, path: str) {
     match (self) {
-        Column(children, _, _, _, _, _) => children.click_in(key, model, path),
-        Row(children, _, _, _, _, _) => children.click_in(key, model, path),
-        Button(_, on_click, own) => if (event_key(own, path) == key) {
-            on_click(model)
-        } else {
-            model
+        Column(children, _, _, _, _, _) => {
+            children.click_in(key, path);
         },
-        Label(..) | Checkbox(..) | Field(..) | Separator(..) => model,
-    }
+        Row(children, _, _, _, _, _) => {
+            children.click_in(key, path);
+        },
+        Button(_, on_click, own) => {
+            if (event_key(own, path) == key) { on_click(); };
+        },
+        Label(..) | Checkbox(..) | Field(..) | Separator(..) => {},
+    };
 }
 
-# `model` after the click `key` names, among `children` at `path`.
-fn click_in<M>(self: Element<M>[], key: str, model: M, path: str) -> M {
-    mut answer = model;
+# Call the handler of the button `key` names, among `children` at `path`.
+fn click_in(self: Element[], key: str, path: str) {
     for (let index, child : self) {
-        set answer = child.click_at(key, answer, `{path}.{index}`);
+        child.click_at(key, `{path}.{index}`);
     }
-    answer
 }
 
-# `model` after the click the event `key` names: what the handler of the button of that name
-# answers, or `model` when no button has the name.
-pub fn click<M>(self: Element<M>, key: str, model: M) -> M { self.click_at(key, model, "0") }.test({
+# Call the handler of the button the event `key` names, and nothing when no button has the name.
+pub fn click(self: Element, key: str) {
+    self.click_at(key, "0");
+}.test({
+    mut n = 5;
     let view = Column([
-        Button("add", |n: i64| { n + 1 }),
-        Row([Button("double", |n: i64| { n * 2 }, key="double")]),
+        Button(
+            "add",
+            [mut n] || {
+                set n++;
+            },
+        ),
+        Row([
+            Button(
+                "double",
+                [mut n] || {
+                    set n *= 2;
+                },
+                key="double",
+            ),
+        ]),
     ]);
     assert(
         view.to_text() == `column spacing=8\n  button "add" key="b0.0"\n  row spacing=8\n    button "double" key="double"\n`,
     );
-    assert(view.click("b0.0", 5) == 6);
-    assert(view.click("double", 5) == 10);
-    // A key no button has leaves the model as it is.
-    assert(view.click("b0.7", 5) == 5);
+    view.click("b0.0");
+    assert(n == 6);
+    view.click("double");
+    assert(n == 12);
+    // A key no button has changes nothing.
+    view.click("b0.7");
+    assert(n == 12);
 })

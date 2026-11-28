@@ -4,7 +4,8 @@
 #
 # It is written the way the React version is: `todo_app` is a function of the list that answers the
 # elements to show, `item` is a component it uses, and what a button does when it is clicked is
-# written on the button, as a function of the list that answers the list after the click.
+# written on the button as a closure that names the list it changes, `[mut todos] || { .. }`, made
+# where the list is and handed down to the components as a callback.
 
 import {
     drop_first,
@@ -68,17 +69,17 @@ fn removing(self: Todo[], index: u64) -> Todo[] { [..self[..index], ..self[(inde
     assert(list.removing(7) == list);
 })
 
-# `self`, the item at `index`, as a row of the window: a checkbox for whether it is done, its text,
-# struck through and muted once it is, and a button to remove it.
-fn item(self: Todo, index: u64) -> Element<Todo[]> {
+# `self` as a row of the window: a checkbox for whether it is done, its text, struck through and
+# muted once it is, and a button that calls `remove`.
+fn item(self: Todo, remove: () mut -> ()) -> Element {
     Row([
         Checkbox("", checked=self.done),
         Label(self.text, muted=self.done, strike=self.done),
-        Button("Remove", |todos| { todos.removing(index) }),
+        Button("Remove", remove),
     ])
 }.test({
     assert(
-        Todo { text: "a", done: false }.item(3).to_text() == """
+        Todo { text: "a", done: false }.item(|| {}).to_text() == """
             row spacing=8
               checkbox ""
               label "a"
@@ -87,7 +88,7 @@ fn item(self: Todo, index: u64) -> Element<Todo[]> {
         """,
     );
     assert(
-        Todo { text: "b", done: true }.item(0).to_text() == """
+        Todo { text: "b", done: true }.item(|| {}).to_text() == """
             row spacing=8
               checkbox "" checked
               label "b" muted strike
@@ -95,52 +96,41 @@ fn item(self: Todo, index: u64) -> Element<Todo[]> {
 
         """,
     );
-    // Removing the item is what the button does, whichever item it is.
-    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: false }];
-    assert(list[1]?.item(1).click("b0.2", list) == [Todo { text: "a", done: false }]);
-    assert(list[0]?.item(0).click("b0.2", list) == [Todo { text: "b", done: false }]);
+    // The button is what calls `remove`.
+    mut removed = 0;
+    Todo { text: "a", done: false }
+        .item([mut removed] || {
+            set removed++;
+        })
+        .click("b0.2");
+    assert(removed == 1);
 })
 
-# Each of `self` as a row of the window.
-fn items(self: Todo[]) -> Element<Todo[]>[] {
-    mut rows: Element<Todo[]>[] = [];
-    for (let index, todo : self) {
-        set rows.push(todo.item(index));
-    }
-    rows
-}
-
 # The title of the window, and a line under it.
-fn header() -> Element<Todo[]>[] { [Label("Todo", size=24, bold=true), Separator()] }
+fn header() -> Element[] { [Label("Todo", size=24, bold=true), Separator()] }
 
 # A line, and how many of the items are not done.
-fn footer(left: u64) -> Element<Todo[]>[] { [Separator(), Label(`{left} left`, muted=true)] }
+fn footer(left: u64) -> Element[] { [Separator(), Label(`{left} left`, muted=true)] }
 
-# The window for the list `self`: a title, a row for each item and a button for another, or a button
-# for the first when there is none, and how many are left.
-fn todo_app(self: Todo[]) -> Element<Todo[]> {
-    let rows = if (self.is_empty()) {
-        [
-            Label("Nothing to do.", muted=true),
-            Button(
-                "Add your first todo",
-                |todos| { [Todo { text: "My first todo", done: false }] },
-            ),
-        ]
-    } else {
-        [
-            ..self.items(),
-            Button(
-                "Add a todo",
-                |todos| { [..todos, Todo { text: `Todo {todos.len() + 1}`, done: false }] },
-            ),
-        ]
-    };
+# The window for the list `self`, whose items are the `rows`: a title, the rows and a button that
+# calls `add` for another, or for the first when there is none, and how many are left.
+fn todo_app(self: Todo[], rows: Element[], add: () mut -> ()) -> Element {
+    let label = if (self.is_empty()) { "Add your first todo" } else { "Add a todo" };
     let left = self.filter(|todo| !todo.done).len();
-    Column([..header(), ..rows, ..footer(left)], padding=16, icon="✓")
+    Column(
+        [
+            ..header(),
+            ..if (self.is_empty()) { [Label("Nothing to do.", muted=true)] } else { rows },
+            Button(label, add),
+            ..footer(left),
+        ],
+        padding=16,
+        icon="✓",
+    )
 }.test({
+    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: true }];
     assert(
-        [].todo_app().to_text() == """
+        [].todo_app([], || {}).to_text() == """
             column spacing=8 padding=16 icon="✓"
               label "Todo" size=24 bold
               separator
@@ -151,20 +141,13 @@ fn todo_app(self: Todo[]) -> Element<Todo[]> {
 
         """,
     );
-    let list = [Todo { text: "a", done: false }, Todo { text: "b", done: true }];
     assert(
-        list.todo_app().to_text() == """
+        list.todo_app([Label("row a"), Label("row b")], || {}).to_text() == """
             column spacing=8 padding=16 icon="✓"
               label "Todo" size=24 bold
               separator
-              row spacing=8
-                checkbox ""
-                label "a"
-                button "Remove" key="b0.2.2"
-              row spacing=8
-                checkbox "" checked
-                label "b" muted strike
-                button "Remove" key="b0.3.2"
+              label "row a"
+              label "row b"
               button "Add a todo" key="b0.4"
               separator
               label "1 left" muted
@@ -172,19 +155,23 @@ fn todo_app(self: Todo[]) -> Element<Todo[]> {
         """,
     );
 
-    // What the buttons do.
-    assert([].todo_app().click("b0.3", []) == [Todo { text: "My first todo", done: false }]);
-    assert(list.todo_app().click("b0.4", list) == [..list, Todo { text: "Todo 3", done: false }]);
-    assert(list.todo_app().click("b0.2.2", list) == [Todo { text: "b", done: true }]);
-    assert(list.todo_app().click("b0.3.2", list) == [Todo { text: "a", done: false }]);
-    // A button that is not there changes nothing, as does the first one's after an item is added.
-    assert(list.todo_app().click("b0.3", list) == list);
-    assert(list.todo_app().click("nothing", list) == list);
+    // The button calls `add`, and only the button.
+    mut added = 0;
+    let view = list.todo_app(
+        [],
+        [mut added] || {
+            set added++;
+        },
+    );
+    view.click("b0.2");
+    assert(added == 1);
+    view.click("nothing");
+    assert(added == 1);
 })
 
 # One of each element, with the options each takes, from constants: what to look at while the
 # elements are drawn.
-fn gallery() -> Element<i64> {
+fn gallery() -> Element {
     Column(
         [
             Label("Elements", size=24, bold=true),
@@ -195,7 +182,7 @@ fn gallery() -> Element<i64> {
             Label("A muted label", muted=true),
             Label("A struck label", strike=true),
             Separator(),
-            Row([Button("A button", |n| { n }), Button("Another", |n| { n })]),
+            Row([Button("A button", || {}), Button("Another", || {})]),
             Row([Checkbox("Unchecked"), Checkbox("Checked", checked=true)]),
             Field(placeholder="A text field", width=240),
             Field(value="A field with text", width=240),
@@ -217,13 +204,29 @@ fn gallery() -> Element<i64> {
 })
 
 # Show the empty list in a window, and keep the window to date as it is used, until the window is gone:
-# it is closed when asked to close or to quit.
+# it is closed when asked to close or to quit. The list is `todos`; the window is built from it, and
+# the buttons' closures change it.
 fn interact() !gui {
     mut todos: Todo[] = [];
-    mut view = todos.todo_app();
+    let add = [mut todos] || {
+        let text = if (todos.is_empty()) { "My first todo" } else { `Todo {todos.len() + 1}` };
+        set todos.push(Todo { text, done: false });
+    };
+    mut view = Label("");
+    mut changed = true;
     mut open = true;
-    show_view("Todo", view.to_text());
     while (open) {
+        if (changed) {
+            mut rows: Element[] = [];
+            for (let index, todo : todos) {
+                set rows.push(todo.item([mut todos] || {
+                    set todos = todos.removing(index);
+                }));
+            }
+            set view = todos.todo_app(rows, add);
+            show_view("Todo", view.to_text());
+            set changed = false;
+        };
         match (parse_event(next_event())) {
             ok(Closed) => {
                 set open = false;
@@ -232,17 +235,17 @@ fn interact() !gui {
                 close_window();
             },
             ok(Clicked(key)) => {
-                let clicked = view.click(key, todos);
-                if (clicked != todos) {
-                    set todos = clicked;
-                    set view = todos.todo_app();
-                    show_view("Todo", view.to_text());
-                };
+                let before = todos;
+                view.click(key);
+                set changed = todos != before;
             },
             err(..) => {},
         };
     }
 }.test({
+    // The window for `todos`, from handlers that do nothing: the text does not show them.
+    fn shows(todos: Todo[]) -> str { todos.todo_app(todos$item(|| {}), || {}).to_text() }
+
     // A click on the button of an empty list adds the first item and shows it; the new window's
     // button adds another, and the first item's removes it, and then the other. A click on a button
     // that is not there changes nothing, and the window is not drawn again.
@@ -281,11 +284,11 @@ fn interact() !gui {
     let first = [Todo { text: "My first todo", done: false }];
     let second = [..first, Todo { text: "Todo 2", done: false }];
     assert(shown == [
-        [].todo_app().to_text(),
-        first.todo_app().to_text(),
-        second.todo_app().to_text(),
-        [Todo { text: "Todo 2", done: false }].todo_app().to_text(),
-        [].todo_app().to_text(),
+        shows([]),
+        shows(first),
+        shows(second),
+        shows([Todo { text: "Todo 2", done: false }]),
+        shows([]),
     ]);
     assert(script.is_empty());
 })

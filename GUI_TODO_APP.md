@@ -24,16 +24,18 @@ as far as the app needs.
   runtime both include that file; AppKit is loaded with `dlopen` on the first call and driven through
   `objc_msgSend`, so nothing is linked. `next_event` runs a hand-written `nextEventMatchingMask`
   loop until the window has an event for the program; the runtime closes nothing of its own accord.
-- The AIPL side is in `projects/todo`: `elements.aipl` has the `Element<M>` variant, `to_text` and
+- The AIPL side is in `projects/todo`: `elements.aipl` has the `Element` variant, `to_text` and
   `click`, with a `gallery` command that draws every element from constants, and `events.aipl` has
   the `Event` variant, its parser and `wait_until_closed`, the loop that grants requests to close and
-  quit. An `Element<M>` is a view of a model `M`; a `Button` holds what a click does as a function of
-  the model, `Button("Add", |todos| { .. })`, the way React's `setState(todos => ..)` is given one,
-  and a button is named in events by its `key`, which is where it is in the tree (`b0.2.1`) until one
-  is written. `main.aipl` has `todo_app`, a function of the list that answers the window (a
-  component `item` per row, a handler per button that closes over what it needs), and `interact`,
-  the loop the todo window runs in: an event is looked up in the tree last shown (`click`), which
-  answers the new list, which is drawn again; the list lives only as long as the window. Its buttons
+  quit. A `Button` holds what a click does as a closure that names the variables it changes,
+  `Button("Add", [mut todos] || { .. })`, which shares them with the code that made it, the way
+  React's `setTodos` does; a button is named in events by its `key`, which is where it is in the tree
+  (`b0.2.1`) until one is written. `main.aipl` has `todo_app`, a function of the list, its rows and
+  an `add` callback that answers the window (a component `item` per row, given its `remove`
+  callback as a prop), and `interact`, the loop the todo window runs in, which owns `mut todos`
+  and makes the closures: an event is looked up in the tree last shown (`click`), which calls the
+  button's closure, which changes the list, and the window is drawn again when it differs; the
+  list lives only as long as the window. Its buttons
   add an item ("Add your first todo" on an empty list, "Add a todo" under the items of any other,
   each with placeholder text) and remove one.
 - What reaches the program is the window's own requests and button clicks. A button has to have a

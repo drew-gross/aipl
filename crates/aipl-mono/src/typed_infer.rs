@@ -563,10 +563,13 @@ impl Mono<'_> {
         };
         !self.generics.contains_key(name)
             && function.params.len() == args.len()
+            // A function-typed parameter is the value it is handed unless the callee is specialized
+            // for the lambda or function name given.
             && function
                 .params
                 .iter()
-                .all(|p| !matches!(p.ty, Type::Fn(..)))
+                .zip(args)
+                .all(|(p, a)| !matches!(p.ty, Type::Fn(..)) || !self.is_function_argument(a))
     }
 
     /// Whether a call is an arithmetic, comparison or logical operator on two operands, which is a

@@ -1,0 +1,67 @@
+# A closure that mutates what it captured is a value like any other: it is handed to a function
+# that takes one, a lambda written in the argument is made once and handed as the value it is, the
+# function stores it in a variant, and calling it from there changes the variable it was made over.
+
+import {
+    equal as ==,
+    len,
+    push,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
+
+variant Handler = Run(on: () mut -> ()) | Idle
+
+fn wrap(f: () mut -> ()) -> Handler { Run(f) }
+
+fn run(self: Handler) {
+    match (self) {
+        Run(f) => {
+            f();
+        },
+        Idle => {},
+    };
+}
+
+# A closure bound to a local, handed to a function that stores it, and called twice.
+fn through_a_local() -> u64 {
+    mut seen: u64[] = [];
+    let record = [mut seen] || {
+        set seen.push(1);
+    };
+    let handler = wrap(record);
+    handler.run();
+    handler.run();
+    seen.len()
+}.test({
+    assert(through_a_local() == 2);
+})
+
+# A lambda written as the argument.
+fn through_a_literal() -> u64 {
+    mut count: u64 = 0;
+    wrap([mut count] || {
+        set count++;
+    }).run();
+    count
+}.test({
+    assert(through_a_literal() == 1);
+})
+
+# One closure per element, each over the same variable, stored in an array.
+fn one_per_element() -> i64 {
+    mut total = 0;
+    // Pushed in a loop, not mapped, so the closures are made one at a time.
+    mut handlers: Handler[] = []; #[allow]
+    for (let index : [1, 2, 3]) {
+        set handlers.push(wrap([mut total] || {
+            set total += index;
+        }));
+    }
+    for (let handler : handlers) {
+        handler.run();
+    }
+    total
+}.test({
+    assert(one_per_element() == 6);
+})

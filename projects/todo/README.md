@@ -24,10 +24,11 @@ long as the window. `gallery` opens a window of every element instead.
 
 It is written the way the React version is. `todo_app` is a function of the list that answers the
 elements to show, `item` is a component it uses for each row, and what a button does is written on
-the button, as a function of the list that answers the list after the click:
+the button as a closure that names the list it changes, made where the list is and handed down to
+the components as a callback, as React hands down a `setTodos`:
 
 ```
-Button("Remove", |todos| { todos.removing(index) })
+todo.item([mut todos] || { set todos = todos.removing(index) })
 ```
 
 Cmd-W and the close button close the window, and Cmd-Q quits, ending the program with exit 0. The
@@ -36,8 +37,8 @@ window's icon, in the Dock and when you Cmd-Tab, is a white check mark on a colo
 
 Exits 1, after saying why, for a command it does not know.
 
-`elements.aipl` is the `Element<M>` type, the text form the window is given them in, and `click`,
-which finds the button an event names and applies its handler; and
+`elements.aipl` is the `Element` type, the text form the window is given them in, and `click`,
+which finds the button an event names and calls its handler; and
 `events.aipl` is what the window tells the program, with the loop that grants requests to close.
 `./aipl check` runs the project's tests; `./aipl build main.aipl` writes the binary. Build it before
 showing the window: `./aipl run` and `--jit` run the program off the main thread, which a window

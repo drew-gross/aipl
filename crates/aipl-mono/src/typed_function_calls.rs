@@ -59,10 +59,28 @@ impl Mono<'_> {
                 || declared
                     .as_ref()
                     .is_some_and(|d| d.get(i).is_some_and(|p| matches!(p, Type::Fn(..))));
-            if !wanted || self.is_function_argument(arg) {
+            if !wanted {
                 continue;
             }
-            // A closure that mutates what it captured is not wrapped: the wrapper would call a copy.
+            // A lambda that mutates what it captured is made once, in a local, and passed as the
+            // value it is.
+            if matches!(arg.kind, TExprKind::Lambda(..)) && matches!(arg.ty, Ty::Fn(_, _, _, true))
+            {
+                *fresh += 1;
+                let local = format!("$fn$eta{fresh}");
+                let ident = TExpr::new(
+                    TExprKind::Ident(local.clone()),
+                    arg.ty.clone(),
+                    arg.span.clone(),
+                );
+                bound.push((local, std::mem::replace(arg, ident)));
+                continue;
+            }
+            if self.is_function_argument(arg) {
+                continue;
+            }
+            // A closure that mutates what it captured is passed as the value it is: a wrapper
+            // would hold a copy of the handle, and the callee is not specialized for it.
             let Ty::Fn(parameter_tys, ret, _, false) = arg.ty.clone() else {
                 continue;
             };
