@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">230 files, 2296 items.</p>
+      <p class="summary">229 files, 2295 items.</p>
 
       <ul class="files">
 
@@ -3644,26 +3644,6 @@
         </li>
 
         <li>
-          <a class="file" href="crates-aipl-codegen-src-lint-zip_with_pair_zip.html">crates/aipl-codegen/src/lint/zip_with_pair_zip.aipl</a>
-
-          <p class="file-summary">The <code>zip_with_pair_zip</code> lint:</p>
-
-
-          <span class="private-count"><a href="crates-aipl-codegen-src-lint-zip_with_pair_zip.html#private">1 private</a></span>
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-codegen-src-lint-zip_with_pair_zip.html#item-zip_with_pair_zip"><code>zip_with_pair_zip</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
           <a class="file" href="crates-aipl-codegen-src-normalize_output.html">crates/aipl-codegen/src/normalize_output.aipl</a>
 
           <p class="file-summary">The cases harness's captured-output normalizer: the test harness calls this through the embedding FFI (see <code>aipl::codegen::normalize_output</code>) to compare a child program's stdout/stderr against the expected sections, and <code>aipl check</code> exercises it via the <code>.test</code> block below. Collapsing CRLF to LF matters on Windows, where libc text-mode stdout rewrites the runtime's <code>\n</code> to <code>\r\n</code>.</p>
@@ -6419,6 +6399,8 @@
 
           <p class="file-summary">The AIPL implementation of the <code>zip</code> builtin. The loader names this function by the canonical name <code>__builtin_zip</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>xs.zip(ys)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
 
+
+          <span class="private-count"><a href="crates-aipl-mono-src-builtin_zip.html#private">2 private</a></span>
 
 
           <ul class="items">

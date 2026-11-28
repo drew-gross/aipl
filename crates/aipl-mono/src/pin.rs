@@ -1300,6 +1300,15 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
                     )
                 })
                 .collect();
+            // A lambda default for a parameter whose type holds a type variable has no types to
+            // check against until a call fixes them, and its own parameters are typed by that
+            // call (`with: (T, U) -> V = |a, b| { (a, b) }`).
+            if matches!(default.kind, ExprKind::Lambda(..))
+                && crate::typing::mentions_typevar(&param.ty)
+            {
+                defaults.push(None);
+                continue;
+            }
             let e = p.expr(default)?;
             if !crate::typing::mentions_typevar(&param.ty) {
                 let what = format!(

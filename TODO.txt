@@ -394,6 +394,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  Braces: a lambda given as a keyword argument needs braces, so it's l.zip(with=|x, y| { x + y }). The unbraced form works positionally but not after with=.
   syntax for required keyword arguments
   syntax for multiple without should be variant CoreKind = ExprKind without (A, B, C) throughout
   let Expr { kind, span } = body; let Construct(name, inits) = kind.as_case::<Construct>()?; ---> support let Expr { kind: Construct(name, inits), span } = body; destructuring
@@ -556,7 +557,6 @@ utilities:
   is_case_and: variant matches case and predicate
   set add operation
   __builtin_drop_* should be mutating methods
-  zip
   int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
   (T, U)[] -> (T[], U[]) function (unzip)
   generic sum function with int bound
@@ -709,6 +709,7 @@ design:
   apis should express intent
 
 optimizations:
+  zip should reuse buffers (somehow). When it was ported to aipl it lost that optimization
   dead code elimination
   dead store elimination
   unused expression elimination

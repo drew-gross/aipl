@@ -3,24 +3,31 @@
 # `xs.zip(ys)` specializes through the ordinary generic machinery — the in-file name
 # is only for this file's own tests, which read exactly like user code.
 #
-# `zip_with` with the pairing function left out: it is the one to reach for when the
-# pairs are what is wanted (to build a dict, to sort, to walk with a destructuring
-# `for`), and `zip_with` when each pair is only going to be combined. A lint steers a
-# `zip_with` whose function just builds the pair here (`zip_with_pair_zip`), and a
-# loop that pairs by index (`push_loop_zip_with`).
+# The pairs are what is wanted by default (to build a dict, to sort, to walk with a
+# destructuring `for`), and `with` says what to make of each pair instead when it is only
+# going to be combined: `xs.zip(ys, with=|x, y| { x + y })`. A lint steers a loop that pairs by
+# index here (`push_loop_zip_with`).
 #
-# The body is a loop rather than a `zip_with` call: the lint on that call would flag
-# the builtin that it advises.
+# The pairing function's default is a lambda, which the call fills in and types from the
+# arrays it is given; its parameters need no types of their own. The body is a loop, so a
+# call with a lambda `with` is specialized for it like any function that takes one.
 
-import { equal as ==, is_empty, push } from builtins;
+import { equal as ==, is_empty, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
-# The elements of both arrays paired up in order, stopping at the shorter one:
-# `[1, 2, 3].zip(["a", "b"])` is `[(1, "a"), (2, "b")]`. Callable as a method.
-pub fn zip<T: any, U: any>(self: T[], other: U[]) -> (T, U)[] {
+# The elements of both arrays combined pairwise by `with`, stopping at the shorter one:
+# `[1, 2, 3].zip(["a", "b"])` is `[(1, "a"), (2, "b")]`, and
+# `[1, 2].zip([10, 20], with=|x, y| { x + y })` is `[11, 22]`. Callable as a method.
+pub fn zip<T: any, U: any, V: any>(
+    self: T[],
+    # The second array; the result stops at the shorter of the two.
+    other: U[],
+    # Called with the elements of both, pairwise. Defaults to making the pair.
+    with: (T, U) -> V = |first, second| { (first, second) },
+) -> V[] {
     mut out = [];
     for (let i, x : self) {
         let some(y) = other[i] else { return out; };
-        set out.push((x, y));
+        set out.push(with(x, y));
     }
     out
 }.test({
@@ -35,4 +42,15 @@ pub fn zip<T: any, U: any>(self: T[], other: U[]) -> (T, U)[] {
     // Reading a pair back out.
     let pairs = [10, 20].zip(["x", "y"]);
     assert(pairs[1] == some((20, "y")));
+
+    // `with` combines each pair: a lambda or a named function.
+    assert([1, 2, 3].zip([10, 20, 30], with=add) == [11, 22, 33]);
+    assert([1, 2, 3].zip([10, 20, 30], with=|x, y| { x * y + y }) == [20, 60, 120]);
+    assert([1, 2, 3].zip([10, 20, 30], with=tagged) == [1011, 1022, 1033]);
+    assert([1, 2, 3, 4].zip([100, 200], with=add) == [101, 202]);
+    assert([1, 2].zip(["x", "y"], with=|n, text| { `{n}{text}` }) == ["1x", "2y"]);
 })
+
+fn add(x: i64, y: i64) -> i64 { x + y }
+
+fn tagged(x: i64, y: i64) -> i64 { x + y + 1000 }

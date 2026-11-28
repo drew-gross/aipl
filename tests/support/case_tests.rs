@@ -1071,7 +1071,6 @@ case_tests! {
     crates_aipl_codegen_src_lint_use_field_projection = "crates/aipl-codegen/src/lint/use_field_projection",
     crates_aipl_codegen_src_lint_value_or_compare = "crates/aipl-codegen/src/lint/value_or_compare",
     crates_aipl_codegen_src_lint_with_value_or_self = "crates/aipl-codegen/src/lint/with_value_or_self",
-    crates_aipl_codegen_src_lint_zip_with_pair_zip = "crates/aipl-codegen/src/lint/zip_with_pair_zip",
     crates_aipl_codegen_src_normalize_output = "crates/aipl-codegen/src/normalize_output",
     crates_aipl_codegen_src_operator_named_forms = "crates/aipl-codegen/src/operator_named_forms",
     crates_aipl_codegen_src_parse = "crates/aipl-codegen/src/parse",

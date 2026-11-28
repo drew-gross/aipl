@@ -1,11 +1,11 @@
-# Like `map`, `zip_with` consumes a *fresh* input (an array literal or call
+# Like `map`, `zip` (with a `with`) consumes a *fresh* input (an array literal or call
 # result) and reuses its buffer for the result instead of allocating a new one.
 # One fresh input is reused regardless of which side it's on; with both fresh,
 # the longer one (only known at runtime) is reused and the shorter freed. The
 # reused array's surplus elements are dropped and its length truncated, so the
 # balanced allocation counters below double as a leak check.
 
-import { equal as ==, map, print, to_str, wrapping_add as +, zip_with } from builtins;
+import { equal as ==, map, print, to_str, wrapping_add as +, zip } from builtins;
 
 fn show(label: str, xs: i64[]) !prints {
     print(label);
@@ -33,26 +33,26 @@ test({
     } {
         // Both fresh, first longer: the first buffer is reused, its surplus
         // elements dropped, and the second input freed.
-        show("a longer", zip_with([1, 2, 3, 4], [10, 20], +));
+        show("a longer", zip([1, 2, 3, 4], [10, 20], with=|x, y| { x + y }));
         // Both fresh, second longer: the second buffer is reused.
-        show("b longer", zip_with([1, 2], [10, 20, 30, 40], +));
+        show("b longer", zip([1, 2], [10, 20, 30, 40], with=|x, y| { x + y }));
         let b = [5, 5, 5];
 
         // Only the first input is fresh: its buffer is reused even when it's the
         // shorter side (the borrowed one is only indexed).
-        show("a fresh", zip_with([1, 2], b, +));
+        show("a fresh", zip([1, 2], b, with=|x, y| { x + y }));
         // Only the second input is fresh: reused, truncated from 4 to len(b).
-        show("b fresh", zip_with(b, [100, 200, 300, 400], +));
+        show("b fresh", zip(b, [100, 200, 300, 400], with=|x, y| { x + y }));
         // A call result is as fresh as a literal.
-        show("call result", zip_with(b.map(|x| x + 1), [10, 10, 10], +));
+        show("call result", zip(b.map(|x| x + 1), [10, 10, 10], with=|x, y| { x + y }));
 
         // The result type may differ from the reused element type (each slot's
         // element drop-fn is patched as it's overwritten): i64 slots, str results.
-        show_strs("strs", zip_with([1, 2, 3], [4, 5, 6], |x, y| to_str(x + y)));
+        show_strs("strs", zip([1, 2, 3], [4, 5, 6], with=|x, y| { to_str(x + y) }));
 
         // Heap elements: the overwritten slots and the dropped tail ("c") are
         // released exactly once.
-        show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| `{s}{t}`));
+        show_strs("concat", zip(["a", "b", "c"], ["x", "y"], with=|s, t| { `{s}{t}` }));
     };
     assert(out == """
         a longer

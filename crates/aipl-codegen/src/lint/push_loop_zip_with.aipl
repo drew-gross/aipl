@@ -40,7 +40,7 @@ import {
     logical_or as ||,
     not_equal as !=,
 } from builtins;
-import { Push, Zip, ZipWith } from "../builtin_table.aipl";
+import { Push, Zip } from "../builtin_table.aipl";
 import { ArrayLit, Expr, Ident, IfLet, Index, TupleLit, Unit, is_ident } from "../expr.aipl";
 import { Function } from "../item.aipl";
 import { Ctor } from "../pat.aipl";
@@ -65,12 +65,12 @@ pub fn push_loop_zip_with(Function { body }) -> LintHit[] {
         `mut out = []; for (let i, x : xs) \{ if (let some(y) = ys[i]) \{ set out.push({pushed}); }; } out`
     }
 
-    // A derived value is a `zip_with`; the pair itself is a `zip`.
+    // A derived value is a `zip` with a `with`; the pair itself is a `zip`.
     assert(lint_function_unfilled(
         `fn f(xs: i64[], ys: i64[]) -> i64[] \{ {pairing("x * y")} }`,
         push_loop_zip_with,
     )?.shown() == [
-        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(ZipWith)(ys, |x, y| ..);" and drop the loop`,
+        `"out" is seeded empty and filled by this loop and nothing else — write "mut out = xs.Builtin(Zip)(ys, with=|x, y| \{ .. \});" and drop the loop`,
     ]);
     assert(lint_function_unfilled(
         `fn f(xs: i64[], ys: i64[]) -> i64[] \{ {pairing("(x, y)")} }`,
@@ -181,7 +181,7 @@ fn zip_hit(self: SeededLoop) -> LintHit? {
     let stage = if (added.is_pair_of(self.variable, partner)) {
         (Zip, `({other})`)
     } else {
-        (ZipWith, `({other}, |{self.variable}, {partner}| ..)`)
+        (Zip, `({other}, with=|{self.variable}, {partner}| \{ .. })`)
     };
     some(self.pipeline_hit("filled by this loop and nothing else", "", [stage]))
 }

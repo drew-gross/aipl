@@ -15,7 +15,7 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
-    zip_with,
+    zip,
 } from builtins;
 
 # One element of a simple array pattern, and where it was written: a binder name (`_`
@@ -159,7 +159,7 @@ pub fn show_pat(self: Pat) -> str {
         Tuple(ps) => `({show_pats(ps)})`,
         Nested(name, args) => `{name}({show_pats(args)})`,
         Int(n) => `{n}`,
-        Struct(name, fields, names) => `{name} \{ {zip_with(fields, names, show_field_binder).join(sep=", ")} }`,
+        Struct(name, fields, names) => `{name} \{ {zip(fields, names, with=show_field_binder).join(sep=", ")} }`,
     }
 }.test({
     assert(Wildcard.show_pat() == "_");
@@ -216,7 +216,7 @@ pub fn pat_text(self: Pat) -> str {
         Tuple(ps) => `({ps$pat_text().join(sep=", ")})`,
         Nested(name, args) => `{name}({args$pat_text().join(sep=", ")})`,
         Int(n) => `{n}`,
-        Struct(name, fields, names) => `{name} \{ {zip_with(fields, names, show_field_binder).join(sep=", ")} }`,
+        Struct(name, fields, names) => `{name} \{ {zip(fields, names, with=show_field_binder).join(sep=", ")} }`,
     }
 }.test({
     assert(Wildcard.pat_text() == "_");

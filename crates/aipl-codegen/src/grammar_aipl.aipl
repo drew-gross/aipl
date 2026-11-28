@@ -103,7 +103,7 @@ import {
     wrapping_decrement as --,
     wrapping_increment as ++,
     wrapping_sub as -,
-    zip_with,
+    zip,
 } from builtins;
 import {
     Arms as AArms,
@@ -2092,7 +2092,7 @@ fn template_slots(toks: str[]) -> str[] {
 
 # The concat chain a template lowers to. A template alternates segments and
 # interpolations and always begins and ends with a segment, so there is exactly
-# one more segment than interpolation: `zip_with` pairs each interpolation with
+# one more segment than interpolation: `zip` pairs each interpolation with
 # the segment in front of it (stopping at the shorter side, which is `exprs`),
 # and the one segment left over is the tail the fold starts from.
 #
@@ -2101,7 +2101,7 @@ fn template_slots(toks: str[]) -> str[] {
 # the concat chain has to agree with it.
 fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {
     let tail = at(Str(segs[exprs.len()].value_or("")), sp);
-    let pieces = zip_with(segs, exprs, |s: str, e: Expr| interpolation_piece(s, e, sp));
+    let pieces = zip(segs, exprs, with=|s: str, e: Expr| { interpolation_piece(s, e, sp) });
     pieces.right_fold(tail, concat_call)
 }
 

@@ -552,7 +552,7 @@ pub(crate) fn collect_body_binders<'a, T: TyRepr>(e: &'a TExpr<T>, sink: &mut dy
 }
 
 /// Whether `e` (or any sub-expression) calls an in-place higher-order intrinsic: one of the calls
-/// the monomorphizer synthesizes for the loop bodies of `map`, `filter` and `zip_with`.
+/// the monomorphizer synthesizes for the loop bodies of `map`, `filter` and `filter_map`.
 pub(crate) fn contains_inplace_hof_intrinsic<T: TyRepr>(e: &TExpr<T>) -> bool {
     if let TExprKind::Call { callee, .. } = &e.kind {
         if matches!(

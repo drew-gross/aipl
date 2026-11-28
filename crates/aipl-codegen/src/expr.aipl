@@ -20,7 +20,7 @@ import {
     not_equal as !=,
     push,
     value_or,
-    zip_with,
+    zip,
 } from builtins;
 import { Callee, Local, Unresolved } from "./builtin_table.aipl";
 import { Ctor, Pat, Wildcard, pat_bindings, show_pat } from "./pat.aipl";
@@ -593,10 +593,12 @@ pub fn show_binding(self: Binding) -> str {
         ByTuple(names) => `({names.join(sep=", ")})`,
         ByCase(case_name, names) => `{case_name}({names.join(sep=", ")})`,
         ByStruct(struct_name, fields, names, mutable) => {
-            let reads = zip_with(
+            let reads = zip(
                 fields,
                 names,
-                |field: str, name: str| if (field == name) { name } else { `{field} as {name}` },
+                with=|field: str, name: str| {
+                    if (field == name) { name } else { `{field} as {name}` }
+                },
             );
             `{if (mutable) { "mut " } else { "" }}{struct_name} \{ {reads.join(sep=", ")} }`
         },

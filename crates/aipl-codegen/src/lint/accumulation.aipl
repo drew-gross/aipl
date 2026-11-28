@@ -34,7 +34,7 @@ import {
     map,
     not_equal as !=,
     value_or,
-    zip_with,
+    zip,
 } from builtins;
 import { Callee, Extend, Filter, Map, Push } from "../builtin_table.aipl";
 import {
@@ -356,10 +356,10 @@ pub fn pipeline_hit(
     let opening = `{lead}write "mut {self.name}{annotation} = {receiver}.`;
     let separators = stages.drop_last()$1.map(|arguments| `{arguments}.`);
     LintHit {
-        named: zip_with(
+        named: zip(
             [opening, ..separators],
             stages,
-            |text: str, stage: (Callee, str)| Named { text, builtin: Builtin(stage.0) },
+            with=|text: str, stage: (Callee, str)| { Named { text, builtin: Builtin(stage.0) } },
         ),
         tail: `{stages.last()$1.value_or("")};" and drop the loop`,
         span: self.seed.span,

@@ -100,7 +100,7 @@ code that produces them and run in-process with the file's other tests. A lint o
   returns the hits as the lint made them; `lint_with_messages` writes each builtin as its own name
   with no import named. A lint's tests are about the shape it
   finds, never about the file's imports (aliasing and the import hint are the framework's, tested in
-  `lint_hit.aipl` and `spelling.aipl`), so a test needs no `import` line. See `zip_with_pair_zip.aipl`.
+  `lint_hit.aipl` and `spelling.aipl`), so a test needs no `import` line. See `len_gt_zero.aipl`.
 - **Not flagged:** `assert(driver("fn f(..) {..}", lint_fn)? == [])` for every near-miss, each with a comment
   saying *why* it must be left alone. These are most of a lint's tests; write the near-misses first.
 - **`#[allow]` and the rewrite agree:** helper functions declared in the test block, the longhand carrying

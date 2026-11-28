@@ -20,7 +20,7 @@ import {
     map,
     not_equal as !=,
     value_or,
-    zip_with,
+    zip,
 } from builtins;
 import {
     Any,
@@ -135,10 +135,10 @@ pub fn at(self: LintHit, span: Span) -> LintHit {
 pub fn filled_with(self: LintHit, spell: (Need) -> Spelling?) -> FilledHit? {
     let spellings = self.named.map(|part| spell(part.builtin)).collect_ok();
     if (spellings.len() != self.named.len()) { return none; };
-    let text = zip_with(
+    let text = zip(
         self.named,
         spellings,
-        |part: Named, spelling: Spelling| { `{part.text}{spelling.text}` },
+        with=|part: Named, spelling: Spelling| { `{part.text}{spelling.text}` },
     ).join();
     let requests = spellings$request.collect_ok().distinct();
     let libraries = requests$library.distinct();

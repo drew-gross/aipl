@@ -132,7 +132,6 @@ pub enum Callee {
     RightFold,
     OptLeftFold,
     OptRightFold,
-    ZipWith,
     Zip,
     Trim,
     /// The `*_str` family: the content of the argument in one **named** runtime
@@ -534,7 +533,6 @@ impl Callee {
         Callee::RightFold,
         Callee::OptLeftFold,
         Callee::OptRightFold,
-        Callee::ZipWith,
         Callee::Zip,
         Callee::Trim,
         Callee::HeapStr,
@@ -785,7 +783,6 @@ impl Callee {
             Callee::RightFold => "__builtin_right_fold",
             Callee::OptLeftFold => "__builtin_opt_left_fold",
             Callee::OptRightFold => "__builtin_opt_right_fold",
-            Callee::ZipWith => "__builtin_zip_with",
             Callee::Zip => "__builtin_zip",
             Callee::Trim => "__builtin_trim",
             Callee::HeapStr => "__builtin_heap_str",

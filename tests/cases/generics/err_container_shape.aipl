@@ -11,7 +11,7 @@
 # constructor and nothing under it, so the specific messages the later passes
 # give for nested shapes — `join`'s "an array of arrays" — still get their say.
 
-import { len, map, print, to_str, wrapping_add as +, zip_with } from builtins;
+import { len, map, print, to_str, wrapping_add as +, zip } from builtins;
 
 struct P { x: i64 }
 
@@ -36,7 +36,7 @@ fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
 // The receiver is fine and a later *argument* is not. That one is reported by
 // position, because only the receiver has a spelling a reader wrote — `a.f(b)`
 // and `f(a, b)` are one AST, so there is no call form to read back.
-fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }
+fn bad_arg(xs: i64[]) -> i64[] { xs.zip(5, with=|a, b| { a + b }) }
 
 fn subject() !prints {
     print(to_str(scalar().len()));
@@ -66,8 +66,8 @@ error: fn "an_optional": body returns i64?, but the declared return type is i64[
 34 | fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
    |                                    ^^^^^^^^^^^^^^^^
 
-error: fn "zip_with" arg 1: expected _[], got i64
-  --> ./tests/cases/generics/err_container_shape.aipl:39:46
+error: fn "zip" arg 1: expected _[], got i64
+  --> ./tests/cases/generics/err_container_shape.aipl:39:41
    |
-39 | fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }
-   |                                              ^
+39 | fn bad_arg(xs: i64[]) -> i64[] { xs.zip(5, with=|a, b| { a + b }) }
+   |                                         ^

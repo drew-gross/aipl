@@ -1,4 +1,4 @@
-import { equal as ==, print, zip_with } from builtins;
+import { equal as ==, print, zip } from builtins;
 
 fn show_strs(label: str, xs: str[]) !prints {
     print(label);
@@ -17,7 +17,7 @@ test({
             set out = `{out}{text}`;
         },
     } {
-        show_strs("concat", zip_with(["a", "b", "c"], ["x", "y"], |s, t| `{s}{t}`));
+        show_strs("concat", zip(["a", "b", "c"], ["x", "y"], with=|s, t| { `{s}{t}` }));
     };
     assert(out == """
         concat

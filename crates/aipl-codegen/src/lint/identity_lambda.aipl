@@ -24,7 +24,7 @@ import {
     logical_or as ||,
     map,
     not_equal as !=,
-    zip_with,
+    zip,
 } from builtins;
 import {
     Call,
@@ -106,12 +106,12 @@ fn forwarded(self: Expr<Lambda>, advised: Span[]) -> LintHit? {
     )) {
         return none;
     };
-    let forwards = zip_with(
+    let forwards = zip(
         arguments,
         parameters,
-        |argument: Expr, parameter: LambdaParam| argument.kind.is_ident(
-            parameter.synthesized_name(),
-        ),
+        with=|argument: Expr, parameter: LambdaParam| {
+            argument.kind.is_ident(parameter.synthesized_name())
+        },
     );
     if (!forwards.all(|same| same)) { return none; };
     some(lint_message(

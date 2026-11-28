@@ -85,7 +85,6 @@ variant Callee =
     | RightFold
     | OptLeftFold
     | OptRightFold
-    | ZipWith
     | Zip
     | Trim
     | HeapStr
@@ -600,7 +599,6 @@ pub fn builtin_table() -> BuiltinEntry[] {
             callee: "__builtin_opt_right_fold",
             definition: Written("builtin_opt_right_fold.aipl"),
         },
-        BuiltinEntry { arm: ZipWith, callee: "__builtin_zip_with", definition: Declared },
         BuiltinEntry { arm: Zip, callee: "__builtin_zip", definition: Written("builtin_zip.aipl") },
         BuiltinEntry { arm: Trim, callee: "__builtin_trim", definition: Declared },
         BuiltinEntry { arm: HeapStr, callee: "__builtin_heap_str", definition: Declared },

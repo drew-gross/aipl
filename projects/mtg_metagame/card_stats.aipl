@@ -10,7 +10,7 @@ import {
     try_set,
     value_or,
     wrapping_add as +,
-    zip_with,
+    zip,
 } from builtins;
 import { Counted, ranked } from "./counted.aipl";
 import { Card, Deck, all_cards } from "./metagame.aipl";
@@ -33,7 +33,7 @@ pub fn card_counts(decks: Deck[]) -> Counted[] {
             set totals.try_set(i, totals[i].value_or(0) + card.count);
         };
     }
-    names.zip_with(totals, |name, count| { Counted { name, count } }).ranked()
+    names.zip(totals, with=|name, count| { Counted { name, count } }).ranked()
 }.test({
     let deck = |main: Card[], side: Card[]| {
         Deck { deck_id: "", maindeck: main, sideboard: side }

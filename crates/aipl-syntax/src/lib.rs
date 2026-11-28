@@ -3757,14 +3757,6 @@ fn __builtin_try_set<T: any>(
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature: the loader
 // loads each as a file of any program that reaches it. See `aipl_builtins`.
-# `f` applied to the elements of both arrays pairwise, stopping at the shorter one.
-fn __builtin_zip_with<T: any, U: any, V: any>(
-    self: T[],
-    # The second array; the result stops at the shorter of the two.
-    other: U[],
-    # Called with the elements of both, pairwise.
-    f: (T, U) -> V,
-) -> V[] { [] }
 # Add `x` at the end of `self`. `set xs.push(x);` appends in place; as an expression it is the extended copy.
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 # Append `other` to `self` — `push` for a whole array, and the way to grow a

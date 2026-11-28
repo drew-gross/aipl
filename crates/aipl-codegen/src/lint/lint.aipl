@@ -91,7 +91,6 @@ import { unused_imports } from "./unused_imports.aipl";
 import { use_field_projection } from "./use_field_projection.aipl";
 import { value_or_compare } from "./value_or_compare.aipl";
 import { with_value_or_self } from "./with_value_or_self.aipl";
-import { zip_with_pair_zip } from "./zip_with_pair_zip.aipl";
 
 # Every lint of one function, under the name of its file, in the order its hits are reported. A lint
 # of one kind of node is run over each node of that kind in a function's body; one that finds at
@@ -147,7 +146,6 @@ pub fn all_lints() -> Lint[] {
         Lint { name: "value_or_compare", run: OfCall(|call| [..value_or_compare(call)]) },
         Lint { name: "map_constant_repeat", run: OfCall(|call| [..map_constant_repeat(call)]) },
         Lint { name: "map_find_if_some", run: OfCall(|call| [..map_find_if_some(call)]) },
-        Lint { name: "zip_with_pair_zip", run: OfCall(|call| [..zip_with_pair_zip(call)]) },
         Lint { name: "with_value_or_self", run: OfCall(|call| [..with_value_or_self(call)]) },
         Lint { name: "case_of_equal_is_case", run: OfCall(|call| [..case_of_equal_is_case(call)]) },
         Lint { name: "len_gt_zero", run: OfCall(|call| [..len_gt_zero(call)]) },

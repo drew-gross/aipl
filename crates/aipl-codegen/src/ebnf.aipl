@@ -62,7 +62,7 @@ import {
     try_map,
     value_or,
     value_or_err,
-    zip_with,
+    zip,
 } from builtins;
 import {
     Climb,
@@ -682,7 +682,9 @@ pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
     // One set per production, in production order — `first_sets` and
     // `prod_names` both map over `g.prods` — so the two zip.
     let sets = first_sets(g)?;
-    ok(zip_with(prod_names(g), sets, |n: str, f: First<K>| `{n} = {f.show_first()}`).join(sep="\n"))
+    ok(zip(prod_names(g), sets, with=|n: str, f: First<K>| { `{n} = {f.show_first()}` }).join(
+        sep="\n",
+    ))
 }.test({
     // The fixture grammar, dumped both ways. Between them the two dumps say
     // everything this file computes, over every `Rule` arm the grammar uses.

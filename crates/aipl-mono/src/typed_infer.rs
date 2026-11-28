@@ -1331,7 +1331,7 @@ impl Mono<'_> {
         if matches!(
             &e.kind,
             TExprKind::Call {
-                callee: Callee::Map | Callee::Filter | Callee::FilterMap | Callee::ZipWith,
+                callee: Callee::Map | Callee::Filter | Callee::FilterMap,
                 ..
             }
         ) {
@@ -1755,7 +1755,6 @@ fn is_expanded(callee: &Callee) -> bool {
         Callee::Map
             | Callee::Filter
             | Callee::FilterMap
-            | Callee::ZipWith
             | Callee::ToArray
             | Callee::WithOrSelf
             | Callee::Any

@@ -24,7 +24,7 @@ import {
     saturating_sub as -,
     wrapping_add as +,
     wrapping_mul as *,
-    zip_with,
+    zip,
 } from builtins;
 
 # The line of `fill` over each column, joined by `+`.
@@ -48,7 +48,7 @@ struct Column { header: str, side: Direction = Right }
 # there are `(width, side)` pairs is cut off at the last pair.
 fn cells_line(self: str[], layout: (u64, Direction)[]) -> str {
     self
-        .zip_with(layout, |text, (width, side)| { ` {text.pad(width, dir=side)} ` })
+        .zip(layout, with=|text, (width, side)| { ` {text.pad(width, dir=side)} ` })
         .join(sep="|", leading_sep=true, trailing_sep=true)
 }.test({
     let layout = [(3, Right), (2, Left)];
@@ -82,9 +82,9 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str {
     // A column is as wide as its widest cell, its header included.
     let widths = cells.left_fold(
         headers$len(),
-        |widths, row| { widths.zip_with(row, |width, cell| max(width, cell.len())) },
+        |widths, row| { widths.zip(row, with=|width, cell| { max(width, cell.len()) }) },
     );
-    let layout = widths.zip_with(columns, |width, column| (width, column.side));
+    let layout = widths.zip(columns, with=|width, column| { (width, column.side) });
     [
         rule(widths, "-"),
         headers.cells_line(layout),
@@ -149,8 +149,8 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str {
 
     // Allocations are exact: the headers, widths, layout, the three rules, the header line and the joined text are the fixed
     // part, and each row adds its padded copy and its line, so a temporary array optimized away shows up here.
-    assert(two.allocations == 48);
-    assert(eight.allocations == 139);
+    assert(two.allocations == 56);
+    assert(eight.allocations == 159);
 
     // Four times the rows costs under three times the instructions: the fixed part is shared and
     // nothing in a row's line depends on the number of rows.

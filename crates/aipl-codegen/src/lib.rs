@@ -2079,7 +2079,6 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./lint/map_find_if_some.aipl",
     "./lint/map_constant_repeat.aipl",
     "./lint/with_value_or_self.aipl",
-    "./lint/zip_with_pair_zip.aipl",
     "./lint/push_loop_zip_with.aipl",
     "./lint/push_loop_pipeline.aipl",
     "./lint/expr_text.aipl",
@@ -20285,7 +20284,7 @@ fn compile_call_expr_direct<M: Module>(
             }
         }
         Callee::ArrWritable => {
-            // Internal (in-place `map`/`filter`/`zip_with`): the moved-in array
+            // Internal (in-place `map`/`filter`): the moved-in array
             // parameter as a block the body may write element slots into. The
             // in-place bodies overwrite slots with plain stores (`__map_set`,
             // `__filter_keep`), which no runtime guard protects, so the block

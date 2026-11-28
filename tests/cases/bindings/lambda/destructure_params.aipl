@@ -2,7 +2,7 @@
 # same patterns a function's parameter or a `let` takes: a struct, a case, a tuple.
 # The names are bound at the top of the body, so they read like any other.
 
-import { collect_arms, equal as ==, map, print, wrapping_add as +, zip_with } from builtins;
+import { collect_arms, equal as ==, map, print, wrapping_add as +, zip } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -33,7 +33,7 @@ test({
         print(`{shapes.collect_arms::<Dot>().map(|Dot(Point { x, y })| x + y)}`);
 
         // Beside a typed parameter, in a two-parameter lambda.
-        print(`{zip_with(points, [10, 20], |Point { x, y }, n: i64| x + y + n)}`);
+        print(`{zip(points, [10, 20], with=|Point { x, y }, n: i64| { x + y + n })}`);
     };
     assert(out == """
         [3, 7]

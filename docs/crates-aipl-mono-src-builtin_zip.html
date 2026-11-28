@@ -14,7 +14,7 @@
 
       <h1><code>crates/aipl-mono/src/builtin_zip.aipl</code></h1>
 
-      <div class="module-doc"><p>The AIPL implementation of the <code>zip</code> builtin. The loader names this function by the canonical name <code>__builtin_zip</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>xs.zip(ys)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p><code>zip_with</code> with the pairing function left out: it is the one to reach for when the pairs are what is wanted (to build a dict, to sort, to walk with a destructuring <code>for</code>), and <code>zip_with</code> when each pair is only going to be combined. A lint steers a <code>zip_with</code> whose function just builds the pair here (<code>zip_with_pair_zip</code>), and a loop that pairs by index (<code>push_loop_zip_with</code>).</p><p>The body is a loop rather than a <code>zip_with</code> call: the lint on that call would flag the builtin that it advises.</p></div>
+      <div class="module-doc"><p>The AIPL implementation of the <code>zip</code> builtin. The loader names this function by the canonical name <code>__builtin_zip</code> (see <code>aipl_syntax::builtin</code>), so a user's <code>xs.zip(ys)</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>The pairs are what is wanted by default (to build a dict, to sort, to walk with a destructuring <code>for</code>), and <code>with</code> says what to make of each pair instead when it is only going to be combined: <code>xs.zip(ys, with=|x, y| { x + y })</code>. A lint steers a loop that pairs by index here (<code>push_loop_zip_with</code>).</p><p>The pairing function's default is a lambda, which the call fills in and types from the arrays it is given; its parameters need no types of their own. The body is a loop, so a call with a lambda <code>with</code> is specialized for it like any function that takes one.</p></div>
 
 
 
@@ -27,10 +27,30 @@
             <a class="anchor" href="#item-zip">zip</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn zip&#60;T: any, U: any&#62;(self: T[], other: U[]) -&#62; (T, U)[]</code></pre>
+          <pre class="signature"><code>pub fn zip&#60;T: any, U: any, V: any&#62;(self: T[], other: U[], with: (T, U) -&#62; V = |first, second| { (first, second) }) -&#62; V[]</code></pre>
 
-          <div class="doc"><p>The elements of both arrays paired up in order, stopping at the shorter one: <code>[1, 2, 3].zip([&quot;a&quot;, &quot;b&quot;])</code> is <code>[(1, &quot;a&quot;), (2, &quot;b&quot;)]</code>. Callable as a method.</p></div>
+          <div class="doc"><p>The elements of both arrays combined pairwise by <code>with</code>, stopping at the shorter one: <code>[1, 2, 3].zip([&quot;a&quot;, &quot;b&quot;])</code> is <code>[(1, &quot;a&quot;), (2, &quot;b&quot;)]</code>, and <code>[1, 2].zip([10, 20], with=|x, y| { x + y })</code> is <code>[11, 22]</code>. Callable as a method.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>other: U[]</code>
+
+              <div class="doc"><p>The second array; the result stops at the shorter of the two.</p></div>
+
+            </li>
+
+            <li><code>with: (T, U) -&#62; V = |first, second| { (first, second) }</code>
+
+              <div class="doc"><p>Called with the elements of both, pairwise. Defaults to making the pair.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -38,6 +58,42 @@
 
       </section>
 
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-add">
+          <h3>
+            <a class="anchor" href="#item-add">add</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn add(x: i64, y: i64) -&#62; i64</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tagged">
+          <h3>
+            <a class="anchor" href="#item-tagged">tagged</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tagged(x: i64, y: i64) -&#62; i64</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+
+        </section>
+
+
+      </section>
 
 
     </main>

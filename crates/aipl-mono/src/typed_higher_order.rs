@@ -1,5 +1,5 @@
 //! Functions that take functions, typed from the pinned program: a lambda lifted to a function of
-//! its own, the loops `map`, `filter`, `filter_map` and `zip_with` are expanded into, and the loops
+//! its own, the loops `map`, `filter` and `filter_map` are expanded into, and the loops
 //! a `for` with a position, over a dict or over a range stands for.
 
 use aipl_syntax::ast::{Arity, Callee, ConcreteType, Primitive, Type};
@@ -272,8 +272,8 @@ fn output_start(element: &ConcreteType, count: impl FnOnce() -> Typed, span: &Sp
 
 impl Mono<'_> {
     /// Whether a call is one of the expansions made from the typed tree: `map`, `filter` and
-    /// `filter_map` over an array (`map` also over an optional or a range) and `zip_with` over two
-    /// arrays, each given lambdas or function names of the parameters they take.
+    /// `filter_map` over an array (`map` also over an optional or a range), each given lambdas or
+    /// function names of the parameters they take.
     pub(crate) fn is_typed_expansion(
         &self,
         callee: &Callee,
@@ -303,7 +303,6 @@ impl Mono<'_> {
             (Callee::FilterMap, [r, p, f]) => {
                 receiver(r, false) && one_parameter(p) && one_parameter(f)
             }
-            (Callee::ZipWith, [a, b, f]) => receiver(a, false) && receiver(b, false) && takes(f, 2),
             _ => false,
         }
     }
@@ -679,11 +678,6 @@ impl Mono<'_> {
         match callee {
             Callee::Map => self.lower_map(receiver, args.remove(0), span),
             Callee::Filter => self.lower_filter(receiver, args.remove(0), span),
-            Callee::ZipWith => {
-                let mut second = args.remove(0);
-                self.lower_in_place(&mut second);
-                self.lower_zip_with(receiver, second, args.remove(0), span)
-            }
             _ => {
                 let predicate = args.remove(0);
                 self.lower_filter_map(receiver, predicate, args.remove(0), span)
@@ -1016,221 +1010,5 @@ impl Mono<'_> {
         };
         let owned: &[usize] = if in_place { &[0] } else { &[] };
         self.call_synthesized("filter_map", expansion, result_ty, body, owned)
-    }
-
-    /// `a.zip_with(b, f)` as a call to a synthesized function that pairs the elements by position
-    /// and applies `f`, up to the shorter input. A fresh input is moved in and its buffer reused
-    /// for the result; with both fresh, the longer one is reused and the other released.
-    fn lower_zip_with(&mut self, a: Typed, b: Typed, f: Typed, span: Span) -> Typed {
-        let (ty_a, ty_b) = (a.ty.clone(), b.ty.clone());
-        let (ConcreteType::Array(elem_a), ConcreteType::Array(elem_b)) = (&ty_a, &ty_b) else {
-            unreachable!("a typed zip_with is given arrays");
-        };
-        let (elem_a, elem_b) = ((**elem_a).clone(), (**elem_b).clone());
-        let fresh =
-            |t: &Typed| crate::is_heap(&t.ty.to_type()) && crate::typed_infer::fresh_tail(t);
-        let (fresh_a, fresh_b) = (fresh(&a), fresh(&b));
-        let Lifted {
-            name: function,
-            ret: r,
-            captures,
-        } = self.lifted_argument(f);
-        let own_a = fresh_a
-            && self.reusable(&elem_a)
-            && self.reusable(&r)
-            && crate::slot_fits(&elem_a.to_type(), &r.to_type());
-        let own_b = fresh_b
-            && self.reusable(&elem_b)
-            && self.reusable(&r)
-            && crate::slot_fits(&elem_b.to_type(), &r.to_type());
-        let mut expansion = Expansion {
-            span: span.clone(),
-            params: vec![parameter("$a", &ty_a), parameter("$b", &ty_b)],
-            call_args: vec![a, b],
-        };
-        // `f($e, $v, captures..)`: `$e` is always the element of `a` and `$v` the element of `b`,
-        // whichever of the two the loop walks.
-        let mut function_args = vec![ident("$e", &elem_a, &span), ident("$v", &elem_b, &span)];
-        function_args.extend(self.thread_typed_captures(&captures, &mut expansion));
-        let applied = call(Callee::resolve(function), function_args, r.clone(), &span);
-        let result_ty = array_of(&r);
-        let i64_ty = primitive(Primitive::I64);
-        let some_none = |some_body: Typed, binder: &str, none_body: Typed, scrutinee: Typed| {
-            let arm = |pattern, body| TMatchArm {
-                pattern,
-                body,
-                span: span.clone(),
-            };
-            node(
-                TExprKind::Match(
-                    Box::new(scrutinee),
-                    vec![
-                        arm(
-                            TPattern::Ctor {
-                                name: "some".to_string(),
-                                bindings: vec![binder.to_string()],
-                                ignore_payload: false,
-                            },
-                            some_body,
-                        ),
-                        arm(
-                            TPattern::Ctor {
-                                name: "none".to_string(),
-                                bindings: Vec::new(),
-                                ignore_payload: false,
-                            },
-                            none_body,
-                        ),
-                    ],
-                ),
-                ConcreteType::Unit,
-                &span,
-            )
-        };
-        // The element of `other` at `$i`, if it has one.
-        let indexed = |other: &str, other_ty: &ConcreteType, other_elem: &ConcreteType| {
-            node(
-                TExprKind::Index(
-                    Box::new(ident(other, other_ty, &span)),
-                    Box::new(ident("$i", &i64_ty, &span)),
-                ),
-                ConcreteType::Optional(Box::new(other_elem.clone())),
-                &span,
-            )
-        };
-        // The loop over the reused input: each slot is read before it is overwritten, and the other
-        // input is indexed, so the shorter-input cutoff works from either side.
-        let in_place_body = |reuse_a: bool, drop_other: bool, applied: Typed| -> Typed {
-            let (reused, other, reused_el, other_el) = if reuse_a {
-                ("$a", "$b", "$e", "$v")
-            } else {
-                ("$b", "$a", "$v", "$e")
-            };
-            let (reused_ty, other_ty, reused_elem, other_elem) = if reuse_a {
-                (&ty_a, &ty_b, &elem_a, &elem_b)
-            } else {
-                (&ty_b, &ty_a, &elem_b, &elem_a)
-            };
-            let z = || ident("$z", reused_ty, &span);
-            let map_set = call(
-                Callee::MapSet,
-                vec![
-                    z(),
-                    ident("$i", &i64_ty, &span),
-                    applied,
-                    ident(reused_el, reused_elem, &span),
-                ],
-                ConcreteType::Unit,
-                &span,
-            );
-            let some_body = seq(map_set, increment("$w", &span), &span);
-            let none_body = call(
-                Callee::FilterDrop,
-                vec![ident(reused_el, reused_elem, &span)],
-                ConcreteType::Unit,
-                &span,
-            );
-            let matched = some_none(
-                some_body,
-                other_el,
-                none_body,
-                indexed(other, other_ty, other_elem),
-            );
-            let for_body = seq(matched, increment("$i", &span), &span);
-            let looped = for_each(reused_el, z(), for_body, &span);
-            let truncate = call(
-                Callee::FilterTruncate,
-                vec![z(), ident("$w", &i64_ty, &span)],
-                ConcreteType::Unit,
-                &span,
-            );
-            let result = call(Callee::MapResult, vec![z()], result_ty.clone(), &span);
-            let mut after = seq(truncate, result, &span);
-            if drop_other {
-                // Both inputs were moved in: release the one not reused, whose elements `f` only
-                // borrowed.
-                let release = call(
-                    Callee::FilterDrop,
-                    vec![ident(other, other_ty, &span)],
-                    ConcreteType::Unit,
-                    &span,
-                );
-                after = seq(release, after, &span);
-            }
-            let counted = let_mut(
-                "$i",
-                node(TExprKind::Int(0), i64_ty.clone(), &span),
-                let_mut(
-                    "$w",
-                    node(TExprKind::Int(0), i64_ty.clone(), &span),
-                    seq(looped, after, &span),
-                    &span,
-                ),
-                &span,
-            );
-            let_mut(
-                "$z",
-                call(
-                    Callee::ArrWritable,
-                    vec![ident(reused, reused_ty, &span)],
-                    reused_ty.clone(),
-                    &span,
-                ),
-                counted,
-                &span,
-            )
-        };
-        let body = if own_a && own_b {
-            let len_of = |n: &str, t: &ConcreteType| {
-                call(
-                    Callee::Len,
-                    vec![ident(n, t, &span)],
-                    primitive(Primitive::U64),
-                    &span,
-                )
-            };
-            let condition = call(
-                Callee::LessThan,
-                vec![len_of("$a", &ty_a), len_of("$b", &ty_b)],
-                primitive(Primitive::Bool),
-                &span,
-            );
-            node(
-                TExprKind::If(
-                    Box::new(condition),
-                    Box::new(in_place_body(false, true, applied.clone())),
-                    Box::new(in_place_body(true, true, applied)),
-                ),
-                result_ty.clone(),
-                &span,
-            )
-        } else if own_a {
-            in_place_body(true, false, applied)
-        } else if own_b {
-            in_place_body(false, false, applied)
-        } else {
-            let push = set_push("$out", &result_ty, applied, &span);
-            let matched = some_none(push, "$v", unit(&span), indexed("$b", &ty_b, &elem_b));
-            let for_body = seq(matched, increment("$i", &span), &span);
-            let looped = for_each("$e", ident("$a", &ty_a, &span), for_body, &span);
-            let counted = let_mut(
-                "$i",
-                node(TExprKind::Int(0), i64_ty.clone(), &span),
-                seq(looped, ident("$out", &result_ty, &span), &span),
-                &span,
-            );
-            let_mut(
-                "$out",
-                node(TExprKind::ArrayLit(Vec::new()), result_ty.clone(), &span),
-                counted,
-                &span,
-            )
-        };
-        let owned: Vec<usize> = [(own_a, 0), (own_b, 1)]
-            .iter()
-            .filter(|(own, _)| *own)
-            .map(|&(_, i)| i)
-            .collect();
-        self.call_synthesized("zip", expansion, result_ty, body, &owned)
     }
 }

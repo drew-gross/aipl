@@ -49,10 +49,7 @@ impl Mono<'_> {
             return;
         };
         let declared = self.declared_parameters(callee.name());
-        let native = matches!(
-            callee,
-            Callee::Map | Callee::Filter | Callee::FilterMap | Callee::ZipWith
-        );
+        let native = matches!(callee, Callee::Map | Callee::Filter | Callee::FilterMap);
         let mut bound: Vec<(String, TExpr<Ty>)> = Vec::new();
         for (i, arg) in args.iter_mut().enumerate() {
             let wanted = native
@@ -164,10 +161,8 @@ impl Mono<'_> {
         in_place: bool,
     ) -> bool {
         let name = callee.name();
-        if matches!(
-            callee,
-            Callee::Map | Callee::Filter | Callee::FilterMap | Callee::ZipWith
-        ) || (!in_place && self.mutating.contains(name))
+        if matches!(callee, Callee::Map | Callee::Filter | Callee::FilterMap)
+            || (!in_place && self.mutating.contains(name))
         {
             return false;
         }
@@ -188,7 +183,7 @@ impl Mono<'_> {
         let name = callee.name();
         !matches!(
             callee,
-            Callee::Map | Callee::Filter | Callee::FilterMap | Callee::ZipWith
+            Callee::Map | Callee::Filter | Callee::FilterMap
         ) && self.declared_parameters(name).is_some_and(|params| {
             params.len() == args.len()
                 && params.iter().zip(args).any(|(p, a)| {
