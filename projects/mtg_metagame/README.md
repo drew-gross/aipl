@@ -31,9 +31,10 @@ slot that is, and its record and win rate there. Metagames merging several tourn
 Clicking an archetype's name (or its Overall cell) locks its panel and also draws its convex hull
 under the matrix, after the original's `convex_hull` command: every card its decks played, by type
 and then the sideboard. A card the decks disagree about has a row, `Tishana's Tidebinder (0-3)`
-(the fewest and most copies any deck played), then for each number of copies
-`copies (percent of decks playing that many): change in those decks' win rate from the archetype's
-baseline`, green when better and red when worse (win rates are wins over wins and losses, a round
+(the fewest and most copies any deck played), then each number of copies side by side (the page widens to hold five),
+as `Copies`, `Decks` (how many decks played that many), `%` (their share of the archetype's decks), `WR` (those decks'
+win rate) and `Δ WR` (that win rate less the archetype's baseline, green when better and red when worse), the headings on
+the row of the type's name, every other card on a tinted band (win rates are wins over wins and losses, a round
 whose games came to 0-0-0 not counted). Cards every deck plays the same number of copies of are
 listed in one line per type. A legend at the top of the hull says the same.
 

@@ -292,11 +292,13 @@ let STYLE = """
     .row-label.sub .hit { fill: #fafafa; }
     #hull text { font-size: 11px; }
     #hull .head { font-weight: bold; fill: #444; }
+    #hull .num { text-anchor: end; }
     #hull .title { font-size: 14px; font-weight: bold; }
     #hull .note { fill: #666; }
     #hull .up { fill: #1a7f37; }
     #hull .down { fill: #c0392b; }
     #hull line { stroke: #ccc; }
+    #hull .stripe { fill: #f1f4f8; }
     #panel .link { fill: #1a6fb5; cursor: pointer; pointer-events: all; }
     #panel .sortable { pointer-events: all; cursor: pointer; }
     #panel .sortable:hover { fill: #1a6fb5; }
@@ -403,20 +405,30 @@ let SCRIPT = """
         fit_height();
         for (var option of root.querySelectorAll(".sort")) option.classList.toggle("active", option.getAttribute("data-sort") === sorting);
     }
-    // The page is as tall as its visible rows need, and no shorter than the panel needs.
+    // The page is as tall as its visible rows need, and no shorter than the panel needs; and as wide
+    // as the hull needs while it is drawn, and no narrower than the matrix and its panel.
+    var page_width = 0;
     function fit_height() {
         var height = Math.max(+panel.getAttribute("data-height"), rows_height + hull_bottom, +panel.getAttribute("data-top") + panel_bottom + +panel.getAttribute("data-margin"));
+        if (!page_width) page_width = +root.getAttribute("width");
+        var width = hull_bottom > 0 ? Math.max(page_width, HULL_WIDTH + 2 * +panel.getAttribute("data-margin")) : page_width;
+        root.setAttribute("width", width);
         root.setAttribute("height", height);
-        root.setAttribute("viewBox", "0 0 " + root.getAttribute("width") + " " + height);
+        root.setAttribute("viewBox", "0 0 " + width + " " + height);
+        document.getElementById("background").setAttribute("width", width);
         document.getElementById("background").setAttribute("height", height);
     }
     // The convex hull of the archetype whose overall panel is locked, below the matrix: every card
     // its decks played, by type and then the sideboard. A card the decks all play the same number of
     // copies of is listed with the others of its part in one line. A card they disagree about has a
-    // row: its name and the fewest and most copies played, then for each number of copies
-    // `copies (share of the decks): change in win rate from the archetype's baseline`. Win rates are
-    // wins over wins and losses, draws left out.
-    var HULL_NAME = 250, HULL_ENTRY = 128, HULL_PER_ROW = 5, HULL_ROW = 16, HULL_WIDTH = 880;
+    // row after its name and the fewest and most copies played, each number of copies side by side as
+    // a group of five columns: the copies, how many decks played that many, their share of the decks,
+    // their win rate and its change (Δ) from the archetype's baseline. The headings are on the row of
+    // the part's name, repeated over each group; more numbers of copies than groups wrap onto the next
+    // line, and the page is widened to hold the groups. Win rates are wins over wins and losses, draws left out.
+    var HULL_NAME = 200, HULL_ROW = 16, HULL_GROUPS = 5, HULL_GROUP = 226, HULL_WIDTH = HULL_NAME + HULL_GROUPS * HULL_GROUP;
+    // The columns of a group, each as its heading and the x of its right edge within the group.
+    var HULL_COLUMNS = [["Copies", 44], ["Decks", 90], ["%", 126], ["WR", 168], ["Δ WR", 214]];
     function hull_put(text, x, y, classes) {
         var node = document.createElementNS("http://www.w3.org/2000/svg", "text");
         node.setAttribute("x", x);
@@ -448,23 +460,31 @@ let SCRIPT = """
             });
             return { section: each.getAttribute("data-section"), name: each.getAttribute("data-name").split(" // ")[0], tallies: tallies };
         });
-        // One number of copies as `copies (share of the decks): change in win rate`.
-        var entry_of = function(tally) {
-            var value = rate(tally), text = "n/a", kind = "flat";
+        // One number of copies as the cells of its row: the copies, the decks, their share, their
+        // win rate, and its change from the baseline, coloured as it is up or down.
+        var cells_of = function(tally) {
+            var value = rate(tally), winrate = "n/a", change_text = "n/a", kind = "flat";
             if (value !== null) {
                 var change = value - baseline;
                 if (Math.abs(change) < 0.0005) change = 0;
-                text = change === 0 ? "0%" : (change < 0 ? "-" : "+") + percent(Math.abs(change) * 100) + "%";
+                winrate = percent(value * 100) + "%";
+                change_text = change === 0 ? "0%" : (change < 0 ? "-" : "+") + percent(Math.abs(change) * 100) + "%";
                 kind = change === 0 ? "flat" : change < 0 ? "down" : "up";
             }
-            return { text: tally.copies + " (" + percent(tally.decks / decks * 100) + "%): " + text, kind: kind };
+            return [
+                [String(tally.copies), ""],
+                [String(tally.decks), ""],
+                [percent(tally.decks / decks * 100) + "%", ""],
+                [winrate, ""],
+                [change_text, kind]
+            ];
         };
         var y = 20;
         hull_put(names[row] + ": every card played in the archetype, " + decks + " decks", 0, y, "title");
         y += HULL_ROW + 2;
-        hull_put("Baseline win rate: " + percent(baseline * 100) + "%. Cards the decks disagree about are listed as: card (fewest-most copies played), then for each number of copies:", 0, y, "note");
+        hull_put("Baseline win rate (WR): " + percent(baseline * 100) + "%. A card the decks disagree about is listed as: card (fewest-most copies played), then each number of copies side by side:", 0, y, "note");
         y += HULL_ROW;
-        hull_put("copies (percent of decks playing that many): difference in those decks' win rate from the baseline. A card every deck plays the same number of copies of is listed once, with its copies.", 0, y, "note");
+        hull_put("how many decks played that many, % their share of the archetype's decks, WR those decks' win rate, and Δ WR its difference from the baseline, under the headings on the part's row. A card every deck plays the same number of copies of is listed once, with its copies.", 0, y, "note");
         var sections = [];
         cards.forEach(function(card) { if (sections.indexOf(card.section) < 0) sections.push(card.section); });
         sections.forEach(function(section) {
@@ -473,19 +493,37 @@ let SCRIPT = """
             var disputed = mine.filter(function(card) { return card.tallies.length > 1; });
             y += HULL_ROW + 14;
             hull_put(section, 0, y, "head");
+            if (disputed.length) {
+                for (var group = 0; group < HULL_GROUPS; group++) {
+                    HULL_COLUMNS.forEach(function(column) { hull_put(column[0], HULL_NAME + group * HULL_GROUP + column[1], y, "head num"); });
+                }
+            }
             var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
             line.setAttribute("x1", 0); line.setAttribute("x2", HULL_WIDTH); line.setAttribute("y1", y + 5); line.setAttribute("y2", y + 5);
             hull.appendChild(line);
             y += 5;
-            disputed.forEach(function(card) {
+            disputed.forEach(function(card, index) {
                 y += HULL_ROW;
+                // Every other card's rows are on a tinted band, drawn first so the text is over it.
+                var top = y, stripe = null;
+                if (index % 2 === 1) {
+                    stripe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    stripe.setAttribute("class", "stripe");
+                    stripe.setAttribute("x", -4);
+                    stripe.setAttribute("width", HULL_WIDTH + 8);
+                    stripe.setAttribute("y", top - 12);
+                    hull.appendChild(stripe);
+                }
                 var least = card.tallies[0].copies, most = card.tallies[card.tallies.length - 1].copies;
                 fit_text(hull_put(card.name + " (" + least + "-" + most + ")", 0, y), HULL_NAME - 14);
                 card.tallies.forEach(function(tally, at) {
-                    if (at > 0 && at % HULL_PER_ROW === 0) y += HULL_ROW;
-                    var entry = entry_of(tally);
-                    hull_put(entry.text, HULL_NAME + (at % HULL_PER_ROW) * HULL_ENTRY, y, entry.kind);
+                    var group = at % HULL_GROUPS;
+                    if (at > 0 && group === 0) y += HULL_ROW;
+                    cells_of(tally).forEach(function(cell, column) {
+                        hull_put(cell[0], HULL_NAME + group * HULL_GROUP + HULL_COLUMNS[column][1], y, "num " + cell[1]);
+                    });
                 });
+                if (stripe) stripe.setAttribute("height", y - top + HULL_ROW);
             });
             if (agreed.length) {
                 y += HULL_ROW;
