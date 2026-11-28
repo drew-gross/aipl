@@ -79,7 +79,12 @@ fn try_fuse(e: &P, outer: Option<&Callee>, guards: &Guards, names: &mut Names) -
 
 fn has_effect(e: &P, effectful: &HashSet<String>) -> bool {
     let here = match &e.kind {
-        TExprKind::Call { callee, .. } => effectful.contains(callee.name()),
+        TExprKind::Call {
+            callee, type_args, ..
+        } => {
+            effectful.contains(callee.name())
+                || crate::sink::calls_effectful_function_value(type_args)
+        }
         TExprKind::Ident(name) => effectful.contains(name),
         TExprKind::Shim(..) => true,
         _ => false,

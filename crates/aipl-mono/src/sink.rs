@@ -60,15 +60,19 @@ use aipl_syntax::typed::{TExpr, TExprKind, TMatchArm, TyRepr};
 
 use crate::MonoProgram;
 
-/// Builtins whose call can abort the program, so deferring one past a branch
-/// could turn a program that dies into one that doesn't. `__assert` is what
-/// `assert(c)` lowers to, and its whole purpose is to abort.
+/// Builtins whose call is left where it is: moving it, or dropping it, changes what the program
+/// does.
 ///
-/// `/` and `%` used to be here. Both are total now — a zero divisor and
-/// `i64::MIN / -1` answer `MAX` and, for `%`, the dividend and 0 — so either can
-/// be deferred like any other arithmetic. Nothing else in the language aborts,
-/// which is why this list is down to one entry.
-const ABORTING_BUILTINS: &[Callee] = &[Callee::Assert];
+/// `__assert` can abort the program, so deferring one past a branch could turn a program that
+/// dies into one that doesn't. Nothing else in the language aborts. The cell calls are the one
+/// place a value is shared: a read moved past a write, or a write moved or dropped, changes what
+/// the program sees.
+const UNDEFERRABLE_BUILTINS: &[Callee] = &[
+    Callee::Assert,
+    Callee::CellNew,
+    Callee::CellGet,
+    Callee::CellSet,
+];
 
 /// [`sink_bindings`] on the pinned program.
 pub fn sink_bindings_pinned(
@@ -134,7 +138,7 @@ fn close_over_calls<B>(
     reaches: impl Fn(&B, &HashSet<String>) -> bool,
 ) -> HashSet<String> {
     let mut blocked: HashSet<String> = effectful.clone();
-    blocked.extend(ABORTING_BUILTINS.iter().map(|c| c.name().to_string()));
+    blocked.extend(UNDEFERRABLE_BUILTINS.iter().map(|c| c.name().to_string()));
     // A fixpoint rather than one pass: `a` calling `b` calling a divider makes
     // `a` undeferrable too, and the items are in no particular order.
     loop {
@@ -191,23 +195,24 @@ fn placeholder<T: TyRepr>() -> TExpr<T> {
     TExpr::new(TExprKind::Unit, T::unit(), 0..0)
 }
 
+/// Whether a call with these type arguments is of a function value that performs an effect or
+/// changes variables its caller can see: a call of one carries the function's type first.
+pub(crate) fn calls_effectful_function_value<T: TyRepr>(type_args: &[T]) -> bool {
+    type_args.first().is_some_and(|t| {
+        matches!(
+            t.to_type(),
+            aipl_syntax::ast::Type::Fn(_, _, ref effects, mutating)
+                if mutating || !effects.is_empty()
+        )
+    })
+}
+
 /// [`reaches_blocked`] over the typed tree.
 fn reaches_blocked_typed<T: TyRepr>(e: &TExpr<T>, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
         TExprKind::Call {
             callee, type_args, ..
-        } => {
-            blocked.contains(callee.name())
-                // A call of a function value carries the function's type, which says whether the
-                // call performs an effect or changes the closure.
-                || type_args.first().is_some_and(|t| {
-                    matches!(
-                        t.to_type(),
-                        aipl_syntax::ast::Type::Fn(_, _, ref effects, mutating)
-                            if mutating || !effects.is_empty()
-                    )
-                })
-        }
+        } => blocked.contains(callee.name()) || calls_effectful_function_value(type_args),
         TExprKind::Ident(name) => blocked.contains(name),
         TExprKind::Shim(..) => true,
         _ => false,

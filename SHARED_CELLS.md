@@ -56,12 +56,7 @@ says `mut`.
 
 ## Stages
 
-Order: 3, 4 (1 and 2 are done: cells exist in the code generator, and a `[mut x]` local is one).
-
-### 3. The optimizer
-- [ ] A call through a `mut` function type is never moved, dropped or merged, and neither is a
-      cell read or write (cases in `tests/cases/optimizations/`); the sink and single-use inlining
-      treat the three cell calls as having effects.
+Stage 4 is what is left: cells exist in the code generator, a `[mut x]` local is one, and the optimizer leaves the cell calls and calls through `mut` function types where they are.
 
 ### 4. The todo app
 - [ ] `Element` takes handlers of type `() mut -> ()` and is no longer generic over the model;

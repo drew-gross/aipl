@@ -1,0 +1,79 @@
+# A call of a `mut` closure changes a variable its caller reads, so it stays where it is written,
+# and so does every read of that variable. Each function below has the shape that sinks or
+# substitutes a binding (one use, in one branch or one place later), with the read or the call
+# that must not move.
+
+import {
+    equal as ==,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+// The read is of the count before the call; it must not be moved into the branch, past `bump()`.
+fn read_before_call(flag: bool) -> i64 {
+    mut n = 0;
+    let bump = [mut n] || {
+        set n++;
+    };
+    let before = n;
+    bump();
+    if (flag) { before } else { n }
+}
+
+// The call runs for both values of `flag`, though only one arm reads the count it leaves.
+fn call_for_effect(flag: bool) -> i64 {
+    mut n = 0;
+    let bump = [mut n] || {
+        set n++;
+    };
+    bump();
+    let after = n + 10;
+    if (flag) { after } else { 0 }
+}
+
+// A read taken between two calls is the value after the first and before the second.
+fn read_between() -> i64 {
+    mut n = 0;
+    let bump = [mut n] || {
+        set n++;
+    };
+    bump();
+    let middle = n;
+    bump();
+    middle + n * 10
+}
+
+// A copy of the closure shares the variable, so a call of either moves what the other reads.
+fn through_a_copy() -> i64 {
+    mut n = 0;
+    let bump = [mut n] || {
+        set n++;
+    };
+    let again = bump;
+    bump();
+    let seen = n;
+    again();
+    seen + n * 10
+}
+
+// A call whose result is discarded is not dropped.
+fn unused_call() -> i64 {
+    mut n = 0;
+    let bump = [mut n] || {
+        set n++;
+    };
+    bump();
+    bump();
+    n
+}
+
+test({
+    assert(read_before_call(true) == 0);
+    assert(read_before_call(false) == 1);
+    assert(call_for_effect(true) == 11);
+    assert(call_for_effect(false) == 0);
+    assert(read_between() == 21);
+    assert(through_a_copy() == 21);
+    assert(unused_call() == 2);
+})

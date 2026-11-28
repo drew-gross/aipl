@@ -660,6 +660,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/optimizations/shared_ctor_wrapper | 9 | 609 | 609 | 1743 | 3880 |
 | tests/cases/optimizations/sink_effects_stay_put | 13 | 860 | 860 | 1971 | 5272 |
 | tests/cases/optimizations/sink_into_branch | 8 | 492 | 492 | 1099 | 5244 |
+| tests/cases/optimizations/sink_mut_closure_calls_stay_put | 7 | 168 | 72 | 1097 | 4384 |
 | tests/cases/optimizations/sink_past_trailing_statements | 8 | 492 | 299 | 1118 | 5160 |
 | tests/cases/optimizations/sink_total_arithmetic | 2 | 105 | 105 | 576 | 4428 |
 | tests/cases/optimizations/slice_starts_with_fusion | 15 | 3511 | 3511 | 20828 | 6064 |

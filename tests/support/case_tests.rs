@@ -623,6 +623,7 @@ case_tests! {
     cases_optimizations_shared_ctor_wrapper = "cases/optimizations/shared_ctor_wrapper",
     cases_optimizations_sink_effects_stay_put = "cases/optimizations/sink_effects_stay_put",
     cases_optimizations_sink_into_branch = "cases/optimizations/sink_into_branch",
+    cases_optimizations_sink_mut_closure_calls_stay_put = "cases/optimizations/sink_mut_closure_calls_stay_put",
     cases_optimizations_sink_past_trailing_statements = "cases/optimizations/sink_past_trailing_statements",
     cases_optimizations_sink_total_arithmetic = "cases/optimizations/sink_total_arithmetic",
     cases_optimizations_slice_starts_with_fusion = "cases/optimizations/slice_starts_with_fusion",
