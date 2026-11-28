@@ -20,7 +20,13 @@ import {
 # Written by the compiler's operation-fusion pass, which rewrites
 # `xs.count(x) < n` (and the mirrored `n > xs.count(x)`) into this. Also
 # callable directly.
-pub fn count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool {
+pub fn count_is_less_than<T: any>(
+    self: T[],
+    # The element counted.
+    x: T,
+    # The count the answer is compared with.
+    limit: u64,
+) -> bool {
     if (limit == 0) { return false; };
     mut n: u64 = 0;
     for (let e : self) {

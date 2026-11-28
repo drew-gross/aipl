@@ -37,7 +37,13 @@ import {
 #
 # Prefer `opt_left_fold` (imported as plain `opt_fold`) unless the right-to-left
 # order matters.
-pub fn opt_right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A?) -> A? {
+pub fn opt_right_fold<T: any, A: any>(
+    self: T[],
+    # The accumulator the last element is combined with.
+    init: A,
+    # Combines an element and the accumulator into the next accumulator, or `none` to end the fold.
+    f: (T, A) -> A?,
+) -> A? {
     mut acc = init;
     mut ok = true;
     mut i = self.len();

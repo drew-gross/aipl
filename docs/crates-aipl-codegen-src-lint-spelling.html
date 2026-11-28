@@ -86,6 +86,26 @@
           <div class="doc"><p>Whether <code>self</code> asks for the builtin whose import name is <code>name</code>. <code>table</code> is the builtin table.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: Need</code>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The import name.</p></div>
+
+            </li>
+
+            <li><code>table: BuiltinEntry[]</code>
+
+              <div class="doc"><p>The builtin table.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -100,6 +120,26 @@
 
           <div class="doc"><p>The spelling of <code>self</code> in a file with these <code>items</code>, or <code>none</code> when the file cannot take any. <code>table</code> is the builtin table.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Need</code>
+
+            </li>
+
+            <li><code>items: Item[]</code>
+
+              <div class="doc"><p>The file's items.</p></div>
+
+            </li>
+
+            <li><code>table: BuiltinEntry[]</code>
+
+              <div class="doc"><p>The builtin table.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -137,6 +177,32 @@
 
           <div class="doc"><p>The spelling of the builtin <code>name</code> of <code>library</code> that the file can import: <code>preferred</code>, or when something else in the file has that name, the builtin under a name that is free (<code>builtin_any</code>). An operator has no other name to take, so there is nothing.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Item[]</code>
+
+            </li>
+
+            <li><code>library: str</code>
+
+              <div class="doc"><p>The builtin's library.</p></div>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The builtin's name there.</p></div>
+
+            </li>
+
+            <li><code>preferred: str</code>
+
+              <div class="doc"><p>The spelling asked for.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

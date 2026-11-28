@@ -32,6 +32,26 @@
           <div class="doc"><p>Combine the elements left to right, starting from <code>init</code>: for <code>[a, b, c]</code>, <code>f(f(f(init, a), b), c)</code> — <code>xs.left_fold(0, |acc, x| acc + x)</code>.</p><p>Import it as plain <code>fold</code> — <code>import { left_fold as fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>left_fold</code> only in a file that also imports <code>right_fold</code>, where the two need telling apart.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>init: A</code>
+
+              <div class="doc"><p>The accumulator the first element is combined with.</p></div>
+
+            </li>
+
+            <li><code>f: (A, T) -&#62; A</code>
+
+              <div class="doc"><p>Combines the accumulator and an element into the next accumulator.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

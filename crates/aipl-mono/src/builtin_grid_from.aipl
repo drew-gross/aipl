@@ -5,8 +5,13 @@
 
 import { Grid, equal as ==, grid_get, not_equal as != } from builtins;
 
-# A grid whose rows are `width` cells long, holding `cells` one row after another.
-pub fn grid_from<T: any>(width: u64, cells: T[]) -> Grid<T> { width, cells }.test({
+# A grid built from `cells`.
+pub fn grid_from<T: any>(
+    # How many cells long a row is.
+    width: u64,
+    # The cells, one row after another.
+    cells: T[],
+) -> Grid<T> { width, cells }.test({
     let grid = grid_from(2, [1, 2, 3, 4]);
     assert(grid == grid_from(2, [1, 2, 3, 4]));
     assert(grid != grid_from(4, [1, 2, 3, 4]));

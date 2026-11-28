@@ -117,8 +117,40 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
           </h3>
           <pre class="signature"><code>fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: str?) -&#62; Taken?</code></pre>
 
-          <div class="doc"><p>How <code>name</code> is taken apart in <code>scope</code>, when it is. <code>value</code> is what a <code>let</code> binds it to, and <code>struct_name</code> the struct the source already names for it, if any.</p></div>
+          <div class="doc"><p>How <code>name</code> is taken apart in <code>scope</code>, when it is.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Expr</code>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The name asked about.</p></div>
+
+            </li>
+
+            <li><code>reads: Read[]</code>
+
+              <div class="doc"><p>The field reads in scope of <code>name</code>.</p></div>
+
+            </li>
+
+            <li><code>value: Expr?</code>
+
+              <div class="doc"><p>What a <code>let</code> binds <code>name</code> to; a parameter or a slot has none.</p></div>
+
+            </li>
+
+            <li><code>struct_name: str?</code>
+
+              <div class="doc"><p>The struct the source already names for it, if any.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -210,6 +242,30 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
           <div class="doc"><p>The hits for the slots of <code>pattern</code>, the names it binds over <code>scope</code>, at <code>at</code>.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: Binding</code>
+
+            </li>
+
+            <li><code>scope: Expr</code>
+
+              <div class="doc"><p>Where the names the pattern binds are used.</p></div>
+
+            </li>
+
+            <li><code>reads: Read[]</code>
+
+            </li>
+
+            <li><code>at: Span</code>
+
+              <div class="doc"><p>Where the hits point.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -267,8 +323,30 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
           </h3>
           <pre class="signature"><code>fn advice(place: Place, name: str, taken: Taken) -&#62; str</code></pre>
 
-          <div class="doc"><p>What is said of <code>name</code>, bound at <code>place</code>, taken apart as <code>taken</code>.</p></div>
+          <div class="doc"><p>What is said of <code>name</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>place: Place</code>
+
+              <div class="doc"><p>Where <code>name</code> is bound.</p></div>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The binding or parameter.</p></div>
+
+            </li>
+
+            <li><code>taken: Taken</code>
+
+              <div class="doc"><p>How it is taken apart.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -284,6 +362,34 @@ for (let Dot(pos) : xs) { pos.line }       for (let Dot(Pos { line }) : xs) { li
 
           <div class="doc"><p>The pattern over <code>names</code>, with the slot <code>name</code> taken apart in place as <code>taken</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>case_name: str?</code>
+
+              <div class="doc"><p>The case the pattern is of, if it is one.</p></div>
+
+            </li>
+
+            <li><code>names: str[]</code>
+
+              <div class="doc"><p>The names the pattern binds.</p></div>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The slot that is taken apart in place.</p></div>
+
+            </li>
+
+            <li><code>taken: str</code>
+
+              <div class="doc"><p>The pattern it is taken apart as.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

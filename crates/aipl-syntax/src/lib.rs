@@ -3363,26 +3363,34 @@ fn __builtin_split(self: str, sep: str) -> str[] { [] }
 # that chain — `src.lines().len()` is a newline count with no array behind it;
 # also callable directly.
 fn __builtin_split_len(self: str, sep: str) -> u64 { 0 }
-# Concatenate the parts with `sep` between consecutive elements.
 # Flatten a sequence of sequences, placing a separator between consecutive
 # parts: `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element*
 # type, so the receiver is one level deeper than it looks — for `T = char` it
 # reads `str[] -> str` with a `char*` (i.e. `str`) separator, which is the
 # string join. Every separator is variadic (a sequence, one element, or an
-# optional one); `sep` defaults to empty, so `xs.join()` concatenates.
-#
-# `final_sep` goes in the last gap and `only_sep` in the sole gap of a two-part
-# join — the same gap seen two ways, since a list of two has no "rest" for `sep`
-# to appear in. Both default to `sep`, so an ordinary join is unaffected; naming
-# them is what writes an English list in one call:
-# `xs.join(sep=", ", final_sep=", or ", only_sep=" or ")` gives `"a"`,
-# `"a or b"`, `"a, b, or c"`.
-#
-# `leading_sep` and `trailing_sep` write `sep` before the first part and after the last, so a
-# list of cells is a row: `cells.join(sep="|", leading_sep=true, trailing_sep=true)` is
-# `"|a|b|"`. They write nothing when there are no parts, and never change which gap is the
-# final or the only one.
-fn __builtin_join<T: any>(self: T[][], sep: T* = [], final_sep: T* = sep, only_sep: T* = sep, leading_sep: bool = false, trailing_sep: bool = false) -> T[] { [] }
+# optional one).
+fn __builtin_join<T: any>(
+    self: T[][],
+    # Written between consecutive parts, and at the ends when `leading_sep` or `trailing_sep` is
+    # set. Variadic (a sequence, one element, or an optional one); defaults to empty, so
+    # `xs.join()` concatenates.
+    sep: T* = [],
+    # Written in the last gap instead of `sep`. With `only_sep` it writes an English list in one
+    # call: `xs.join(sep=", ", final_sep=", or ", only_sep=" or ")` gives `"a"`, `"a or b"`, `"a,
+    # b, or c"`. Defaults to `sep`.
+    final_sep: T* = sep,
+    # Written in the sole gap of a two-part join instead of `sep`: the same gap as `final_sep`
+    # seen the other way, since a list of two has no "rest" for `sep` to appear in. Defaults to
+    # `sep`.
+    only_sep: T* = sep,
+    # Write `sep` before the first part, so a list of cells is a row: `cells.join(sep="|",
+    # leading_sep=true, trailing_sep=true)` is `"|a|b|"`. Nothing is written when there are no
+    # parts. Defaults to false.
+    leading_sep: bool = false,
+    # Write `sep` after the last part. Nothing is written when there are no parts. Defaults to
+    # false.
+    trailing_sep: bool = false,
+) -> T[] { [] }
 
 # The file builtins return a Result; the `ok(..)` body coerces to the declared
 # `..!Error` (codegen builds the real ok/err).
@@ -3565,7 +3573,14 @@ fn __builtin_ends_with<T: any>(self: T[], suffix: T*) -> bool { false }
 # the end matches only the empty pattern. The pattern is variadic exactly as
 # `starts_with`'s, and dispatched with it in the checker / codegen. Written by
 # the compiler's operation-fusion pass; also callable directly.
-fn __builtin_starts_with_at<T: any>(self: T[], prefix: T*, at: u64) -> bool { false }
+fn __builtin_starts_with_at<T: any>(
+    self: T[],
+    # The pattern, variadic exactly as `starts_with`'s.
+    prefix: T*,
+    # Where in `self` the comparison starts. It clamps like a slice bound, so an `at` past the end
+    # matches only the empty pattern.
+    at: u64,
+) -> bool { false }
 # True if `self` contains the needle: a `T[]` (or `str`) needle matches as a
 # contiguous subsequence (substring), a `T` (or `char`) as a single element,
 # and a `T?` as its element when `some` — a `none` needle is nothing to find,
@@ -3648,7 +3663,13 @@ fn __builtin_remove_key<K: any, V: any>(mut self: #{K: V}, key: K) {}
 # value and keeps its place, any other is added after the existing ones — so
 # the last write to a key wins. The counterpart of `remove_key`, with the same
 # `mut self` receiver. Internal: `to_dict` is the spelling.
-fn __builtin_insert_key<K: any, V: any>(mut self: #{K: V}, key: K, value: V) {}
+fn __builtin_insert_key<K: any, V: any>(
+    mut self: #{K: V},
+    # The entry to bind: one the dict already holds keeps its place.
+    key: K,
+    # What `key` is bound to.
+    value: V,
+) {}
 
 # `map` also takes an optional receiver — `opt.map(f)` is `U?`, `some(f(v))`
 # for `some(v)` and `none` for `none` — which the checker and mono dispatch
@@ -3661,7 +3682,13 @@ fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 # each with an array between them. Written by the compiler's operation-fusion
 # pass; also callable directly, and worth writing by hand when the two halves
 # belong together.
-fn __builtin_filter_map<T: any, U: any>(self: T[], keep: (T) -> bool, f: (T) -> U) -> U[] { [] }
+fn __builtin_filter_map<T: any, U: any>(
+    self: T[],
+    # Which elements are kept.
+    keep: (T) -> bool,
+    # Called on each kept element, in order.
+    f: (T) -> U,
+) -> U[] { [] }
 fn __builtin_intersperse<T: any>(self: T[], sep: T) -> T[] { self }
 # True if both values are the same case of the variant, whatever their payloads.
 fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
@@ -3701,14 +3728,27 @@ fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 # so a chain of updates allocates nothing. `set xs = xs.with(i, v).value_or(xs)`
 # keeps `xs` alive for the fallback, and so copies; write `xs.with(i, v)` where
 # `xs` is not read again to avoid the copy. Not for a `str`.
-fn __builtin_with<T: any>(self: T[], index: u64, value: T) -> T[]? { none }
+fn __builtin_with<T: any>(
+    self: T[],
+    # The element to replace, counted from 0; past the end there is none, and the answer is
+    # `none`.
+    index: u64,
+    # What the element becomes.
+    value: T,
+) -> T[]? { none }
 # Replace the element at `index` with `value`, in place: `set xs.try_set(i, v);`.
 # When `index` is past the end there is no element to replace and `xs` is left as
 # it was — a write that misses does nothing, as removing a key that is not there
 # does nothing. Reach for `with` when the miss should be told apart. Like `push`
 # it is a mutating method, so `xs.try_set(i, v)` as an expression is the updated
 # copy and leaves `xs` alone. Not for a `str`.
-fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
+fn __builtin_try_set<T: any>(
+    mut self: T[],
+    # The element to replace, counted from 0; past the end `xs` is left as it was.
+    index: u64,
+    # What the element becomes.
+    value: T,
+) {}
 // NOTE: `all`, `grid_of`, `words`, `cartesian_product`, `count_while`, `count_if`, `count_if_is_less_than` and its five siblings, `find_if`, `only`, `remove_index`, `collect_arms`, `as_case`, `is_case`, `collect_ok`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `join_is_nonempty`, `join_is_empty`, `reduce`, `repeat`, `map_reduce`, `filter_map_reduce`, `split_map`, `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
@@ -3718,7 +3758,13 @@ fn __builtin_try_set<T: any>(mut self: T[], index: u64, value: T) {}
 // which is the single source of both their body and their signature: the loader
 // loads each as a file of any program that reaches it. See `aipl_builtins`.
 # `f` applied to the elements of both arrays pairwise, stopping at the shorter one.
-fn __builtin_zip_with<T: any, U: any, V: any>(self: T[], other: U[], f: (T, U) -> V) -> V[] { [] }
+fn __builtin_zip_with<T: any, U: any, V: any>(
+    self: T[],
+    # The second array; the result stops at the shorter of the two.
+    other: U[],
+    # Called with the elements of both, pairwise.
+    f: (T, U) -> V,
+) -> V[] { [] }
 # Add `x` at the end of `self`. `set xs.push(x);` appends in place; as an expression it is the extended copy.
 fn __builtin_push<T: any>(mut self: T[], x: T) {}
 # Append `other` to `self` — `push` for a whole array, and the way to grow a
@@ -3743,7 +3789,11 @@ fn __builtin_extend<T: any>(mut self: T[], other: T*) {}
 # by doubling. Exact rather than doubled: the caller has said what it needs. A
 # `str` receiver keeps its representation (an inline value that still fits
 # stays inline).
-fn __builtin_reserve<T: any>(mut self: T[], additional: u64) {}
+fn __builtin_reserve<T: any>(
+    mut self: T[],
+    # How many more elements (bytes, for a `str`) will be appended.
+    additional: u64,
+) {}
 # Reverse the elements of an array or the bytes of a string.
 fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
 # Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or

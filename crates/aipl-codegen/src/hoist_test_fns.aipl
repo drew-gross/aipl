@@ -149,7 +149,11 @@ fn with_test_function(self: Function, test_body: Expr?) -> Function[] {
 }
 
 # What `name` is renamed to by `renames`, or `name` itself.
-fn renamed(self: str, renames: #{str: str}) -> str { renames.get(self).value_or(self) }.test({
+fn renamed(
+    self: str,
+    # Old name to new name.
+    renames: #{str: str},
+) -> str { renames.get(self).value_or(self) }.test({
     assert("a".renamed(#{"a": "b", "c": "d"}) == "b");
     assert("c".renamed(#{"a": "b", "c": "d"}) == "d");
     assert("e".renamed(#{"a": "b"}) == "e");

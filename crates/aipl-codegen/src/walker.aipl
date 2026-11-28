@@ -544,9 +544,13 @@ fn tok_text(self: W, i: u64) -> str { self.toks[i].map(|t| self.src[t.span]).val
 fn peek_is(self: W, k: FmtKind) -> bool { self.peek_is_n(0, k) }
 
 # Whether the token `n` past the cursor has kind `k`.
-fn peek_is_n(self: W, n: u64, k: FmtKind) -> bool {
-    self.toks[self.pos + n].is_some_and(|t| t.kind == k)
-}
+fn peek_is_n(
+    self: W,
+    # How far past the cursor.
+    n: u64,
+    # The kind asked about.
+    k: FmtKind,
+) -> bool { self.toks[self.pos + n].is_some_and(|t| t.kind == k) }
 
 # Whether an undrained comment sits before the token at the cursor.
 fn comment_before_cursor(self: W) -> bool {
@@ -1795,11 +1799,14 @@ fn mut_stmt(self: W) -> WDoc!FmtError {
     ok(WDoc { w: done, doc: Concat([Text(`mut {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
 
-# The tail of a struct-destructuring statement, entered on the `{`: `kw` is the
-# leading keyword and `name` the struct the pattern names. `let` and `mut`
-# differ only in that keyword, so they share this rather than spelling the same
-# walk twice.
-fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
+# The tail of a struct-destructuring statement, entered on the `{`.
+fn struct_pattern(
+    self: W,
+    # The leading keyword: `let` and `mut` differ only in that, so they share this.
+    kw: str,
+    # The struct the pattern names.
+    name: str,
+) -> WDoc!FmtError {
     let ids = self.bump().w.field_binder_list();
     let WDoc { w, doc } = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
     let done = w.expect(";")?.w;
@@ -3068,7 +3075,13 @@ fn hugs_sole_arg(self: W) -> bool {
 #
 # so a chained argument keeps the ordinary broken list, where the chain breaks
 # on a line of its own.
-fn chain_in(self: W, first: u64, last: u64) -> bool {
+fn chain_in(
+    self: W,
+    # The first token of the range.
+    first: u64,
+    # The last.
+    last: u64,
+) -> bool {
     mut i = first;
     mut depth: u64 = 0;
     mut calls: u64 = 0;
@@ -3095,7 +3108,13 @@ fn is_construct_end(self: W, i: u64) -> bool {
 }
 
 # Whether a comma at bracket depth zero sits among tokens `first` through `last`.
-fn top_comma_in(self: W, first: u64, last: u64) -> bool {
+fn top_comma_in(
+    self: W,
+    # The first token of the range.
+    first: u64,
+    # The last.
+    last: u64,
+) -> bool {
     mut i = first;
     mut depth: u64 = 0;
     while (i <= last) {

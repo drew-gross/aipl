@@ -110,9 +110,14 @@ fn add(a: Counts, b: Counts) -> Counts {
     ) == Counts { lines: 11, words: 22, bytes: 33 });
 })
 
-# One output line: the counts `columns` selects, then `label`, separated by single
-# spaces.
-fn row(c: Counts, columns: Columns, label: str) -> str {
+# One output line, separated by single spaces.
+fn row(
+    c: Counts,
+    # Which counts are written.
+    columns: Columns,
+    # Written after them.
+    label: str,
+) -> str {
     mut cells: str[] = [];
     if (columns.lines) { set cells.push(`{c.lines}`); };
     if (columns.words) { set cells.push(`{c.words}`); };

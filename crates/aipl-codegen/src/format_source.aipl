@@ -205,7 +205,11 @@ fn fmt_prepare(src: str) -> FmtInput {
 # newline — including for an empty program, which formats to just that. The
 # printer only keeps a trailing newline when the layout happens to end with
 # one, so the guarantee is made here rather than there.
-fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
+fn fmt_layout(
+    cleaned: str,
+    # The width to lay out at.
+    width: u64,
+) -> str!FmtError {
     let laid_out = format_program(cleaned, width)?;
     ok(`{laid_out.trim_end_while(|c| c == '\n')}\n`)
 }.test({

@@ -15,9 +15,18 @@ variant Direction = Left | Right
 
 # `self` made `width` long by adding `with` to the `dir` side of it: `"ab".pad(5)` is
 # `"ab   "`, `"ab".pad(5, dir=Left)` is `"   ab"`, and `"7".pad(3, with='0', dir=Left)` is
-# `"007"`. Text already `width` long or longer is left as it is. The length is `len`'s, so
-# a character wider than a byte counts as the bytes it takes. Callable as a method.
-pub fn pad(self: str, width: u64, with: char = ' ', dir: Direction = Right) -> str {
+# `"007"`. The length is `len`'s, so a character wider than a byte counts as the bytes it takes.
+# Callable as a method.
+pub fn pad(
+    self: str,
+    # The length to make `self`. Text already this long or longer is left as it is.
+    width: u64,
+    # What fills the gap.
+    with: char = ' ',
+    # The side the gap goes on: `Right` (the default) leaves the text on the left, `Left` puts it
+    # on the right.
+    dir: Direction = Right,
+) -> str {
     // The annotation is needed: unannotated, the gap read inside a `match` arm renders as the
     // array `['x', 'x']` rather than its text.
     let gap: str = to_str(with).repeat(width - self.len());

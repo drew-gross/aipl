@@ -618,9 +618,13 @@ pub fn rule_first<K: variant>(r: LinkedRule<K>, sets: First<K>[]) -> First<K>!Pa
 # and its spelling among the set's spellings. Conservative in the direction
 # that matters: it is never false for a token that could in fact start a match,
 # so pruning on it cannot lose a parse.
-pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
-    self.nullable || self.kinds.has(kind) || self.texts.has(text)
-}.test({
+pub fn can_start<K: variant>(
+    self: First<K>,
+    # The kind of the token.
+    kind: Case<K>,
+    # How the token is spelled.
+    text: str,
+) -> bool { self.nullable || self.kinds.has(kind) || self.texts.has(text) }.test({
     // A kind names itself only where the expected type says `Case<K>`, which a
     // constructor argument gives and a plain argument does not — hence the
     // annotated bindings, the same idiom a `Rule` is written with.

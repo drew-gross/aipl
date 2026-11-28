@@ -32,6 +32,32 @@
           <div class="doc"><p>The elements <code>keep</code> accepts, each mapped by <code>f</code>, combined left to right with <code>step</code>: for the survivors <code>[a, b, c]</code>, <code>some(step(step(f(a), f(b)), f(c)))</code>. The first mapped survivor seeds the result, so <code>step</code> is never called on fewer than two; when nothing survives — an empty receiver, or a <code>keep</code> that accepts none — it is <code>none</code>.</p><p><code>keep</code> then <code>f</code> run per element, in order, interleaved with <code>step</code> and with the next element's <code>keep</code> — which no one can tell apart unless one of them does something, and the fusion that writes this call refuses when any does.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>keep: (T) -&#62; bool</code>
+
+              <div class="doc"><p>Which elements survive.</p></div>
+
+            </li>
+
+            <li><code>f: (T) -&#62; U</code>
+
+              <div class="doc"><p>Maps each survivor.</p></div>
+
+            </li>
+
+            <li><code>step: (U, U) -&#62; U</code>
+
+              <div class="doc"><p>Combines the mapped survivors left to right; the first seeds the result, so it is never called on fewer than two.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

@@ -207,10 +207,16 @@ pub fn as_record(self: Result) -> Record {
     assert(Draw.as_record() == Record { draw: 1 });
 })
 
-# One round of the match history of the deck `owner`, at the tournament `tournament`, when the
-# deck's matches came to `before`: how it ended, and the match against the opponent it names, or
-# `none` for a round with no opponent.
-fn decode_match(self: Json, owner: str, tournament: str, before: Record) -> (Result, Match?)!str {
+# One round of the deck's match history: how it ended, and the match against the opponent it names, or `none` for a round with no opponent.
+fn decode_match(
+    self: Json,
+    # The deck whose match history it is.
+    owner: str,
+    # The tournament the round was played at.
+    tournament: str,
+    # What the deck's matches came to before this round.
+    before: Record,
+) -> (Result, Match?)!str {
     let record = self.field("record").value_or_err(`missing "record"`)?;
     let result = self.text_field("result")?.decode_result()?;
     let decoded = decode_record(record)?;

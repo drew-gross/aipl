@@ -67,7 +67,14 @@ fn append_missing(out: str, pending: #{str: str}) -> str {
 # The whole batch costs one walk, which is the point: a case whose `stdout`,
 # `exit code` and `report` all went stale is read, rewritten and written
 # back once rather than three times.
-pub fn fill_or_add_sections(contents: str, fills: #{str: str}) -> str {
+pub fn fill_or_add_sections(
+    # The file's text; everything the fills do not touch is preserved verbatim.
+    contents: str,
+    # Section name to body: an existing `--- section ---` block has its old body (up to the next
+    # header line or EOF) replaced, and a section the file does not carry is appended as a fresh
+    # block.
+    fills: #{str: str},
+) -> str {
     // Walk `contents` line by line (matching Rust's `str::lines()`: no line
     // terminators kept, no trailing empty line for a final `\n`, but the final
     // unterminated line — if any — still counts). Every kept line is re-emitted

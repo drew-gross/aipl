@@ -58,8 +58,34 @@
           </h3>
           <pre class="signature"><code>pub fn pad(self: str, width: u64, with: char = &#39; &#39;, dir: Direction = Right) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> made <code>width</code> long by adding <code>with</code> to the <code>dir</code> side of it: <code>&quot;ab&quot;.pad(5)</code> is <code>&quot;ab   &quot;</code>, <code>&quot;ab&quot;.pad(5, dir=Left)</code> is <code>&quot;   ab&quot;</code>, and <code>&quot;7&quot;.pad(3, with='0', dir=Left)</code> is <code>&quot;007&quot;</code>. Text already <code>width</code> long or longer is left as it is. The length is <code>len</code>'s, so a character wider than a byte counts as the bytes it takes. Callable as a method.</p></div>
+          <div class="doc"><p><code>self</code> made <code>width</code> long by adding <code>with</code> to the <code>dir</code> side of it: <code>&quot;ab&quot;.pad(5)</code> is <code>&quot;ab   &quot;</code>, <code>&quot;ab&quot;.pad(5, dir=Left)</code> is <code>&quot;   ab&quot;</code>, and <code>&quot;7&quot;.pad(3, with='0', dir=Left)</code> is <code>&quot;007&quot;</code>. The length is <code>len</code>'s, so a character wider than a byte counts as the bytes it takes. Callable as a method.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>width: u64</code>
+
+              <div class="doc"><p>The length to make <code>self</code>. Text already this long or longer is left as it is.</p></div>
+
+            </li>
+
+            <li><code>with: char = &#39; &#39;</code>
+
+              <div class="doc"><p>What fills the gap.</p></div>
+
+            </li>
+
+            <li><code>dir: Direction = Right</code>
+
+              <div class="doc"><p>The side the gap goes on: <code>Right</code> (the default) leaves the text on the left, <code>Left</code> puts it on the right.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

@@ -99,9 +99,14 @@ fn header() -> Element[] { [Label("Todo", size=24, bold=true), Separator()] }
 # A line, and how many of the items are not done.
 fn footer(left: u64) -> Element[] { [Separator(), Label(`{left} left`, muted=true)] }
 
-# The window for the list `self`, whose items are the `rows`: a title, the rows and a button that
-# calls `add` for another, or for the first when there is none, and how many are left.
-fn todo_app(self: Todo[], rows: Element[], add: () mut -> ()) -> Element {
+# The window for the list `self`: a title, the rows and a button for another, or for the first when there is none, and how many are left.
+fn todo_app(
+    self: Todo[],
+    # The elements of the items, one each.
+    rows: Element[],
+    # Called when the button for another item (or the first) is clicked.
+    add: () mut -> (),
+) -> Element {
     let label = if (self.is_empty()) { "Add your first todo" } else { "Add a todo" };
     let left = self.filter(|todo| !todo.done).len();
     Column(

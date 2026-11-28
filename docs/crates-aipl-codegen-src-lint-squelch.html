@@ -32,6 +32,28 @@
           <div class="doc"><p>The hits of <code>hits</code> that no marker in <code>allows</code> squelches, each saying how to keep it, followed by an error for every marker that squelched nothing. <code>src</code> is the text the spans index into. A marker is not itself squelchable: what it would squelch is itself.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>src: str</code>
+
+              <div class="doc"><p>The text the spans index into.</p></div>
+
+            </li>
+
+            <li><code>allows: Span[]</code>
+
+              <div class="doc"><p>The <code>#[allow]</code> markers.</p></div>
+
+            </li>
+
+            <li><code>hits: FilledHit[]</code>
+
+              <div class="doc"><p>The hits to filter. A marker is not itself squelchable: what it would squelch is itself.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

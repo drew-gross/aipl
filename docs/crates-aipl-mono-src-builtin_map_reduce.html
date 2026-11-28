@@ -32,6 +32,26 @@
           <div class="doc"><p><code>f</code> applied to each element, left to right, combined with <code>step</code> as it goes: for <code>[a, b, c]</code>, <code>some(step(step(f(a), f(b)), f(c)))</code>. The first mapped element seeds the result, so <code>step</code> is never called on fewer than two; an empty receiver is <code>none</code>, and one element is <code>some(f(that element))</code>.</p><p><code>f</code> runs once per element, in order, interleaved with <code>step</code> rather than before all of them — which no one can tell apart unless <code>step</code> does something, and a reduction's step does not.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>f: (T) -&#62; U</code>
+
+              <div class="doc"><p>Applied to each element, once, in order.</p></div>
+
+            </li>
+
+            <li><code>step: (U, U) -&#62; U</code>
+
+              <div class="doc"><p>Combines the mapped elements left to right; the first seeds the result, so it is never called on fewer than two.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

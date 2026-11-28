@@ -29,8 +29,30 @@
           </h3>
           <pre class="signature"><code>pub fn written_names(tokens: Span[], src: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
-          <div class="doc"><p>The names <code>tokens</code> spell, in a pattern written in <code>src</code>. <code>tokens</code> are the pattern's token spans, nothing before or after it.</p><p>A name followed by <code>(</code> or written after a <code>.</code> is a case, and one followed by <code>{</code> opens a struct pattern, whose own name is a type. Any other name is a binder unless it spells a case (<code>none</code>, or capitalised) — and <code>bare_is_case</code> says the pattern's top level is a case position: at the head of a <code>match</code> arm a bare name is a nullary case, where in a <code>let</code> it binds.</p></div>
+          <div class="doc"><p>The names <code>tokens</code> spell. A name followed by <code>(</code> or written after a <code>.</code> is a case, and one followed by <code>{</code> opens a struct pattern, whose own name is a type. Any other name is a binder unless it spells a case (<code>none</code>, or capitalised).</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>tokens: Span[]</code>
+
+              <div class="doc"><p>The pattern's token spans, nothing before or after it.</p></div>
+
+            </li>
+
+            <li><code>src: str</code>
+
+              <div class="doc"><p>The source they are in.</p></div>
+
+            </li>
+
+            <li><code>bare_is_case: bool</code>
+
+              <div class="doc"><p>Whether the pattern's top level is a case position: at the head of a <code>match</code> arm a bare name is a nullary case, where in a <code>let</code> it binds.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

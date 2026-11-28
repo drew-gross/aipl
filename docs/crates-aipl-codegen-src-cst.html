@@ -454,8 +454,24 @@
           </h3>
           <pre class="signature"><code>fn split_kids(kids: Cst[], acc: Parts) -&#62; Parts</code></pre>
 
-          <div class="doc"><p><code>kids</code> split onto <code>acc</code>, in source order. The accumulator is a whole <code>Parts</code> rather than the two lists on their own so that one value threads through the loop and through a group's recursion.</p></div>
+          <div class="doc"><p><code>kids</code> split onto <code>acc</code>, in source order.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>kids: Cst[]</code>
+
+              <div class="doc"><p>The children to sort into nodes and tokens.</p></div>
+
+            </li>
+
+            <li><code>acc: Parts</code>
+
+              <div class="doc"><p>What they are split onto: a whole <code>Parts</code> rather than two lists, so one value threads through the loop and through a group's recursion.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

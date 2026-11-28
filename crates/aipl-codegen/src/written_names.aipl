@@ -30,15 +30,18 @@ import {
 import { WrittenName, WrittenNames, WrittenStruct } from "./expr.aipl";
 import { is_binder_name } from "./pat.aipl";
 
-# The names `tokens` spell, in a pattern written in `src`. `tokens` are the
-# pattern's token spans, nothing before or after it.
-#
-# A name followed by `(` or written after a `.` is a case, and one followed by `{`
-# opens a struct pattern, whose own name is a type. Any other name is a binder
-# unless it spells a case (`none`, or capitalised) — and `bare_is_case` says the
-# pattern's top level is a case position: at the head of a `match` arm a bare name
-# is a nullary case, where in a `let` it binds.
-pub fn written_names(tokens: Span[], src: str, bare_is_case: bool) -> WrittenNames {
+# The names `tokens` spell. A name followed by `(` or written after a `.` is a case, and
+# one followed by `{` opens a struct pattern, whose own name is a type. Any other name is a
+# binder unless it spells a case (`none`, or capitalised).
+pub fn written_names(
+    # The pattern's token spans, nothing before or after it.
+    tokens: Span[],
+    # The source they are in.
+    src: str,
+    # Whether the pattern's top level is a case position: at the head of a `match` arm a bare name
+    # is a nullary case, where in a `let` it binds.
+    bare_is_case: bool,
+) -> WrittenNames {
     mut cases: WrittenName[] = [];
     mut binders: WrittenName[] = [];
     mut structs: WrittenStruct[] = [];

@@ -16,10 +16,16 @@ import { join_is_nonempty, logical_not as ! } from builtins;
 # every separator `join` would write between or around them. Exactly the negation of `join_is_nonempty`, which owns the rule.
 pub fn join_is_empty<T: any>(
     self: T[][],
+    # Written between consecutive pieces, and at the ends when `leading_sep` or `trailing_sep` is
+    # set; defaults to empty.
     sep: T* = [],
+    # Written in the last gap instead of `sep`.
     final_sep: T* = sep,
+    # Written in the sole gap of a two-piece join instead of `sep`.
     only_sep: T* = sep,
+    # Write `sep` before the first piece (when there is one).
     leading_sep: bool = false,
+    # Write `sep` after the last piece (when there is one).
     trailing_sep: bool = false,
 ) -> bool {
     !self.join_is_nonempty(

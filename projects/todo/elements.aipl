@@ -79,8 +79,12 @@ fn number(name: str, value: u64) -> str[] {
     assert(number("size", 0).is_empty());
 })
 
-# `name`, when `on`.
-fn flag(name: str, on: bool) -> str[] { if (on) { [name] } else { [] } }.test({
+# `name`, when it is on.
+fn flag(
+    name: str,
+    # Whether it is written.
+    on: bool,
+) -> str[] { if (on) { [name] } else { [] } }.test({
     assert(flag("bold", true) == ["bold"]);
     assert(flag("bold", false).is_empty());
 })
@@ -93,8 +97,12 @@ fn text_attribute(name: str, value: str) -> str[] {
     assert(text_attribute("key", "").is_empty());
 })
 
-# The line for an element made of `parts`, indented `depth` levels.
-fn line(self: str[], depth: u64) -> str { `{" ".repeat(depth * 2)}{self.join(sep=" ")}` }.test({
+# The line for an element made of `self`.
+fn line(
+    self: str[],
+    # How many levels to indent, two spaces each.
+    depth: u64,
+) -> str { `{" ".repeat(depth * 2)}{self.join(sep=" ")}` }.test({
     assert(["label", `"x"`].line(0) == `label "x"`);
     assert(["label", `"x"`].line(2) == `    label "x"`);
 })
@@ -116,8 +124,14 @@ fn event_key(key: str, path: str) -> str { if (key.is_empty()) { `b{path}` } els
     assert(event_key("", "0.2") == "b0.2");
 })
 
-# `self` as lines of the text form, indented `depth` levels, at `path` in the tree.
-fn lines(self: Element, depth: u64, path: str) -> str[] {
+# `self` as lines of the text form.
+fn lines(
+    self: Element,
+    # How many levels to indent.
+    depth: u64,
+    # Where `self` is in the tree.
+    path: str,
+) -> str[] {
     match (self) {
         Column(children, spacing, padding, width, key, icon) => container(
             "column",
@@ -233,8 +247,14 @@ fn click_at(self: Element, key: str, path: str) {
     };
 }
 
-# Call the handler of the button `key` names, among `children` at `path`.
-fn click_in(self: Element[], key: str, path: str) {
+# Call the handler of the button `key` names, among `self`.
+fn click_in(
+    self: Element[],
+    # The event key a click names.
+    key: str,
+    # Where `self` is in the tree.
+    path: str,
+) {
     for (let index, child : self) {
         child.click_at(key, `{path}.{index}`);
     }

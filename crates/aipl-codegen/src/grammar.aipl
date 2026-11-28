@@ -708,11 +708,14 @@ fn desugar_rules<K: variant>(rs: Rule<K>[]) -> Rule<K>[]!ParseError { rs.try_map
 # bracketed repetition given its entry in the grammar's `groups` table. Fails
 # when a reference names no production — the error a grammar author most wants
 # caught before a parse rather than during one.
-#
-# `base` is the index the first group in `r` takes; the rest follow in
-# `group_styles` order. It is threaded by arithmetic rather than by a running
-# counter because a rule is a tree and `try_map` has nowhere to keep one.
-fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> LinkedRule<K>!ParseError {
+fn link_rule<K: variant>(
+    r: Rule<K>,
+    names: str[],
+    # The index the first group in `r` takes; the rest follow in `group_styles` order. It is
+    # threaded by arithmetic rather than by a running counter because a rule is a tree and
+    # `try_map` has nowhere to keep one.
+    base: u64,
+) -> LinkedRule<K>!ParseError {
     match (r) {
         Named(n) => ok(NamedIdx(
             names
@@ -784,9 +787,14 @@ fn link_opt<K: variant>(r: Rule<K>?, names: str[], base: u64) -> LinkedRule<K>?!
     }
 }
 
-# Each rule in `rs`, linked, with `base` advancing past the groups each one
-# holds.
-fn link_rules<K: variant>(rs: Rule<K>[], names: str[], base: u64) -> LinkedRule<K>[]!ParseError {
+# Each rule in `rs`, linked.
+fn link_rules<K: variant>(
+    # The rules to link.
+    rs: Rule<K>[],
+    names: str[],
+    # The number the first group is numbered from; it advances past the groups each rule holds.
+    base: u64,
+) -> LinkedRule<K>[]!ParseError {
     mut out: LinkedRule<K>[] = [];
     mut b = base;
     for (let r : rs) {

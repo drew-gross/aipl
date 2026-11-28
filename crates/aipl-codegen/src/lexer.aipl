@@ -318,9 +318,12 @@ variant Transition = Stay | Push(i64) | Pop
 # checked in the right order at each site. (`Transition? = none` would be legal
 # now that a field may be an optional of a variant — `none` is a literal — at the
 # cost of an unwrap at each use.)
-fn transition(push: i64, pop: bool) -> Transition {
-    if (0 <= push) { Push(push) } else { if (pop) { Pop } else { Stay } }
-}
+fn transition(
+    # The mode to enter, when the rule enters one.
+    push: i64,
+    # Whether the rule leaves the mode it is in.
+    pop: bool,
+) -> Transition { if (0 <= push) { Push(push) } else { if (pop) { Pop } else { Stay } } }
 
 # One entry of the mode stack: the mode, where the token that pushed it started,
 # and that rule's `unterminated` message. The span and the message are carried so
@@ -417,7 +420,13 @@ pub fn keep_skipped<K>(self: TokenRule<K>[]) -> TokenRule<K>[] {
 # `CharRun`: length of the maximal run at the start of `self` — a `head`
 # char, then `cont` chars. 0 when the first char isn't in `head`.
 # (`head` rather than `first`, which is now a builtin this file calls.)
-fn char_run_len(self: str, head: #{char}, cont: #{char}) -> u64 {
+fn char_run_len(
+    self: str,
+    # The chars the run may start with; the length is 0 when the first char is not one.
+    head: #{char},
+    # The chars that continue it.
+    cont: #{char},
+) -> u64 {
     if (self.first().is_some_and(|c| head.has(c))) {
         1 + self.drop_first().count_while(|c| cont.has(c))
     } else {
@@ -443,7 +452,14 @@ fn exact_len(self: str, spelling: str) -> u64 {
 # char after it is absent (end of source) or outside `boundary` — a keyword must
 # not end in the middle of an identifier. 0 when it doesn't match (or the char
 # after is a boundary char, as in `iffy` for `if`).
-fn keyword_len(self: str, spelling: str, boundary: #{char}) -> u64 {
+fn keyword_len(
+    self: str,
+    # What must prefix `self`.
+    spelling: str,
+    # The chars an identifier is made of: the one after the keyword must be absent (end of source)
+    # or outside this set, so a keyword does not end in the middle of one (`iffy` is not `if`).
+    boundary: #{char},
+) -> u64 {
     let bounded = !self[spelling.len()].is_some_and(|c| boundary.has(c));
     if (spelling.is_nonempty() && bounded && self.starts_with(spelling)) {
         spelling.len()
@@ -460,7 +476,19 @@ fn keyword_len(self: str, spelling: str, boundary: #{char}) -> u64 {
 # the end of the source cut the escape off. A token still open at the end of
 # the source is a hard error (`at` is the token's absolute start, so error spans
 # land in the real source).
-fn delimited_len(self: str, at: u64, delims: #{char}, escapes: #{char}, msg: str) -> u64!LexError {
+fn delimited_len(
+    self: str,
+    # Where `self` starts in the whole source, so error spans land in the real source.
+    at: u64,
+    # The chars that open a token; it closes at the next occurrence of the same char.
+    delims: #{char},
+    # The chars a backslash may escape. When non-empty, a backslash escapes its next char: an
+    # allowed char is content (an escaped delimiter does not close), a disallowed one is a hard
+    # error, and so is a backslash with nothing after it.
+    escapes: #{char},
+    # What a token still open at the end of the source is reported as.
+    msg: str,
+) -> u64!LexError {
     if (!self.first().is_some_and(|c| delims.has(c))) { return ok(0); };
     let d = self.first().value_or(' '); // in bounds: the guard above saw a char
 
@@ -511,7 +539,18 @@ fn unterminated_msg(msg: str) -> str {
 # content, not a terminator, and open/close may be multi-char and differ. No
 # escapes — contents are verbatim. A token still open at the end of the source
 # is a hard error (`at` places the span in the real source).
-fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
+fn between_len(
+    self: str,
+    # Where `self` starts in the whole source, so error spans land in the real source.
+    at: u64,
+    # What opens the token; it may be several chars.
+    open: str,
+    # What ends it, matched whole: a partial close inside (a lone `"` under a `"""` close) is
+    # content, not a terminator.
+    close: str,
+    # What a token still open at the end of the source is reported as.
+    msg: str,
+) -> u64!LexError {
     if (!self.starts_with(open)) { return ok(0); };
 
     // Scan for the close from just past the open, so an `open`/`close` that
@@ -570,7 +609,18 @@ fn up_to_any_len(
 # overlap can't misclassify, but the two must be distinct for nesting to mean
 # anything. No escapes — contents are verbatim. Still open (depth > 0) at the
 # end of the source is a hard error (`at` places the span in the real source).
-fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
+fn nested_len(
+    self: str,
+    # Where `self` starts in the whole source, so error spans land in the real source.
+    at: u64,
+    # What raises the depth. Tested before `close`, so an overlap cannot misclassify, but the two
+    # must be distinct for nesting to mean anything.
+    open: str,
+    # What lowers it.
+    close: str,
+    # What a token still open at the end of the source is reported as.
+    msg: str,
+) -> u64!LexError {
     if (!self.starts_with(open)) { return ok(0); };
     mut depth: u64 = 1;
 
@@ -661,7 +711,12 @@ fn int_len(self: str) -> u64 {
 # (`src[at..at+n]`, delimiters included), with the delimiters taken off by the
 # three matchers that bracket their content — see the table on `Matcher`.
 # Everything else is its own text, and its rule's `emit` interprets it.
-fn token_content(m: Matcher, text: str) -> str {
+fn token_content(
+    # The matcher that made the token.
+    m: Matcher,
+    # What it matched (`src[at..at+n]`, delimiters included).
+    text: str,
+) -> str {
     match (m) {
         Delimited(..) => text[1..text.len() - 1],
         // The two bracketing matchers strip the same way — their delimiters are
@@ -683,7 +738,13 @@ fn token_content(m: Matcher, text: str) -> str {
 # what `token_content` made of the matched text. `Bare` ignores it; `Of` applies
 # its constructor; `Try` does too but may fail with a message (paired with the
 # token `span` to make a `LexError`).
-fn apply_emit<K>(e: Emit<K>, span: Span, content: str) -> K!LexError {
+fn apply_emit<K>(
+    e: Emit<K>,
+    # Where the token is, to make a `LexError` of a failure.
+    span: Span,
+    # What `token_content` made of the matched text.
+    content: str,
+) -> K!LexError {
     match (e) {
         Bare(k) => ok(k),
         Of(f) => ok(f(content)),
@@ -786,7 +847,17 @@ fn stepped<K>(self: ModeFrame[], step: StepResult<K>, at: u64) -> ModeFrame[] {
 # The `ok(..)` on the infallible arms is the seam between the two kinds of
 # helper — a length that cannot fail and a `u64!LexError` — in the one place that
 # has to know the difference, exactly as `apply_emit` wraps its `Of` arm.
-fn step_len(self: Matcher, src: str, at: u64, unterminated: str) -> u64!LexError {
+fn step_len(
+    self: Matcher,
+    # The whole source.
+    src: str,
+    # Where this matcher is tried; passed alongside the slice being scanned because a `LexError`
+    # is spanned in the whole source.
+    at: u64,
+    # The rule's message for a construct still open at the end of the source, which only the
+    # bracketing matchers can report.
+    unterminated: str,
+) -> u64!LexError {
     let rest = src[at..];
     match (self) {
         CharRun(cont, first) => ok(rest.char_run_len(first, cont)),
@@ -859,7 +930,12 @@ fn opening(self: str) -> Starts {
 # these are the only ones worth trying. Every mode's rules are in the answer, and `lex_step`
 # passes over the ones of another mode, which is one comparison; keeping the modes apart would
 # make the answer depend on two things instead of one.
-fn candidates(firsts: Starts[], c: char) -> u64[] {
+fn candidates(
+    # What each rule can start with.
+    firsts: Starts[],
+    # The byte at the position being lexed.
+    c: char,
+) -> u64[] {
     mut found: u64[] = [];
     for (let i, first : firsts) {
         if (first.any || first.chars.has(c)) { set found.push(i); };
@@ -900,9 +976,17 @@ fn candidates(firsts: Starts[], c: char) -> u64[] {
 # Neither the loop nor the first-match-wins rule has anything to say about *which* matcher it
 # is. A rule of another mode is passed over rather than filtered out up front: the check is one
 # comparison inside the loop that already runs.
-fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], chosen: u64[], mode: i64) -> StepResult<
-    K
->!LexError {
+fn lex_step<K>(
+    src: str,
+    # The absolute position.
+    at: u64,
+    rules: TokenRule<K>[],
+    # The rules the byte at `at` can start (see `candidates`); a rule that cannot is not measured
+    # against the text at all.
+    chosen: u64[],
+    # The mode the step is in; a rule of another mode is passed over.
+    mode: i64,
+) -> StepResult<K>!LexError {
     for (let i : chosen) {
         if (let some(r) = rules[i]) {
             if (r.mode == mode) {

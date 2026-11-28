@@ -32,6 +32,44 @@
           <div class="doc"><p>True when <code>self.join(..)</code> with these separators has no elements: every piece is empty and so is every separator <code>join</code> would write between or around them. Exactly the negation of <code>join_is_nonempty</code>, which owns the rule.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[][]</code>
+
+            </li>
+
+            <li><code>sep: T[] = []</code>
+
+              <div class="doc"><p>Written between consecutive pieces, and at the ends when <code>leading_sep</code> or <code>trailing_sep</code> is set; defaults to empty.</p></div>
+
+            </li>
+
+            <li><code>final_sep: T[] = sep</code>
+
+              <div class="doc"><p>Written in the last gap instead of <code>sep</code>.</p></div>
+
+            </li>
+
+            <li><code>only_sep: T[] = sep</code>
+
+              <div class="doc"><p>Written in the sole gap of a two-piece join instead of <code>sep</code>.</p></div>
+
+            </li>
+
+            <li><code>leading_sep: bool = false</code>
+
+              <div class="doc"><p>Write <code>sep</code> before the first piece (when there is one).</p></div>
+
+            </li>
+
+            <li><code>trailing_sep: bool = false</code>
+
+              <div class="doc"><p>Write <code>sep</code> after the last piece (when there is one).</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

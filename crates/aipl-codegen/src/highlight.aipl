@@ -203,7 +203,14 @@ fn class_char(ch: char) -> str {
 #
 # Total over `Matcher`, so a new matcher shape in `lexer.aipl` fails to compile
 # here until it has a highlighting answer.
-pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
+pub fn matcher_pat(
+    m: Matcher,
+    # What what `m` matches is painted.
+    scope: str,
+    # What the escape sequences of a matcher that scans between delimiters are painted
+    # (`constant.character.escape.*`); every other matcher ignores it.
+    esc_scope: str,
+) -> Pat {
     match (m) {
         // A run of `cont` chars opened by a `first` char. When the two classes
         // are the same the run is one class and a `+`.
@@ -428,7 +435,11 @@ struct Item { scope: str, re: str, pat: Pat, plain: bool, named: bool }
 # A self-referential region — a nestable block comment — comes back as an
 # `Include` plus the named entry it refers to, since that shape cannot be
 # written inline.
-pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
+pub fn rule_pats<K>(
+    rules: TokenRule<K>[],
+    # What the escape sequences inside delimited literals are painted.
+    esc_scope: str,
+) -> Expansion {
     mut pats: Pat[] = [];
     mut entries: Entry[] = [];
     for (let it : merge_runs(items_of(rules, esc_scope))) {
@@ -567,17 +578,22 @@ fn self_referential(m: Matcher) -> bool {
 
 // ---------- patterns the lexer cannot describe ----------
 
-# A declaration: `keyword` then a name matching `name_re`, with the two halves
-# painted `kw_scope` and `name_scope`. This is the one genuinely *syntactic*
-# thing a highlighter does — a name means something different for standing
-# after `fn` — and the only one a regex- and line-based target can express.
-#
-# Pass `name_re` from the identifier rule's own matcher (`matcher_regex`) so
-# the names a declaration accepts stay the names the lexer accepts. It must
-# contain no capture groups of its own, which a character-class run never does.
-pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -> Pat {
-    Caps(```\b({re_escape(keyword)})\s+({name_re})```, [kw_scope, name_scope])
-}.test({
+# A declaration: a keyword then a name, with the two halves painted differently. This is
+# the one genuinely *syntactic* thing a highlighter does — a name means something
+# different for standing after `fn` — and the only one a regex- and line-based target
+# can express.
+pub fn decl_pat(
+    # What opens the declaration (`fn`).
+    keyword: str,
+    # Matches the declared name. Pass it from the identifier rule's own matcher (`matcher_regex`)
+    # so the names a declaration accepts stay the names the lexer accepts; it must contain no
+    # capture groups of its own, which a character-class run never does.
+    name_re: str,
+    # What `keyword` is painted.
+    kw_scope: str,
+    # What the name is painted.
+    name_scope: str,
+) -> Pat { Caps(```\b({re_escape(keyword)})\s+({name_re})```, [kw_scope, name_scope]) }.test({
     assert(decl_pat("fn", "[a-z]+", "kw", "name") == Caps("""\b(fn)\s+([a-z]+)""", ["kw", "name"]));
 })
 

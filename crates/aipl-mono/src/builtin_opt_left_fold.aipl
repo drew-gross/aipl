@@ -39,7 +39,13 @@ import {
 # Import it as plain `opt_fold` — `import { opt_left_fold as opt_fold } from
 # builtins;` — in the usual case where a file folds in only one direction;
 # spell it `opt_left_fold` only in a file that also imports `opt_right_fold`.
-pub fn opt_left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A?) -> A? {
+pub fn opt_left_fold<T: any, A: any>(
+    self: T[],
+    # The accumulator the first element is combined with.
+    init: A,
+    # Combines the accumulator and an element into the next accumulator, or `none` to end the fold.
+    f: (A, T) -> A?,
+) -> A? {
     mut acc = init;
     mut ok = true;
     for (let x : self) {

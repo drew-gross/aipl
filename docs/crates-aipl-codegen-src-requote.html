@@ -62,6 +62,28 @@
           <div class="doc"><p>An interpolated template respelled between its two forms — <code>`…{e}…`</code> and <code>```…{e}…```</code> — by the same rule as a string: fewest escapes, then the single-backtick form, then the form it has. <code>segs</code> are the source texts of the template's literal segments (between the delimiters and the interpolation braces), <code>interps</code> the interpolations' source, which is the same in both forms and is copied through; <code>raw</code> says which form the source used. A template holding a newline stays as written.</p><p>The two forms share the brace escapes <code>\{</code>/<code>\}</code>; a single-backtick segment also escapes <code>\\</code>, <code>\`</code> and the control characters, which a raw segment holds verbatim — so a raw segment can become a single one when it holds no backslash (beyond a brace escape) and no backtick, and a single segment can become a raw one when its only escapes are braces, backslashes and backticks (a control-character escape has no raw spelling), which saves every backslash and backtick escape it has.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>raw: bool</code>
+
+              <div class="doc"><p>Which form the source used: single-backtick or triple.</p></div>
+
+            </li>
+
+            <li><code>segs: str[]</code>
+
+              <div class="doc"><p>The source texts of the template's literal segments (between the delimiters and the interpolation braces).</p></div>
+
+            </li>
+
+            <li><code>interps: str[]</code>
+
+              <div class="doc"><p>The interpolations' source, which is the same in both forms and is copied through.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -114,6 +136,22 @@
           <div class="doc"><p>How many escapes <code>body</code> — the source text between a literal's delimiters, escapes undecoded — would need under <code>delim</code>. A <code>\X</code> pair counts as the one char X, so <code>\&quot;</code> costs one under <code>&quot;</code> and nothing under a backtick, exactly as a bare <code>&quot;</code> does.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>body: str</code>
+
+              <div class="doc"><p>The source text between a literal's delimiters, escapes undecoded.</p></div>
+
+            </li>
+
+            <li><code>delim: char</code>
+
+              <div class="doc"><p>The delimiter asked about.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -128,6 +166,22 @@
 
           <div class="doc"><p><code>body</code> respelled for <code>delim</code>: an escape the old delimiter needed and this one doesn't is dropped (<code>\&quot;</code> → <code>&quot;</code> under a backtick), a bare char this one needs escaped gains its backslash (<code>{</code> → <code>\{</code>), and everything else — the shared escapes, plain text — copies verbatim. Respelling for the delimiter <code>body</code> already has is the identity.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>body: str</code>
+
+              <div class="doc"><p>The source text between a literal's delimiters.</p></div>
+
+            </li>
+
+            <li><code>delim: char</code>
+
+              <div class="doc"><p>The delimiter to respell for.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -219,6 +273,22 @@
           <div class="doc"><p>How many escapes <code>value</code> needs as a single-line literal under <code>delim</code>: the delimiter's own (<code>needs_escape</code>) plus the ones every single-line form spells — a backslash, a tab, a carriage return — which a block spells with none.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>value: str</code>
+
+              <div class="doc"><p>The literal's value.</p></div>
+
+            </li>
+
+            <li><code>delim: char</code>
+
+              <div class="doc"><p>The delimiter asked about.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -233,6 +303,22 @@
 
           <div class="doc"><p><code>value</code> as the body of a single-line literal delimited by <code>delim</code>: the shared escapes for a backslash, tab and carriage return, and the delimiter's own escapes (<code>needs_escape</code>); everything else verbatim.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>value: str</code>
+
+              <div class="doc"><p>The literal's value.</p></div>
+
+            </li>
+
+            <li><code>delim: char</code>
+
+              <div class="doc"><p>The delimiter to escape for.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

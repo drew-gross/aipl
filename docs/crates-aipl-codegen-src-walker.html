@@ -808,6 +808,26 @@
           <div class="doc"><p>Whether the token <code>n</code> past the cursor has kind <code>k</code>.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: W</code>
+
+            </li>
+
+            <li><code>n: u64</code>
+
+              <div class="doc"><p>How far past the cursor.</p></div>
+
+            </li>
+
+            <li><code>k: FmtKind</code>
+
+              <div class="doc"><p>The kind asked about.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -1763,7 +1783,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$64305: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$64375: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -1855,8 +1875,28 @@
           </h3>
           <pre class="signature"><code>fn struct_pattern(self: W, kw: str, name: str) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>The tail of a struct-destructuring statement, entered on the <code>{</code>: <code>kw</code> is the leading keyword and <code>name</code> the struct the pattern names. <code>let</code> and <code>mut</code> differ only in that keyword, so they share this rather than spelling the same walk twice.</p></div>
+          <div class="doc"><p>The tail of a struct-destructuring statement, entered on the <code>{</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: W</code>
+
+            </li>
+
+            <li><code>kw: str</code>
+
+              <div class="doc"><p>The leading keyword: <code>let</code> and <code>mut</code> differ only in that, so they share this.</p></div>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The struct the pattern names.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -2929,6 +2969,26 @@
 </code></pre><p>so a chained argument keeps the ordinary broken list, where the chain breaks on a line of its own.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: W</code>
+
+            </li>
+
+            <li><code>first: u64</code>
+
+              <div class="doc"><p>The first token of the range.</p></div>
+
+            </li>
+
+            <li><code>last: u64</code>
+
+              <div class="doc"><p>The last.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -2958,6 +3018,26 @@
 
           <div class="doc"><p>Whether a comma at bracket depth zero sits among tokens <code>first</code> through <code>last</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: W</code>
+
+            </li>
+
+            <li><code>first: u64</code>
+
+              <div class="doc"><p>The first token of the range.</p></div>
+
+            </li>
+
+            <li><code>last: u64</code>
+
+              <div class="doc"><p>The last.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

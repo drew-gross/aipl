@@ -529,9 +529,14 @@ pub fn show_arm(self: MatchArm) -> str { `{self.pattern.show_pat()} => {self.bod
 
 fn show_arms(self: MatchArm[]) -> str { self$show_arm().join(sep=", ") }
 
-# A call, in the spelling its `method_style` flag says was written: the receiver
-# is `args[0]` for a method call and an ordinary argument for a free one.
-fn show_call(name: str, args: Expr[], method_style: bool) -> str {
+# A call, in the spelling its `method_style` flag says was written.
+fn show_call(
+    name: str,
+    args: Expr[],
+    # Whether it was written `recv.f(..)`: the receiver is `args[0]` for a method call and an
+    # ordinary argument for a free one.
+    method_style: bool,
+) -> str {
     if (!method_style) { return `{name}({show_exprs(args)})`; };
     match (args.first()) {
         some(recv) => `{recv.show_expr()}.{name}({show_exprs(args[1..])})`,

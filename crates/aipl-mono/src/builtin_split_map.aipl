@@ -27,7 +27,13 @@ import { equal as ==, len, logical_not as !, push, reserve, split, split_len } f
 # `f` — computed without the array of parts in between. The parts are `split`'s:
 # `n` separators give `n + 1`, including empty ones at either end, and an empty
 # `sep` never matches, so the whole string is the one part.
-pub fn split_map<U: any>(self: str, sep: str, f: (str) -> U) -> U[] {
+pub fn split_map<U: any>(
+    self: str,
+    # What the parts are separated by; an empty one never matches.
+    sep: str,
+    # Called with each part.
+    f: (str) -> U,
+) -> U[] {
     mut out: U[] = [];
 
     // Exactly one allocation: `split_len` is the same scan the loop makes with

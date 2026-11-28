@@ -29,8 +29,22 @@
           </h3>
           <pre class="signature"><code>pub fn drop_n&#60;T: any&#62;(self: T[], n: u64) -&#62; T[]</code></pre>
 
-          <div class="doc"><p>Every element except the first <code>n</code>. Dropping <code>n &gt;= len</code> gives an empty array — the same clamping an out-of-range slice does.</p></div>
+          <div class="doc"><p>Every element except the first <code>n</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>n: u64</code>
+
+              <div class="doc"><p>How many to drop from the front; at or past the length it gives an empty array, the same clamping an out-of-range slice does.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

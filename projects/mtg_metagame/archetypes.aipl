@@ -203,11 +203,14 @@ pub fn archetype_of(self: Deck, identifiers: Identifier[]) -> Archetype!str {
     ]) == err("deck d1 (Ramp) is more than one archetype: Both, Control"));
 })
 
-# The sub-archetype of the archetype `archetype` that `self` is, by name: the one identifier in
-# `identifiers` with that parent that it matches. `none` when the archetype has no sub-archetypes.
-# A deck that matches none of them is `Other`, and one that matches more than one name is an error
-# naming them, as for archetypes.
-pub fn sub_archetype_of(self: Deck, archetype: str, identifiers: Identifier[]) -> str?!str {
+# The sub-archetype that `self` is. `none` when the archetype has no sub-archetypes. A deck that matches none of them is `Other`, and one that matches more than one name is an error naming them, as for archetypes.
+pub fn sub_archetype_of(
+    self: Deck,
+    # The archetype whose sub-archetypes are asked about.
+    archetype: str,
+    # The identifiers; the one with that parent that `self` matches names it.
+    identifiers: Identifier[],
+) -> str?!str {
     let own = identifiers.filter(|i| i.parent == some(archetype));
     if (own.is_empty()) { return ok(none); };
     let deck_holdings = self.holdings();
@@ -321,8 +324,13 @@ fn string_list(self: Json, key: str) -> str[]!str {
     assert(json.string_list("q") == err(`missing "q"`));
 })
 
-# The identifiers `config` names in the file `path` of them, or why there are none.
-pub fn load_identifiers(path: str, config: str) !read_files -> Identifier[]!str {
+# The identifiers `config` names, or why there are none.
+pub fn load_identifiers(
+    # The file of identifiers.
+    path: str,
+    # Which of them are wanted.
+    config: str,
+) !read_files -> Identifier[]!str {
     let all_configs = parse(read_file_to_string(path)?)?;
     let found = all_configs.list_field(config);
     if (let err(..) = found) {

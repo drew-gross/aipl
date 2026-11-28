@@ -45,6 +45,22 @@
           <div class="doc"><p>Rewrites <code>contents</code> so that every section named in <code>fills</code> holds that fill's <code>body</code>: an existing <code>--- section ---</code> block has its old body (up to the next header line or EOF) replaced, and a section the file doesn't carry is appended as a fresh block. Everything else is preserved verbatim.</p><p>The whole batch costs one walk, which is the point: a case whose <code>stdout</code>, <code>exit code</code> and <code>report</code> all went stale is read, rewritten and written back once rather than three times.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>contents: str</code>
+
+              <div class="doc"><p>The file's text; everything the fills do not touch is preserved verbatim.</p></div>
+
+            </li>
+
+            <li><code>fills: #{str: str}</code>
+
+              <div class="doc"><p>Section name to body: an existing <code>--- section ---</code> block has its old body (up to the next header line or EOF) replaced, and a section the file does not carry is appended as a fresh block.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

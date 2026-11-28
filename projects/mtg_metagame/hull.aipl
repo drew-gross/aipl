@@ -42,9 +42,15 @@ fn copies_of(self: Card[], name: str) -> u64 {
     assert(cards.copies_of("Duress") == 0);
 })
 
-# The tally of the decks that played `wanted` copies, given how many copies each deck played
-# (`copies`) and the deck's records, as listed in `records`.
-fn tally_of(copies: u64[], records: Record[], wanted: u64) -> Tally {
+# The tally of the decks that played `wanted` copies.
+fn tally_of(
+    # How many copies each deck played.
+    copies: u64[],
+    # The decks' records, in the same order.
+    records: Record[],
+    # The number of copies asked about.
+    wanted: u64,
+) -> Tally {
     mut found = Tally { copies: wanted, decks: 0, record: Record {} };
     for (let at, count : copies) {
         if (count == wanted) {
@@ -77,8 +83,17 @@ fn tally_of(copies: u64[], records: Record[], wanted: u64) -> Tally {
     assert(tally_of(copies, records, 3) == Tally { copies: 3, decks: 0, record: Record {} });
 })
 
-# The card `name`, listed under `section`, given how many copies each deck had and how each did.
-fn hull_card(section: str, name: str, copies: u64[], records: Record[]) -> HullCard {
+# The card `name`, listed under `section`.
+fn hull_card(
+    # Where the card is listed.
+    section: str,
+    # The card.
+    name: str,
+    # How many copies each deck had.
+    copies: u64[],
+    # How each deck did.
+    records: Record[],
+) -> HullCard {
     section,
     name,
     tallies: copies.distinct().sort().map(|wanted| tally_of(copies, records, wanted)),

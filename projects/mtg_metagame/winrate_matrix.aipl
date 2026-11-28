@@ -125,12 +125,14 @@ fn placement_of(self: Deck, identifiers: Identifier[]) -> Placement!str {
     ]) == ok(Placement { archetype: "Landfall", sub: some("Other") }));
 })
 
-# Every match of `matches`, once from each side. A match with a deck not in `decks` is an error. `last_rounds` is
-# the last round of each tournament, which a match's slot is counted back from.
+# Every match, once from each side.
 fn observations(
+    # The decks; a match with a deck not in it is an error.
     decks: Deck[],
+    # The matches, each counted once from each side.
     matches: Match[],
     identifiers: Identifier[],
+    # The last round of each tournament, which a match's slot is counted back from.
     last_rounds: #{str: u64},
 ) -> Observation[]!str {
     let placed: #{str: Placement} = decks
@@ -283,8 +285,14 @@ fn record_of(self: Observation[]) -> Record {
 # bracket of the metagame, indexed alike.
 struct Cell { record: Record, rounds: Record[], brackets: Record[] }
 
-# The cell of `self`, for a metagame of `slot_count` slots and the brackets `brackets`.
-fn cell_of(self: Observation[], slot_count: u64, brackets: Bracket[]) -> Cell {
+# The cell of `self`.
+fn cell_of(
+    self: Observation[],
+    # How many slots the metagame has.
+    slot_count: u64,
+    # The brackets to count in.
+    brackets: Bracket[],
+) -> Cell {
     record: self.record_of(),
     rounds: (0..slot_count).map(|slot| self.filter(|each| each.slot == some(slot)).record_of()),
     brackets: brackets.map(|bracket| self.filter(|each| each.bracket == some(bracket)).record_of()),

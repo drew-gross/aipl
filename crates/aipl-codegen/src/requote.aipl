@@ -67,7 +67,12 @@ fn is_shared_escape(self: char) -> bool {
 # escapes undecoded — would need under `delim`. A `\X` pair counts as the one
 # char X, so `\"` costs one under `"` and nothing under a backtick, exactly as a
 # bare `"` does.
-fn escape_cost(body: str, delim: char) -> u64 {
+fn escape_cost(
+    # The source text between a literal's delimiters, escapes undecoded.
+    body: str,
+    # The delimiter asked about.
+    delim: char,
+) -> u64 {
     mut cost: u64 = 0;
     mut escaped = false;
     for (let c : body) {
@@ -107,7 +112,12 @@ fn escape_cost(body: str, delim: char) -> u64 {
 # escaped gains its backslash (`{` → `\{`), and everything else — the shared
 # escapes, plain text — copies verbatim. Respelling for the delimiter `body`
 # already has is the identity.
-fn redelimit(body: str, delim: char) -> str {
+fn redelimit(
+    # The source text between a literal's delimiters.
+    body: str,
+    # The delimiter to respell for.
+    delim: char,
+) -> str {
     mut out = "";
     mut escaped = false;
     for (let c : body) {
@@ -332,9 +342,12 @@ fn brace_escaped(value: str) -> str {
 # delimiter's own (`needs_escape`) plus the ones every single-line form
 # spells — a backslash, a tab, a carriage return — which a block spells with
 # none.
-fn single_cost(value: str, delim: char) -> u64 {
-    value.count_if(|c| c.needs_escape(delim) || c == '\\' || c == '\t' || c == '\r')
-}.test({
+fn single_cost(
+    # The literal's value.
+    value: str,
+    # The delimiter asked about.
+    delim: char,
+) -> u64 { value.count_if(|c| c.needs_escape(delim) || c == '\\' || c == '\t' || c == '\r') }.test({
     assert(single_cost(`say "hi"`, '"') == 2);
     assert(single_cost(`say "hi"`, '`') == 0);
     assert(single_cost("{a}", '`') == 2);
@@ -345,7 +358,12 @@ fn single_cost(value: str, delim: char) -> u64 {
 # `value` as the body of a single-line literal delimited by `delim`: the
 # shared escapes for a backslash, tab and carriage return, and the delimiter's
 # own escapes (`needs_escape`); everything else verbatim.
-fn encode(value: str, delim: char) -> str {
+fn encode(
+    # The literal's value.
+    value: str,
+    # The delimiter to escape for.
+    delim: char,
+) -> str {
     value
         .map(|c| if (c == '\\') {
             """\\"""
@@ -382,7 +400,15 @@ fn encode(value: str, delim: char) -> str {
 # become a raw one when its only escapes are braces, backslashes and backticks
 # (a control-character escape has no raw spelling), which saves every
 # backslash and backtick escape it has.
-pub fn retemplate(raw: bool, segs: str[], interps: str[]) -> str {
+pub fn retemplate(
+    # Which form the source used: single-backtick or triple.
+    raw: bool,
+    # The source texts of the template's literal segments (between the delimiters and the
+    # interpolation braces).
+    segs: str[],
+    # The interpolations' source, which is the same in both forms and is copied through.
+    interps: str[],
+) -> str {
     let any_newline = segs.any(|s| s.contains('\n')) || interps.any(|s| s.contains('\n'));
     let want_raw = if (any_newline) {
         raw

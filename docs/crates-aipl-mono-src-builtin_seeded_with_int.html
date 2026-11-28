@@ -29,8 +29,18 @@
           </h3>
           <pre class="signature"><code>pub fn seeded_with_int(seed: u64) -&#62; RandomProvider</code></pre>
 
-          <div class="doc"><p>The <code>random</code> provider that starts the generator at <code>seed</code>, so the same seed plays out the same numbers. Used as the value of a <code>shim random { .. }</code> block; see <code>seeded_with_clock</code> for a fresh sequence each run.</p></div>
+          <div class="doc"><p>The <code>random</code> provider that starts the generator at a seed. Used as the value of a <code>shim random { .. }</code> block; see <code>seeded_with_clock</code> for a fresh sequence each run.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>seed: u64</code>
+
+              <div class="doc"><p>Where the generator starts; the same seed plays out the same numbers.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

@@ -237,7 +237,14 @@ struct Parser<K: variant, A: any> {
 # `far` updated with "`label` was expected at `pos`". Deeper wins outright;
 # equally deep joins the expected set (deduped); shallower is discarded. An
 # empty label is a *transparent* production and records nothing.
-fn far_miss(far: Far, pos: u64, label: str) -> Far {
+fn far_miss(
+    # The furthest failure so far.
+    far: Far,
+    # Where `label` was expected.
+    pos: u64,
+    # What was expected. An empty label is a *transparent* production and records nothing.
+    label: str,
+) -> Far {
     if (label.is_empty() || pos < far.pos) { return far; };
     if (far.pos < pos) { return Far { pos, expected: [label], recorded: far.recorded }; };
     if (far.expected.contains(label)) { return far; };
@@ -257,7 +264,13 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
 # inside the rule it matched aborts with what `b` holds, and that has to be
 # everything met so far. So `b`'s `recorded` is the whole of it, and `a`'s is a
 # prefix of it.
-fn far_join(a: Far, b: Far) -> Far {
+fn far_join(
+    # One failure record; its blamed bracket wins a tie.
+    a: Far,
+    # The other. It began empty at this point (`match_expect` starts one so its error says what
+    # *it* wanted), but carries `a`'s `recorded`, so its `recorded` is the whole of it.
+    b: Far,
+) -> Far {
     let recorded = b.recorded;
     if (a.pos < b.pos) { return Far { ..b, recorded }; };
     if (b.pos < a.pos) { return Far { ..a, recorded }; };
@@ -284,7 +297,11 @@ fn far_join(a: Far, b: Far) -> Far {
 # inside out, so the first to record is the innermost one — and closing that is
 # the edit the reader has to make first, even when an outer bracket is hanging
 # too.
-fn far_unclosed(far: Far, open: Span[]) -> Far {
+fn far_unclosed(
+    far: Far,
+    # The spans of the opening bracket that went unclosed.
+    open: Span[],
+) -> Far {
     if (far.unclosed.is_nonempty()) { return far; };
     Far { ..far, unclosed: open }
 }
@@ -403,8 +420,12 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
 # only `Climb` needs (each operator application nests under it).
 fn match_rule<K: variant, A: any>(
     p: Parser<K, A>,
+    # The rule to match.
     r: LinkedRule<K>,
+    # Where in the tokens.
     pos: u64,
+    # The index of the production being matched, which only `Climb` needs (each operator
+    # application nests under it).
     cur: u64,
     far: Far,
 ) -> Step!Abort {
@@ -447,7 +468,15 @@ fn match_rule<K: variant, A: any>(
 # A `Fn` refusal is handed those tokens' text, run together with a single
 # space wherever the source had a gap: the parser holds no source, only the
 # tokens, and their spans say where the gaps were.
-fn refusal<K: variant, A: any>(p: Parser<K, A>, what: Refusal, start: u64, end: u64) -> ParseError {
+fn refusal<K: variant, A: any>(
+    p: Parser<K, A>,
+    what: Refusal,
+    # The first token the enclosing sequence accepted before refusing.
+    start: u64,
+    # One past the last. An empty range is a refusal reached with nothing in front of it, which
+    # points at the token at `end`.
+    end: u64,
+) -> ParseError {
     let matched = p.toks[start..end];
     let span = match (matched.first()) {
         some(f) => f.text.span.start..matched.last().value_or(f).text.span.end,
@@ -556,13 +585,22 @@ fn match_one_of<K: variant, A: any>(
 # either the list or a list followed by a stray comma.
 fn match_many<K: variant, A: any>(
     p: Parser<K, A>,
+    # The repeated rule.
     sub: LinkedRule<K>,
+    # The fewest items accepted.
     min: u64,
+    # The most items, when bounded.
     max: u64?,
+    # What goes between consecutive items. What it matched is held back until an item follows it.
     sep: LinkedRule<K>?,
+    # Whether a separator with nothing after it is part of the list; otherwise the position
+    # rewinds to before it and the enclosing rule is the one that complains.
     trailing_sep: bool,
+    # Whether a separator may stand in front of the first item.
     leading_sep: bool,
+    # The bracket pair holding the list, if it is bracketed.
     nested_in: (LinkedRule<K>, LinkedRule<K>)?,
+    # Which group the brackets are, for reporting an unclosed one.
     group: u64?,
     pos: u64,
     cur: u64,
@@ -759,6 +797,7 @@ fn match_sep<K: variant, A: any>(
 # still reports.
 fn match_leading_sep<K: variant, A: any>(
     p: Parser<K, A>,
+    # The separator that may stand in front of the first item.
     sep: LinkedRule<K>?,
     pos: u64,
     cur: u64,
@@ -775,6 +814,7 @@ fn hit_nothing(pos: u64, far: Far) -> Step { hit: true, pos, kids: [], far }
 # an optional part that was *started* and then went wrong still reports.
 fn match_maybe<K: variant, A: any>(
     p: Parser<K, A>,
+    # The rule that may or may not be there.
     sub: LinkedRule<K>,
     pos: u64,
     cur: u64,
@@ -810,6 +850,7 @@ fn match_maybe<K: variant, A: any>(
 # improve on.
 fn match_expect<K: variant, A: any>(
     p: Parser<K, A>,
+    # The rule the grammar is committed to.
     sub: LinkedRule<K>,
     pos: u64,
     cur: u64,
@@ -846,7 +887,13 @@ fn match_expect<K: variant, A: any>(
 # since the incoming `far` (a sibling alternative's expectations at the same
 # position) is what the label is merged into. A transparent production (empty
 # `expect_as`) never collapses anything: its insides are the message.
-fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -> Step!Abort {
+fn match_prod<K: variant, A: any>(
+    p: Parser<K, A>,
+    # The production's index.
+    i: u64,
+    pos: u64,
+    far: Far,
+) -> Step!Abort {
     let Production { rule, expect_as } = p.prods[i].value_or_err(grammar_fault(
         `no production at index {i}`,
     ))?;
@@ -877,7 +924,13 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
 # production still matches there, and the cost of trying the rest is one failed
 # token compare. `can_start` is conservative in the safe direction anyway, so the
 # only thing a wrong answer here could cost is the pruning itself.
-fn can_reach<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64) -> bool {
+fn can_reach<K: variant, A: any>(
+    p: Parser<K, A>,
+    # The production.
+    i: u64,
+    # Where the token to ask about is.
+    pos: u64,
+) -> bool {
     // A grammar whose FIRST sets and productions disagree in length is not
     // one this can prune; let the match decide.
     p.toks[pos]
@@ -1025,7 +1078,14 @@ fn rule_nullable<K: variant>(r: LinkedRule<K>, firsts: First<K>[]) -> bool {
 # `min_power`. Levels are scanned in order, so a spelling listed twice takes the
 # first. The empty string never matches — that is what `tok_text` returns past
 # the end of the tokens, so running out of input simply ends the climb.
-fn find_prec(precs: Prec[], text: str, min_power: u64) -> Prec? {
+fn find_prec(
+    precs: Prec[],
+    # The operator's spelling. The empty string never matches — that is what `tok_text` returns
+    # past the end of the tokens, so running out of input ends the climb.
+    text: str,
+    # The loosest binding power accepted.
+    min_power: u64,
+) -> Prec? {
     if (text.is_empty()) { return none; };
     precs.find_if(|pr| min_power <= pr.power && pr.ops.contains(text))
 }
@@ -1369,8 +1429,13 @@ fn missing_slips(node: Cst) -> Slip[] {
 fn recovered_errors<K: variant, A: any>(
     p: Parser<K, A>,
     src: str,
+    # The errors the grammar recovered from.
     slips: Slip[],
+    # The failure that ended the parse, when one did.
     last: ParseError?,
+    # Which of two errors at one token stays: a refusal's message was written for the case and
+    # replaces the generic "expected" a slip would have said; an ordinary miss says nothing more
+    # than the slip did, and the slip, being first, stays.
     last_wins: bool,
 ) -> ParseError[] {
     mut out: ParseError[] = [];

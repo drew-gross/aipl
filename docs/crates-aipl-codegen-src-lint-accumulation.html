@@ -260,8 +260,34 @@ for (let x : xs) {
           </h3>
           <pre class="signature"><code>pub fn pipeline_hit(self: SeededLoop, what: str, annotation: str, stages: (Callee, str)[]) -&#62; LintHit</code></pre>
 
-          <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the binding: <code>what</code> is how the loop fills it, as the message says, and <code>annotation</code> what follows the binding's name in the advice. Each stage is a builtin and the arguments it is written with. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
+          <div class="doc"><p>The hit for a loop that is the pipeline of <code>stages</code> over its iterable, assigned to the binding. It points at the seed, not the loop: <code>#[allow]</code> is line-scoped, so a hit spanning the loop could never be squelched (the marker would have to go on the <code>for (..) {</code> header, and the formatter relocates one written there onto a line of its own, where it squelches nothing). <code>mut out = [];</code> always occupies one line, and is where the shape starts.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: SeededLoop</code>
+
+            </li>
+
+            <li><code>what: str</code>
+
+              <div class="doc"><p>How the loop fills the binding, as the message says it.</p></div>
+
+            </li>
+
+            <li><code>annotation: str</code>
+
+              <div class="doc"><p>What follows the binding's name in the advice.</p></div>
+
+            </li>
+
+            <li><code>stages: (Callee, str)[]</code>
+
+              <div class="doc"><p>The pipeline: each stage is a builtin and the arguments it is written with.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

@@ -45,20 +45,23 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-# `self.map(f).join(sep=sep, final_sep=final_sep, only_sep=only_sep, leading_sep=leading_sep,
-# trailing_sep=trailing_sep)` — every `f(x)` flattened into one sequence with the separators
-# between — computed in a single pass into a single buffer. The three separators are `join`'s
-# (`sep` between consecutive pieces, `final_sep` in the last gap, `only_sep` in the sole gap of a
-# two-piece join), all defaulting to empty, and `leading_sep` and `trailing_sep` write `sep`
-# before the first piece and after the last. For a `str`-valued
-# `f` the result is the string join; a `str` receiver iterates its chars.
+# `self.map(f).join(..)` — every `f(x)` flattened into one sequence with the separators between —
+# computed in a single pass into a single buffer. For a `str`-valued `f` the result is the string join;
+# a `str` receiver iterates its chars.
 pub fn map_join<T: any, U: any>(
     self: T[],
+    # Maps each element to the piece written for it.
     f: (T) -> U[],
+    # Written between consecutive pieces, and at the ends when `leading_sep` or `trailing_sep` is
+    # set; defaults to empty.
     sep: U* = [],
+    # Written in the last gap instead of `sep`.
     final_sep: U* = sep,
+    # Written in the sole gap of a two-piece join instead of `sep`.
     only_sep: U* = sep,
+    # Write `sep` before the first piece (when there is one).
     leading_sep: bool = false,
+    # Write `sep` after the last piece (when there is one).
     trailing_sep: bool = false,
 ) -> U[] {
     let n = self.len();

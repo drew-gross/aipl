@@ -66,8 +66,24 @@
           </h3>
           <pre class="signature"><code>fn rule(widths: u64[], fill: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The line of <code>fill</code> characters over each column of <code>widths</code>, joined by <code>+</code>.</p></div>
+          <div class="doc"><p>The line of <code>fill</code> over each column, joined by <code>+</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>widths: u64[]</code>
+
+              <div class="doc"><p>How wide each column is.</p></div>
+
+            </li>
+
+            <li><code>fill: str</code>
+
+              <div class="doc"><p>What the line is made of.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -96,8 +112,28 @@
           </h3>
           <pre class="signature"><code>fn fitted&#60;T: any&#62;(self: T[], n: u64, filler: T) -&#62; T[]</code></pre>
 
-          <div class="doc"><p><code>self</code> made <code>n</code> long by adding <code>filler</code> to the end; one already longer is left as it is.</p></div>
+          <div class="doc"><p><code>self</code> made <code>n</code> long.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>n: u64</code>
+
+              <div class="doc"><p>How long to make <code>self</code>; one already longer is left as it is.</p></div>
+
+            </li>
+
+            <li><code>filler: T</code>
+
+              <div class="doc"><p>What is added to the end.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

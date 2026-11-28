@@ -251,8 +251,28 @@
           </h3>
           <pre class="signature"><code>fn fits_after(budget: u64, n: u64, rest: Work) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Spend <code>n</code> of the remaining columns and keep walking — or give up when <code>n</code> doesn't fit. The check has to come <em>before</em> the subtraction: on an unsigned budget <code>budget - n</code> floors at 0, which would hide the overrun.</p></div>
+          <div class="doc"><p>Spend <code>n</code> of the remaining columns and keep walking — or give up when <code>n</code> doesn't fit.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>budget: u64</code>
+
+              <div class="doc"><p>The columns that remain.</p></div>
+
+            </li>
+
+            <li><code>n: u64</code>
+
+              <div class="doc"><p>The columns to spend. The check comes <em>before</em> the subtraction: on an unsigned budget <code>budget - n</code> floors at 0, which would hide the overrun.</p></div>
+
+            </li>
+
+            <li><code>rest: Work</code>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -296,8 +316,24 @@
           </h3>
           <pre class="signature"><code>fn col_after(col: u64, text: str) -&#62; u64</code></pre>
 
-          <div class="doc"><p>The column just past <code>text</code> when appended at column <code>col</code>: the length of its last line for multi-line text, else <code>col + width</code>.</p></div>
+          <div class="doc"><p>The column just past <code>text</code> when appended at column <code>col</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>col: u64</code>
+
+              <div class="doc"><p>The column <code>text</code> is appended at.</p></div>
+
+            </li>
+
+            <li><code>text: str</code>
+
+              <div class="doc"><p>What is appended; for multi-line text only its last line counts.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

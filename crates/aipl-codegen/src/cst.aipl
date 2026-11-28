@@ -284,10 +284,14 @@ pub fn parts(self: Cst) -> Parts {
     }
 }
 
-# `kids` split onto `acc`, in source order. The accumulator is a whole `Parts`
-# rather than the two lists on their own so that one value threads through the
-# loop and through a group's recursion.
-fn split_kids(kids: Cst[], acc: Parts) -> Parts {
+# `kids` split onto `acc`, in source order.
+fn split_kids(
+    # The children to sort into nodes and tokens.
+    kids: Cst[],
+    # What they are split onto: a whole `Parts` rather than two lists, so one value threads
+    # through the loop and through a group's recursion.
+    acc: Parts,
+) -> Parts {
     mut a = acc;
     for (let k : kids) {
         set a = split_kid(a, k);

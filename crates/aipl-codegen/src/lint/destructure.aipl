@@ -515,9 +515,18 @@ variant Taken = Fields(str[]) | Opening(Span, str, str[])
 # pattern (a tuple's has no case) over these names.
 variant Place = Parameter(str) | Bound(str?) | Slot(str?, str[])
 
-# How `name` is taken apart in `scope`, when it is. `value` is what a `let` binds it
-# to, and `struct_name` the struct the source already names for it, if any.
-fn taken_apart(self: Expr, name: str, reads: Read[], value: Expr?, struct_name: str?) -> Taken? {
+# How `name` is taken apart in `scope`, when it is.
+fn taken_apart(
+    self: Expr,
+    # The name asked about.
+    name: str,
+    # The field reads in scope of `name`.
+    reads: Read[],
+    # What a `let` binds `name` to; a parameter or a slot has none.
+    value: Expr?,
+    # The struct the source already names for it, if any.
+    struct_name: str?,
+) -> Taken? {
     let Uses { mentions, field_reads, shadowed } = self.uses_of(name);
     if (!shadowed && field_reads == 0 && mentions == 1) {
         if (let some((span, named, fields)) = self.opening_destructure(name, struct_name)) {
@@ -617,7 +626,14 @@ fn binding_hit(name: str, annotation: Ty?, value: Expr, inner: Expr, reads: Read
 }
 
 # The hits for the slots of `pattern`, the names it binds over `scope`, at `at`.
-fn slot_hits(self: Binding, scope: Expr, reads: Read[], at: Span) -> LintHit[] {
+fn slot_hits(
+    self: Binding,
+    # Where the names the pattern binds are used.
+    scope: Expr,
+    reads: Read[],
+    # Where the hits point.
+    at: Span,
+) -> LintHit[] {
     match (self) {
         ByCase(case_name, names) => names.slots_taken_apart(some(case_name), scope, reads, at),
         ByTuple(names) => names.slots_taken_apart(none, scope, reads, at),
@@ -685,8 +701,15 @@ fn slots_taken_apart(
     found
 }
 
-# What is said of `name`, bound at `place`, taken apart as `taken`.
-fn advice(place: Place, name: str, taken: Taken) -> str {
+# What is said of `name`.
+fn advice(
+    # Where `name` is bound.
+    place: Place,
+    # The binding or parameter.
+    name: str,
+    # How it is taken apart.
+    taken: Taken,
+) -> str {
     match (place) {
         Parameter(struct_name) => match (taken) {
             Fields(fields) => param_message(name, struct_name, fields),
@@ -710,7 +733,16 @@ fn advice(place: Place, name: str, taken: Taken) -> str {
 }
 
 # The pattern over `names`, with the slot `name` taken apart in place as `taken`.
-fn slot_pattern(case_name: str?, names: str[], name: str, taken: str) -> str {
+fn slot_pattern(
+    # The case the pattern is of, if it is one.
+    case_name: str?,
+    # The names the pattern binds.
+    names: str[],
+    # The slot that is taken apart in place.
+    name: str,
+    # The pattern it is taken apart as.
+    taken: str,
+) -> str {
     let spelled = names.map(|n| if (n == name) { taken } else { n }).join(sep=", ");
     match (case_name) {
         some(case_name) => `{case_name}({spelled})`,

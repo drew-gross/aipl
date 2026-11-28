@@ -32,6 +32,26 @@
           <div class="doc"><p><code>self.split(sep).map(f)</code> — every <code>sep</code>-separated part of <code>self</code> mapped through <code>f</code> — computed without the array of parts in between. The parts are <code>split</code>'s: <code>n</code> separators give <code>n + 1</code>, including empty ones at either end, and an empty <code>sep</code> never matches, so the whole string is the one part.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>sep: str</code>
+
+              <div class="doc"><p>What the parts are separated by; an empty one never matches.</p></div>
+
+            </li>
+
+            <li><code>f: (str) -&#62; U</code>
+
+              <div class="doc"><p>Called with each part.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

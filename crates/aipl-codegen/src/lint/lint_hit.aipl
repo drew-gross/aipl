@@ -84,11 +84,16 @@ struct LintHit { named: Named[], tail: str, span: Span = 0..0 }
 struct Named { text: str, builtin: Need }
 
 # An unfilled hit at `span` for a message `before` + the builtin's spelling + `after`.
-pub fn unfilled(builtin: Callee, before: str, after: str, span: Span) -> LintHit {
-    named: [Named { text: before, builtin: Builtin(builtin) }],
-    tail: after,
-    span,
-}.test({
+pub fn unfilled(
+    # The builtin the message names.
+    builtin: Callee,
+    # The message up to the builtin's spelling.
+    before: str,
+    # The message after it.
+    after: str,
+    # Where the hit points.
+    span: Span,
+) -> LintHit { named: [Named { text: before, builtin: Builtin(builtin) }], tail: after, span }.test({
     assert(unfilled(Len, "use ", "()", 1..2).span == 1..2);
 })
 
@@ -105,10 +110,14 @@ pub fn lint_message(message: str, span: Span = 0..0) -> LintHit {
 })
 
 # An advice for a message `before` + the builtin's spelling + `after`.
-pub fn advice(builtin: Callee, before: str, after: str) -> LintHit {
-    named: [Named { text: before, builtin: Builtin(builtin) }],
-    tail: after,
-}.test({
+pub fn advice(
+    # The builtin the message names.
+    builtin: Callee,
+    # The message up to the builtin's spelling.
+    before: str,
+    # The message after it.
+    after: str,
+) -> LintHit { named: [Named { text: before, builtin: Builtin(builtin) }], tail: after }.test({
     assert(advice(Len, "use ", "()").named == [Named { text: "use ", builtin: Builtin(Len) }]);
 })
 

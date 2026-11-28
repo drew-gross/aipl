@@ -27,7 +27,7 @@
             <a class="anchor" href="#item-unused_binding">unused_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn unused_binding(__spat$3404: Function) -&#62; LintHit[]</code></pre>
+          <pre class="signature"><code>pub fn unused_binding(__spat$3500: Function) -&#62; LintHit[]</code></pre>
 
           <div class="doc"><p>A hit for each <code>let</code> and <code>mut</code> binding in the function whose name is never mentioned after it.</p></div>
 
@@ -83,6 +83,28 @@
 
           <div class="doc"><p>A hit if nothing in <code>inner</code>, the rest of the block, mentions <code>name</code>, which was bound to the value at <code>at</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The binding.</p></div>
+
+            </li>
+
+            <li><code>at: Span</code>
+
+              <div class="doc"><p>The value it was bound to.</p></div>
+
+            </li>
+
+            <li><code>inner: Expr</code>
+
+              <div class="doc"><p>The rest of the block.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

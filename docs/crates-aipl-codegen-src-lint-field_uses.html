@@ -59,8 +59,34 @@
           </h3>
           <pre class="signature"><code>pub fn sole_fields(self: Expr, name: str, reads: Read[], value: Expr?) -&#62; str[]?</code></pre>
 
-          <div class="doc"><p>The fields <code>self</code> reads off <code>name</code>, when every use of <code>name</code> in it is a field read and nothing holds a pattern back: the name is not rebound, no field is also read off another value, none is a tuple position, and no field's name is already spoken for in <code>self</code>. <code>reads</code> are the field reads in scope of <code>name</code>, which is what tells a field read off two values apart.</p><p><code>value</code> is what a <code>let</code> binds <code>name</code> to. It runs before the pattern binds anything, so the reads in it do not count against a field and no name in it is exempt; a parameter or a slot has none.</p></div>
+          <div class="doc"><p>The fields <code>self</code> reads off <code>name</code>, when every use of <code>name</code> in it is a field read and nothing holds a pattern back: the name is not rebound, no field is also read off another value, none is a tuple position, and no field's name is already spoken for in <code>self</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Expr</code>
+
+            </li>
+
+            <li><code>name: str</code>
+
+              <div class="doc"><p>The name asked about.</p></div>
+
+            </li>
+
+            <li><code>reads: Read[]</code>
+
+              <div class="doc"><p>The field reads in scope of <code>name</code>, which is what tells a field read off two values apart.</p></div>
+
+            </li>
+
+            <li><code>value: Expr?</code>
+
+              <div class="doc"><p>What a <code>let</code> binds <code>name</code> to. It runs before the pattern binds anything, so the reads in it do not count against a field and no name in it is exempt; a parameter or a slot has none.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -91,6 +117,26 @@
 
           <div class="doc"><p>Whether <code>self</code> mentions any of <code>names</code> as a bare identifier, ignoring <code>skip</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Expr</code>
+
+            </li>
+
+            <li><code>names: str[]</code>
+
+              <div class="doc"><p>The identifiers asked about.</p></div>
+
+            </li>
+
+            <li><code>skip: str?</code>
+
+              <div class="doc"><p>One that is ignored.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -158,6 +204,28 @@
 
           <div class="doc"><p>The distinct bases <code>field</code> is read off, counting only those read somewhere other than <code>inside</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>field: str</code>
+
+              <div class="doc"><p>The field.</p></div>
+
+            </li>
+
+            <li><code>everywhere: Read[]</code>
+
+              <div class="doc"><p>Every read of a field.</p></div>
+
+            </li>
+
+            <li><code>inside: Read[]</code>
+
+              <div class="doc"><p>The reads that do not count.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

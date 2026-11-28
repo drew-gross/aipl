@@ -698,8 +698,26 @@
           </h3>
           <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[], base: u64) -&#62; LinkedRule&#60;K&#62;!ParseError</code></pre>
 
-          <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code> and every bracketed repetition given its entry in the grammar's <code>groups</code> table. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p><p><code>base</code> is the index the first group in <code>r</code> takes; the rest follow in <code>group_styles</code> order. It is threaded by arithmetic rather than by a running counter because a rule is a tree and <code>try_map</code> has nowhere to keep one.</p></div>
+          <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code> and every bracketed repetition given its entry in the grammar's <code>groups</code> table. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>r: Rule&#60;K&#62;</code>
+
+            </li>
+
+            <li><code>names: str[]</code>
+
+            </li>
+
+            <li><code>base: u64</code>
+
+              <div class="doc"><p>The index the first group in <code>r</code> takes; the rest follow in <code>group_styles</code> order. It is threaded by arithmetic rather than by a running counter because a rule is a tree and <code>try_map</code> has nowhere to keep one.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -743,8 +761,28 @@
           </h3>
           <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[], base: u64) -&#62; LinkedRule&#60;K&#62;[]!ParseError</code></pre>
 
-          <div class="doc"><p>Each rule in <code>rs</code>, linked, with <code>base</code> advancing past the groups each one holds.</p></div>
+          <div class="doc"><p>Each rule in <code>rs</code>, linked.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>rs: Rule&#60;K&#62;[]</code>
+
+              <div class="doc"><p>The rules to link.</p></div>
+
+            </li>
+
+            <li><code>names: str[]</code>
+
+            </li>
+
+            <li><code>base: u64</code>
+
+              <div class="doc"><p>The number the first group is numbered from; it advances past the groups each rule holds.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

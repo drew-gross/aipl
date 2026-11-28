@@ -231,9 +231,10 @@ variant Callee =
     | LogicalAnd
     | LogicalOr
     | LogicalNot
-    # The operator builtins that share another's Rust callee (`wrapping_increment` is a `wrapping_add`
-    # of one), so the table the Rust side reads has no row for them and a call to one is a call of
-    # the shared callee there. A lint tells them apart, which is what `lint_table` is for.
+    # The operator builtins that share another's Rust callee (`wrapping_increment` is a
+    # `wrapping_add` of one), so the table the Rust side reads has no row for them and a call to
+    # one is a call of the shared callee there. A lint tells them apart, which is what
+    # `lint_table` is for.
     | WrappingIncrement
     | SaturatingIncrement
     | WrappingDecrement

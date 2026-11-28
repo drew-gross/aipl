@@ -20,7 +20,8 @@ variant Ty =
     | Set(Ty, SetOrder)
     | Dict(Ty, Ty)
     | Result(Ty, Ty)
-    # `mutating` is last so an artifact built before it decodes a function type as the plain one it was.
+    # `mutating` is last so an artifact built before it decodes a function type as the plain one
+    # it was.
     | Fn(Ty[], Ty, str[], mutating: bool = false)
     | Tuple(Ty[])
     | Generic(str, Ty[])

@@ -909,8 +909,26 @@
           </h3>
           <pre class="signature"><code>fn show_call(name: str, args: Expr[], method_style: bool) -&#62; str</code></pre>
 
-          <div class="doc"><p>A call, in the spelling its <code>method_style</code> flag says was written: the receiver is <code>args[0]</code> for a method call and an ordinary argument for a free one.</p></div>
+          <div class="doc"><p>A call, in the spelling its <code>method_style</code> flag says was written.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>name: str</code>
+
+            </li>
+
+            <li><code>args: Expr[]</code>
+
+            </li>
+
+            <li><code>method_style: bool</code>
+
+              <div class="doc"><p>Whether it was written <code>recv.f(..)</code>: the receiver is <code>args[0]</code> for a method call and an ordinary argument for a free one.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

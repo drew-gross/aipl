@@ -5,9 +5,12 @@ import { ends_with, equal as ==, filter, is_empty, list_files, sort } from built
 
 # Every file at or below `dir` whose path ends with `ext`, sorted. `err(..)` if
 # the tree can't be walked at all — see the `list_files` builtin.
-pub fn find_files(dir: str, ext: str) !list_files -> str[]!Error {
-    ok(with_extension(list_files(dir)?, ext))
-}.test({
+pub fn find_files(
+    # The directory walked.
+    dir: str,
+    # What a path must end with.
+    ext: str,
+) !list_files -> str[]!Error { ok(with_extension(list_files(dir)?, ext)) }.test({
     // `list_files` is the disk-touching half, so a stand-in answers for it; the
     // end-to-end walk is `tests/cases/files/list_files.aipl`.
     shim list_files { list_files = |dir| err("could not list files") } {

@@ -288,7 +288,13 @@ fn check_projection(name: str) -> str!str {
 
 # `spec` with the expectation that `projection` of `check`'s output is `body`. Two sections cannot
 # pin the same projection, however they are spelled.
-fn with_check(spec: Spec, projection: str, body: str) -> Spec!str {
+fn with_check(
+    spec: Spec,
+    # Which part of `check`'s output the section pins.
+    projection: str,
+    # What it must be.
+    body: str,
+) -> Spec!str {
     if (spec.checks.any(|existing| existing.projection == projection)) {
         return err(`two sections pin the same part of \`aipl check\`'s output ("{projection}")`);
     };

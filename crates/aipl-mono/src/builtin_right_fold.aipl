@@ -26,7 +26,13 @@ import {
 # Prefer `left_fold` (imported as plain `fold`) unless the right-to-left order
 # matters — building a cons list front-to-back from an array is the standard
 # case where it does.
-pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
+pub fn right_fold<T: any, A: any>(
+    self: T[],
+    # The accumulator the last element is combined with.
+    init: A,
+    # Combines an element and the accumulator into the next accumulator.
+    f: (T, A) -> A,
+) -> A {
     mut acc = init;
     mut i = self.len();
     while (i > 0) {

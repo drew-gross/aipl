@@ -481,7 +481,15 @@ struct LiftedAll { patterns: Pat[], structs: Found[] }
 # `self` with each struct pattern in it replaced by a binder named for `tag` and
 # its place, counting from `taken` — the number already lifted from the patterns
 # before this one in the arm.
-fn lifted(self: Pat, tag: u64, taken: u64, written: WrittenNames) -> Lifted {
+fn lifted(
+    self: Pat,
+    # Names each binder (with its place) the pattern is replaced by.
+    tag: u64,
+    # How many have already been lifted from the patterns before this one in the arm; counting
+    # starts here.
+    taken: u64,
+    written: WrittenNames,
+) -> Lifted {
     match (self) {
         Struct(struct_name, fields, names) => Lifted {
             pattern: PatCtor(`__npat${tag}_{taken}`),
@@ -690,8 +698,10 @@ fn for_pattern(
 # pattern names the right one.
 fn bind_off(
     binding: Binding,
+    # The variable the names are read off.
     tmp: str,
     span: Span,
+    # What the bindings are in front of.
     body: CoreExpr,
     written: WrittenNames,
 ) -> CoreExpr {
@@ -782,6 +792,9 @@ fn bind_arm(
     names: str[],
     tmp: str,
     span: Span,
+    # What follows the bindings. Each name gets its own `match` rather than one wrapping `rest`,
+    # which keeps `rest` out of an arm: a block that is an expression may not assign to a binding
+    # from outside it.
     rest: CoreExpr,
     written: WrittenNames,
 ) -> CoreExpr { bind_pattern(PatCtor(case_name, bindings=names), tmp, span, rest, written) }
@@ -890,12 +903,15 @@ fn bind_one_param(Param { binding, name_span, written }, body: CoreExpr) -> Core
     bind_param_pattern(name, binding, name_span, body, written.value_or(WrittenNames {}))
 }
 
-# The bindings `pattern` makes, read off the parameter called `parameter`, in front of
-# `body`. The parameter's own type is what the checker holds the pattern to.
+# The bindings `pattern` makes, read off `parameter`, in front of `body`.
 fn bind_param_pattern(
+    # The parameter the bindings are read off; its own type is what the checker holds the pattern
+    # to.
     parameter: str,
+    # What the parameter is destructured into.
     pattern: Binding,
     span: Span,
+    # What the bindings are in front of.
     body: CoreExpr,
     written: WrittenNames,
 ) -> CoreExpr {

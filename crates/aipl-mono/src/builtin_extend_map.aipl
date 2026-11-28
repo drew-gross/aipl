@@ -10,7 +10,13 @@
 import { equal as ==, len, push } from builtins;
 
 # Append `f(x)` for each `x` of `xs`, in order, onto `self`.
-pub fn extend_map<T: any, U: any>(mut self: U[], xs: T[], f: (T) -> U) {
+pub fn extend_map<T: any, U: any>(
+    mut self: U[],
+    # The elements mapped.
+    xs: T[],
+    # What is appended for each.
+    f: (T) -> U,
+) {
     for (let x : xs) {
         set self.push(f(x));
     }

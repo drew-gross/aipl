@@ -654,6 +654,28 @@
           <div class="doc"><p>One keyword/constant rule: match the exact <code>spelling</code> at an identifier boundary (so <code>fn</code>/<code>true</code> don't split <code>fnord</code>/<code>trueish</code>) and emit the fixed <code>kind</code>. Every keyword and constant is a single <code>kw</code> call in <code>aipl_rules</code>, so the spelling and its <code>AiplTok</code> arm are named together — no spelling→arm <code>match</code> to keep in sync with a separate spelling list.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>spelling: str</code>
+
+              <div class="doc"><p>Matched exactly, at an identifier boundary (so <code>fn</code>/<code>true</code> don't split <code>fnord</code>/<code>trueish</code>).</p></div>
+
+            </li>
+
+            <li><code>kind: AiplTok</code>
+
+              <div class="doc"><p>The fixed token kind emitted.</p></div>
+
+            </li>
+
+            <li><code>scope: str</code>
+
+              <div class="doc"><p>What the keyword is painted.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -668,6 +690,28 @@
 
           <div class="doc"><p>One operator/punctuation rule: match the exact <code>spelling</code> (no identifier boundary) and emit the fixed <code>kind</code>. Each <code>op</code> is one rule matching one spelling, and rules are first-match-wins — so <code>aipl_rules</code> lists the <code>op</code> rules longest spelling first (<code>==</code> before <code>=</code>) to keep maximal munch.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>spelling: str</code>
+
+              <div class="doc"><p>Matched exactly, with no identifier boundary. Rules are first-match-wins, so <code>aipl_rules</code> lists the <code>op</code> rules longest spelling first (<code>==</code> before <code>=</code>) to keep maximal munch.</p></div>
+
+            </li>
+
+            <li><code>kind: AiplTok</code>
+
+              <div class="doc"><p>The fixed token kind emitted.</p></div>
+
+            </li>
+
+            <li><code>scope: str</code>
+
+              <div class="doc"><p>What the operator is painted.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

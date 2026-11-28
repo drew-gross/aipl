@@ -5,7 +5,15 @@
 import { equal as ==, len, less_than as <, push } from builtins;
 
 # Append `f(x)` for each `x` of `xs` that satisfies `keep`, in order, onto `self`.
-pub fn extend_filter_map<T: any, U: any>(mut self: U[], xs: T[], keep: (T) -> bool, f: (T) -> U) {
+pub fn extend_filter_map<T: any, U: any>(
+    mut self: U[],
+    # The elements considered.
+    xs: T[],
+    # Which of them are appended.
+    keep: (T) -> bool,
+    # What is appended for each.
+    f: (T) -> U,
+) {
     for (let x : xs) {
         if (keep(x)) { set self.push(f(x)); };
     }

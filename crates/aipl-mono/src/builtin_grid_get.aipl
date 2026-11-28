@@ -11,9 +11,13 @@
 import { Grid, equal as ==, less_than as <, wrapping_add as +, wrapping_mul as * } from builtins;
 
 # The cell at `row`, `column`, or `none` when either is off the grid.
-pub fn grid_get<T: any>(self: Grid<T>, row: u64, column: u64) -> T? {
-    if (column < self.width) { self.cells[row * self.width + column] } else { none }
-}.test({
+pub fn grid_get<T: any>(
+    self: Grid<T>,
+    # Counted from 0.
+    row: u64,
+    # Counted from 0.
+    column: u64,
+) -> T? { if (column < self.width) { self.cells[row * self.width + column] } else { none } }.test({
     let two: u64 = 2;
     let grid = Grid { width: two, cells: [1, 2, 3, 4, 5, 6] };
     assert(grid.grid_get(0, 0) == some(1));

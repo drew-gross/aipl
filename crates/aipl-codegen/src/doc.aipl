@@ -234,12 +234,15 @@ fn fits(budget: u64, work: Work) -> bool {
     }
 }
 
-# Spend `n` of the remaining columns and keep walking — or give up when `n`
-# doesn't fit. The check has to come *before* the subtraction: on an unsigned
-# budget `budget - n` floors at 0, which would hide the overrun.
-fn fits_after(budget: u64, n: u64, rest: Work) -> bool {
-    if (n > budget) { false } else { fits(budget - n, rest) }
-}
+# Spend `n` of the remaining columns and keep walking — or give up when `n` doesn't fit.
+fn fits_after(
+    # The columns that remain.
+    budget: u64,
+    # The columns to spend. The check comes *before* the subtraction: on an unsigned budget
+    # `budget - n` floors at 0, which would hide the overrun.
+    n: u64,
+    rest: Work,
+) -> bool { if (n > budget) { false } else { fits(budget - n, rest) } }
 
 # A `Text`/`RawBlock` atom in `fits`: a multi-line atom can't sit on a flat line
 # (so it only "fits" when the surrounding content is already broken); a
@@ -256,9 +259,13 @@ fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
     ds.right_fold(rest, |d, work| Cons(sp, flat, d, work))
 }
 
-# The column just past `text` when appended at column `col`: the length of its
-# last line for multi-line text, else `col + width`.
-fn col_after(col: u64, text: str) -> u64 {
+# The column just past `text` when appended at column `col`.
+fn col_after(
+    # The column `text` is appended at.
+    col: u64,
+    # What is appended; for multi-line text only its last line counts.
+    text: str,
+) -> u64 {
     let parts = text.split("\n");
     let n = parts.len();
     if (n < 2) { col + text.len() } else { parts[n - 1].value_or("").len() }

@@ -587,6 +587,22 @@
           <div class="doc"><p>A rule's <code>push</code>/<code>pop</code> pair read as the one decision it is. The flags are a pair because a struct field's default must be a literal, so a <code>Transition</code> constructor cannot sit on <code>TokenRule</code>; classifying them here means the stack is driven by an exhaustive <code>match</code> on three cases rather than by two booleans checked in the right order at each site. (<code>Transition? = none</code> would be legal now that a field may be an optional of a variant — <code>none</code> is a literal — at the cost of an unwrap at each use.)</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>push: i64</code>
+
+              <div class="doc"><p>The mode to enter, when the rule enters one.</p></div>
+
+            </li>
+
+            <li><code>pop: bool</code>
+
+              <div class="doc"><p>Whether the rule leaves the mode it is in.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -601,6 +617,26 @@
 
           <div class="doc"><p><code>CharRun</code>: length of the maximal run at the start of <code>self</code> — a <code>head</code> char, then <code>cont</code> chars. 0 when the first char isn't in <code>head</code>. (<code>head</code> rather than <code>first</code>, which is now a builtin this file calls.)</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>head: #{char}</code>
+
+              <div class="doc"><p>The chars the run may start with; the length is 0 when the first char is not one.</p></div>
+
+            </li>
+
+            <li><code>cont: #{char}</code>
+
+              <div class="doc"><p>The chars that continue it.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -647,6 +683,26 @@
           <div class="doc"><p><code>Keyword</code>: the length of <code>spelling</code> when it prefixes <code>self</code>, but only when the char after it is absent (end of source) or outside <code>boundary</code> — a keyword must not end in the middle of an identifier. 0 when it doesn't match (or the char after is a boundary char, as in <code>iffy</code> for <code>if</code>).</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>spelling: str</code>
+
+              <div class="doc"><p>What must prefix <code>self</code>.</p></div>
+
+            </li>
+
+            <li><code>boundary: #{char}</code>
+
+              <div class="doc"><p>The chars an identifier is made of: the one after the keyword must be absent (end of source) or outside this set, so a keyword does not end in the middle of one (<code>iffy</code> is not <code>if</code>).</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -661,6 +717,38 @@
 
           <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and so is a backslash with nothing after it — the end of the source cut the escape off. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>at: u64</code>
+
+              <div class="doc"><p>Where <code>self</code> starts in the whole source, so error spans land in the real source.</p></div>
+
+            </li>
+
+            <li><code>delims: #{char}</code>
+
+              <div class="doc"><p>The chars that open a token; it closes at the next occurrence of the same char.</p></div>
+
+            </li>
+
+            <li><code>escapes: #{char}</code>
+
+              <div class="doc"><p>The chars a backslash may escape. When non-empty, a backslash escapes its next char: an allowed char is content (an escaped delimiter does not close), a disallowed one is a hard error, and so is a backslash with nothing after it.</p></div>
+
+            </li>
+
+            <li><code>msg: str</code>
+
+              <div class="doc"><p>What a token still open at the end of the source is reported as.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -707,6 +795,38 @@
           <div class="doc"><p><code>Between</code>: the <code>open</code> spelling opens the token, which runs to just past the next full occurrence of <code>close</code>. ok(0) when <code>self</code> doesn't start with <code>open</code>. The close scan starts past the open and matches the whole <code>close</code> spelling, so a partial close inside (a lone <code>&quot;</code>/<code>&quot;&quot;</code> under a <code>&quot;&quot;&quot;</code> close) is content, not a terminator, and open/close may be multi-char and differ. No escapes — contents are verbatim. A token still open at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>at: u64</code>
+
+              <div class="doc"><p>Where <code>self</code> starts in the whole source, so error spans land in the real source.</p></div>
+
+            </li>
+
+            <li><code>open: str</code>
+
+              <div class="doc"><p>What opens the token; it may be several chars.</p></div>
+
+            </li>
+
+            <li><code>close: str</code>
+
+              <div class="doc"><p>What ends it, matched whole: a partial close inside (a lone <code>&quot;</code> under a <code>&quot;&quot;&quot;</code> close) is content, not a terminator.</p></div>
+
+            </li>
+
+            <li><code>msg: str</code>
+
+              <div class="doc"><p>What a token still open at the end of the source is reported as.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -736,6 +856,38 @@
 
           <div class="doc"><p><code>Nested</code>: the depth-tracked <code>Between</code>. The <code>open</code> spelling opens the token at depth 1; each further <code>open</code> raises the depth and each <code>close</code> lowers it, so the token ends just past the <code>close</code> that returns the depth to 0. ok(0) when <code>self</code> doesn't start with <code>open</code>. <code>open</code> is tested before <code>close</code> so an overlap can't misclassify, but the two must be distinct for nesting to mean anything. No escapes — contents are verbatim. Still open (depth &gt; 0) at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: str</code>
+
+            </li>
+
+            <li><code>at: u64</code>
+
+              <div class="doc"><p>Where <code>self</code> starts in the whole source, so error spans land in the real source.</p></div>
+
+            </li>
+
+            <li><code>open: str</code>
+
+              <div class="doc"><p>What raises the depth. Tested before <code>close</code>, so an overlap cannot misclassify, but the two must be distinct for nesting to mean anything.</p></div>
+
+            </li>
+
+            <li><code>close: str</code>
+
+              <div class="doc"><p>What lowers it.</p></div>
+
+            </li>
+
+            <li><code>msg: str</code>
+
+              <div class="doc"><p>What a token still open at the end of the source is reported as.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -827,6 +979,22 @@
           <div class="doc"><p>The content string a token of matcher <code>m</code> is built from: its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included), with the delimiters taken off by the three matchers that bracket their content — see the table on <code>Matcher</code>. Everything else is its own text, and its rule's <code>emit</code> interprets it.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>m: Matcher</code>
+
+              <div class="doc"><p>The matcher that made the token.</p></div>
+
+            </li>
+
+            <li><code>text: str</code>
+
+              <div class="doc"><p>What it matched (<code>src[at..at+n]</code>, delimiters included).</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -841,6 +1009,26 @@
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its <code>content</code> string — what <code>token_content</code> made of the matched text. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>).</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>e: Emit&#60;K&#62;</code>
+
+            </li>
+
+            <li><code>span: Span</code>
+
+              <div class="doc"><p>Where the token is, to make a <code>LexError</code> of a failure.</p></div>
+
+            </li>
+
+            <li><code>content: str</code>
+
+              <div class="doc"><p>What <code>token_content</code> made of the matched text.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -887,6 +1075,32 @@
           <div class="doc"><p>How far this matcher reaches at <code>at</code> in <code>src</code> — the number of chars it consumes, or 0 for a decline. No matcher matches empty input, so a nonzero length always means progress.</p><p>This is the whole of what the matchers differ by, which is the point: one arm per matcher naming its own <code>*_len</code> helper and nothing else, so adding a matcher is one line here beside one <code>*_len</code> function. <code>unterminated</code> is the rule's message for a construct still open at the end of the source, which only the bracketing matchers can report; <code>at</code> is passed alongside <code>rest</code> for the same reason, since a <code>LexError</code> is spanned in the whole source rather than in the slice being scanned.</p><p>The <code>ok(..)</code> on the infallible arms is the seam between the two kinds of helper — a length that cannot fail and a <code>u64!LexError</code> — in the one place that has to know the difference, exactly as <code>apply_emit</code> wraps its <code>Of</code> arm.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: Matcher</code>
+
+            </li>
+
+            <li><code>src: str</code>
+
+              <div class="doc"><p>The whole source.</p></div>
+
+            </li>
+
+            <li><code>at: u64</code>
+
+              <div class="doc"><p>Where this matcher is tried; passed alongside the slice being scanned because a <code>LexError</code> is spanned in the whole source.</p></div>
+
+            </li>
+
+            <li><code>unterminated: str</code>
+
+              <div class="doc"><p>The rule's message for a construct still open at the end of the source, which only the bracketing matchers can report.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -932,6 +1146,22 @@
           <div class="doc"><p>The rules that could match at a byte <code>c</code>, as indices into <code>rules</code>, in the order they are tried: those whose matcher can start with it, given every rule's <code>firsts</code>. Trying a rule means measuring its matcher against the text, and most rules cannot start with the byte at hand, so these are the only ones worth trying. Every mode's rules are in the answer, and <code>lex_step</code> passes over the ones of another mode, which is one comparison; keeping the modes apart would make the answer depend on two things instead of one.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>firsts: Starts[]</code>
+
+              <div class="doc"><p>What each rule can start with.</p></div>
+
+            </li>
+
+            <li><code>c: char</code>
+
+              <div class="doc"><p>The byte at the position being lexed.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -946,6 +1176,36 @@
 
           <div class="doc"><p>One lexing step at absolute position <code>at</code> in <code>mode</code>: tries each of the rules in <code>chosen</code> that belong to it, in order (first match wins), and returns the winning rule's outcome — see <code>StepResult</code>. <code>chosen</code> is the rules the byte at <code>at</code> can start (see <code>candidates</code>), so a rule that cannot start with it is not measured against the text at all: a <code>{</code> or a <code>,</code> is tried against the rules that start with one rather than against every rule there is.</p><p>Every rule is tried the same way, which is what <code>step_len</code> and <code>step_result</code> are for: the first says how far this rule's matcher reaches, the second turns that length into the step. Neither the loop nor the first-match-wins rule has anything to say about <em>which</em> matcher it is. A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>at: u64</code>
+
+              <div class="doc"><p>The absolute position.</p></div>
+
+            </li>
+
+            <li><code>rules: TokenRule&#60;K&#62;[]</code>
+
+            </li>
+
+            <li><code>chosen: u64[]</code>
+
+              <div class="doc"><p>The rules the byte at <code>at</code> can start (see <code>candidates</code>); a rule that cannot is not measured against the text at all.</p></div>
+
+            </li>
+
+            <li><code>mode: i64</code>
+
+              <div class="doc"><p>The mode the step is in; a rule of another mode is passed over.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

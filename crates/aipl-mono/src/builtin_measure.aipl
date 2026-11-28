@@ -51,7 +51,14 @@ import {
 # The `input` is built outside the window and handed in so that building it is
 # not what is measured, and `f` is called with it exactly once. Callable only in a
 # `.benchmark` block.
-pub fn measure<T: any, R: any>(label: str, input: T, f: (T) -> R) !measure -> Measurement {
+pub fn measure<T: any, R: any>(
+    # Names the measurement; a repeated literal label in one block is an error.
+    label: str,
+    # Built outside the window and handed in, so that building it is not what is measured.
+    input: T,
+    # Called with `input` exactly once, inside the window; its result is released inside it.
+    f: (T) -> R,
+) !measure -> Measurement {
     measure_begin();
     measure_consume(f(input));
     measure_end();

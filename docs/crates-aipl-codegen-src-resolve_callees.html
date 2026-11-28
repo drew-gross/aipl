@@ -501,8 +501,28 @@
           </h3>
           <pre class="signature"><code>fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedCallee</code></pre>
 
-          <div class="doc"><p>What the call to <code>name</code> is to, where <code>locals</code> are the names in scope that hold a value.</p></div>
+          <div class="doc"><p>What the call to <code>name</code> is to.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>name: str</code>
+
+            </li>
+
+            <li><code>imported: #{str: Callee}</code>
+
+              <div class="doc"><p>The names imported, and what each is.</p></div>
+
+            </li>
+
+            <li><code>locals: str[]</code>
+
+              <div class="doc"><p>The names in scope that hold a value.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -516,8 +536,28 @@
           </h3>
           <pre class="signature"><code>fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -&#62; ResolvedExpr</code></pre>
 
-          <div class="doc"><p><code>self</code> with every call resolved: against <code>imported</code>, except where a name in <code>locals</code> hides it.</p></div>
+          <div class="doc"><p><code>self</code> with every call resolved.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Expr</code>
+
+            </li>
+
+            <li><code>imported: #{str: Callee}</code>
+
+              <div class="doc"><p>The names imported, and what each is.</p></div>
+
+            </li>
+
+            <li><code>locals: str[]</code>
+
+              <div class="doc"><p>The names in scope that hold a value; each hides an import of its name.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

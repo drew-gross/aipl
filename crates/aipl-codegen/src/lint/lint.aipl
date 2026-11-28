@@ -171,9 +171,12 @@ fn lints_named(names: str[]) -> Lint[]!ParseFailure {
 # What the lints named `names` say of the program `src` parses to, as they say it, before any file's
 # imports decide how they are written. Every builtin counts as imported, so a lint's own tests are
 # about the shape it finds and nothing about imports, or about any other lint.
-pub fn lint_with_unfilled(src: str, names: str*) -> LintHit[]!ParseFailure {
-    lint_lints_unfilled(src, lints_named(names)?)
-}
+pub fn lint_with_unfilled(
+    # The program's source.
+    src: str,
+    # The lints to run, by their registered names.
+    names: str*,
+) -> LintHit[]!ParseFailure { lint_lints_unfilled(src, lints_named(names)?) }
 
 # [`lint_with_unfilled`], shown as messages.
 pub fn lint_with_messages(src: str, names: str*) -> str[]!ParseFailure {
@@ -182,9 +185,12 @@ pub fn lint_with_messages(src: str, names: str*) -> str[]!ParseFailure {
 
 # What the lints named `names` report for the program `src` parses to, filled in for the imports
 # `src` has.
-pub fn lint_with_filled_messages(src: str, names: str*) -> str[]!ParseFailure {
-    lint_lints_filled_messages(src, lints_named(names)?)
-}
+pub fn lint_with_filled_messages(
+    # The program's source.
+    src: str,
+    # The lints to run, by their registered names.
+    names: str*,
+) -> str[]!ParseFailure { lint_lints_filled_messages(src, lints_named(names)?) }
 
 # `self` less the hits at a place `others` has a hit at.
 fn not_at(self: FilledHit[], others: FilledHit[]) -> FilledHit[] {

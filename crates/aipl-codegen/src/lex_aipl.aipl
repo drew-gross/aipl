@@ -195,21 +195,28 @@ pub let IDENT_CONT: #{char} = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW
 # `kind`. Every keyword and constant is a single `kw` call in `aipl_rules`, so
 # the spelling and its `AiplTok` arm are named together — no spelling→arm
 # `match` to keep in sync with a separate spelling list.
-fn kw(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
-    matcher: Keyword(spelling, IDENT_CONT),
-    emit: Bare(kind),
-    scope,
-}
+fn kw(
+    # Matched exactly, at an identifier boundary (so `fn`/`true` don't split `fnord`/`trueish`).
+    spelling: str,
+    # The fixed token kind emitted.
+    kind: AiplTok,
+    # What the keyword is painted.
+    scope: str,
+) -> TokenRule<AiplTok> { matcher: Keyword(spelling, IDENT_CONT), emit: Bare(kind), scope }
 
 # One operator/punctuation rule: match the exact `spelling` (no identifier
 # boundary) and emit the fixed `kind`. Each `op` is one rule matching one
 # spelling, and rules are first-match-wins — so `aipl_rules` lists the `op`
 # rules longest spelling first (`==` before `=`) to keep maximal munch.
-fn op(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
-    matcher: Exact(spelling),
-    emit: Bare(kind),
-    scope,
-}
+fn op(
+    # Matched exactly, with no identifier boundary. Rules are first-match-wins, so `aipl_rules`
+    # lists the `op` rules longest spelling first (`==` before `=`) to keep maximal munch.
+    spelling: str,
+    # The fixed token kind emitted.
+    kind: AiplTok,
+    # What the operator is painted.
+    scope: str,
+) -> TokenRule<AiplTok> { matcher: Exact(spelling), emit: Bare(kind), scope }
 
 # The text emit for a `` `...` `` template's segments: the `UpToAny` matcher
 # hands the segment's *raw* text, and this decodes its escapes (`` \` ``/`\n`/…

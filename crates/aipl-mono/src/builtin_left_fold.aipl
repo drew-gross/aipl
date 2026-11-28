@@ -14,7 +14,13 @@ import { equal as ==, filter, logical_not as !, wrapping_add as + } from builtin
 # the usual case where a file folds in only one direction; spell it `left_fold`
 # only in a file that also imports `right_fold`, where the two need telling
 # apart.
-pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
+pub fn left_fold<T: any, A: any>(
+    self: T[],
+    # The accumulator the first element is combined with.
+    init: A,
+    # Combines the accumulator and an element into the next accumulator.
+    f: (A, T) -> A,
+) -> A {
     mut acc = init;
     for (let x : self) {
         set acc = f(acc, x);

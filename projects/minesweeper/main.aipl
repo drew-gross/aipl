@@ -63,9 +63,13 @@ variant Status = Playing | Won | Lost
 # How many mines a game has.
 let MINE_COUNT: u64 = 10;
 
-# A board `width` cells wide and `height` high, every cell hidden and mine-free: the
-# mines come later, from `place_mines`.
-fn new_game(width: u64, height: u64) -> Mark[,] { grid_of(width, height, Hidden(false)) }.test({
+# A board of hidden, mine-free cells: the mines come later, from `place_mines`.
+fn new_game(
+    # How many cells across.
+    width: u64,
+    # How many cells down.
+    height: u64,
+) -> Mark[,] { grid_of(width, height, Hidden(false)) }.test({
     let expected: Mark[,] = [
         [Hidden(false), Hidden(false), Hidden(false)],
         [Hidden(false), Hidden(false), Hidden(false)],
@@ -133,10 +137,14 @@ fn mine_count(self: Mark[,]) -> u64 {
     assert(new_game(3, 2).add_mines([(0, 0), (1, 1)]).mine_count() == 2);
 })
 
-# Place `count` mines at random cells that hold none yet, none of them on `away_from`
-# or a cell touching it (fewer, if there is no room for that many). A flag, or a reveal,
-# on a cell it mines stays.
-fn place_mines(mut self: Mark[,], count: u64, away_from: (u64, u64)) !random {
+# Place mines at random cells that hold none yet. A flag, or a reveal, on a cell it mines stays.
+fn place_mines(
+    mut self: Mark[,],
+    # How many to place; fewer if there is no room.
+    count: u64,
+    # A cell that, with the cells touching it, gets none.
+    away_from: (u64, u64),
+) !random {
     let cells: (u64, u64)[] = (0..self.height()).cartesian_product(0..self.width());
     let clear = [away_from, ..self.neighbors(away_from)];
     let candidates = cells.filter(|cell| !self.is_mine(cell) && !clear.any(|near| near == cell));
@@ -309,10 +317,14 @@ fn status(self: Mark[,]) -> Status {
     assert(game.reveal((0, 0)).reveal((0, 1)).reveal((1, 0)).status() == Won);
 })
 
-# What is drawn for `cell`: `#` hidden, `F` flagged, `.` revealed with nothing
-# around it, a digit counting the mines around it, `*` a mine (shown once
-# revealed, or when `show_mines`).
-fn symbol(self: Mark[,], cell: (u64, u64), show_mines: bool) -> str {
+# What is drawn for `cell`: `#` hidden, `F` flagged, `.` revealed with nothing around it, a digit counting the mines around it, `*` a mine.
+fn symbol(
+    self: Mark[,],
+    # The cell drawn.
+    cell: (u64, u64),
+    # Whether a mine is shown before it is revealed.
+    show_mines: bool,
+) -> str {
     match (self[cell]) {
         some(Revealed(mine)) => if (mine) {
             "*"
@@ -398,8 +410,12 @@ fn before(self: u64) -> u64 { if (self == 0) { self } else { self - 1 } }.test({
     assert(3.before() == 2);
 })
 
-# One step toward the end of a side `length` cells long, stopping at the last.
-fn after(self: u64, length: u64) -> u64 { if (self + 1 < length) { self + 1 } else { self } }.test({
+# One step toward the end of a side, stopping at the last.
+fn after(
+    self: u64,
+    # How many cells long the side is.
+    length: u64,
+) -> u64 { if (self + 1 < length) { self + 1 } else { self } }.test({
     assert(0.after(3) == 1);
     assert(2.after(3) == 2);
     assert(0.after(0) == 0);

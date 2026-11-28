@@ -126,6 +126,26 @@
           <div class="doc"><p>Whether a token of kind <code>kind</code> spelled <code>text</code> could begin a match of <code>self</code> — the test a driver skips an alternative on.</p><p>A nullable rule accepts anything, because it can match without consuming the token at all; otherwise the token's kind is looked for among the set's kinds and its spelling among the set's spellings. Conservative in the direction that matters: it is never false for a token that could in fact start a match, so pruning on it cannot lose a parse.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: First&#60;K&#62;</code>
+
+            </li>
+
+            <li><code>kind: Case&#60;K&#62;</code>
+
+              <div class="doc"><p>The kind of the token.</p></div>
+
+            </li>
+
+            <li><code>text: str</code>
+
+              <div class="doc"><p>How the token is spelled.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

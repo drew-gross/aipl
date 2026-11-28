@@ -63,9 +63,17 @@ fn xml_escape(self: str) -> str {
     assert(xml_escape(`say "hi"`) == "say &quot;hi&quot;");
 })
 
-# One colour channel at `rate`, the share won in thousandths: `low` at none, `middle` at an even
-# record, `high` at all.
-fn channel(low: i64, middle: i64, high: i64, rate: i64) -> i64 {
+# One colour channel.
+fn channel(
+    # The value at a rate of none.
+    low: i64,
+    # The value at an even record.
+    middle: i64,
+    # The value at all.
+    high: i64,
+    # The share won, in thousandths.
+    rate: i64,
+) -> i64 {
     if (rate < 500) {
         low + (middle - low) * rate / 500
     } else {
@@ -108,7 +116,13 @@ fn record_text(self: Record) -> str {
 
 # What a cell centred on (`x`, `y`) shows of `self`: its win rate and, smaller beneath, its record.
 # An archetype against itself (`none`) and a pairing that never met show only a `-`.
-fn cell_labels(x: u64, y: u64, self: Record?) -> str {
+fn cell_labels(
+    # The cell's centre across.
+    x: u64,
+    # The cell's centre down.
+    y: u64,
+    self: Record?,
+) -> str {
     let some(record) = self else { return `<text x="{x}" y="{y}">-</text>`; };
     if (record.win + record.loss + record.draw == 0) { return `<text x="{x}" y="{y}">-</text>`; };
     `<text x="{x}" y="{y - 7}">{record.rate_text()}</text><text class="detail" x="{x}" y="{y + 9}">{record.record_text()}</text>`
@@ -124,8 +138,14 @@ fn cell_labels(x: u64, y: u64, self: Record?) -> str {
     );
 })
 
-# What hovering a cell says, as the tooltip: `row` against `column`, the win rate and the record.
-fn describe(row: str, column: str, cell: Cell?) -> str {
+# What hovering a cell says, as the tooltip: the win rate and the record of `row` against `column`.
+fn describe(
+    # The row's archetype.
+    row: str,
+    # The column's.
+    column: str,
+    cell: Cell?,
+) -> str {
     match (cell) {
         some(found) => `{row} vs {column}: {found.record.rate_text()} ({found.record.record_text()})`,
         none => `{row} against itself is not counted`,
@@ -205,8 +225,13 @@ fn panel_attributes(
     );
 })
 
-# How big an archetype with `count` of `total` decks is, as its row label says.
-fn deck_summary(count: u64, total: u64) -> str {
+# How big an archetype is, as its row label says.
+fn deck_summary(
+    # How many decks the archetype has.
+    count: u64,
+    # How many decks there are.
+    total: u64,
+) -> str {
     let noun = if (count == 1) { "deck" } else { "decks" };
     `{count} {noun} · {percent(count, total)}`
 }.test({
@@ -214,11 +239,19 @@ fn deck_summary(count: u64, total: u64) -> str {
     assert(deck_summary(1, 4) == "1 deck · 25%");
 })
 
-# The heading of the column starting at `left`, sitting on `bottom` and `rise` tall, with `attributes`
-# on it: a tile the width of the column whose sides lean up and to the right at 45 degrees, as the
-# name written along its middle does, so the headings fit side by side the way the cells do and
-# the whole tile is what a click lands on.
-fn column_heading(attributes: str, left: u64, bottom: u64, rise: u64, text: str) -> str {
+# The heading of a column: a tile the width of the column whose sides lean up and to the right at 45 degrees, as the name written along its middle does, so the headings fit side by side the way the cells do and the whole tile is what a click lands on.
+fn column_heading(
+    # What the tile carries.
+    attributes: str,
+    # Where the column starts.
+    left: u64,
+    # What the tile sits on.
+    bottom: u64,
+    # How tall it is.
+    rise: u64,
+    # The name written along its middle.
+    text: str,
+) -> str {
     let top = bottom - rise;
     let corners = `{left},{bottom} {left + CELL},{bottom} {left + CELL + rise},{top} {left + rise},{top}`;
     `<g class="label"{attributes}><polygon class="hit" points="{corners}"/><text transform="translate({left + CELL / 2},{bottom}) rotate(-45)" x="14" y="0">{text.xml_escape()}</text></g>`

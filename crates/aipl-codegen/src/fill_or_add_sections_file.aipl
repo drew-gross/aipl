@@ -4,7 +4,12 @@ import { fill_or_add_sections } from "./fill_or_add_sections.aipl";
 # Reads the file at `path`, splices every fill in `fills` into (or appends it
 # to) its `--- section ---` blocks via `fill_or_add_sections`, and writes the
 # result back to `path`. One read and one write for the whole batch.
-pub fn fill_or_add_sections_file(path: str, fills: #{str: str}) !read_files !write_files -> !Error {
+pub fn fill_or_add_sections_file(
+    # The file read and written back.
+    path: str,
+    # As `fill_or_add_sections` takes them.
+    fills: #{str: str},
+) !read_files !write_files -> !Error {
     let contents = read_file_to_string(path)?;
     write_string_to_file(path, fill_or_add_sections(contents, fills))
 }.test({

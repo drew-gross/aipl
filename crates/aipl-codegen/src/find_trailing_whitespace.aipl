@@ -18,13 +18,21 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-# The span of a line's trailing space/tab run, given the bytes around its ending,
-# or `none` if the line has none. `boundary` is the index of the line-ending '\n'
-# (or the input length, at EOF); `prev`/`prev2` are the two bytes before it;
-# `ws_start` is where the current run of spaces/tabs began; `line_start` is the
-# line's first byte. A single '\r' right before the boundary is part of a CRLF
+# The span of a line's trailing space/tab run, given the bytes around its ending, or
+# `none` if the line has none. A single `\r` right before the boundary is part of a CRLF
 # (or lone-CR) ending, so the last content byte is the one before it.
-fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_start: u64) -> Span? {
+fn line_end_span(
+    # The byte before the line ending.
+    prev: char,
+    # The byte before that.
+    prev2: char,
+    # The index of the line-ending `\n` (or the input length, at EOF).
+    boundary: u64,
+    # Where the current run of spaces and tabs began.
+    ws_start: u64,
+    # The line's first byte.
+    line_start: u64,
+) -> Span? {
     let cr = prev == '\r';
     let end = if (cr) { boundary - 1 } else { boundary };
     let last = if (cr) { prev2 } else { prev };

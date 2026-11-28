@@ -32,6 +32,26 @@
           <div class="doc"><p>Combine the elements right to left with a <em>fallible</em> combiner, starting from <code>init</code>: <code>f</code> takes the element first and the accumulator second (the mirror of <code>opt_left_fold</code>) and returns <code>A?</code>; the first <code>none</code> ends the fold with <code>none</code>, and the elements to its left are never visited. An empty array folds to <code>some(init)</code>.</p><p>Prefer <code>opt_left_fold</code> (imported as plain <code>opt_fold</code>) unless the right-to-left order matters.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>init: A</code>
+
+              <div class="doc"><p>The accumulator the last element is combined with.</p></div>
+
+            </li>
+
+            <li><code>f: (T, A) -&#62; A?</code>
+
+              <div class="doc"><p>Combines an element and the accumulator into the next accumulator, or <code>none</code> to end the fold.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

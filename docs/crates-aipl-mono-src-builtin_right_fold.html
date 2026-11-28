@@ -32,6 +32,26 @@
           <div class="doc"><p>Combine the elements right to left, starting from <code>init</code>: for <code>[a, b, c]</code>, <code>f(a, f(b, f(c, init)))</code> — note the combiner takes the element first, the accumulator second, the mirror of <code>left_fold</code>: <code>xs.right_fold(Nil, |x, acc| Cons(x, acc))</code>.</p><p>Prefer <code>left_fold</code> (imported as plain <code>fold</code>) unless the right-to-left order matters — building a cons list front-to-back from an array is the standard case where it does.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>init: A</code>
+
+              <div class="doc"><p>The accumulator the last element is combined with.</p></div>
+
+            </li>
+
+            <li><code>f: (T, A) -&#62; A</code>
+
+              <div class="doc"><p>Combines an element and the accumulator into the next accumulator.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

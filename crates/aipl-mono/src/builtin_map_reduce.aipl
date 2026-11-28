@@ -35,7 +35,14 @@ import {
 # `f` runs once per element, in order, interleaved with `step` rather than before
 # all of them — which no one can tell apart unless `step` does something, and a
 # reduction's step does not.
-pub fn map_reduce<T: any, U: any>(self: T[], f: (T) -> U, step: (U, U) -> U) -> U? {
+pub fn map_reduce<T: any, U: any>(
+    self: T[],
+    # Applied to each element, once, in order.
+    f: (T) -> U,
+    # Combines the mapped elements left to right; the first seeds the result, so it is never
+    # called on fewer than two.
+    step: (U, U) -> U,
+) -> U? {
     mut reduced: U? = none;
     for (let x : self) {
         let next = f(x);

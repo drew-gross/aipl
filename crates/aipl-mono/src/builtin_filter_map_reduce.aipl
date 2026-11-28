@@ -41,8 +41,12 @@ import {
 # something, and the fusion that writes this call refuses when any does.
 pub fn filter_map_reduce<T: any, U: any>(
     self: T[],
+    # Which elements survive.
     keep: (T) -> bool,
+    # Maps each survivor.
     f: (T) -> U,
+    # Combines the mapped survivors left to right; the first seeds the result, so it is never
+    # called on fewer than two.
     step: (U, U) -> U,
 ) -> U? {
     mut reduced: U? = none;

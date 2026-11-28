@@ -146,6 +146,26 @@
           <div class="doc"><p>The TextMate pattern recognizing what <code>m</code> matches, painted <code>scope</code>. A matcher that scans between delimiters becomes a <code>Region</code>, and <code>esc_scope</code> is what its escape sequences are painted (<code>constant.character.escape.*</code>); every other matcher becomes a plain <code>Match</code>.</p><p>Total over <code>Matcher</code>, so a new matcher shape in <code>lexer.aipl</code> fails to compile here until it has a highlighting answer.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>m: Matcher</code>
+
+            </li>
+
+            <li><code>scope: str</code>
+
+              <div class="doc"><p>What what <code>m</code> matches is painted.</p></div>
+
+            </li>
+
+            <li><code>esc_scope: str</code>
+
+              <div class="doc"><p>What the escape sequences of a matcher that scans between delimiters are painted (<code>constant.character.escape.*</code>); every other matcher ignores it.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -236,6 +256,20 @@
           <div class="doc"><p>The patterns <code>rules</code> describes, in rule order — one per rule, except that a run of consecutive rules sharing a scope collapses into a single ordered alternation, which is what turns twenty <code>Keyword</code> rules into one <code>\\bfn\\b|\\blet\\b|..</code>. Rules with no scope (whitespace, anything a highlighter should not paint) are dropped.</p><p>Order is preserved exactly, and regex alternation is ordered too, so a rule list written longest-spelling-first stays maximal munch. <code>esc_scope</code> paints the escape sequences inside delimited literals.</p><p>A self-referential region — a nestable block comment — comes back as an <code>Include</code> plus the named entry it refers to, since that shape cannot be written inline.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>rules: TokenRule&#60;K&#62;[]</code>
+
+            </li>
+
+            <li><code>esc_scope: str</code>
+
+              <div class="doc"><p>What the escape sequences inside delimited literals are painted.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -248,8 +282,36 @@
           </h3>
           <pre class="signature"><code>pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -&#62; Pat</code></pre>
 
-          <div class="doc"><p>A declaration: <code>keyword</code> then a name matching <code>name_re</code>, with the two halves painted <code>kw_scope</code> and <code>name_scope</code>. This is the one genuinely <em>syntactic</em> thing a highlighter does — a name means something different for standing after <code>fn</code> — and the only one a regex- and line-based target can express.</p><p>Pass <code>name_re</code> from the identifier rule's own matcher (<code>matcher_regex</code>) so the names a declaration accepts stay the names the lexer accepts. It must contain no capture groups of its own, which a character-class run never does.</p></div>
+          <div class="doc"><p>A declaration: a keyword then a name, with the two halves painted differently. This is the one genuinely <em>syntactic</em> thing a highlighter does — a name means something different for standing after <code>fn</code> — and the only one a regex- and line-based target can express.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>keyword: str</code>
+
+              <div class="doc"><p>What opens the declaration (<code>fn</code>).</p></div>
+
+            </li>
+
+            <li><code>name_re: str</code>
+
+              <div class="doc"><p>Matches the declared name. Pass it from the identifier rule's own matcher (<code>matcher_regex</code>) so the names a declaration accepts stay the names the lexer accepts; it must contain no capture groups of its own, which a character-class run never does.</p></div>
+
+            </li>
+
+            <li><code>kw_scope: str</code>
+
+              <div class="doc"><p>What <code>keyword</code> is painted.</p></div>
+
+            </li>
+
+            <li><code>name_scope: str</code>
+
+              <div class="doc"><p>What the name is painted.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -276,7 +338,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$25484: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$25895: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -577,7 +639,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$27998: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$28409: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

@@ -52,17 +52,20 @@ import {
 
 # The float `self` as text. With no options that is `to_str(self)`: the shortest decimal that
 # reads back as the same value.
-#
-# - `digits`: for a float, write exactly that many digits after the point, correctly rounded
-#   from the float's exact value (halves to even: `0.25` is `0.2` to one digit, `2.5` is `2`
-#   to none), so `render(1.0 / 3.0, digits=3)` is `0.333`. A count past the 1074 digits a
-#   float's exact value has gives the rest as zeros. `NaN` and `inf` have no digits.
-# - `significant`: for a float, write that many significant digits, correctly rounded from
-#   the exact value the same way (a count of 0 is 1), with zeros where the digits run out
-#   before the point: `12345.0` is `12000` to two, `12.345` is `12`, `1.2345` is `1.2` and
-#   `0.0012345` is `0.0012`. Trailing zeros are kept (`1.0`), and zero is `0`. It is used
-#   instead of `digits` when both are given.
-pub fn render<T: any>(self: T, digits?: u64 = none, significant?: u64 = none) -> str {
+pub fn render<T: any>(
+    self: T,
+    # For a float, write exactly that many digits after the point, correctly rounded from the
+    # float's exact value (halves to even: `0.25` is `0.2` to one digit, `2.5` is `2` to none), so
+    # `render(1.0 / 3.0, digits=3)` is `0.333`. A count past the 1074 digits a float's exact value
+    # has gives the rest as zeros. `NaN` and `inf` have no digits.
+    digits?: u64 = none,
+    # For a float, write that many significant digits, correctly rounded from the exact value the
+    # same way (a count of 0 is 1), with zeros where the digits run out before the point:
+    # `12345.0` is `12000` to two, `12.345` is `12`, `1.2345` is `1.2` and `0.0012345` is
+    # `0.0012`. Trailing zeros are kept (`1.0`), and zero is `0`. It is used instead of `digits`
+    # when both are given.
+    significant?: u64 = none,
+) -> str {
     if (let some(count) = significant) {
         let exact = self.to_fixed(1074);
         let negative = exact.starts_with("-");

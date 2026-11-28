@@ -100,27 +100,15 @@ variant Piece =
     | Note(str, bool)
 
 # The `Doc` that lays `node` out, given the grammar it was parsed with.
-#
-# `space` answers the one question a grammar cannot: whether a space belongs
-# between two adjacent tokens. It is asked with the spellings on either side of
-# the gap — `space("+", "1")` while laying out `1 + 1`, `space("(", "a")` while
-# laying out `(a)` — so a language brings one small function instead of a layout
-# function per production. Where a production wants no spaces at all, that is
-# `Tight` and the rule is never consulted.
-#
-# `g` is linked here, so it may be handed over unlinked, exactly as `parse_cst`
-# takes it. That is not a convenience: a group's style lives in `groups`, which
-# only `link` fills, so an unlinked grammar would lay every bracket pair out
-# against a table that is not there. Linking is idempotent, so a caller that
-# linked already pays one walk and nothing else.
-#
-# Fails only on a tree that does not belong to `g` — a node naming a production
-# or a group index the grammar has no entry for, which a tree from `parse_cst`
-# cannot be.
 pub fn format_cst<K: variant, A: any>(
     g: Grammar<K, A>,
     src: str,
     node: Cst,
+    # Answers the one question a grammar cannot: whether a space belongs between two adjacent
+    # tokens. It is asked with the spellings on either side of the gap — `space("+", "1")` while
+    # laying out `1 + 1`, `space("(", "a")` while laying out `(a)` — so a language brings one
+    # small function instead of a layout function per production. Where a production wants no
+    # spaces at all, that is `Tight` and the rule is never consulted.
     space: (str, str) -> bool,
 ) -> Doc!ParseError { fmt_node(link(g)?, src, node, space) }
 
@@ -240,6 +228,7 @@ pub fn render_cst<K: variant, A: any>(
     src: str,
     node: Cst,
     space: (str, str) -> bool,
+    # The width to lay out at.
     width: u64,
 ) -> str!ParseError { ok(format_cst(g, src, node, space)?.print(width)) }.test({
     // A `build` that lowers nothing: the formatter never lowers, and a `Production`

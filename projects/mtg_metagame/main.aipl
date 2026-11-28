@@ -37,9 +37,13 @@ let USAGE = """
 # The archetype list `winrate` uses when `--archetypes` is not given.
 let DEFAULT_ARCHETYPES = "Standard2026Q4Worlds";
 
-# The file in `data/` that `name` stands for: the file `index` maps it to, or
-# `name` itself when the index does not know it.
-fn data_path(index: Json, name: str) -> str {
+# The file in `data/` that `name` stands for.
+fn data_path(
+    # Maps a name to its file.
+    index: Json,
+    # What the file stands for; the name itself is the file when the index does not know it.
+    name: str,
+) -> str {
     let target = index.optional_text_field(name).value_or(name);
     `data/{target}.json.gz`
 }.test({

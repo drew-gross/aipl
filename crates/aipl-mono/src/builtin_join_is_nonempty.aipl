@@ -23,19 +23,21 @@ import {
     split,
 } from builtins;
 
-# True when `self.join(sep=sep, final_sep=final_sep, only_sep=only_sep, leading_sep=leading_sep,
-# trailing_sep=trailing_sep)` has any element: some piece is non-empty, or — when every piece is
-# empty — a separator that would be written between or around them is. The three separators are
-# `join`'s, all defaulting to empty, and which one applies is `join`'s rule: `only_sep` in the sole
-# gap of a two-piece join, `final_sep` in the last gap and `sep` in every other; `sep` is also
-# what `leading_sep` and `trailing_sep` write at the ends. Stops at the first non-empty piece; an
-# empty `self` is false.
+# True when `self.join(..)` with these separators has any element: some piece is non-empty, or — when
+# every piece is empty — a separator that would be written between or around them is. Which separator
+# applies is `join`'s rule. Stops at the first non-empty piece; an empty `self` is false.
 pub fn join_is_nonempty<T: any>(
     self: T[][],
+    # Written between consecutive pieces, and at the ends when `leading_sep` or `trailing_sep` is
+    # set; defaults to empty.
     sep: T* = [],
+    # Written in the last gap instead of `sep`.
     final_sep: T* = sep,
+    # Written in the sole gap of a two-piece join instead of `sep`.
     only_sep: T* = sep,
+    # Write `sep` before the first piece (when there is one).
     leading_sep: bool = false,
+    # Write `sep` after the last piece (when there is one).
     trailing_sep: bool = false,
 ) -> bool {
     let n = self.len();

@@ -57,7 +57,13 @@ struct Request { library: str, item: str }
 struct Spelling { text: str, request: Request? }
 
 # Whether `self` asks for the builtin whose import name is `name`. `table` is the builtin table.
-pub fn is_builtin_named(self: Need, name: str, table: BuiltinEntry[]) -> bool {
+pub fn is_builtin_named(
+    self: Need,
+    # The import name.
+    name: str,
+    # The builtin table.
+    table: BuiltinEntry[],
+) -> bool {
     match (self) {
         Builtin(callee) => table
             .find_if(|entry| entry.arm == callee)
@@ -70,7 +76,13 @@ pub fn is_builtin_named(self: Need, name: str, table: BuiltinEntry[]) -> bool {
 
 # The spelling of `self` in a file with these `items`, or `none` when the file cannot take any.
 # `table` is the builtin table.
-pub fn spelled(self: Need, items: Item[], table: BuiltinEntry[]) -> Spelling? {
+pub fn spelled(
+    self: Need,
+    # The file's items.
+    items: Item[],
+    # The builtin table.
+    table: BuiltinEntry[],
+) -> Spelling? {
     match (self) {
         Builtin(callee) => items.spelled_builtin(table.find_if(|entry| entry.arm == callee)?),
     }
@@ -175,7 +187,15 @@ fn spelled_builtin(self: Item[], entry: BuiltinEntry) -> Spelling? {
 # The spelling of the builtin `name` of `library` that the file can import: `preferred`, or when
 # something else in the file has that name, the builtin under a name that is free
 # (`builtin_any`). An operator has no other name to take, so there is nothing.
-fn importable(self: Item[], library: str, name: str, preferred: str) -> Spelling? {
+fn importable(
+    self: Item[],
+    # The builtin's library.
+    library: str,
+    # The builtin's name there.
+    name: str,
+    # The spelling asked for.
+    preferred: str,
+) -> Spelling? {
     let text = if (!self.bound_names().contains(preferred)) {
         preferred
     } else {

@@ -325,18 +325,18 @@ pub fn filled_hit(self: Accumulation, stages: (Callee, str)[]) -> LintHit {
     self.seeded.pipeline_hit("filled by this loop and nothing else", "", stages)
 }
 
-# The hit for a loop that is the pipeline of `stages` over its iterable, assigned to
-# the binding: `what` is how the loop fills it, as the message says, and `annotation`
-# what follows the binding's name in the advice. Each stage is a builtin and the
-# arguments it is written with. It points at the seed, not the loop: `#[allow]` is
-# line-scoped, so a hit spanning the loop could never be squelched (the marker would
-# have to go on the `for (..) {` header, and the formatter relocates one written
-# there onto a line of its own, where it squelches nothing). `mut out = [];` always
-# occupies one line, and is where the shape starts.
+# The hit for a loop that is the pipeline of `stages` over its iterable, assigned to the
+# binding. It points at the seed, not the loop: `#[allow]` is line-scoped, so a hit spanning
+# the loop could never be squelched (the marker would have to go on the `for (..) {` header,
+# and the formatter relocates one written there onto a line of its own, where it squelches
+# nothing). `mut out = [];` always occupies one line, and is where the shape starts.
 pub fn pipeline_hit(
     self: SeededLoop,
+    # How the loop fills the binding, as the message says it.
     what: str,
+    # What follows the binding's name in the advice.
     annotation: str,
+    # The pipeline: each stage is a builtin and the arguments it is written with.
     stages: (Callee, str)[],
 ) -> LintHit {
     let lead = `"{self.name}" is seeded empty and {what} — `;

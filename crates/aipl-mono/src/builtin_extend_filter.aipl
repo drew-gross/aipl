@@ -6,7 +6,13 @@
 import { equal as ==, len, less_than as <, push } from builtins;
 
 # Append the elements of `xs` that satisfy `keep`, in order, onto `self`.
-pub fn extend_filter<T: any>(mut self: T[], xs: T[], keep: (T) -> bool) {
+pub fn extend_filter<T: any>(
+    mut self: T[],
+    # The elements considered.
+    xs: T[],
+    # Which of them are appended.
+    keep: (T) -> bool,
+) {
     for (let x : xs) {
         if (keep(x)) { set self.push(x); };
     }

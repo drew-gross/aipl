@@ -381,8 +381,14 @@ fn settled(self: Callee, name: str) -> ResolvedCallee {
     }
 }
 
-# What the call to `name` is to, where `locals` are the names in scope that hold a value.
-fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -> ResolvedCallee {
+# What the call to `name` is to.
+fn callee_of(
+    name: str,
+    # The names imported, and what each is.
+    imported: #{str: Callee},
+    # The names in scope that hold a value.
+    locals: str[],
+) -> ResolvedCallee {
     if (locals.contains(name)) {
         Local(name)
     } else if (let some(found) = imported.get(name)) {
@@ -400,8 +406,14 @@ fn callee_of(name: str, imported: #{str: Callee}, locals: str[]) -> ResolvedCall
     }
 }
 
-# `self` with every call resolved: against `imported`, except where a name in `locals` hides it.
-fn resolved(self: Expr, imported: #{str: Callee}, locals: str[]) -> ResolvedExpr {
+# `self` with every call resolved.
+fn resolved(
+    self: Expr,
+    # The names imported, and what each is.
+    imported: #{str: Callee},
+    # The names in scope that hold a value; each hides an import of its name.
+    locals: str[],
+) -> ResolvedExpr {
     let Expr { span, value_span, name_span, source, written } = self;
     Expr {
         kind: self.kind.resolved_kind(imported, locals),

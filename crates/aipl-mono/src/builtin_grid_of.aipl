@@ -8,9 +8,14 @@
 import { Grid, equal as ==, grid_from, grid_get, map, wrapping_mul as * } from builtins;
 
 # A grid `width` cells wide and `height` high with a copy of `value` in every cell.
-pub fn grid_of<T: any>(width: u64, height: u64, value: T) -> Grid<T> {
-    grid_from(width, (0..width * height).map(|cell| value))
-}.test({
+pub fn grid_of<T: any>(
+    # How many cells across.
+    width: u64,
+    # How many cells down.
+    height: u64,
+    # Copied into every cell.
+    value: T,
+) -> Grid<T> { grid_from(width, (0..width * height).map(|cell| value)) }.test({
     let grid = grid_of(3, 2, "x");
     assert(grid == grid_from(3, ["x", "x", "x", "x", "x", "x"]));
     assert(grid.grid_get(1, 2) == some("x"));

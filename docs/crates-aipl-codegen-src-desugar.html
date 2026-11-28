@@ -309,6 +309,30 @@
           <div class="doc"><p><code>self</code> with each struct pattern in it replaced by a binder named for <code>tag</code> and its place, counting from <code>taken</code> — the number already lifted from the patterns before this one in the arm.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: Pat</code>
+
+            </li>
+
+            <li><code>tag: u64</code>
+
+              <div class="doc"><p>Names each binder (with its place) the pattern is replaced by.</p></div>
+
+            </li>
+
+            <li><code>taken: u64</code>
+
+              <div class="doc"><p>How many have already been lifted from the patterns before this one in the arm; counting starts here.</p></div>
+
+            </li>
+
+            <li><code>written: WrittenNames</code>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -334,7 +358,7 @@
             <a class="anchor" href="#item-projected">projected</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn projected(self: CoreExpr, __spat$19512: Expr, step: (CoreExpr) -&#62; CoreExpr) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn projected(self: CoreExpr, __spat$19714: Expr, step: (CoreExpr) -&#62; CoreExpr) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p>What <code>receiver$step</code> means: <code>receiver.map(|e| step)</code>, where <code>step</code> is the projection written against the element <code>e</code>, which sits where the step's name is written so an error about it points at the name. The element's name has a <code>$</code> in it, so no source can spell it and an argument of the step can never mean it by accident; it carries the projection's span, so no two projections of a function name their element alike.</p></div>
 
@@ -414,6 +438,34 @@
           <div class="doc"><p>The names <code>binding</code> binds, read off the variable <code>tmp</code> in front of <code>body</code>. A struct is read through a binding annotated with its type, which is what checks the pattern names the right one.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>binding: Binding</code>
+
+            </li>
+
+            <li><code>tmp: str</code>
+
+              <div class="doc"><p>The variable the names are read off.</p></div>
+
+            </li>
+
+            <li><code>span: Span</code>
+
+            </li>
+
+            <li><code>body: CoreExpr</code>
+
+              <div class="doc"><p>What the bindings are in front of.</p></div>
+
+            </li>
+
+            <li><code>written: WrittenNames</code>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -473,6 +525,36 @@
 
           <div class="doc"><p><code>let a = match (&lt;tmp&gt;) { Case(a, _) =&gt; a }; let b = match (&lt;tmp&gt;) { Case(_, b) =&gt; b }; rest</code>, innermost last — what <code>let Case(a, b) = value; rest</code> binds, one <code>match</code> per name. The scrutinee is a value that can only be <code>Case</code>, which is what makes each <code>match</code> exhaustive with the one arm; any other value is refused by that check. A <code>match</code> for each name, rather than one around the rest of the block, keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>case_name: str</code>
+
+            </li>
+
+            <li><code>names: str[]</code>
+
+            </li>
+
+            <li><code>tmp: str</code>
+
+            </li>
+
+            <li><code>span: Span</code>
+
+            </li>
+
+            <li><code>rest: CoreExpr</code>
+
+              <div class="doc"><p>What follows the bindings. Each name gets its own <code>match</code> rather than one wrapping <code>rest</code>, which keeps <code>rest</code> out of an arm: a block that is an expression may not assign to a binding from outside it.</p></div>
+
+            </li>
+
+            <li><code>written: WrittenNames</code>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -544,7 +626,7 @@
             <a class="anchor" href="#item-bind_one_param">bind_one_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn bind_one_param(__spat$31274: Param, body: CoreExpr) -&#62; CoreExpr</code></pre>
+          <pre class="signature"><code>fn bind_one_param(__spat$31778: Param, body: CoreExpr) -&#62; CoreExpr</code></pre>
 
           <div class="doc"><p>A destructured parameter's bindings in front of <code>body</code>: the case's payload, or the struct's fields, read off the parameter itself. Folded from the right by the caller so they come out in source order.</p></div>
 
@@ -561,8 +643,38 @@
           </h3>
           <pre class="signature"><code>fn bind_param_pattern(parameter: str, pattern: Binding, span: Span, body: CoreExpr, written: WrittenNames) -&#62; CoreExpr</code></pre>
 
-          <div class="doc"><p>The bindings <code>pattern</code> makes, read off the parameter called <code>parameter</code>, in front of <code>body</code>. The parameter's own type is what the checker holds the pattern to.</p></div>
+          <div class="doc"><p>The bindings <code>pattern</code> makes, read off <code>parameter</code>, in front of <code>body</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>parameter: str</code>
+
+              <div class="doc"><p>The parameter the bindings are read off; its own type is what the checker holds the pattern to.</p></div>
+
+            </li>
+
+            <li><code>pattern: Binding</code>
+
+              <div class="doc"><p>What the parameter is destructured into.</p></div>
+
+            </li>
+
+            <li><code>span: Span</code>
+
+            </li>
+
+            <li><code>body: CoreExpr</code>
+
+              <div class="doc"><p>What the bindings are in front of.</p></div>
+
+            </li>
+
+            <li><code>written: WrittenNames</code>
+
+            </li>
+
+          </ul>
 
 
         </section>

@@ -3276,20 +3276,39 @@ fn second_tok(self: Parts, fallback: Span) -> Span {
     }
 }
 
-# The names written in the tokens of `node` after its first `skip` and before the
-# first `stop` (which may be empty: no stop), with `bare_is_case` as `written_names`
-# takes it.
-fn written_in(Parts { cst }, src: str, skip: u64, stop: str, bare_is_case: bool) -> WrittenNames {
+# The names written in the tokens of `node` after its first `skip` and before the first `stop`.
+fn written_in(
+    Parts { cst },
+    src: str,
+    # How many of the node's tokens to pass first.
+    skip: u64,
+    # The spelling of the token that ends the names; empty means no stop.
+    stop: str,
+    # As `written_names` takes it.
+    bare_is_case: bool,
+) -> WrittenNames {
     written_names(cst.token_leaves().tokens_between(src, skip, stop), src, bare_is_case)
 }
 
 # The names written in the pattern child `i` of `subs`.
-fn sub_written(subs: Cst[], i: u64, src: str, bare_is_case: bool) -> WrittenNames {
-    written_names(subs[i].map(token_leaves).value_or([]), src, bare_is_case)
-}
+fn sub_written(
+    # The node's children.
+    subs: Cst[],
+    # Which of them is the pattern.
+    i: u64,
+    src: str,
+    bare_is_case: bool,
+) -> WrittenNames { written_names(subs[i].map(token_leaves).value_or([]), src, bare_is_case) }
 
 # `self`, less the first `skip` tokens and everything from the first one spelled `stop`.
-fn tokens_between(self: Span[], src: str, skip: u64, stop: str) -> Span[] {
+fn tokens_between(
+    self: Span[],
+    src: str,
+    # How many tokens to leave off the front.
+    skip: u64,
+    # The spelling of the first token left off, with everything after it.
+    stop: str,
+) -> Span[] {
     mut kept: Span[] = [];
     mut i = skip;
     mut open = true;
@@ -3884,9 +3903,13 @@ fn generic_pattern_param(
     })
 }
 
-# The pattern `case_name(..slots..)` writes: its `payload` child holds the slots, or
-# says they are ignored.
-fn case_pattern(case_name: str, payload: Ast, span: Span) -> Pat!ParseError {
+# The pattern `case_name(..slots..)` writes.
+fn case_pattern(
+    case_name: str,
+    # The `payload` child: it holds the slots, or says they are ignored.
+    payload: Ast,
+    span: Span,
+) -> Pat!ParseError {
     let APayload(slots, ignore_payload) = payload else {
         return err(wrong_kind("a constructor payload", payload, span));
     };
@@ -4382,10 +4405,16 @@ fn lower_refinement_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     }))
 }
 
-# The `# ..` lines among `node`'s own tokens that start in `lo..hi` — the run
-# written above the case starting at `hi`, since between two cases there is
-# nothing but those lines and the `|`.
-fn doc_lines_between(src: str, Parts { tokens }, lo: u64, hi: u64) -> str[] {
+# The `# ..` lines among `node`'s own tokens that start in `lo..hi`.
+fn doc_lines_between(
+    src: str,
+    Parts { tokens },
+    # Where the range starts, as a byte offset.
+    lo: u64,
+    # Where the range ends: the start of the case the lines are written above, since between two
+    # cases there is nothing but those lines and the `|`.
+    hi: u64,
+) -> str[] {
     tokens.filter(|t| lo <= t.start && t.start < hi).map(|t| src[t]).filter(|t| t.starts_with('#'))
 }
 
@@ -6663,12 +6692,17 @@ fn pipes() -> (Rule<AiplTok>, Rule<AiplTok>) {
 # A bracketed group: `open`, whatever it holds, `close`, and how that lays out.
 # Shorter than the `Many` it builds, because a grammar this size writes a lot of
 # them and the four arguments matter more than the spelling.
-#
-# `min=1, max=1` is "exactly one thing in brackets" — the body is a single rule,
-# not a list. The layout still is a list's, and `style` says so outright: what
-# these groups hold is usually a production that is itself a list (`(args)`), and
-# the `Many` holding it has no separator of its own to read one off.
-fn nest(open: str, body: Rule<AiplTok>, close: str, style: ListStyle) -> Rule<AiplTok> {
+fn nest(
+    # The opening bracket.
+    open: str,
+    body: Rule<AiplTok>,
+    # The closing bracket.
+    close: str,
+    # How the group lays out. `min=1, max=1` makes the body one thing rather than a list, but the
+    # layout still is a list's: what these groups hold is usually a production that is itself a
+    # list (`(args)`), and the `Many` holding it has no separator of its own to read one off.
+    style: ListStyle,
+) -> Rule<AiplTok> {
     let open_rule: Rule<AiplTok> = Lit(open);
     let close_rule: Rule<AiplTok> = Lit(close);
     Many(body, min=1, max=1, nested_in=(open_rule, close_rule), style=style)
@@ -6771,9 +6805,11 @@ fn set_order(after_hash: str) -> SetOrder {
 # reads that back as a group laid out inline rather than broken at a width. It
 # is still a group, so an unclosed one is reported against the token that
 # opened it.
-fn one(body: Rule<AiplTok>, nested_in?: (Rule<AiplTok>, Rule<AiplTok>) = none) -> Rule<AiplTok> {
-    Many(body, min=1, max=1, nested_in?=nested_in)
-}
+fn one(
+    body: Rule<AiplTok>,
+    # The bracket pair, declared exactly as `Many` declares its own.
+    nested_in?: (Rule<AiplTok>, Rule<AiplTok>) = none,
+) -> Rule<AiplTok> { Many(body, min=1, max=1, nested_in?=nested_in) }
 
 # A comma-separated list that takes no trailing comma when it breaks, which most
 # of AIPL's bracketed positions want.

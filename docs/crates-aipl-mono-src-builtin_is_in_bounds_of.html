@@ -29,8 +29,22 @@
           </h3>
           <pre class="signature"><code>pub fn is_in_bounds_of&#60;T: any&#62;(self: u64, other: T[]) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether <code>self</code> is the position of an element of <code>other</code>, so that <code>other[self]</code> is <code>some</code>. A <code>str</code> is asked about its bytes.</p></div>
+          <div class="doc"><p>Whether <code>self</code> is the position of an element of <code>other</code>, so that <code>other[self]</code> is <code>some</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: u64</code>
+
+            </li>
+
+            <li><code>other: T[]</code>
+
+              <div class="doc"><p>The array (or <code>str</code>, asked about its bytes) <code>self</code> is a position in.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>

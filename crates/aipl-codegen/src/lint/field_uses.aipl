@@ -93,13 +93,17 @@ pub fn uses_of(self: Expr, name: str) -> Uses {
 # The fields `self` reads off `name`, when every use of `name` in it is a field read
 # and nothing holds a pattern back: the name is not rebound, no field is also read
 # off another value, none is a tuple position, and no field's name is already
-# spoken for in `self`. `reads` are the field reads in scope of `name`, which is
-# what tells a field read off two values apart.
-#
-# `value` is what a `let` binds `name` to. It runs before the pattern binds
-# anything, so the reads in it do not count against a field and no name in it is
-# exempt; a parameter or a slot has none.
-pub fn sole_fields(self: Expr, name: str, reads: Read[], value: Expr?) -> str[]? {
+# spoken for in `self`.
+pub fn sole_fields(
+    self: Expr,
+    # The name asked about.
+    name: str,
+    # The field reads in scope of `name`, which is what tells a field read off two values apart.
+    reads: Read[],
+    # What a `let` binds `name` to. It runs before the pattern binds anything, so the reads in it
+    # do not count against a field and no name in it is exempt; a parameter or a slot has none.
+    value: Expr?,
+) -> str[]? {
     let Uses { mentions, field_reads, fields, shadowed } = self.uses_of(name);
     if (shadowed || field_reads == 0 || field_reads != mentions) { return none; };
     let inside = value$field_reads().value_or([]);
@@ -167,7 +171,13 @@ fn rebinds(self: Expr, name: str) -> bool {
 }
 
 # Whether `self` mentions any of `names` as a bare identifier, ignoring `skip`.
-pub fn mentions_any(self: Expr, names: str[], skip: str?) -> bool {
+pub fn mentions_any(
+    self: Expr,
+    # The identifiers asked about.
+    names: str[],
+    # One that is ignored.
+    skip: str?,
+) -> bool {
     self
         .descendants()
         .any(|node| match (node.kind) {
@@ -206,7 +216,14 @@ pub fn is_shared(self: str[], everywhere: Read[], inside: Read[]) -> bool {
 
 # The distinct bases `field` is read off, counting only those read somewhere
 # other than `inside`.
-fn bases_outside(field: str, everywhere: Read[], inside: Read[]) -> str[] {
+fn bases_outside(
+    # The field.
+    field: str,
+    # Every read of a field.
+    everywhere: Read[],
+    # The reads that do not count.
+    inside: Read[],
+) -> str[] {
     let mine = everywhere.filter(|r| r.field == field);
     let local = inside.filter(|r| r.field == field);
     mut bases: str[] = [];

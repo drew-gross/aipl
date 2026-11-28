@@ -32,6 +32,26 @@
           <div class="doc"><p>The first <code>f(x)</code> over the elements of <code>self</code> that satisfies <code>pred</code>, or <code>none</code> when none does — <code>self.map(f).find_if(pred)</code> without the array between, and without mapping the elements after the match. A <code>str</code> receiver iterates its chars.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>self: T[]</code>
+
+            </li>
+
+            <li><code>f: (T) -&#62; U</code>
+
+              <div class="doc"><p>Maps each element; the elements after the match are not mapped.</p></div>
+
+            </li>
+
+            <li><code>pred: (U) -&#62; bool</code>
+
+              <div class="doc"><p>Which mapped value is wanted.</p></div>
+
+            </li>
+
+          </ul>
+
 
         </section>
 

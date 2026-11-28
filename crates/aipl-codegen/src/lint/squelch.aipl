@@ -14,7 +14,14 @@ import { FilledHit, hit } from "./lint_hit.aipl";
 # The hits of `hits` that no marker in `allows` squelches, each saying how to keep it,
 # followed by an error for every marker that squelched nothing. `src` is the text the
 # spans index into. A marker is not itself squelchable: what it would squelch is itself.
-pub fn squelch(src: str, allows: Span[], hits: FilledHit[]) -> FilledHit[] {
+pub fn squelch(
+    # The text the spans index into.
+    src: str,
+    # The `#[allow]` markers.
+    allows: Span[],
+    # The hits to filter. A marker is not itself squelchable: what it would squelch is itself.
+    hits: FilledHit[],
+) -> FilledHit[] {
     let marker_lines = allows.map(|marker| src.line_of(marker.start));
     let hit_lines = hits.map(|h| src.line_of(h.span.start));
 

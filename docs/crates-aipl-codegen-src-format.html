@@ -63,8 +63,30 @@
           </h3>
           <pre class="signature"><code>pub fn format_cst&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
 
-          <div class="doc"><p>The <code>Doc</code> that lays <code>node</code> out, given the grammar it was parsed with.</p><p><code>space</code> answers the one question a grammar cannot: whether a space belongs between two adjacent tokens. It is asked with the spellings on either side of the gap — <code>space(&quot;+&quot;, &quot;1&quot;)</code> while laying out <code>1 + 1</code>, <code>space(&quot;(&quot;, &quot;a&quot;)</code> while laying out <code>(a)</code> — so a language brings one small function instead of a layout function per production. Where a production wants no spaces at all, that is <code>Tight</code> and the rule is never consulted.</p><p><code>g</code> is linked here, so it may be handed over unlinked, exactly as <code>parse_cst</code> takes it. That is not a convenience: a group's style lives in <code>groups</code>, which only <code>link</code> fills, so an unlinked grammar would lay every bracket pair out against a table that is not there. Linking is idempotent, so a caller that linked already pays one walk and nothing else.</p><p>Fails only on a tree that does not belong to <code>g</code> — a node naming a production or a group index the grammar has no entry for, which a tree from <code>parse_cst</code> cannot be.</p></div>
+          <div class="doc"><p>The <code>Doc</code> that lays <code>node</code> out, given the grammar it was parsed with.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>g: Grammar&#60;K, A&#62;</code>
+
+            </li>
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>node: Cst</code>
+
+            </li>
+
+            <li><code>space: (str, str) -&#62; bool</code>
+
+              <div class="doc"><p>Answers the one question a grammar cannot: whether a space belongs between two adjacent tokens. It is asked with the spellings on either side of the gap — <code>space(&quot;+&quot;, &quot;1&quot;)</code> while laying out <code>1 + 1</code>, <code>space(&quot;(&quot;, &quot;a&quot;)</code> while laying out <code>(a)</code> — so a language brings one small function instead of a layout function per production. Where a production wants no spaces at all, that is <code>Tight</code> and the rule is never consulted.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -80,6 +102,32 @@
 
           <div class="doc"><p><code>src</code> laid out at <code>width</code> — <code>format_cst</code> and <code>print</code>, which is what every caller wants and neither half should assume.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>g: Grammar&#60;K, A&#62;</code>
+
+            </li>
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>node: Cst</code>
+
+            </li>
+
+            <li><code>space: (str, str) -&#62; bool</code>
+
+            </li>
+
+            <li><code>width: u64</code>
+
+              <div class="doc"><p>The width to lay out at.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -362,7 +410,7 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$24664: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$24162: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline — in the order the style asks for.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p><p>A <code>sorted</code> style orders the items by their leading token, in ordinary <code>str</code> order. The sort is stable, so two items with one key keep the author's order — a duplicate JSON key, say, stays a duplicate in the order it was written.</p></div>
 

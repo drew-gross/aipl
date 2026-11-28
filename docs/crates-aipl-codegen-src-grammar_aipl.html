@@ -1917,10 +1917,40 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-written_in">written_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn written_in(__spat$135255: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
+          <pre class="signature"><code>fn written_in(__spat$135177: Parts, src: str, skip: u64, stop: str, bare_is_case: bool) -&#62; WrittenNames</code></pre>
 
-          <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code> (which may be empty: no stop), with <code>bare_is_case</code> as <code>written_names</code> takes it.</p></div>
+          <div class="doc"><p>The names written in the tokens of <code>node</code> after its first <code>skip</code> and before the first <code>stop</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>__spat$135177: Parts</code>
+
+            </li>
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>skip: u64</code>
+
+              <div class="doc"><p>How many of the node's tokens to pass first.</p></div>
+
+            </li>
+
+            <li><code>stop: str</code>
+
+              <div class="doc"><p>The spelling of the token that ends the names; empty means no stop.</p></div>
+
+            </li>
+
+            <li><code>bare_is_case: bool</code>
+
+              <div class="doc"><p>As <code>written_names</code> takes it.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -1937,6 +1967,30 @@ if (let some(..) = target[__iset$N]) {
           <div class="doc"><p>The names written in the pattern child <code>i</code> of <code>subs</code>.</p></div>
 
 
+          <ul class="slots">
+
+            <li><code>subs: Cst[]</code>
+
+              <div class="doc"><p>The node's children.</p></div>
+
+            </li>
+
+            <li><code>i: u64</code>
+
+              <div class="doc"><p>Which of them is the pattern.</p></div>
+
+            </li>
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>bare_is_case: bool</code>
+
+            </li>
+
+          </ul>
+
 
         </section>
 
@@ -1951,6 +2005,30 @@ if (let some(..) = target[__iset$N]) {
 
           <div class="doc"><p><code>self</code>, less the first <code>skip</code> tokens and everything from the first one spelled <code>stop</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>self: Span[]</code>
+
+            </li>
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>skip: u64</code>
+
+              <div class="doc"><p>How many tokens to leave off the front.</p></div>
+
+            </li>
+
+            <li><code>stop: str</code>
+
+              <div class="doc"><p>The spelling of the first token left off, with everything after it.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -2459,8 +2537,26 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn case_pattern(case_name: str, payload: Ast, span: Span) -&#62; Pat!ParseError</code></pre>
 
-          <div class="doc"><p>The pattern <code>case_name(..slots..)</code> writes: its <code>payload</code> child holds the slots, or says they are ignored.</p></div>
+          <div class="doc"><p>The pattern <code>case_name(..slots..)</code> writes.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>case_name: str</code>
+
+            </li>
+
+            <li><code>payload: Ast</code>
+
+              <div class="doc"><p>The <code>payload</code> child: it holds the slots, or says they are ignored.</p></div>
+
+            </li>
+
+            <li><code>span: Span</code>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -2802,10 +2898,34 @@ if (let some(..) = target[__iset$N]) {
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$182495: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$182718: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
+          <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code>.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>src: str</code>
+
+            </li>
+
+            <li><code>__spat$182718: Parts</code>
+
+            </li>
+
+            <li><code>lo: u64</code>
+
+              <div class="doc"><p>Where the range starts, as a byte offset.</p></div>
+
+            </li>
+
+            <li><code>hi: u64</code>
+
+              <div class="doc"><p>Where the range ends: the start of the case the lines are written above, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -3141,8 +3261,34 @@ if (let some(..) = target[__iset$N]) {
           </h3>
           <pre class="signature"><code>fn nest(open: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>A bracketed group: <code>open</code>, whatever it holds, <code>close</code>, and how that lays out. Shorter than the <code>Many</code> it builds, because a grammar this size writes a lot of them and the four arguments matter more than the spelling.</p><p><code>min=1, max=1</code> is &quot;exactly one thing in brackets&quot; — the body is a single rule, not a list. The layout still is a list's, and <code>style</code> says so outright: what these groups hold is usually a production that is itself a list (<code>(args)</code>), and the <code>Many</code> holding it has no separator of its own to read one off.</p></div>
+          <div class="doc"><p>A bracketed group: <code>open</code>, whatever it holds, <code>close</code>, and how that lays out. Shorter than the <code>Many</code> it builds, because a grammar this size writes a lot of them and the four arguments matter more than the spelling.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>open: str</code>
+
+              <div class="doc"><p>The opening bracket.</p></div>
+
+            </li>
+
+            <li><code>body: Rule&#60;AiplTok&#62;</code>
+
+            </li>
+
+            <li><code>close: str</code>
+
+              <div class="doc"><p>The closing bracket.</p></div>
+
+            </li>
+
+            <li><code>style: ListStyle</code>
+
+              <div class="doc"><p>How the group lays out. <code>min=1, max=1</code> makes the body one thing rather than a list, but the layout still is a list's: what these groups hold is usually a production that is itself a list (<code>(args)</code>), and the <code>Many</code> holding it has no separator of its own to read one off.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
@@ -3308,6 +3454,20 @@ if (let some(..) = target[__iset$N]) {
 
           <div class="doc"><p>Exactly one thing, in a bracket pair — a condition's parentheses, a block's braces, an index's brackets. <code>Many</code> bounded at one, and spelled like one: <code>one(body, nested_in=parens())</code>, <code>nested_in</code> declared exactly as <code>Many</code> declares its own. <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
 
+
+          <ul class="slots">
+
+            <li><code>body: Rule&#60;AiplTok&#62;</code>
+
+            </li>
+
+            <li><code>nested_in?: (Rule&#60;AiplTok&#62;, Rule&#60;AiplTok&#62;) = none</code>
+
+              <div class="doc"><p>The bracket pair, declared exactly as <code>Many</code> declares its own.</p></div>
+
+            </li>
+
+          </ul>
 
 
         </section>
