@@ -555,14 +555,13 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/lambdas/filter_map | 25 | 1586 | 936 | 6399 | 11800 |
 | tests/cases/lambdas/fn_ref_shadowing | 1 | 40 | 40 | 435 | 1252 |
 | tests/cases/lambdas/generic_fn_as_value | 25 | 1710 | 1766 | 6842 | 16228 |
-| tests/cases/lambdas/lent_variables | 0 | 0 | 0 | 352 | 1040 |
 | tests/cases/lambdas/map_capture | 2 | 128 | 128 | 670 | 1456 |
 | tests/cases/lambdas/map_empty | 3 | 72 | 72 | 750 | 3176 |
 | tests/cases/lambdas/map_fresh_variant | 4 | 144 | 160 | 646 | 1748 |
 | tests/cases/lambdas/map_in_place | 16 | 972 | 1004 | 2983 | 7276 |
 | tests/cases/lambdas/map_span | 31 | 1778 | 1810 | 5280 | 9304 |
 | tests/cases/lambdas/method_form | 15 | 639 | 855 | 1550 | 3492 |
-| tests/cases/lambdas/mutating_closures | 9 | 439 | 105 | 1855 | 7976 |
+| tests/cases/lambdas/mutating_closures | 12 | 543 | 209 | 1192 | 4960 |
 | tests/cases/lambdas/named_fn_args | 10 | 435 | 363 | 1950 | 4532 |
 | tests/cases/lambdas/operator_as_value | 5 | 298 | 298 | 989 | 4676 |
 | tests/cases/lambdas/operator_as_value_custom | 2 | 108 | 108 | 561 | 4420 |

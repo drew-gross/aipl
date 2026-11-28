@@ -8,15 +8,13 @@ says `mut`.
 
 ## Context
 
-- A closure that mutates is built (`MUTATING_CLOSURES` work, deleted) as owning what it takes:
-  `[mut x]` moves `x` into the closure, which holds it in a synthesized struct (`lift_mutating_lambda`),
-  and a call is `f = apply$n$mut(f, args)`. The enclosing code may not use `x` afterwards
-  (`Binding::moved`), unless the closure is only ever called as `set f(..)`, when it is inlined and
-  `x` is lent (`inline_closure`, `lend`).
-- Values do not alias: a struct, array or closure is copied on write, so a variable has one owner.
-  Nothing here is a reference today, except what the runtime does for a `shim` closure, which keeps
-  its captured variables in numbered global slots for the shim's extent (`ShimCellGet`,
-  `ShimCellSet`).
+- A `mut` local that any closure's capture list in the function names is a cell (`Binding::cell` in
+  `pin.rs`, decided by name before the body is typed): its declaration makes one
+  (`let x$cell = cell_new(v)`), a read is `cell_get(x$cell)`, and a `set` rooted at it reads the
+  cell into a local of its name, assigns, and writes it back. A closure that names it captures the
+  handle like any local, so closure conversion and lifting treat a `mut` closure as any other.
+- The cell calls are one-element array blocks in the code generator (`CellNew`, `CellGet`,
+  `CellSet`); nothing in source can write them.
 - Calls through function values carry the function's type as their one type argument, which the
   sink and single-use inlining read to leave a call with effects, or one that mutates, where it is.
 
@@ -26,8 +24,8 @@ says `mut`.
   made where the variable is declared and shared by the code around it and by every closure that
   captures it. Reading it copies the value out (copy on write as ever); writing replaces the value.
   Copying a closure copies its handle on the cell, so the copy shares the state.
-- **Only a `[mut ..]` capture is shared.** A variable a closure reads without naming it in the
-  capture list is copied when the closure is made, as before.
+- **Only a `[mut ..]` capture is shared.** A closure that reads a `mut` variable without naming it
+  in the capture list is refused, as before.
 - **A `[mut x]` names a local, not a parameter**, for now: a parameter holds a copy of what it was
   passed and is no place for state others can see.
 - **The enclosing code uses the variable freely**, before and after the closure is made: the
@@ -58,30 +56,12 @@ says `mut`.
 
 ## Stages
 
-Order: 1, 2, 3, 4.
-
-### 1. Cells in the code generator
-- [x] `cell_new`, `cell_get`, `cell_set` as `Callee` arms, internal builtins and `builtin_table.aipl`
-      entries, with codegen (a one-element array block; JIT and AOT share the arms). Nothing in
-      source reaches them yet, so stage 2's cases are their first test.
-- [ ] The sink and single-use inlining treat them as having effects: this waits for stage 3, since
-      nothing produces them before stage 2.
-
-### 2. Cell variables in the pinner
-- [ ] A `mut` variable named by a capture list, or declared by one, is a cell: its declaration makes
-      one, its reads read it and its writes (`set x = v`, `set x.field = v`, a mutating method
-      through `set`, `set x++`) write it.
-- [ ] `moved`, `lent` and the inlining are removed with their errors; what a capture list may not
-      name stays (a binding that is not `mut`, a name that is not there, a name twice).
-- [ ] The cell is the closure's captured value: mono lifts a closure that mutates as it lifts one
-      that does not, and closure conversion has no `apply$n$mut` or environment struct.
-- [ ] Cases: the counter factory, copies sharing state, an accumulator read after its calls, a
-      closure called after the variable is read in between, two closures over one variable, a heap
-      value in the cell; leak gate clean.
+Order: 3, 4 (1 and 2 are done: cells exist in the code generator, and a `[mut x]` local is one).
 
 ### 3. The optimizer
 - [ ] A call through a `mut` function type is never moved, dropped or merged, and neither is a
-      cell read or write (cases in `tests/cases/optimizations/`).
+      cell read or write (cases in `tests/cases/optimizations/`); the sink and single-use inlining
+      treat the three cell calls as having effects.
 
 ### 4. The todo app
 - [ ] `Element` takes handlers of type `() mut -> ()` and is no longer generic over the model;

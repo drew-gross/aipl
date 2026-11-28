@@ -135,6 +135,11 @@ pub fn any_child<T: TyRepr>(e: &TExpr<T>, mut test: impl FnMut(&TExpr<T>) -> boo
 pub fn mentions_free<T: TyRepr>(e: &TExpr<T>, name: &str) -> bool {
     match &e.kind {
         TExprKind::Ident(n) => n == name,
+        // A call through a local is a read of it.
+        TExprKind::Call {
+            callee: Callee::Local(n),
+            ..
+        } if n == name => true,
         TExprKind::Let(n, value, body) | TExprKind::LetMut(n, value, body) => {
             mentions_free(value, name) || (n != name && mentions_free(body, name))
         }
@@ -170,7 +175,12 @@ pub(crate) fn contains_context_literal<T: TyRepr>(e: &TExpr<T>) -> bool {
 
 /// Every name `e` reads. Shadowing is ignored: this only ever adds names.
 pub(crate) fn read_names<T: TyRepr>(e: &TExpr<T>, out: &mut std::collections::HashSet<String>) {
-    if let TExprKind::Ident(n) = &e.kind {
+    if let TExprKind::Ident(n)
+    | TExprKind::Call {
+        callee: Callee::Local(n),
+        ..
+    } = &e.kind
+    {
         out.insert(n.clone());
     }
     each_child(e, &mut |c| read_names(c, out));
@@ -192,6 +202,19 @@ fn walk_uses<T: TyRepr>(e: &TExpr<T>, name: &str, repeated: bool, out: &mut crat
         TExprKind::Ident(n) if n == name => {
             out.count += 1;
             out.repeated |= repeated;
+        }
+        // A call through a local reads it, and then its arguments. It is no place a value can be
+        // written into, so it counts as a use that runs other than exactly once.
+        TExprKind::Call {
+            callee: Callee::Local(n),
+            args,
+            ..
+        } if n == name => {
+            out.count += 1;
+            out.repeated = true;
+            for a in args {
+                walk_uses(a, name, repeated, out);
+            }
         }
         TExprKind::Let(n, value, body) | TExprKind::LetMut(n, value, body) => {
             walk_uses(value, name, repeated, out);

@@ -1,15 +1,10 @@
 # A closure that mutates what it captures names the variables it takes in `[mut ..]`, sets each of
-# them in its body, and returns nothing. A variable it takes is the closure's from there on. Calling
-# one is `set f(x);` on a `mut` binding, and what it is stored as says it mutates (`mut` in the
-# function type), which a function type without it does not accept. The functions that are not
-# marked below are accepted.
+# them in its body, and returns nothing. A variable it takes is a local `mut` variable of the
+# function that makes the closure, which shares it. What a closure's type says it does (`mut` in the
+# function type) is not accepted where a function type without it is expected. The functions that are
+# not marked below are accepted.
 
-import {
-    print,
-    wrapping_add as +,
-    wrapping_add_assign as +=,
-    wrapping_increment as ++,
-} from builtins;
+import { print, wrapping_increment as ++ } from builtins;
 
 struct Plain { run: () -> () }
 
@@ -63,58 +58,13 @@ fn returns_a_value() -> () mut -> i64 {
     }
 }
 
-# The state is written back when the body ends, which an early `return` would skip.
-fn returns_early() -> () mut !prints -> () {
-    mut x = 0;
-    [mut x] || {
-        set x++;
-        return print("early");
-    }
-}
-
-# The variable is the closure's once it is taken.
-fn used_after() -> () mut -> () {
-    mut x = 0;
-    let f = [mut x] || {
-        set x++;
+# The receiver of a mutating method is a parameter, not a place to share: take a local that starts
+# from it.
+fn bump(mut self: i64) {
+    let tick = [mut self] || {
+        set self++;
     };
-    set x++;
-    f
-}
-
-# A loop that makes a closure takes a new variable each time round, not one from outside it.
-fn in_a_loop() {
-    mut x = 0;
-    for (let i : [1, 2]) {
-        let f = [mut x] || {
-            set x++;
-        };
-        set f();
-    }
-}
-
-# A closure that is only ever called, `mut f = [mut x] ..` and `set f(..)`, lends its variables for
-# as long as it is called: they are the closure's until the last call and the function's again after.
-fn used_while_lent() -> i64 {
-    mut sum = 0;
-    mut add = [mut sum] |x: i64| {
-        set sum += x;
-    };
-    set add(1);
-    let seen = sum;
-    set add(2);
-    seen + sum
-}
-
-# It is written out where it is called, so what it names has to be what it named when it was made.
-fn shadowed_before_a_call() -> i64 {
-    mut sum = 0;
-    mut add = [mut sum] |x: i64| {
-        set sum += x;
-    };
-    let sum = 5;
-    set add(1);
-    sum
+    tick();
 }
 
 # State the closure starts with is its own.
@@ -147,100 +97,69 @@ fn mutating_stored() -> Mutating {
     }
 }
 
-# `set f();` calls it and keeps it; `f();` would lose what it did.
+# A closure is called as any function is, and keeps what it did.
 fn calls() !prints {
-    mut tick = owned_state();
-    set tick();
-    set tick();
+    let tick = owned_state();
+    tick();
     tick();
 }
 
-# A `let` binding cannot be set, and neither can a closure that is not a mutating one.
-fn called_through_let() !prints {
-    let tick = owned_state();
+# The old way of calling one, `set f();`, assigns what the call answers, which is nothing.
+fn set_call() !prints {
+    mut tick = owned_state();
     set tick();
 }
 --- check --compile ---
 error: `[mut x]` takes a variable the closure mutates, and "x" is not a `mut` binding
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:21:6
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:16:6
    |
-21 |     [mut x] || {
+16 |     [mut x] || {
    |      ^^^^^
 
 error: `[mut x]` is never set in the closure's body
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:29:6
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:24:6
    |
-29 |     [mut x] || {
+24 |     [mut x] || {
    |      ^^^^^
 
 error: a lambda used as a value cannot capture the `mut` binding "y": it would keep the value it has now, not the later ones (write `[mut y]` in front of it to let the closure take "y" and change it)
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:38:5
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:33:5
    |
-38 |     [mut x] || {
+33 |     [mut x] || {
    |     ^^^^^^^^^^^^
 
 error: `[mut missing]` names no variable here
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:45:6
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:40:6
    |
-45 |     [mut missing] || {
+40 |     [mut missing] || {
    |      ^^^^^^^^^^^
 
 error: "x" is captured twice
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:52:12
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:47:12
    |
-52 |     [mut x, mut x] || {
+47 |     [mut x, mut x] || {
    |            ^^^^^^
 
 error: a closure that mutates what it captures returns nothing, but its body is i64
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:61:13
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:56:13
    |
-61 |         set x++;
+56 |         set x++;
    |             ^^^
 
-error: return value is (), but the function returns () mut !prints -> ()
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:71:16
+error: `[mut self]` takes a local variable, and "self" is a parameter
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:64:17
    |
-71 |         return print("early");
-   |                ^^^^^^^^^^^^^^
-
-error: "x" was moved into a closure that mutates it, and is the closure's from there on
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:81:9
-   |
-81 |     set x++;
-   |         ^
-
-error: `[mut x]` would take "x" on every pass of a loop, and it is declared outside the loop
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:89:18
-   |
-89 |         let f = [mut x] || {
-   |                  ^^^^^
-
-error: "sum" is lent to the closure "add" until the last time it is called
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:104:16
-    |
-104 |     let seen = sum;
-    |                ^^^
-
-error: "sum" here is not the variable the closure "add" was made over
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:116:9
-    |
-116 |     set add(1);
-    |         ^^^^^
+64 |     let tick = [mut self] || {
+   |                 ^^^^^^^^
 
 error: struct "Plain" field "run": expected () -> (), got () mut -> ()
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:133:14
-    |
-133 |         run: [mut x] || {
-    |              ^^^^^^^^^^^^
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:83:14
+   |
+83 |         run: [mut x] || {
+   |              ^^^^^^^^^^^^
 
-error: the result of the mutating closure "tick" is discarded, losing the mutation; write "set tick(..)" to mutate it in place
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:155:5
+error: set: expected () mut !prints -> (), got ()
+   --> ./tests/cases/lambdas/err_mutating_closure.aipl:110:9
     |
-155 |     tick();
-    |     ^^^^^^
-
-error: set: cannot assign to immutable binding "tick" (use "let mut")
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:161:9
-    |
-161 |     set tick();
+110 |     set tick();
     |         ^^^^

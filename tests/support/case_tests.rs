@@ -492,7 +492,6 @@ case_tests! {
     cases_lambdas_filter_map = "cases/lambdas/filter_map",
     cases_lambdas_fn_ref_shadowing = "cases/lambdas/fn_ref_shadowing",
     cases_lambdas_generic_fn_as_value = "cases/lambdas/generic_fn_as_value",
-    cases_lambdas_lent_variables = "cases/lambdas/lent_variables",
     cases_lambdas_map_capture = "cases/lambdas/map_capture",
     cases_lambdas_map_empty = "cases/lambdas/map_empty",
     cases_lambdas_map_fresh_variant = "cases/lambdas/map_fresh_variant",

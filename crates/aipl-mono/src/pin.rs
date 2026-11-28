@@ -21,7 +21,6 @@
 //! **Gaps.** A form the pinner does not type is a [`Failure::Gap`] naming it, never a guess.
 
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
 
 use crate::typing::{
     check_result_inspected, display, no_outer_assign, optional_map_signature, span_map_signature,
@@ -639,103 +638,27 @@ struct Binding {
     mutable: bool,
     /// Where the name was introduced, if it is written anywhere.
     binder: Option<Span>,
-    /// Set once a closure's `[mut name]` has taken the variable: it is the closure's from there on.
-    moved: bool,
-    /// The closure a variable is lent to, for as long as it is called: the variable is the
-    /// closure's until the call that is the last.
-    lent: Option<String>,
-    /// What tells this binding from another of the same name: a closure inlined at a call has to
-    /// find the variables it was made over, not ones that shadow them.
-    id: u64,
-    /// For a closure that is only ever called, what each call is replaced by.
-    inline: Option<Rc<InlineClosure>>,
-    /// How many loops enclosed the declaration, so a closure made in a loop cannot take a variable
-    /// that was declared outside it.
-    depth: u32,
+    /// Whether the variable lives in a cell, because a closure's capture list names it: the local
+    /// of the typed tree is then `<name>$cell`, the handle on the cell, and a read of the variable
+    /// reads the cell.
+    cell: bool,
 }
 
-/// How many times `e` calls the closure `name` as `set name(..);`, or `None` when it mentions it any
-/// other way: as a value, called some other way, or from inside another closure. Only a closure
-/// that is called and nothing else can be written out where it is called.
-fn closure_calls(e: &Expr, name: &str, in_closure: bool) -> Option<usize> {
-    let sum = |children: &mut dyn Iterator<Item = &Expr>| -> Option<usize> {
-        let mut total = 0;
-        for child in children {
-            total += closure_calls(child, name, in_closure)?;
-        }
-        Some(total)
-    };
-    match &e.kind {
-        ExprKind::Ident(n) if n == name => None,
-        ExprKind::Call(Callee::Local(n), ..) if n == name => None,
-        ExprKind::Assign(lhs, value, rest) => {
-            let called = matches!(
-                (&lhs.kind, &value.kind),
-                (ExprKind::Ident(l), ExprKind::Call(Callee::Local(c), _, false))
-                    if l == name && c == name
-            );
-            if called {
-                if in_closure {
-                    return None;
-                }
-                let ExprKind::Call(_, args, _) = &value.kind else {
-                    unreachable!("matched above");
-                };
-                return Some(1 + sum(&mut args.iter())? + closure_calls(rest, name, in_closure)?);
-            }
-            if aipl_syntax::ast::assign_target(lhs).is_some_and(|(root, _)| root == name) {
-                return None;
-            }
-            Some(closure_calls(value, name, in_closure)? + closure_calls(rest, name, in_closure)?)
-        }
-        ExprKind::Lambda(_, body, captures) => {
-            if captures.iter().any(|c| c.name == name) {
-                return None;
-            }
-            sum(&mut captures.iter().filter_map(|c| c.init.as_ref()))?;
-            closure_calls(body, name, true)
-        }
-        _ => sum(&mut e.children()),
+/// Every name a closure's capture list in `e` takes or starts, `[mut x]` and `[mut x = ..]`.
+fn captured_names(e: &Expr, out: &mut HashSet<String>) {
+    if let ExprKind::Lambda(_, _, captures) = &e.kind {
+        out.extend(captures.iter().map(|c| c.name.clone()));
     }
-}
-
-/// A number no other [`Binding`] has: only compared for equality.
-fn fresh_binding_id() -> u64 {
-    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-}
-
-/// A closure that mutates what it captured and is only ever called, `mut f = [mut x] || { .. };`
-/// then `set f();`: it has no value at run time, and each call is its body, written where the call is.
-struct InlineClosure {
-    params: Vec<TLambdaParam<It>>,
-    body: TExpr<It>,
-    effects: Vec<String>,
-    /// The variables its body names from outside, with what they were bound as where it was made.
-    variables: Vec<(String, u64)>,
-}
-
-/// What a `let` of a closure that is only ever called is made of, before it is typed.
-struct Inlined {
-    /// How many calls it has.
-    calls: usize,
-    /// The variables it takes, which are lent until the last of those calls.
-    lent: Vec<String>,
-    /// Everything its body names from outside, the variables it takes included.
-    outside: Vec<String>,
-}
-
-/// The calls of an inlined closure still to come, and the variables that are lent until the last.
-struct Lending {
-    variables: Vec<String>,
-    remaining: usize,
+    for child in e.children() {
+        captured_names(child, out);
+    }
 }
 
 /// What a lambda's capture list changed in the environment while its body is typed.
 #[derive(Default)]
 struct CaptureScope {
     /// The variables of the enclosing function it takes.
-    lent: Vec<String>,
+    taken: Vec<String>,
     /// The bindings to put back.
     saved: Vec<(String, Option<Binding>)>,
     /// The state the closure starts with, `[mut n = 0]`: each is a `mut` variable around the
@@ -787,8 +710,9 @@ struct Pinner<'a> {
     closure_outer: Option<Vec<String>>,
     /// How many loop bodies enclose what is being typed.
     loops: u32,
-    /// Closures inlined at their calls that still have calls to come, by binding id.
-    lendings: HashMap<u64, Lending>,
+    /// The names some closure's capture list in the function takes: a `mut` local of one of them
+    /// is a cell.
+    cells: HashSet<String>,
     /// Typing a `.test` or `.benchmark` block, where a failed `?` fails the test: the block
     /// returns nothing, so the operand's shape is the only constraint.
     in_test: bool,
@@ -1202,7 +1126,7 @@ fn pinner_for<'a>(
         inferring: None,
         closure_outer: None,
         loops: 0,
-        lendings: HashMap::new(),
+        cells: HashSet::new(),
         in_test: false,
         errors: Vec::new(),
         narrows: Vec::new(),
@@ -1236,11 +1160,7 @@ fn pin_slot_default(
                 ty: t,
                 mutable: false,
                 binder: None,
-                moved: false,
-                lent: None,
-                id: fresh_binding_id(),
-                inline: None,
-                depth: 0,
+                cell: false,
             },
         );
     }
@@ -1333,11 +1253,7 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
                 ty,
                 mutable: param.mutable,
                 binder: written(&param.name_span.0),
-                moved: false,
-                lent: None,
-                id: fresh_binding_id(),
-                inline: None,
-                depth: 0,
+                cell: false,
             },
         );
     }
@@ -1379,11 +1295,7 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
                             ty: t.clone(),
                             mutable: false,
                             binder: written(&q.name_span.0),
-                            moved: false,
-                            lent: None,
-                            id: fresh_binding_id(),
-                            inline: None,
-                            depth: 0,
+                            cell: false,
                         },
                     )
                 })
@@ -1406,6 +1318,7 @@ fn pin_function_in(p: &mut Pinner<'_>, decls: &Decls, f: &Function) -> Res<TFunc
     if let Some(returned @ Type::Fn(..)) = &f.sig.return_ty {
         typed_returned_lambdas(&mut written, returned);
     }
+    captured_names(&written, &mut p.cells);
     let body = p.expr(&written)?;
     let ret = p.ret.clone();
     p.coerce_expr(
@@ -2588,6 +2501,48 @@ impl Pinner<'_> {
         self.expr_at(e, Pos::Value)
     }
 
+    /// The local that holds the handle on the cell of the variable `name`.
+    fn cell_handle(name: &str) -> String {
+        format!("{name}$cell")
+    }
+
+    /// A call of one of the cell intrinsics, which carry the type of what the cell holds as their
+    /// one type argument.
+    fn cell_call(
+        &self,
+        callee: Callee,
+        held: &It,
+        args: Vec<TExpr<It>>,
+        ret: It,
+        at: &Expr,
+    ) -> TExpr<It> {
+        self.node(
+            TExprKind::Call {
+                callee,
+                type_args: vec![held.clone()],
+                args,
+                method_style: false,
+            },
+            ret,
+            at,
+        )
+    }
+
+    /// The handle on the cell of the variable `name`, which holds a `held`.
+    fn cell_local(&self, name: &str, held: &It, at: &Expr) -> TExpr<It> {
+        self.node(
+            TExprKind::Ident(Self::cell_handle(name)),
+            It::Arr(Box::new(held.clone())),
+            at,
+        )
+    }
+
+    /// What the cell of the variable `name` holds now.
+    fn cell_read(&self, name: &str, held: It, at: &Expr) -> TExpr<It> {
+        let handle = self.cell_local(name, &held, at);
+        self.cell_call(Callee::CellGet, &held, vec![handle], held.clone(), at)
+    }
+
     /// `e`, told whether its value is used (see [`Pos`]).
     ///
     /// A stamp already on `e` (`Expr::ty`) is the context its type was decided in, recorded where
@@ -2623,11 +2578,14 @@ impl Pinner<'_> {
             ExprKind::Unit => self.node(K::Unit, It::Unit, e),
             ExprKind::Ident(name) => match self.env.get(name).cloned() {
                 Some(b) => {
-                    self.ensure_not_moved(name, &b, &e.span)?;
                     if let Some(binder) = b.binder {
                         self.resolve(&e.name_span, Target::Local(binder));
                     }
-                    self.node(K::Ident(name.clone()), b.ty, e)
+                    if b.cell {
+                        self.cell_read(name, b.ty, e)
+                    } else {
+                        self.node(K::Ident(name.clone()), b.ty, e)
+                    }
                 }
                 None => return self.reference(e, name),
             },
@@ -2695,21 +2653,6 @@ impl Pinner<'_> {
                 )
             }
             ExprKind::Seq(first, rest) => {
-                // A closure that mutates what it captured, called for effect, would lose it too.
-                if let ExprKind::Call(Callee::Local(name), _, false) = &first.kind {
-                    if let Some(It::Fn(.., true)) =
-                        self.env.get(name).map(|b| self.table.shallow(&b.ty))
-                    {
-                        self.errors.push(Error::at(
-                            format!(
-                                "the result of the mutating closure \"{name}\" is discarded, \
-                                 losing the mutation; write \"set {name}(..)\" to mutate it in \
-                                 place"
-                            ),
-                            first.span.clone(),
-                        ));
-                    }
-                }
                 // A mutating method called for effect would lose its mutation.
                 if let ExprKind::Call(name, cargs, true) = &first.kind {
                     if self
@@ -2758,11 +2701,6 @@ impl Pinner<'_> {
             }
             ExprKind::Let(name, ann, v, body_src) | ExprKind::LetMut(name, ann, v, body_src) => {
                 let mutable = matches!(e.kind, ExprKind::LetMut(..));
-                let candidate = if ann.is_none() {
-                    self.inline_candidate(name, v, body_src, mutable)
-                } else {
-                    None
-                };
                 let bound = (|| match ann {
                     Some(t) => {
                         let names: Vec<String> = self
@@ -2803,6 +2741,7 @@ impl Pinner<'_> {
                 // A binding's initializer is not a place to recover: the body is typed against
                 // what it produced, so going on would report the echoes of its failure.
                 let (v, ty) = bound?;
+                let held = ty.clone();
                 if self.table.shallow(&ty) == It::Unit {
                     return reject(
                         format!("cannot bind {name:?} to a value of type ()"),
@@ -2811,28 +2750,18 @@ impl Pinner<'_> {
                 }
                 let binder = written(&e.name_span.as_deref().cloned().unwrap_or_default());
                 let declared = ann.is_some().then(|| ty.clone());
-                // A closure that is only ever called is not made: each call is its body.
-                let inline = match &candidate {
-                    Some(inlined) => self.inline_closure(&v, inlined),
-                    None => None,
-                };
-                let inline_id = fresh_binding_id();
+                // A variable a closure's capture list names is a cell: the closure and the code
+                // around it share it.
+                let cell = mutable && self.cells.contains(name);
                 let old = self.env.insert(
                     name.clone(),
                     Binding {
-                        id: inline_id,
-                        inline: inline.clone(),
-                        ty,
+                        ty: ty.clone(),
                         mutable,
                         binder,
-                        moved: false,
-                        lent: None,
-                        depth: self.loops,
+                        cell,
                     },
                 );
-                if let (Some(inlined), Some(_)) = (&candidate, &inline) {
-                    self.lend(inline_id, name, &inlined.lent, inlined.calls);
-                }
                 let body = self.expr_at(body_src, pos)?;
                 if let It::Res(..) = self.table.shallow(&v.ty) {
                     let shown = Type::Result(Box::new(Type::Unit), Box::new(Type::Unit));
@@ -2843,11 +2772,21 @@ impl Pinner<'_> {
                     Some(b) => self.env.insert(name.clone(), b),
                     None => self.env.remove(name),
                 };
-                if inline.is_some() {
-                    self.lendings.remove(&inline_id);
-                    return Ok(body);
-                }
                 let ty = body.ty.clone();
+                if cell {
+                    let made = self.cell_call(
+                        Callee::CellNew,
+                        &held,
+                        vec![v],
+                        It::Arr(Box::new(held.clone())),
+                        e,
+                    );
+                    return Ok(self.node(
+                        K::Let(Self::cell_handle(name), Box::new(made), Box::new(body)),
+                        ty,
+                        e,
+                    ));
+                }
                 let kind = if mutable {
                     K::LetMut(name.clone(), Box::new(v), Box::new(body))
                 } else {
@@ -2858,14 +2797,15 @@ impl Pinner<'_> {
                 node
             }
             ExprKind::Assign(lhs, v, rest) => {
-                // `set f(x);` for a closure that is only ever called.
-                if let (ExprKind::Ident(f), ExprKind::Call(Callee::Local(called), args, false)) =
-                    (&lhs.kind, &v.kind)
-                {
-                    if f == called {
-                        if let Some(b) = self.env.get(f).filter(|b| b.inline.is_some()).cloned() {
-                            return self.inline_call(f, &b, args, rest, pos, e);
-                        }
+                // A variable in a cell is read, changed and put back around the assignment: the
+                // place and the value see an ordinary local of its name.
+                let cell_root = aipl_syntax::ast::assign_target(lhs).and_then(|(root, _)| {
+                    let b = self.env.get(root).filter(|b| b.cell)?;
+                    Some((root.to_string(), b.ty.clone()))
+                });
+                if let Some((root, _)) = &cell_root {
+                    if let Some(b) = self.env.get_mut(root) {
+                        b.cell = false;
                     }
                 }
                 let assigned = (|| {
@@ -2878,7 +2818,6 @@ impl Pinner<'_> {
                     let Some(b) = self.env.get(root).cloned() else {
                         return reject(format!("set: undeclared variable {root:?}"), &lhs.span);
                     };
-                    self.ensure_not_moved(root, &b, &lhs.span)?;
                     if let Some(binder) = &b.binder {
                         let mut base = &**lhs;
                         while let ExprKind::Field(obj, _) = &base.kind {
@@ -2901,6 +2840,11 @@ impl Pinner<'_> {
                     self.coerce_expr(&v, &lhs.ty, &v.span, "set")?;
                     Ok((lhs, v))
                 })();
+                if let Some((root, _)) = &cell_root {
+                    if let Some(b) = self.env.get_mut(root) {
+                        b.cell = true;
+                    }
+                }
                 let (lhs, v) = match assigned {
                     Ok(done) => done,
                     Err(failure) => {
@@ -2910,7 +2854,29 @@ impl Pinner<'_> {
                 };
                 let rest = self.expr_at(rest, pos)?;
                 let ty = rest.ty.clone();
-                self.node(K::Assign(Box::new(lhs), Box::new(v), Box::new(rest)), ty, e)
+                match cell_root {
+                    Some((root, held)) => {
+                        let handle = self.cell_local(&root, &held, e);
+                        let value = self.node(K::Ident(root.clone()), held.clone(), e);
+                        let store = self.cell_call(
+                            Callee::CellSet,
+                            &held,
+                            vec![handle, value],
+                            It::Unit,
+                            e,
+                        );
+                        let rest =
+                            self.node(K::Seq(Box::new(store), Box::new(rest)), ty.clone(), e);
+                        let assign = self.node(
+                            K::Assign(Box::new(lhs), Box::new(v), Box::new(rest)),
+                            ty.clone(),
+                            e,
+                        );
+                        let read = self.cell_read(&root, held, e);
+                        self.node(K::LetMut(root, Box::new(read), Box::new(assign)), ty, e)
+                    }
+                    None => self.node(K::Assign(Box::new(lhs), Box::new(v), Box::new(rest)), ty, e),
+                }
             }
             ExprKind::Call(callee, args, method_style) => {
                 return self.call(e, callee, args, *method_style)
@@ -3546,7 +3512,7 @@ impl Pinner<'_> {
                     body.ty.clone()
                 } else {
                     self.unit_body(&body)?;
-                    self.finish_captures(&taken.lent, captures, &body)?;
+                    self.finish_captures(captures, &body)?;
                     It::Unit
                 };
                 let ty = It::Fn(
@@ -3622,168 +3588,6 @@ impl Pinner<'_> {
         })
     }
 
-    /// Whether `mut name = value;` followed by `body` is a closure that is only ever called, and
-    /// takes variables of the function it is in: then it needs no value of its own.
-    fn inline_candidate(
-        &self,
-        name: &str,
-        value: &Expr,
-        body: &Expr,
-        mutable: bool,
-    ) -> Option<Inlined> {
-        let ExprKind::Lambda(params, lambda_body, captures) = &value.kind else {
-            return None;
-        };
-        if !mutable || captures.is_empty() || captures.iter().any(|c| c.init.is_some()) {
-            return None;
-        }
-        let locals: HashMap<String, Type> =
-            self.env.keys().map(|n| (n.clone(), Type::Unit)).collect();
-        let outside = crate::free_vars(lambda_body, params, &locals)
-            .into_iter()
-            .map(|(n, _)| n)
-            .chain(captures.iter().map(|c| c.name.clone()))
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        Some(Inlined {
-            calls: closure_calls(body, name, false)?,
-            lent: captures.iter().map(|c| c.name.clone()).collect(),
-            outside,
-        })
-    }
-
-    /// The closure typed as `typed` (a lambda node), as what each call is written out as.
-    fn inline_closure(&self, typed: &TExpr<It>, inlined: &Inlined) -> Option<Rc<InlineClosure>> {
-        let TExprKind::Lambda(params, body) = &typed.kind else {
-            return None;
-        };
-        let It::Fn(_, _, effects, _) = self.table.shallow(&typed.ty) else {
-            return None;
-        };
-        Some(Rc::new(InlineClosure {
-            params: params.clone(),
-            body: (**body).clone(),
-            effects,
-            variables: inlined
-                .outside
-                .iter()
-                .filter_map(|n| self.env.get(n).map(|b| (n.clone(), b.id)))
-                .collect(),
-        }))
-    }
-
-    /// The variables an inlined closure takes are lent to it until its last call, which is now
-    /// when it has none.
-    fn lend(&mut self, closure: u64, name: &str, variables: &[String], calls: usize) {
-        for variable in variables {
-            if let Some(b) = self.env.get_mut(variable) {
-                b.moved = false;
-                b.lent = Some(name.to_string());
-            }
-        }
-        self.lendings.insert(
-            closure,
-            Lending {
-                variables: variables.to_vec(),
-                remaining: calls,
-            },
-        );
-        if calls == 0 {
-            self.call_done(closure);
-        }
-    }
-
-    /// One call of an inlined closure is typed; after the last the variables are the function's
-    /// again, with what the calls made of them.
-    fn call_done(&mut self, closure: u64) {
-        let Some(lending) = self.lendings.get_mut(&closure) else {
-            return;
-        };
-        lending.remaining = lending.remaining.saturating_sub(1);
-        if lending.remaining > 0 {
-            return;
-        }
-        let variables = std::mem::take(&mut lending.variables);
-        for name in variables {
-            if let Some(b) = self.env.get_mut(&name) {
-                b.lent = None;
-            }
-        }
-    }
-
-    /// `set name(args);` for a closure that is only ever called: its body, with its parameters
-    /// bound to the arguments, in place of the call.
-    fn inline_call(
-        &mut self,
-        name: &str,
-        binding: &Binding,
-        args: &[Expr],
-        rest: &Expr,
-        pos: Pos,
-        e: &Expr,
-    ) -> Res<TExpr<It>> {
-        let inline = binding.inline.clone().expect("an inlined closure");
-        for (variable, id) in &inline.variables {
-            if self.env.get(variable).map(|b| b.id) != Some(*id) {
-                return reject(
-                    format!(
-                        "{variable:?} here is not the variable the closure {name:?} was made over"
-                    ),
-                    &e.span,
-                );
-            }
-        }
-        for effect in &inline.effects {
-            self.require_effect(name, effect, &e.span, true)?;
-        }
-        if inline.params.len() != args.len() {
-            return reject(
-                format!("{name:?} takes {} argument(s)", inline.params.len()),
-                &e.span,
-            );
-        }
-        let mut typed = Vec::new();
-        for (i, (arg, param)) in args.iter().zip(&inline.params).enumerate() {
-            let t = self.arg(arg, &param.ty)?;
-            self.coerce_expr(&t, &param.ty, &t.span, Site::Argument(display(name), i))?;
-            typed.push(t);
-        }
-        let mut call = inline.body.clone();
-        for (param, value) in inline.params.iter().zip(typed).rev() {
-            call = self.node(
-                TExprKind::Let(param.name.clone(), Box::new(value), Box::new(call)),
-                It::Unit,
-                e,
-            );
-        }
-        self.call_done(binding.id);
-        let rest = self.expr_at(rest, pos)?;
-        let ty = rest.ty.clone();
-        Ok(self.node(TExprKind::Seq(Box::new(call), Box::new(rest)), ty, e))
-    }
-
-    fn ensure_not_moved(&self, name: &str, binding: &Binding, span: &Span) -> Res<()> {
-        if let Some(closure) = &binding.lent {
-            return reject(
-                format!(
-                    "{name:?} is lent to the closure {closure:?} until the last time it is called"
-                ),
-                span,
-            );
-        }
-        if binding.moved {
-            return reject(
-                format!(
-                    "{name:?} was moved into a closure that mutates it, and is the closure's \
-                     from there on"
-                ),
-                span,
-            );
-        }
-        Ok(())
-    }
-
     /// What a lambda's capture list does to the code around it while its body is typed: the
     /// variables it takes are the ones the body may `set`, and no other `mut` variable of the
     /// enclosing function may be set there. State a capture starts with is a binding of the body.
@@ -3808,7 +3612,6 @@ impl Pinner<'_> {
                             &c.span,
                         );
                     };
-                    self.ensure_not_moved(&c.name, &b, &c.span)?;
                     if !b.mutable {
                         return reject(
                             format!(
@@ -3819,17 +3622,16 @@ impl Pinner<'_> {
                             &c.span,
                         );
                     }
-                    if b.depth < self.loops {
+                    if !b.cell {
                         return reject(
                             format!(
-                                "`[mut {0}]` would take {0:?} on every pass of a loop, and it is \
-                                 declared outside the loop",
+                                "`[mut {0}]` takes a local variable, and {0:?} is a parameter",
                                 c.name
                             ),
                             &c.span,
                         );
                     }
-                    scope.lent.push(c.name.clone());
+                    scope.taken.push(c.name.clone());
                 }
             }
         }
@@ -3839,7 +3641,7 @@ impl Pinner<'_> {
         let others: Vec<String> = self
             .env
             .iter()
-            .filter(|(name, b)| b.mutable && !scope.lent.contains(name))
+            .filter(|(name, b)| b.mutable && !scope.taken.contains(name))
             .map(|(name, _)| name.clone())
             .collect();
         for name in others {
@@ -3860,11 +3662,7 @@ impl Pinner<'_> {
                     ty,
                     mutable: true,
                     binder,
-                    moved: false,
-                    lent: None,
-                    id: fresh_binding_id(),
-                    inline: None,
-                    depth: self.loops,
+                    cell: true,
                 },
             );
             scope.saved.push((name, old));
@@ -3881,8 +3679,16 @@ impl Pinner<'_> {
     ) -> TExpr<It> {
         let ty = lambda.ty.clone();
         owned.into_iter().rev().fold(lambda, |inner, (name, init)| {
+            let held = init.ty.clone();
+            let made = self.cell_call(
+                Callee::CellNew,
+                &held,
+                vec![init],
+                It::Arr(Box::new(held.clone())),
+                at,
+            );
             self.node(
-                TExprKind::LetMut(name, Box::new(init), Box::new(inner)),
+                TExprKind::Let(Self::cell_handle(&name), Box::new(made), Box::new(inner)),
                 ty.clone(),
                 at,
             )
@@ -3899,32 +3705,8 @@ impl Pinner<'_> {
         }
     }
 
-    /// Once the body is typed: it has to set everything it takes, and the variables it took are the
-    /// closure's from here on.
-    fn finish_captures(
-        &mut self,
-        lent: &[String],
-        captures: &[Capture],
-        body: &TExpr<It>,
-    ) -> Res<()> {
-        // The closure's state is written back when its body ends, which a `return` would skip.
-        fn returns_early(e: &TExpr<It>) -> Option<Span> {
-            match &e.kind {
-                TExprKind::Return(_) => Some(e.span.clone()),
-                TExprKind::Lambda(..) => None,
-                _ => {
-                    let mut found = None;
-                    e.for_each_child(&mut |c| found = found.take().or_else(|| returns_early(c)));
-                    found
-                }
-            }
-        }
-        if let Some(at) = returns_early(body) {
-            return reject(
-                "a closure that mutates what it captures cannot `return` early yet",
-                &at,
-            );
-        }
+    /// Once the body is typed: it has to set everything it takes.
+    fn finish_captures(&mut self, captures: &[Capture], body: &TExpr<It>) -> Res<()> {
         let mut assigned = HashSet::new();
         crate::typed_util::assigned_names(body, &mut assigned);
         for c in captures {
@@ -3933,11 +3715,6 @@ impl Pinner<'_> {
                     format!("`[mut {}]` is never set in the closure's body", c.name),
                     &c.span,
                 );
-            }
-        }
-        for name in lent {
-            if let Some(b) = self.env.get_mut(name) {
-                b.moved = true;
             }
         }
         Ok(())
@@ -5184,11 +4961,7 @@ impl Pinner<'_> {
                         ty,
                         mutable: false,
                         binder,
-                        moved: false,
-                        lent: None,
-                        id: fresh_binding_id(),
-                        inline: None,
-                        depth: self.loops,
+                        cell: false,
                     },
                 );
                 (name, old)
@@ -5810,13 +5583,11 @@ impl Pinner<'_> {
                 self.coerce_expr(&t, pty, &t.span, Site::Argument(display(name), i))?;
                 typed.push(t);
             }
-            // A call of a closure that mutates what it captured answers the closure as it is
-            // afterwards, as a call of a mutating method answers its receiver: `set f(x);`.
             // The type of the function called is the call's one type argument: it says whether the
             // call is of a closure that mutates, and what effects it performs, which what reorders
             // calls has to know.
-            let answer = if mutating { ty.clone() } else { *ret };
-            return Ok(call_with(vec![ty.clone()], typed, answer, self));
+            let _ = mutating;
+            return Ok(call_with(vec![ty.clone()], typed, *ret, self));
         }
         if method_style && !args.is_empty() {
             if let Some(s) = self.decls.sigs.get(name).filter(|s| !s.sig.is_method()) {
@@ -6289,16 +6060,7 @@ impl Pinner<'_> {
                 if let It::Named(_) | It::Gen(..) = self.table.shallow(&recv.ty) {
                     let owner = self.table.shallow(&recv.ty);
                     if let Ok(field) = self.field_type(&owner, name, &e.span) {
-                        if let It::Fn(ptys, ret, effects, mutating) = self.table.shallow(&field) {
-                            if mutating {
-                                return reject(
-                                    format!(
-                                        "field {name:?} holds a closure that mutates what it \
-                                         captured, which cannot be called through a field yet"
-                                    ),
-                                    &e.span,
-                                );
-                            }
+                        if let It::Fn(ptys, ret, effects, _) = self.table.shallow(&field) {
                             for effect in &effects {
                                 self.require_effect(display(name), effect, &e.span, true)?;
                             }
@@ -6897,11 +6659,7 @@ impl Pinner<'_> {
                             ty: pty.clone(),
                             mutable: false,
                             binder: written(&param.span),
-                            moved: false,
-                            lent: None,
-                            id: fresh_binding_id(),
-                            inline: None,
-                            depth: self.loops,
+                            cell: false,
                         },
                     ),
                 ));
@@ -6962,7 +6720,7 @@ impl Pinner<'_> {
                         &arg.span,
                     )
                 })?;
-                self.finish_captures(&taken.lent, captures, &body)?;
+                self.finish_captures(captures, &body)?;
             }
             let ty = It::Fn(ptys, ret, effects, mutating || !captures.is_empty());
             let lambda = self.node(TExprKind::Lambda(typed, Box::new(body)), ty, arg);

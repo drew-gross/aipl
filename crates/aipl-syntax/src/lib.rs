@@ -3428,9 +3428,8 @@ fn __builtin_shim_cell_get(id: u64) -> u64 { 0 }
 # is seen through all of them. It is where a variable a closure takes with `[mut x]` lives. The
 # handle is typed as the one-element array it is made of. Only the pinner writes it.
 fn __builtin_cell_new<R: any>(value: R) -> R[] { [value] }
-# A copy of what the cell holds, typed by the call: the pinner writes the call with the type of the
-# variable, which this signature cannot say. The other half of `cell_new`.
-fn __builtin_cell_get<R: any>(cell: R[]) -> R[] { cell }
+# A copy of what the cell holds. The other half of `cell_new`.
+fn __builtin_cell_get<R: any>(cell: R[]) -> R { __builtin_cell_get(cell) }
 # Put `value` in the cell, for every handle on it to see, and let go of what it held.
 fn __builtin_cell_set<R: any>(cell: R[], value: R) {}
 # Put `value` in the cell `id`, which takes a reference of its own to it and lets

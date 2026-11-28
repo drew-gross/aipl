@@ -1165,14 +1165,6 @@ impl Mono<'_> {
                 }
             }
         }
-        // A lambda that mutates what it captured, which has something to capture.
-        if let (TExprKind::Lambda(params, body), ConcreteType::Fn(_, _, effects, true)) =
-            (&e.kind, &e.ty)
-        {
-            if !self.typed_lambda_captures(params, body).is_empty() {
-                return self.lift_mutating_lambda(params, body, effects.clone(), &e);
-            }
-        }
         if let TExprKind::Lambda(params, body) = &e.kind {
             if matches!(e.ty, ConcreteType::Fn(..)) {
                 let ConcreteType::Fn(_, ret, effects, _) = &e.ty else {
@@ -1767,9 +1759,6 @@ fn is_expanded(callee: &Callee) -> bool {
             | Callee::Extend
             | Callee::RopeStr
             | Callee::ShimCellGet
-            | Callee::CellNew
-            | Callee::CellGet
-            | Callee::CellSet
     )
 }
 
