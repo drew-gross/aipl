@@ -28,8 +28,8 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
         ok(s[0].value_or_err("empty")?.to_digit().value_or_err("not a digit")?)
     }
     assert(unwrap(digit_of("42"), -1) == 4); // first char only
-    assert(message(digit_of("")) == "empty"); // the first `?` fires
-    assert(message(digit_of("x")) == "not a digit"); // the second one does
+    assert(digit_of("")! == some("empty")); // the first `?` fires
+    assert(digit_of("x")! == some("not a digit")); // the second one does
 
     // Test helpers. The optionals come from functions rather than a bare `none`
     // literal so each one's element type is pinned by a declared return type.
@@ -52,18 +52,11 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
         }
     }
 
-    fn code(r: char!i64) -> i64 {
-        match (r) {
-            ok(..) => 0,
-            err(e) => e,
-        }
-    }
-
     // some -> ok, none -> err(e).
     assert(unwrap(maybe_int(true).value_or_err("absent"), 0) == 7);
     assert(unwrap(maybe_int(false).value_or_err("absent"), -1) == -1);
-    assert(message(maybe_int(true).value_or_err("absent")) == "");
-    assert(message(maybe_int(false).value_or_err("absent")) == "absent");
+    assert(maybe_int(true).value_or_err("absent")! == none);
+    assert(maybe_int(false).value_or_err("absent")! == some("absent"));
 
     // Free-call form.
     assert(unwrap(value_or_err(maybe_int(true), "absent"), 0) == 7);
@@ -73,17 +66,10 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     assert(unwrap_str(maybe_str(false).value_or_err("absent"), "?") == "?");
 
     // The error type is generic too: an i64 code reads back as an i64.
-    assert(code(""[0].value_or_err(404)) == 404); // none -> err(404)
-    assert(code("a"[0].value_or_err(404)) == 0); // some('a') -> ok
+    assert(""[0].value_or_err(404)! == some(404)); // none -> err(404)
+    assert("a"[0].value_or_err(404)! == none); // some('a') -> ok
 
     // In front of `?`: the err propagates out of the enclosing function.
     assert(unwrap(digit_of("7"), -1) == 7);
-    assert(message(digit_of("x")) == "not a digit");
+    assert(digit_of("x")! == some("not a digit"));
 })
-
-fn message(r: i64!str) -> str {
-    match (r) {
-        ok(..) => "",
-        err(e) => e,
-    }
-}

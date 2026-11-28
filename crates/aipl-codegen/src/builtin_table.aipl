@@ -114,6 +114,7 @@ variant Callee =
     | IsSomeAnd
     | IsErrAnd
     | MapErr
+    | ErrorOf
     | MapOk
     | IntParse
     | IntParseUnsigned
@@ -673,6 +674,11 @@ pub fn builtin_table() -> BuiltinEntry[] {
             arm: MapErr,
             callee: "__builtin_map_err",
             definition: Written("builtin_map_err.aipl"),
+        },
+        BuiltinEntry {
+            arm: ErrorOf,
+            callee: "__builtin_error_of",
+            definition: Written("builtin_error_of.aipl"),
         },
         BuiltinEntry {
             arm: MapOk,

@@ -9,7 +9,7 @@
 # `?` — the one array-building shape `map` could not absorb. This is that loop,
 # written once.
 
-import { equal as ==, is_empty, is_err_and, len, less_than as <, push } from builtins;
+import { equal as ==, is_empty, len, less_than as <, push } from builtins;
 
 # `self` with `f` applied to each element, short-circuiting on failure: the
 # result is `ok` of every mapped value, in order, or the *first* `err` that
@@ -28,13 +28,13 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
     // and name which one came back.
     fn label(n: i64) -> str!str { if (n < 0) { err(`negative {n}`) } else { ok(`n{n}`) } }
     assert(label(1)? == "n1");
-    assert(label(-2).is_err_and(|e| e == "negative -2"));
+    assert(label(-2)! == some("negative -2"));
 
     // A second fallible mapping whose ok, err and element types all differ from
     // `label`'s, so the tests cover `try_map` being generic in all three.
     fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }
     assert(width("abc")? == 3);
-    assert(width("").is_err_and(|c| c == 'e'));
+    assert(width("")! == some('e'));
 
     // Every element succeeds: the mapped values come back in order.
     assert([1, 2, 3].try_map(label)? == ["n1", "n2", "n3"]);
@@ -49,26 +49,22 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
     assert(empty.try_map(label)?.is_empty());
 
     // A failure anywhere is the whole result.
-    assert([1, -2].try_map(label).is_err_and(|e| e == "negative -2"));
+    assert([1, -2].try_map(label)! == some("negative -2"));
 
     // The *first* failure wins and nothing after it is mapped — which is what
     // distinguishes this from collecting every error.
-    assert([1, -2, -3].try_map(label).is_err_and(|e| e == "negative -2"));
-    assert([-3, -2].try_map(label).is_err_and(|e| e == "negative -3"));
+    assert([1, -2, -3].try_map(label)! == some("negative -2"));
+    assert([-3, -2].try_map(label)! == some("negative -3"));
 
     // A lambda that can fail *only* through a `?`: `ok(..)` names no error
     // type, so the `?` is the one thing that pins `E` (see
     // `tests/cases/lambdas/try_error_inferred.aipl`).
     assert([1, 2].try_map(|n| ok(label(n)?))? == ["n1", "n2"]);
-    assert([1, -2].try_map(|n| ok(label(n)?)).is_err_and(|e| e == "negative -2"));
+    assert([1, -2].try_map(|n| ok(label(n)?))! == some("negative -2"));
 
     // A lambda, including one that captures — the form the call sites use to
     // pass a fallible function its extra arguments.
     let floor = 0;
     assert([1, 2].try_map(|n| if (n < floor) { err("under") } else { ok(n) })? == [1, 2]);
-    assert(
-        [1, -2]
-            .try_map(|n| if (n < floor) { err("under") } else { ok(n) })
-            .is_err_and(|e| e == "under"),
-    );
+    assert([1, -2].try_map(|n| if (n < floor) { err("under") } else { ok(n) })! == some("under"));
 })

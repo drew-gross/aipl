@@ -35,7 +35,7 @@ variant Shape = Circle(r: i64) | Square(i64) | Empty
 ```
 let x = 1;  mut y = 0;  set y = y + 1;  set y++;  set xs.push(x);   // `mut` binding required to set
 [1, 2]  [..a, x] (a spread takes an array, or an optional as zero or one elements)  0..n  xs[1..3]  xs[i] (→ T?)  #{1, 2}  #{k: v}  (a, b)  P { x: 1 }  P { ..p, x: 2 }
-some(x) none ok(x) err(e)   f()?  (postfix: propagate none/err)   f(sep=", ")   |x| x + 1
+some(x) none ok(x) err(e)   f()?  (postfix: propagate none/err)   f()!  (postfix: a result's error as an optional, `error_of`: `parse(s)! == some("msg")` in a test)   f(sep=", ")   |x| x + 1
 `text {expr} \{literal brace}`   """raw multi-line, dedented"""   'c'   "s"
 if (c) { a } else { b }      if (let some(v) = o) { .. }
 match (x) { some(v) => v, Circle(..) | Square(..) => 0, _ => 1 }      // `Ctor(..)` ignores payload; arms may be `A | B`
@@ -69,7 +69,7 @@ less_than_or_equal greater_than_or_equal`; `&& ||` `logical_and logical_or`; `!`
 - **text/chars**: print put to_str split words trim pad trim_while starts_with ends_with contains is_digit to_digit is_space is_whitespace is_all_whitespace int_parse int_parse_unsigned inline_str heap_str rope_str
 - **arrays**: distinct (first-appearance order; `==`, so not floats) len is_empty is_nonempty first last only push extend reserve reverse sort sort_by drop_first drop_last drop_n drop_last_n remove_index zip (`xs.zip(ys, with=|x, y| { .. })` combines each pair; without `with` it makes the pair) intersperse repeat range tuple_windows cartesian_product
 - **query/fold**: map filter filter_map map_join map_reduce reduce fold (`xs.fold(init, |acc, x| { .. }, direction=Right)`; `direction` defaults to `Left`) opt_fold find_if find_index find_map any all count count_if count_while join collect_ok try_map split_map
-- **optional/result**: value_or value_or_err is_some is_some_and is_err_and map_ok map_err
+- **optional/result**: value_or value_or_err error_of is_some is_some_and is_err_and map_ok map_err
 - **dicts**: to_dict get contains_key insert_key remove_key map_to_dict
 - **sets** (`import { .. } from sets;`, not `builtins`): to_set to_array union union_all has difference intersection set_map
 - **variants**: is_case as_case case_of case_name same_case collect_arms

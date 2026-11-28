@@ -2227,8 +2227,8 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
                 set acc.push(d.seg);
                 set w = d.w;
             } else {
-                if (t == "?") {
-                    set acc.push(Seg { is_call: false, doc: Text("?") });
+                if (t == "?" || t == "!") {
+                    set acc.push(Seg { is_call: false, doc: Text(t) });
                     set w = w.bump().w;
                 } else {
                     set more = false;
@@ -3513,6 +3513,10 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("xs.f()$kind$g()")?.expr().rendered(100)? == "xs.f()$kind$g()");
     // A `.field` still glues to its left.
     assert(walker_of("a.b.c")?.expr().rendered(100)? == "a.b.c");
+    // `!` after an operand is the postfix form, written tight; `?` after it too.
+    assert(walker_of("parse ( s ) ! ?")?.expr().rendered(100)? == "parse(s)!?");
+    assert(walker_of("a.f() ! == some(b)")?.expr().rendered(100)? == "a.f()! == some(b)");
+    assert(walker_of("! a")?.expr().rendered(100)? == "!a");
 
     // A template literal is copied verbatim, interpolations and all — three
     // token positions (head, middle, tail) that only a kind tells apart.

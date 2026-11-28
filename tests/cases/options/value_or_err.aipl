@@ -2,7 +2,7 @@
 # -> `err(e)`. Unlike `value_or`, which substitutes a default and forgets that
 # anything was missing, it keeps the absence as a failure the caller can report.
 
-import { equal as ==, print, to_digit, value_or_err } from builtins;
+import { equal as ==, print, to_digit, value_or, value_or_err } from builtins;
 
 // Its main use is in front of `?`: each step's `none` becomes a message and
 // leaves the function, so the body reads as the happy path alone. Without it,
@@ -34,10 +34,7 @@ test({
 
         // The error is any type, not just a message — here an i64 code. And the
         // result is an ordinary value, so it needn't be propagated with `?`.
-        let code = match (""[0].value_or_err(404)) {
-            ok(..) => 0,
-            err(n) => n,
-        };
+        let code = ""[0].value_or_err(404)!.value_or(0);
         print(`code {code}`);
     };
     assert(out == """

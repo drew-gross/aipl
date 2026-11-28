@@ -65,7 +65,7 @@ pub fn map_ok<T: any, U: any, E: any>(self: T!E, f: (T) -> U) -> U!E {
     // The mirror image, composed: each side is rewritten by its own mapper and
     // neither disturbs the other.
     assert(lex("fine").map_ok(shout).map_err(|e| e.span)? == "fine!");
-    assert(lex("bad").map_ok(shout).map_err(|e| e.span).is_err_and(|c| c == 3));
+    assert(lex("bad").map_ok(shout).map_err(|e| e.span)! == some(3));
 })
 
 struct LexError { message: str, span: i64 }

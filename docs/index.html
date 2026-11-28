@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">227 files, 2291 items.</p>
+      <p class="summary">228 files, 2293 items.</p>
 
       <ul class="files">
 
@@ -5094,6 +5094,24 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_error_of.html">crates/aipl-mono/src/builtin_error_of.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>error_of</code> builtin. The loader names this function by the canonical name <code>__builtin_error_of</code> (see <code>aipl_syntax::aipl_builtins</code>); the parser writes <code>result!</code> as a call to it, so <code>parse(src)!</code> is <code>parse(src).error_of()</code>.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_error_of.html#item-error_of"><code>error_of</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-mono-src-builtin_extend_filter.html">crates/aipl-mono/src/builtin_extend_filter.aipl</a>
 
           <p class="file-summary">The AIPL implementation of the <code>extend_filter</code> builtin. The loader names this function by the canonical name <code>__builtin_extend_filter</code>; see <code>builtin_extend_map.aipl</code>, whose filtering sibling it is. <code>set out.extend(xs.filter(p))</code> and <code>..xs.filter(p)</code> in an array literal become this call, so the filtered array is never built.</p>
@@ -6307,8 +6325,6 @@
 
           <p class="file-summary">The AIPL implementation of the <code>value_or_err</code> builtin: the bridge from the optional world to the result world, and the <code>value_or</code> sibling that keeps a message about the failure instead of erasing it. The loader names this function by the canonical name <code>__builtin_value_or_err</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>x.value_or_err(e)</code> specializes through the ordinary generic machinery — the in-file name <code>value_or_err</code> is only for this file's own tests, which read exactly like user code.</p>
 
-
-          <span class="private-count"><a href="crates-aipl-mono-src-builtin_value_or_err.html#private">1 private</a></span>
 
 
           <ul class="items">

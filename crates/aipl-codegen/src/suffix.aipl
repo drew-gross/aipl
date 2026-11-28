@@ -39,6 +39,7 @@ variant Suffix =
     | SliceFrom(Expr)
     | SliceTo(Expr)
     | Try
+    | ErrorOf
     | MapField(SpanStr)
     | MapMethod(name: SpanStr, args: Expr[])
 
@@ -67,6 +68,8 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
         SliceFrom(lo) => at(Slice(recv, some(lo), none), span),
         SliceTo(hi) => at(Slice(recv, none, some(hi)), span),
         Try => at(TryExpr(recv), span),
+        // `recv!` is the error a result holds, as an optional.
+        ErrorOf => at(Call("__builtin_error_of", [recv], false, Unresolved), span),
         MapField(name) => at(FieldProjection(recv, name.text), span).named_at(name.span),
         MapMethod(name, args) => at(MethodProjection(recv, name.text, args), span).named_at(
             name.span,
@@ -90,6 +93,7 @@ pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
     assert(apply_suffix(p, SliceFrom(num(1)), 0..0).show_expr() == "Slice(p, 1, )");
     assert(apply_suffix(p, SliceTo(num(2)), 0..0).show_expr() == "Slice(p, , 2)");
     assert(apply_suffix(p, Try, 0..0).show_expr() == "Try(p)");
+    assert(apply_suffix(p, ErrorOf, 0..0).show_expr() == "__builtin_error_of(p)");
 
     // `$` maps the step over the receiver: `p$x` is `p.map(|x| x.x)`, with the
     // element named by something no source can spell.

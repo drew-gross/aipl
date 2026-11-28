@@ -381,6 +381,7 @@ import { Char as CharPrim, Str as StrPrim, prim_from_name } from "./prim.aipl";
 import { with_source_text } from "./source_text.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import {
+    ErrorOf as SufErrorOf,
     Field as SufField,
     Index as SufIndex,
     Index2 as SufIndex2,
@@ -1207,6 +1208,8 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("$"), Term(Name)]),
         Then([Lit("$"), Term(IntLit)]),
         Lit("?"),
+        // `result!` — the error a result holds, as an optional (`err(e)` is `some(e)`).
+        Lit("!"),
     ]);
 
     let atom: Rule<AiplTok> = OneOf([
@@ -1700,6 +1703,7 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     // no slot pattern can name its shape; the `::` after the name does.
     match (node.own_texts(src)) {
         ["$", ..] => ok(ASuffix(map_step(src, node, kids, sp)?)),
+        ["!"] => ok(ASuffix(SufErrorOf)),
         [_, _, "::", ..] => {
             let TypedCall { tys, args } = typed_call(kids, sp)?;
             ok(ASuffix(SufMethodTyped(span_str(src, node.second_tok(sp)), tys, args)))
@@ -5004,6 +5008,12 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("p.0") == "p._0");
     assert(expr_dump("p.-1") == "error: tuple index must be a non-negative integer");
     assert(expr_dump("x?") == "Try(x)");
+    // `x!` is the error a result holds, as an optional: a call of the builtin that says so.
+    assert(expr_dump("x!") == "__builtin_error_of(x)");
+    assert(expr_dump("f(a)!?") == "Try(__builtin_error_of(f(a)))");
+    assert(expr_dump("a.b(1)!") == "__builtin_error_of(a.b(1))");
+    assert(expr_dump("p!.q") == "__builtin_error_of(p).q");
+    assert(expr_dump("a != b") == expr_dump("a!=b"));
     assert(expr_dump("a.b.c") == "a.b.c");
 
     // `$` maps a member over the receiver: a field, a tuple slot, or a call.
@@ -6111,10 +6121,7 @@ pub fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
 # AIPL, marshal the result, reconstruct on the other side.
 pub fn aipl_program(src: str) -> Program!ParseError { lower_aipl_program(src) }.test({
     assert(aipl_program("fn f() { }")?.show_program() == "fn f() = ()");
-    assert(match (aipl_program("fn f( {")) {
-        ok(..) => false,
-        err(..) => true,
-    });
+    assert(aipl_program("fn f( {")!.is_some());
 })
 
 # What a source file parses to: its program, and the spans of every `#[allow]`
@@ -6411,12 +6418,7 @@ fn constructor_names(self: Cst[]) -> Span[] {
 # error-message comparison reads. A refusal from a `build` (a mixed `#{ .. }`,
 # a duplicate `.test`) comes back the same way a syntax error does, since both
 # are reasons a source has no AST.
-pub fn aipl_parse_error(src: str) -> ParseError? {
-    match (aipl_program(src)) {
-        ok(..) => none,
-        err(e) => some(e),
-    }
-}.test({
+pub fn aipl_parse_error(src: str) -> ParseError? { aipl_program(src)! }.test({
     assert(aipl_parse_error("fn f() { }") == none);
     assert(aipl_parse_error("fn f( {").is_some());
 
@@ -6514,7 +6516,7 @@ pub fn aipl_parses(src: str) -> bool {
     assert(
         why(
             "fn f() {\n    g(1,\n    2",
-        ) == "expected `$`, `)`, `,`, `.`, `?`, `[`, or an operator, found end of input (`(` at line 2 is never closed)",
+        ) == "expected `!`, `$`, `)`, `,`, `.`, `?`, `[`, or an operator, found end of input (`(` at line 2 is never closed)",
     );
 
     // A bracket that *is* closed is never blamed. Both of these fail with a real

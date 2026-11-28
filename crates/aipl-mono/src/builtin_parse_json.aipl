@@ -274,15 +274,6 @@ fn parse_document(src: str) -> Json!ParseError {
 pub fn parse(self: str) -> Json!str {
     parse_document(self).map_err(|e| `{e.message} (at byte {e.span.start})`)
 }.test({
-    // The message a failed parse reports — and a distinguishable string when it
-    // unexpectedly succeeded, so a broken assertion says which way it broke.
-    fn message_of(src: str) -> str {
-        match (parse(src)) {
-            ok(..) => "parsed",
-            err(message) => message,
-        }
-    }
-
     // ---- the terminal classes, one at a time ----
     assert(parse("null")? == Null);
     assert(parse("true")? == Bool(true));
@@ -321,22 +312,20 @@ pub fn parse(self: str) -> Json!str {
     //
     // `trailing_sep=false` leaves the dangling comma unconsumed, so
     // the enclosing rule is what reports it.
-    assert(message_of("[1, 2,]") == "expected a JSON value, found `]` (at byte 6)");
-    assert(message_of("""{"a": 1,}""") == "expected Str, found `}` (at byte 8)");
+    assert(parse("[1, 2,]")! == some("expected a JSON value, found `]` (at byte 6)"));
+    assert(parse("""{"a": 1,}""")! == some("expected Str, found `}` (at byte 8)"));
 
     // ---- errors ----
-    assert(message_of("") == "expected a JSON value, found end of input (at byte 0)");
-    assert(
-        message_of(
-            "[1",
-        ) == "expected `,` or `]`, found end of input (`[` at line 1 is never closed) (at byte 2)",
-    );
-    assert(message_of("{1: 2}") == "expected Str or `}`, found `1` (at byte 1)");
-    assert(message_of("""{"a" 1}""") == "expected `:`, found `1` (at byte 5)");
+    assert(parse("")! == some("expected a JSON value, found end of input (at byte 0)"));
+    assert(parse("[1")! == some(
+        "expected `,` or `]`, found end of input (`[` at line 1 is never closed) (at byte 2)",
+    ));
+    assert(parse("{1: 2}")! == some("expected Str or `}`, found `1` (at byte 1)"));
+    assert(parse("""{"a" 1}""")! == some("expected `:`, found `1` (at byte 5)"));
     // Every token must be consumed: two documents is not one.
-    assert(message_of("1 2") == "expected end of input, found `2` (at byte 2)");
+    assert(parse("1 2")! == some("expected end of input, found `2` (at byte 2)"));
     // A lex failure reports in the same shape as a parse failure.
-    assert(message_of("@") == "unexpected character (at byte 0)");
+    assert(parse("@")! == some("unexpected character (at byte 0)"));
 }).benchmark({
     // What parsing costs is stated per byte of input and as a scaling, not as the exact
     // counts: the parser is many files' code, and an exact count would move with each. A

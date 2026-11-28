@@ -1,0 +1,30 @@
+# The AIPL implementation of the `error_of` builtin. The loader names this function by the
+# canonical name `__builtin_error_of` (see `aipl_syntax::aipl_builtins`); the parser writes
+# `result!` as a call to it, so `parse(src)!` is `parse(src).error_of()`.
+#
+# It is the result-world way to ask what went wrong, as `is_err_and` is the way to ask whether a
+# given thing did. It exists mainly for tests that assert on a failure: `==` doesn't span the
+# two sides of a result, so without it every such assertion needs a hand-written `match` helper
+# per type. `parse(src)! == some("unexpected end")` reads as it means.
+
+import { equal as ==, less_than as < } from builtins;
+
+# The error `self` holds, or `none` when it is an `ok`. Callable as a method, and written as the
+# postfix `!`.
+pub fn error_of<T: any, E: any>(self: T!E) -> E? {
+    match (self) {
+        ok(_) => none,
+        err(e) => some(e),
+    }
+}.test({
+    fn half(n: i64) -> i64!str { if (n < 0) { err("negative") } else { ok(n) } }
+    assert(half(4).error_of() == none);
+    assert(half(-1).error_of() == some("negative"));
+    assert(error_of(half(-2)) == some("negative"));
+
+    // The error side may be any type, and `ok` has none to give.
+    let nothing: i64!bool = ok(1);
+    assert(nothing.error_of() == none);
+    let failed: i64!bool = err(false);
+    assert(failed.error_of() == some(false));
+})
