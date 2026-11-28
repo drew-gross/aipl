@@ -1020,10 +1020,6 @@ debugging:
 
 formatting:
   escape hatch to allow non-reflowed-docs, probably alongside removing lines in reflow.
-  """
-    .descendants_of_kind::<LetMut>()$kind
-    $seeded_loop()
-  """ <-- this should format the $kind on one line (mixed $/. chains should just format like . chains)
   exclude if expressions from being on same line as function it's result is passed to
   some way of wrapping really long string literals and template literals
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.

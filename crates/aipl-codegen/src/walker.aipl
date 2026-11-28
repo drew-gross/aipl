@@ -2241,13 +2241,20 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
 
 # `.member` or `.method(args)` — field access glues to its left; a call is
 # tagged so the chain layout can break before it. `$member` and `$method(args)`
-# are the same shapes, mapped over the receiver, and lay out the same way.
+# are the same shapes, mapped over the receiver, and lay out the same way — except that a
+# `$member` counts as a call, since it maps rather than reads, so a chain mixing the two
+# breaks as one of `.` calls would.
 fn dot_seg(self: W) -> WSeg!FmtError {
     let sigil = self.peek_text();
     let m = self.bump().w.bump();
     let typed = m.w.turbofish_if_any()?;
     if (typed.w.peek_text() != "(") {
-        return ok(WSeg { w: typed.w, seg: Seg { is_call: false, doc: Text(`{sigil}{m.text}`) } });
+        // A `$field` maps over the receiver, so it breaks like a call; a `.field` is read off it
+        // and glues to its left.
+        return ok(WSeg {
+            w: typed.w,
+            seg: Seg { is_call: sigil == "$", doc: Text(`{sigil}{m.text}`) },
+        });
     };
     let hug = typed.w.bump().w.hugs_sole_arg();
     let args = typed.w.bump().w.call_args_until(")", [])?;
@@ -3493,6 +3500,19 @@ fn walker_of(src: str) -> W!FmtError {
             .expr()
             .rendered(20)? == "f(\n    xxxxxxxxxx\n        .g()\n        .h(a, b),\n)\n",
     );
+
+    // `$name` maps over the receiver, so a chain mixing it with `.` calls breaks as a `.` chain
+    // does: each segment on a line of its own, a `$field` included.
+    assert(
+        walker_of("xs.descendants_of_kind::<LetMut>()$kind$seeded_loop()")?
+            .expr()
+            .rendered(
+                40,
+            )? == "xs\n    .descendants_of_kind::<LetMut>()\n    $kind\n    $seeded_loop()\n",
+    );
+    assert(walker_of("xs.f()$kind$g()")?.expr().rendered(100)? == "xs.f()$kind$g()");
+    // A `.field` still glues to its left.
+    assert(walker_of("a.b.c")?.expr().rendered(100)? == "a.b.c");
 
     // A template literal is copied verbatim, interpolations and all — three
     // token positions (head, middle, tail) that only a kind tells apart.

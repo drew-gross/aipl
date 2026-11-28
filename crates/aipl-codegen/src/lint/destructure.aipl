@@ -124,21 +124,25 @@ pub fn destructure(Function { sig, body }) -> LintHit[] {
     [
         ..sig.param_hits(body, reads),
         ..body
-            .descendants_of_kind::<Let>()$kind
+            .descendants_of_kind::<Let>()
+            $kind
             .map(|Let(name, annotation, value, inner)| {
                 binding_hit(name, annotation, value, inner, reads)
             })
             .collect_ok(),
         ..body
-            .descendants_of_kind::<LetPattern>()$kind
+            .descendants_of_kind::<LetPattern>()
+            $kind
             .map(|LetPattern(pattern, value, rest)| pattern.slot_hits(rest, reads, value.span))
             .join(),
         ..body
-            .descendants_of_kind::<IfLet>()$kind
+            .descendants_of_kind::<IfLet>()
+            $kind
             .map(|IfLet(arm, _, _)| { arm.array_slot_hits() })
             .join(),
         ..body
-            .descendants_of_kind::<ForPattern>()$kind
+            .descendants_of_kind::<ForPattern>()
+            $kind
             .map(|ForPattern(pattern, iterable, loop_body, _)| {
                 pattern.slot_hits(loop_body, reads, iterable.span)
             })

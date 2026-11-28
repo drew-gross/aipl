@@ -99,7 +99,8 @@ pub fn seeded_loops(self: Expr) -> SeededLoop[] {
 # than the loop.
 pub fn indexed_seeded_loops(self: Expr) -> SeededLoop[] {
     self
-        .descendants_of_kind::<LetMut>()$kind
+        .descendants_of_kind::<LetMut>()
+        $kind
         $seeded_loop()
         .collect_ok()
         .filter(|l| l.index.is_some())
@@ -170,7 +171,9 @@ fn block_accumulations(src: str, adder: Callee) -> str[]!ParseError {
     ok(
         lower_aipl_block_surface(src)?
             .resolved_with_builtins(["push", "extend"])
-            .accumulations(adder)$seeded$name,
+            .accumulations(adder)
+            $seeded
+            $name,
     )
 }
 

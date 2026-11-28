@@ -55,7 +55,8 @@ pub fn option_match(self: Match(scrutinee, arms)) -> OptionMatch? {
         lint_function_messages(
             src,
             |function| function.body
-                .descendants_of_kind::<Match>()$kind
+                .descendants_of_kind::<Match>()
+                $kind
                 $option_match()
                 .collect_ok()
                 .map(|m| lint_message(`{m.binder} {m.scrutinee.receiver_text()}`, span=0..0)),

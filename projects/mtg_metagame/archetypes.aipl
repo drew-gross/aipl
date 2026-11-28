@@ -156,7 +156,8 @@ pub fn label(self: Archetype) -> str {
 pub fn archetype_of(self: Deck, identifiers: Identifier[]) -> Archetype!str {
     let deck_holdings = self.holdings();
     let found: #<{str} = identifiers
-        .filter(|i| !i.parent.is_some() && i.matches(deck_holdings))$name
+        .filter(|i| !i.parent.is_some() && i.matches(deck_holdings))
+        $name
         .to_set();
     let names = found.to_array();
     match (names) {

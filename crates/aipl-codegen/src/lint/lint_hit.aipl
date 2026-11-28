@@ -228,7 +228,8 @@ pub fn filled_assuming(self: LintHit, spelled: str?) -> str {
                         }),
                     },
                 }),
-        })$message
+        })
+        $message
         .value_or("")
 }.test({
     assert(unfilled(Len, "use ", "()", 0..1).filled_assuming(some("size")) == "use size()");
@@ -248,14 +249,14 @@ pub fn filled(self: LintHit[], items: Item[]) -> FilledHit[] {
     let items = aipl_parse_surface_file(
         "import { is_case as isa } from builtins;",
     )?.program.hoist_test_fns().items;
-    assert([unfilled(IsCase, "write ", "(x)", 0..1), unfilled(Len, "use ", "", 1..2)].filled(
-        items,
-    )$message == ["write isa(x)", "use len, importing `len` from builtins"]);
+    assert([unfilled(IsCase, "write ", "(x)", 0..1), unfilled(Len, "use ", "", 1..2)]
+        .filled(items)
+        $message == ["write isa(x)", "use len, importing `len` from builtins"]);
 
     // A name the file has for something else is not the builtin's: it is imported under another.
-    assert([unfilled(Len, "use ", "", 1..2)].filled(
-        aipl_parse_surface_file("fn len() { }")?.program.hoist_test_fns().items,
-    )$message == ["use builtin_len, importing `len as builtin_len` from builtins"]);
+    assert([unfilled(Len, "use ", "", 1..2)]
+        .filled(aipl_parse_surface_file("fn len() { }")?.program.hoist_test_fns().items)
+        $message == ["use builtin_len, importing `len as builtin_len` from builtins"]);
 })
 
 # What the program lint `lint` says of the program `src` parses to, as it says it. The one way the
@@ -462,7 +463,9 @@ pub fn run_lints(self: Function, lints: Lint[]) -> LintHit[] {
     assert(lint_function_unfilled(
         "fn f() { g(h(1)); }",
         |function| function.run_lints([named("calls", OfCall(|call| [lint_message(call.name)]))]),
-    )?$span$start == [9, 11]);
+    )?
+        $span
+        $start == [9, 11]);
     assert(lint_function_messages(
         "fn f() { g(h(1)); }",
         |function| function.run_lints([named("once", OfFunction(|f| [lint_message(f.name.text)]))]),

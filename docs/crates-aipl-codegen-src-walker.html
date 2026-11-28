@@ -2225,7 +2225,7 @@
           </h3>
           <pre class="signature"><code>fn dot_seg(self: W) -&#62; WSeg!FmtError</code></pre>
 
-          <div class="doc"><p><code>.member</code> or <code>.method(args)</code> — field access glues to its left; a call is tagged so the chain layout can break before it. <code>$member</code> and <code>$method(args)</code> are the same shapes, mapped over the receiver, and lay out the same way.</p></div>
+          <div class="doc"><p><code>.member</code> or <code>.method(args)</code> — field access glues to its left; a call is tagged so the chain layout can break before it. <code>$member</code> and <code>$method(args)</code> are the same shapes, mapped over the receiver, and lay out the same way — except that a <code>$member</code> counts as a call, since it maps rather than reads, so a chain mixing the two breaks as one of <code>.</code> calls would.</p></div>
 
 
 

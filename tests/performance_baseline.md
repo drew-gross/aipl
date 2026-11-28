@@ -38,7 +38,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/find_trailing_whitespace | 0 | 0 | 0 | 4906 | 2416 |
 | crates/aipl-codegen/src/fn_names | 70 | 4541 | 1871 | 29558 | 31556 |
 | crates/aipl-codegen/src/format | 2193 | 176989 | 23600 | 390339 | 239052 |
-| crates/aipl-codegen/src/format_source | 37240 | 7112472 | 898609 | 29657485 | 9658096 |
+| crates/aipl-codegen/src/format_source | 37240 | 7112472 | 898609 | 29657468 | 9658124 |
 | crates/aipl-codegen/src/grammar | 653 | 72678 | 37768 | 102774 | 127684 |
 | crates/aipl-codegen/src/grammar_aipl | 2926405 | 715043358 | 1900885 | 1275866276 | 8336612 |
 | crates/aipl-codegen/src/grammar_calc | 9646 | 1011154 | 41210 | 5086515 | 476768 |
@@ -143,7 +143,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-codegen/src/trim_suffix | 0 | 0 | 0 | 381 | 1380 |
 | crates/aipl-codegen/src/ty | 307 | 26691 | 8376 | 27713 | 70200 |
 | crates/aipl-codegen/src/unescape | 0 | 0 | 0 | 9696 | 10652 |
-| crates/aipl-codegen/src/walker | 133358 | 35223191 | 1223783 | 79080931 | 22160680 |
+| crates/aipl-codegen/src/walker | 133741 | 35307711 | 1232327 | 79465743 | 22502872 |
 | crates/aipl-codegen/src/written_names | 36 | 2176 | 3008 | 14814 | 22520 |
 | crates/aipl-mono/src/builtin_all | 0 | 0 | 0 | 1145 | 2512 |
 | crates/aipl-mono/src/builtin_any | 0 | 0 | 0 | 947 | 2444 |

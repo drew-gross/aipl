@@ -52,7 +52,8 @@ pub fn result_match(self: Match(scrutinee, arms)) -> ResultMatch? {
         lint_function_messages(
             src,
             |function| function.body
-                .descendants_of_kind::<Match>()$kind
+                .descendants_of_kind::<Match>()
+                $kind
                 $result_match()
                 .collect_ok()
                 .map(|m| lint_message(`{m.ok_binder} {m.err_binder}`, span=0..0)),
@@ -102,7 +103,8 @@ fn ok_arm_flags(body: str) -> str!ParseFailure {
     let flags = lint_function_messages(
         `fn f(r: i64!str) -> i64!str \{ match (r) \{ ok(v) => {body}, err(e) => err(e) } }`,
         |function| function.body
-            .descendants_of_kind::<Match>()$kind
+            .descendants_of_kind::<Match>()
+            $kind
             $result_match()
             .collect_ok()
             .map(|m| lint_message(
