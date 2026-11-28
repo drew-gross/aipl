@@ -31,11 +31,16 @@ import { Json, parse } from json;
 
 let USAGE = """
     usage: mtg_metagame cards <metagame>
-           mtg_metagame winrate <metagame> [--archetypes <config>] [--output <file.svg>]
+           mtg_metagame winrate [<metagame>] [--archetypes <config>] [--output <file.svg>]
 """;
 
 # The archetype list `winrate` uses when `--archetypes` is not given.
-let DEFAULT_ARCHETYPES = "Standard2026Q4Worlds";
+let DEFAULT_ARCHETYPES = "trk_standard";
+
+# The metagame `winrate` shows when none is named: the Worlds field and the NRG Series $2.5k
+# Standard
+# Trial, together.
+let DEFAULT_METAGAME = "trk_standard";
 
 # The file in `data/` that `name` stands for.
 fn data_path(
@@ -78,9 +83,8 @@ fn cards_listing(args: str[]) !read_files !execute_program -> str!str {
 # writes its page (`none` for the default, named after the metagame).
 struct DeckOptions { metagame: str, archetypes: str, output: str? }
 
-# The options of `winrate` in `args`: one metagame, `--archetypes <config>` and `--output <file>`,
-# in
-# any order.
+# The options of `winrate` in `args`: at most one metagame (the default one when none is named),
+# `--archetypes <config>` and `--output <file>`, in any order.
 fn parse_deck_options(args: str[]) -> DeckOptions!str {
     mut metagame = "";
     mut archetypes = DEFAULT_ARCHETYPES;
@@ -101,12 +105,15 @@ fn parse_deck_options(args: str[]) -> DeckOptions!str {
         };
         set i++;
     }
-    if (metagame == "") { return err("winrate needs a metagame"); };
-    ok(DeckOptions { metagame, archetypes, output })
+    ok(DeckOptions {
+        metagame: if (metagame == "") { DEFAULT_METAGAME } else { metagame },
+        archetypes,
+        output,
+    })
 }.test({
     assert(parse_deck_options(["m"]) == ok(DeckOptions {
         metagame: "m",
-        archetypes: "Standard2026Q4Worlds",
+        archetypes: "trk_standard",
         output: none,
     }));
     assert(parse_deck_options(["--archetypes", "Modern2026Q3RC", "m"]) == ok(DeckOptions {
@@ -116,11 +123,21 @@ fn parse_deck_options(args: str[]) -> DeckOptions!str {
     }));
     assert(parse_deck_options(["m", "--output", "out.svg"]) == ok(DeckOptions {
         metagame: "m",
-        archetypes: "Standard2026Q4Worlds",
+        archetypes: "trk_standard",
         output: some("out.svg"),
     }));
     assert(parse_deck_options(["m", "--output"]) == err("--output needs the name of a file"));
-    assert(parse_deck_options([]) == err("winrate needs a metagame"));
+    // With none named it is the default metagame.
+    assert(parse_deck_options([]) == ok(DeckOptions {
+        metagame: "trk_standard",
+        archetypes: "trk_standard",
+        output: none,
+    }));
+    assert(parse_deck_options(["--output", "o.svg"]) == ok(DeckOptions {
+        metagame: "trk_standard",
+        archetypes: "trk_standard",
+        output: some("o.svg"),
+    }));
     assert(parse_deck_options(["m", "n"]) == err(`unexpected argument "n"`));
     assert(parse_deck_options(["m", "--jank"]) == err(`unknown option "--jank"`));
     assert(parse_deck_options(["m", "--archetypes"]) == err(
@@ -151,7 +168,8 @@ fn run(args: str[]) !read_files !execute_program !write_files -> str!str {
     }
 }
 
-# Run a command: `cards <metagame>` lists every card played, `winrate <metagame>` writes an SVG page
+# Run a command: `cards <metagame>` lists every card played, `winrate [<metagame>]` writes an SVG
+# page
 # of how each archetype does against each other. The metagame is a file in `data/` (without its
 # `.json.gz`), or
 # one of the names in `data/index.json`.

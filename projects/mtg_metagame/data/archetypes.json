@@ -1,5 +1,5 @@
 {
- "Standard2026Q4Worlds": [
+ "trk_standard": [
   {
    "any_cards": [],
    "cards": [],
@@ -161,6 +161,56 @@
     "Plains"
    ],
    "parent": "Landfall"
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Day of Judgment",
+    "The Theorist, Jace Beleren"
+   ],
+   "name": "Azorius Control",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Anthropological Mission",
+    "Ral, Crackling Wit"
+   ],
+   "name": "Izzet Mission",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Hinterland Sanctifier",
+    "Case of the Uneaten Feast"
+   ],
+   "name": "Orzhov Lifegain",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Kona, Rescue Beastie"
+   ],
+   "name": "Temur Kona",
+   "not_cards": []
+  },
+  {
+   "any_cards": [],
+   "cards": [],
+   "maindeck_cards": [
+    "Marauding Mako",
+    "Moonshadow",
+    "Practiced Offense"
+   ],
+   "name": "Mardu Discard",
+   "not_cards": []
   }
  ]
 }

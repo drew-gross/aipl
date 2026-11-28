@@ -15,7 +15,7 @@ $ ./aipl run -- winrate metagame_worlds_32
 wrote winrate_metagame_worlds_32.svg
 ```
 
-`winrate <metagame> [--archetypes <config>] [--output <file.svg>]` writes the winrate matrix as an SVG
+`winrate [<metagame>] [--archetypes <config>] [--output <file.svg>]` writes the winrate matrix as an SVG
 page (default `winrate_<metagame>.svg`) and prints where it went: a heat map with a row per archetype
 (most decks first, `Other` last) and a column for each, coloured by the share of the row's
 matches it won against the column's, green for winning and red for losing. Open it in a browser:
@@ -68,7 +68,7 @@ deck's side only.
 sideboards together; equal counts in name order). `winrate` classifies each deck into
 one archetype; the decks that match none are one `Other` row, last whatever its size. The metagame is a file in
 `data/` without its `.json.gz`, or one of the names in `data/index.json`; `--archetypes` names
-a list in `data/archetypes.json` (default `Standard2026Q4Worlds`). Run it from this directory.
+a list in `data/archetypes.json` (default `trk_standard`). Run it from this directory.
 
 ## Layout
 
@@ -110,7 +110,12 @@ as gzipped JSON, converted by `tools/pkl_to_json.py`. Its decks' `tournament` is
 file has `tournament_ids`, `ranked_decklist_ids` and `decks`; a deck has its name,
 pilot, `url` (where its decklist can be read), `maindeck`/`sideboard` (cards with name, count, type) and `match_history`
 (result, game record, round). `data/index.json` (plain, not gzipped) maps descriptive names to the file holding
-them, and is empty.
+them, and is empty. `metagame_477106.json.gz` is the NRG Series $2.5k Standard Trial
+(https://melee.gg/Tournament/View/477106), scraped by the original's `melee_scraper.py` and converted the same way,
+its decks' `tournament` set to the event's name by hand. `trk_standard.json.gz`, which `winrate` shows
+when it is given no metagame, is the two together, made by `tools/merge_metagames.py` (the decks of each
+keep their own `tournament`, so the page counts rounds from the end of each event):
+`python3 tools/merge_metagames.py data/trk_standard.json.gz trk_standard data/metagame_worlds_32.json.gz data/metagame_477106.json.gz`.
 
 A deck is one archetype: a deck that matches identifiers of more than one name is an error naming
 them. Archetypes are not in the data: the original derives them from a canonicalization config, one
@@ -125,8 +130,12 @@ identifier may also list `not_maindeck_cards`, which it must not hold in the mai
 sideboard does not count). `Landfall` has two, `Selesnya` (Plains in the main deck) and `Mono-G`
 (none there). Sub-archetypes show on the winrate page.
 
-`archetypes.json` holds one config, `Standard2026Q4Worlds`. It is not from the original: it is
+`archetypes.json` holds one config, `trk_standard`. It is not from the original: it is
 `Standard2026Q4RC` with the archetypes of the Worlds field added, the two `Landfall` lists merged
 into one, and every archetype of two decks or fewer left out (the merged `Tablet Control` among
 them), so those decks are `Other`, except `Tablet Control`, which is any deck with Jeskai
-Revelation and Tablet of Discovery. Rerunning `tools/archetypes_to_json.py` rewrites the file without it.
+Revelation and Tablet of Discovery. It has since been extended with the archetypes of
+`metagame_477106` (the NRG Series $2.5k Standard Trial) that two or more decks, in it or in the Worlds field,
+played: `Azorius Control`, `Izzet Mission`, `Orzhov Lifegain`, `Temur Kona` and `Mardu Discard`, each the
+main-deck cards that tell it from the rest. Seven of that event's 41 decks (`Temur Combo`, `Golgari`, `Gruul`,
+`Boros Aggro`, `Mono-Black Aggro` and two Dimir lists) are still `Other`. Rerunning `tools/archetypes_to_json.py` rewrites the file without it.
