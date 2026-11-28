@@ -118,7 +118,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
-  cells_line looks like it can improve to leading/trailing sep by doing the space-wrapping in the map
+  repeat's self arg should be T*
   is_infix should be determined as a property of the call
   ByPattern is just ByCase that supports _ bindings. Lets unify.
   expr_text quoted should use the formatters requoting logic
@@ -308,6 +308,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace), but also separate types for strings that can contain those
 
 lsp:
+  go-to-refs for builtins should work
   "this document does not compile" error should name he document
   warm the cache in the background on start and on edit
   docs hover should work on Error, err, ok, etc.

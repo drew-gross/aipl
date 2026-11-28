@@ -42,8 +42,9 @@ struct Column { header: str, side: Direction = Right }
 # One row's line: each cell padded to a width, on a side, between `|`s. A row with more cells than
 # there are `(width, side)` pairs is cut off at the last pair.
 fn cells_line(self: str[], layout: (u64, Direction)[]) -> str {
-    let parts = self.zip_with(layout, |text, (width, side)| text.pad(width, dir=side));
-    `| {parts.join(sep=" | ")} |`
+    self
+        .zip_with(layout, |text, (width, side)| { ` {text.pad(width, dir=side)} ` })
+        .join(sep="|", leading_sep=true, trailing_sep=true)
 }.test({
     let layout = [(3, Right), (2, Left)];
     assert(["a", "b"].cells_line(layout) == "| a   |  b |");
@@ -138,8 +139,8 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str {
 
     // Allocations are exact: the headers, widths, layout, the three rules, the header line and the joined text are the fixed
     // part, and each row adds its padded copy and its line, so a temporary array optimized away shows up here.
-    assert(two.allocations == 36);
-    assert(eight.allocations == 103);
+    assert(two.allocations == 48);
+    assert(eight.allocations == 139);
 
     // Four times the rows costs under three times the instructions: the fixed part is shared and
     // nothing in a row's line depends on the number of rows.

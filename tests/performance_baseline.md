@@ -230,7 +230,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | crates/aipl-mono/src/builtin_set_map | 50 | 1866 | 1738 | 5288 | 14524 |
 | crates/aipl-mono/src/builtin_sort_by | 33 | 1816 | 1216 | 15609 | 23484 |
 | crates/aipl-mono/src/builtin_split_map | 39 | 3153 | 3153 | 3899 | 8176 |
-| crates/aipl-mono/src/builtin_tabulate | 101 | 6693 | 1719 | 24735 | 20004 |
+| crates/aipl-mono/src/builtin_tabulate | 111 | 7573 | 1578 | 25099 | 19984 |
 | crates/aipl-mono/src/builtin_to_dict | 12 | 896 | 992 | 2222 | 7176 |
 | crates/aipl-mono/src/builtin_trim_while | 0 | 0 | 0 | 1255 | 3784 |
 | crates/aipl-mono/src/builtin_try_map | 42 | 2365 | 2163 | 6567 | 21568 |
@@ -517,7 +517,7 @@ cargo test --test cases -- --ignored refresh_baseline
 | tests/cases/imports/duplicate_import_source_allowed | 2 | 105 | 105 | 557 | 4404 |
 | tests/cases/imports/import_alias | 4 | 282 | 282 | 906 | 4616 |
 | tests/cases/imports/imports_pull_named_items_into_scope | 2 | 105 | 105 | 557 | 4404 |
-| tests/cases/imports/library_import | 254 | 40188 | 16168 | 138979 | 313660 |
+| tests/cases/imports/library_import | 254 | 40188 | 16168 | 138994 | 313640 |
 | tests/cases/imports/operator_alias | 2 | 105 | 105 | 594 | 4592 |
 | tests/cases/imports/operator_builtin_bare | 0 | 0 | 0 | 127 | 608 |
 | tests/cases/imports/operator_imports | 2 | 106 | 106 | 594 | 4596 |
