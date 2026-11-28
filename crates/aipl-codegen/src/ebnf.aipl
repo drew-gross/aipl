@@ -49,10 +49,10 @@ import {
     equal as ==,
     filter,
     find_if,
+    fold,
     is_empty,
     is_nonempty,
     join,
-    left_fold,
     len,
     logical_not as !,
     logical_or as ||,
@@ -526,7 +526,7 @@ pub fn rule_first<K: variant>(r: LinkedRule<K>, sets: First<K>[]) -> First<K>!Pa
         // when any one is. Order does not matter here even though it matters to
         // the parse: this is what *could* start a match, not which branch takes
         // it.
-        OneOf(rs) => ok(rs.try_map(|sub| rule_first(sub, sets))?.left_fold(First {}, merge)),
+        OneOf(rs) => ok(rs.try_map(|sub| rule_first(sub, sets))?.fold(First {}, merge)),
         // A separated list begins with its item, and with its separator only
         // when it allows a leading one — then the optional separator in front
         // is the sequence `sep? item`, and contributes like one.

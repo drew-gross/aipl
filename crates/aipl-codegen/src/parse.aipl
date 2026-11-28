@@ -53,6 +53,7 @@ import {
     find_if,
     find_index,
     first,
+    fold,
     is_case,
     is_empty,
     is_nonempty,
@@ -60,7 +61,6 @@ import {
     is_some_and,
     join,
     last,
-    left_fold,
     len,
     less_than as <,
     less_than_or_equal as <=,
@@ -952,7 +952,7 @@ fn can_reach<K: variant, A: any>(
 # exact position; see `label_sets` in `ebnf.aipl` for the exact version.
 fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str, far: Far) -> Step {
     if (expect_as.is_nonempty()) { return no(far_miss(far, pos, expect_as), pos); };
-    no(p.labels[i].value_or(#{}).left_fold(far, |f: Far, l: str| far_miss(f, pos, l)), pos)
+    no(p.labels[i].value_or(#{}).fold(far, |f: Far, l: str| far_miss(f, pos, l)), pos)
 }
 
 # The expectation labels each production would record on failing at its own first

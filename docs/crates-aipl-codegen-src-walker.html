@@ -2980,7 +2980,7 @@
 
           <div class="doc"><p>Whether tokens <code>first</code> through <code>last</code> hold a member chain at bracket depth zero — two or more <code>.method(</code> segments, which <code>postfix</code> lays out as one group that breaks before every call. Hugging such an argument would put that break inside the hug, splitting the receiver from its calls right after the <code>(</code>:</p><pre><code>ok(ATy(node
     .own_tokens()
-    .left_fold(..)))
+    .fold(..)))
 </code></pre><p>so a chained argument keeps the ordinary broken list, where the chain breaks on a line of its own.</p></div>
 
 

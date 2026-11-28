@@ -1,0 +1,98 @@
+# The AIPL implementation of the `fold` builtin. The loader names this function by the canonical
+# name `__builtin_fold` (see `aipl_syntax::aipl_builtins`), so a user's `xs.fold(init, f)`
+# specializes through the ordinary generic / higher-order machinery — the in-file name is only for
+# this file's own tests, which read exactly like user code.
+#
+# The combiner takes the accumulator first and the element second whichever way the fold goes, so
+# one function says what to do with each step and `direction` says where the walk starts.
+
+import {
+    Direction,
+    Left,
+    Right,
+    equal as ==,
+    filter,
+    greater_than as >,
+    len,
+    logical_not as !,
+    push,
+    saturating_decrement as --,
+    wrapping_add as +,
+} from builtins;
+
+# Combine the elements one at a time into an accumulator that starts as `init`: from the left, for
+# `[a, b, c]`, `f(f(f(init, a), b), c)` — `xs.fold(0, |acc, x| acc + x)`; from the right,
+# `f(f(f(init, c), b), a)` — building a cons list front to back from an array, the case where the
+# direction matters: `xs.fold(Nil, |acc, x| Cons(x, acc), direction=Right)`. Callable as a method.
+pub fn fold<T: any, A: any>(
+    self: T[],
+    # The accumulator the first element met is combined with.
+    init: A,
+    # Combines the accumulator and an element into the next accumulator.
+    f: (A, T) -> A,
+    # Which end the walk starts at: `Left` (the default) at the first element, `Right` at the last.
+    direction: Direction = Left,
+) -> A {
+    mut acc = init;
+    match (direction) {
+        Left => {
+            for (let x : self) {
+                set acc = f(acc, x);
+            }
+        },
+        Right => {
+            // Copied so the walk can index it: `self` may be a set, which has no positions
+            // (and both branches are compiled for every receiver).
+            mut items: T[] = []; #[allow]
+            for (let x : self) {
+                set items.push(x);
+            }
+            mut i = items.len();
+            while (i > 0) {
+                set i--;
+
+                // `i` is in bounds by construction, so the `none` arm never runs; a
+                // `map` here would lift a lambda per fold to say the same thing.
+                set acc = match (items[i]) {
+                    some(x) => f(acc, x),
+                    none => acc, #[allow]
+                };
+            }
+        },
+    };
+    acc
+}.test({
+    fn add(acc: i64, x: i64) -> i64 { acc + x }
+    assert(add(1, 2) == 3);
+
+    fn is_big(self: i64) -> bool { self == 99 }
+    assert(!is_big(1));
+
+    assert([1, 2, 3].fold(0, |acc, x| acc + x) == 6); // sum
+    assert([1, 2, 3].fold(10, |acc, x| acc + x) == 16); // from a nonzero init
+    assert(fold([2, 3], 1, |acc, x| acc + x) == 6); // free-call form
+    // Left-associative by default: the order of combination is visible in a string.
+    assert(["a", "b", "c"].fold("", |acc, s| `{acc}{s}`) == "abc");
+    assert(["a", "b", "c"].fold("", |acc, s| `{acc}{s}`, direction=Left) == "abc");
+    // The accumulator type need not match the element type.
+    assert(['x', 'y'].fold(0, |acc, c| acc + 1) == 2);
+    assert("hey".fold(0, |acc, c| acc + 1) == 3); // a str receiver folds its chars
+    assert([1, 2, 3].fold(0, add) == 6); // a named combiner, no lambda
+    // Empty (a typed empty from `filter`) folds to its init untouched.
+    assert([1, 2].filter(is_big).fold(5, add) == 5);
+    let bump = 10;
+    assert([1, 2].fold(0, |acc, x| acc + x + bump) == 23); // a captured value
+
+    // From the right, the elements meet the accumulator last to first: the reverse of what the
+    // left fold builds, and the same combiner.
+    assert(["a", "b", "c"].fold("", |acc, s| `{acc}{s}`, direction=Right) == "cba");
+    assert(["a", "b", "c"].fold("", |acc, s| `{s}{acc}`, direction=Right) == "abc");
+    assert(['x', 'y'].fold(0, |acc, c| acc + 1, direction=Right) == 2);
+    assert([1, 2, 3].fold(0, add, direction=Right) == 6);
+    assert([1, 2].filter(is_big).fold(7, add, direction=Right) == 7);
+    assert([1, 2].fold(0, |acc, x| acc + x + bump, direction=Right) == 23);
+
+    // A set folds too, from either end.
+    assert(#{1, 2, 3}.fold(0, add) == 6);
+    assert(#{1, 2, 3}.fold(0, add, direction=Right) == 6);
+})

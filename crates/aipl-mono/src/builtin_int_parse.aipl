@@ -12,7 +12,7 @@ import {
     greater_than as >,
     is_empty,
     len,
-    opt_left_fold as opt_fold,
+    opt_fold,
     starts_with,
     to_digit,
     trim_while,

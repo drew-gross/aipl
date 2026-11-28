@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">229 files, 2295 items.</p>
+      <p class="summary">227 files, 2291 items.</p>
 
       <ul class="files">
 
@@ -5256,6 +5256,24 @@
         </li>
 
         <li>
+          <a class="file" href="crates-aipl-mono-src-builtin_fold.html">crates/aipl-mono/src/builtin_fold.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>fold</code> builtin. The loader names this function by the canonical name <code>__builtin_fold</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.fold(init, f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_fold.html#item-fold"><code>fold</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
+
+        </li>
+
+        <li>
           <a class="file" href="crates-aipl-mono-src-builtin_grid_from.html">crates/aipl-mono/src/builtin_grid_from.aipl</a>
 
           <p class="file-summary">The AIPL implementation of the <code>grid_from</code> builtin. The loader names this function by the canonical name <code>__builtin_grid_from</code> (see <code>aipl_syntax::aipl_builtins</code>); a nested array literal written where a grid is expected is rewritten to a call to it.</p>
@@ -5626,24 +5644,6 @@
         </li>
 
         <li>
-          <a class="file" href="crates-aipl-mono-src-builtin_left_fold.html">crates/aipl-mono/src/builtin_left_fold.aipl</a>
-
-          <p class="file-summary">The AIPL implementation of the <code>left_fold</code> builtin. The loader names this function by the canonical name <code>__builtin_left_fold</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.left_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>left_fold</code> is only for this file's own tests, which read exactly like user code.</p>
-
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-mono-src-builtin_left_fold.html#item-left_fold"><code>left_fold</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
           <a class="file" href="crates-aipl-mono-src-builtin_map_err.html">crates/aipl-mono/src/builtin_map_err.aipl</a>
 
           <p class="file-summary">The AIPL implementation of the <code>map_err</code> builtin. The loader names this function by the canonical name <code>__builtin_map_err</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>r.map_err(f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>map_err</code> is only for this file's own tests, which read exactly like user code.</p>
@@ -5844,34 +5844,16 @@
         </li>
 
         <li>
-          <a class="file" href="crates-aipl-mono-src-builtin_opt_left_fold.html">crates/aipl-mono/src/builtin_opt_left_fold.aipl</a>
+          <a class="file" href="crates-aipl-mono-src-builtin_opt_fold.html">crates/aipl-mono/src/builtin_opt_fold.aipl</a>
 
-          <p class="file-summary">The AIPL implementation of the <code>opt_left_fold</code> builtin: <code>left_fold</code> with a fallible combiner. The loader names this function by the canonical name <code>__builtin_opt_left_fold</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.opt_left_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p>
-
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-mono-src-builtin_opt_left_fold.html#item-opt_left_fold"><code>opt_left_fold</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-mono-src-builtin_opt_right_fold.html">crates/aipl-mono/src/builtin_opt_right_fold.aipl</a>
-
-          <p class="file-summary">The AIPL implementation of the <code>opt_right_fold</code> builtin: <code>right_fold</code> with a fallible combiner, and the mirror of <code>opt_left_fold</code> (see <code>builtin_opt_left_fold.aipl</code>). The loader names this function by the canonical name <code>__builtin_opt_right_fold</code> (see <code>aipl_syntax::aipl_builtins</code>).</p>
+          <p class="file-summary">The AIPL implementation of the <code>opt_fold</code> builtin: <code>fold</code> with a fallible combiner. The loader names this function by the canonical name <code>__builtin_opt_fold</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.opt_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p>
 
 
 
           <ul class="items">
 
             <li>
-              <a href="crates-aipl-mono-src-builtin_opt_right_fold.html#item-opt_right_fold"><code>opt_right_fold</code></a>
+              <a href="crates-aipl-mono-src-builtin_opt_fold.html#item-opt_fold"><code>opt_fold</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -6075,24 +6057,6 @@
 
             <li>
               <a href="crates-aipl-mono-src-builtin_reverse_find_map.html#item-reverse_find_map"><code>reverse_find_map</code></a>
-              <span class="kind kind-fn">fn</span>
-            </li>
-
-          </ul>
-
-        </li>
-
-        <li>
-          <a class="file" href="crates-aipl-mono-src-builtin_right_fold.html">crates/aipl-mono/src/builtin_right_fold.aipl</a>
-
-          <p class="file-summary">The AIPL implementation of the <code>right_fold</code> builtin — <code>left_fold</code>'s mirror (see <code>builtin_left_fold.aipl</code>). The loader names this function by the canonical name <code>__builtin_right_fold</code> (see <code>aipl_syntax::aipl_builtins</code>), so a user's <code>xs.right_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p>
-
-
-
-          <ul class="items">
-
-            <li>
-              <a href="crates-aipl-mono-src-builtin_right_fold.html#item-right_fold"><code>right_fold</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 

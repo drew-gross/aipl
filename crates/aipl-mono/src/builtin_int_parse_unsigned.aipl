@@ -13,7 +13,7 @@ import {
     logical_and as &&,
     logical_or as ||,
     narrow,
-    opt_left_fold as opt_fold,
+    opt_fold,
     to_digit,
     wrapping_add as +,
     wrapping_mul as *,

@@ -13,12 +13,14 @@
 # parser used to produce directly.
 
 import {
+    Right,
     Span,
     as_case,
     contains,
     equal as ==,
     extend,
     first,
+    fold,
     greater_than as >,
     is_empty,
     len,
@@ -28,7 +30,6 @@ import {
     not_equal as !=,
     push,
     range,
-    right_fold,
     value_or,
     wrapping_add as +,
     wrapping_decrement as --,
@@ -152,7 +153,11 @@ fn desugared_function(self: Function) -> Function {
     Function {
         ..self,
         sig: Signature { ..self.sig, params: plain },
-        body: self.sig.params.right_fold(self.body.desugared(), bind_one_param),
+        body: self.sig.params.fold(
+            self.body.desugared(),
+            |result, p| { bind_one_param(p, result) },
+            direction=Right,
+        ),
     }
 }
 
@@ -343,15 +348,18 @@ fn with_binders_lowered(self: CoreExpr) -> CoreExpr {
                     ..p,
                     binding: Name(p.binding.name_at(p.span)),
                 }),
-                params.right_fold(
+                params.fold(
                     body,
-                    |p: LambdaParam, result: CoreExpr| bind_param_pattern(
-                        p.binding.name_at(p.span),
-                        p.binding,
-                        p.span,
-                        result,
-                        p.written.value_or(WrittenNames {}),
-                    ),
+                    |result: CoreExpr, p: LambdaParam| {
+                        bind_param_pattern(
+                            p.binding.name_at(p.span),
+                            p.binding,
+                            p.span,
+                            result,
+                            p.written.value_or(WrittenNames {}),
+                        )
+                    },
+                    direction=Right,
                 ),
                 captures=captures,
             ),
@@ -416,9 +424,9 @@ fn lifted_arm(self: CoreMatchArm) -> CoreMatchArm {
     let written = self.written.value_or(WrittenNames {});
     let Lifted { pattern, structs } = self.pattern.lifted(self.span.start, 0, written);
     let span = self.span;
-    let body = structs.right_fold(
+    let body = structs.fold(
         self.body,
-        |found: Found, rest: CoreExpr| {
+        |rest: CoreExpr, found: Found| {
             let Found { binder, struct_name, fields, names, temporary, spelled } = found.bound_only();
             destructure_struct(
                 struct_name,
@@ -432,6 +440,7 @@ fn lifted_arm(self: CoreMatchArm) -> CoreMatchArm {
                 spelled,
             )
         },
+        direction=Right,
     );
     MatchArm { ..self, pattern, body }
 }

@@ -54,6 +54,7 @@
 # annotation is what every constructor inside resolves from.
 
 import {
+    Right,
     Span,
     all,
     any,
@@ -68,6 +69,7 @@ import {
     find_if,
     find_index,
     first,
+    fold,
     greater_than as >,
     int_parse,
     is_case,
@@ -91,7 +93,6 @@ import {
     not_equal as !=,
     push,
     range,
-    right_fold,
     same_case,
     split,
     starts_with,
@@ -2102,7 +2103,7 @@ fn template_slots(toks: str[]) -> str[] {
 fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {
     let tail = at(Str(segs[exprs.len()].value_or("")), sp);
     let pieces = zip(segs, exprs, with=|s: str, e: Expr| { interpolation_piece(s, e, sp) });
-    pieces.right_fold(tail, concat_call)
+    pieces.fold(tail, |rest, piece| { concat_call(piece, rest) }, direction=Right)
 }
 
 # One link of the chain: the segment in front of an interpolation, joined to

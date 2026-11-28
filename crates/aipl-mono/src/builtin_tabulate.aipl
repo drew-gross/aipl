@@ -12,8 +12,8 @@ import {
     Left,
     Right,
     equal as ==,
+    fold,
     join,
-    left_fold,
     len,
     less_than as <,
     map,
@@ -80,7 +80,7 @@ pub fn tabulate(self: str[][], columns: Column[]) -> str {
     let headers = columns$header;
     let cells = self$fitted(columns.len(), "");
     // A column is as wide as its widest cell, its header included.
-    let widths = cells.left_fold(
+    let widths = cells.fold(
         headers$len(),
         |widths, row| { widths.zip(row, with=|width, cell| { max(width, cell.len()) }) },
     );

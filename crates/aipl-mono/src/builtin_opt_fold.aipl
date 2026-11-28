@@ -1,0 +1,136 @@
+# The AIPL implementation of the `opt_fold` builtin: `fold` with a fallible combiner. The loader
+# names this function by the canonical name `__builtin_opt_fold` (see
+# `aipl_syntax::aipl_builtins`), so a user's `xs.opt_fold(init, f)` specializes through the
+# ordinary generic / higher-order machinery.
+#
+# From the left, `f` is not called again once a step has failed, so the fold's *work* stops at the
+# first `none` — but the walk itself continues (AIPL has no `break`). That keeps the plain `for`,
+# whose element access streams a `str` receiver through the char cursor; an index-driven `while`
+# that really exits early reads `self[i]` per element, which costs far more than the leftover
+# `if (ok)` ticks. From the right the walk is index-driven anyway and does exit early. The
+# accumulator stays a plain `A` — the `ok` flag, not an `A?` threaded through the loop, carries
+# the failure. A `mut` binding of an *optional* (a composite) reassigned from inside a loop body
+# is currently miscompiled: the body's scope releases the new value's heap components while the
+# binding still points at them, so a `str`/array/boxed accumulator would corrupt. A plain `A`
+# binding goes through the slot-owned-reference model instead, which is correct across scopes.
+
+import {
+    Direction,
+    Left,
+    Right,
+    equal as ==,
+    filter,
+    greater_than as >,
+    is_some,
+    len,
+    logical_and as &&,
+    logical_not as !,
+    push,
+    saturating_decrement as --,
+    to_digit,
+    value_or,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+# Combine the elements one at a time with a *fallible* combiner, into an accumulator that starts
+# as `init`: `f` returns `A?`, and the first `none` ends the fold with `none` — the remaining
+# elements are never visited. All-`some` folds to `some(result)`, exactly as `fold` would; an
+# empty array folds to `some(init)`.
+#
+# Since the combiner's body may use `?`, a fold that can fail reads as one expression:
+# `s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))`.
+pub fn opt_fold<T: any, A: any>(
+    self: T[],
+    # The accumulator the first element met is combined with.
+    init: A,
+    # Combines the accumulator and an element into the next accumulator, or `none` to end the fold.
+    f: (A, T) -> A?,
+    # Which end the walk starts at: `Left` (the default) at the first element, `Right` at the last.
+    direction: Direction = Left,
+) -> A? {
+    mut acc = init;
+    mut ok = true;
+    match (direction) {
+        Left => {
+            for (let x : self) {
+                let step = if (ok) { f(acc, x) } else { none };
+
+                // Once a step has failed, `step` is `none` every time after, so `ok`
+                // stays false without an explicit `ok &&`.
+                set ok = step.is_some();
+                set acc = step.value_or(acc);
+            }
+        },
+        Right => {
+            // Copied so the walk can index it: `self` may be a set, which has no positions
+            // (and both branches are compiled for every receiver).
+            mut items: T[] = []; #[allow]
+            for (let x : self) {
+                set items.push(x);
+            }
+            mut i = items.len();
+            while (ok && i > 0) {
+                set i--;
+
+                // `i` is in bounds by construction, so the `none` arm never runs; a
+                // `map` here would lift a lambda per fold to say the same thing.
+                let step = match (items[i]) {
+                    some(x) => f(acc, x),
+                    none => none,
+                };
+                set acc = step.value_or(acc);
+                set ok = step.is_some();
+            }
+        },
+    };
+    if (ok) { some(acc) } else { none }
+}.test({
+    fn add(acc: i64, x: i64) -> i64? { some(acc + x) }
+    assert(add(1, 2) == some(3));
+
+    fn is_big(self: i64) -> bool { self == 99 }
+    assert(!is_big(1));
+
+    // All-`some`: the same result `fold` would give.
+    assert([1, 2, 3].opt_fold(0, |acc, x| some(acc + x)) == some(6));
+    assert(opt_fold([2, 3], 1, |acc, x| some(acc + x)) == some(6)); // free-call
+    assert([1, 2, 3].opt_fold(0, add) == some(6)); // a named combiner
+
+    // Empty (a typed empty from `filter`) folds to `some(init)`, untouched.
+    assert([1, 2].filter(is_big).opt_fold(7, add) == some(7));
+
+    // A heap accumulator (`str`) is carried across iterations intact.
+    assert(["a", "b", "c"].opt_fold("", |acc, s| some(`{acc}{s}`)) == some("abc"));
+
+    // The first `none` ends it — including when the very first element fails.
+    assert([1, 2, 3].opt_fold(0, |acc, x| if (x == 2) { none } else { some(acc + x) }) == none);
+    assert([1, 2].opt_fold(0, |acc, x| none) == none);
+
+    // A `str` receiver folds its chars.
+    assert("123".opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == some(123));
+    assert("1x3".opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?)) == none);
+
+    let bump = 10;
+    assert([1, 2].opt_fold(0, |acc, x| some(acc + x + bump)) == some(23)); // a capture
+
+    // From the right: the same results for an order-blind combiner, the order visible in a
+    // string, and the first `none` counted from the right ends it.
+    assert([1, 2, 3].opt_fold(0, |acc, x| some(acc + x), direction=Right) == some(6));
+    assert([1, 2, 3].opt_fold(0, add, direction=Right) == some(6));
+    assert([1, 2].filter(is_big).opt_fold(7, add, direction=Right) == some(7));
+    assert(["a", "b", "c"].opt_fold("", |acc, s| some(`{acc}{s}`), direction=Right) == some("cba"));
+    assert(
+        [1, 2, 3].opt_fold(
+            0,
+            |acc, x| if (x == 2) { none } else { some(acc + x) },
+            direction=Right,
+        ) == none,
+    );
+    assert([1, 2].opt_fold(0, |acc, x| none, direction=Right) == none);
+    assert([1, 2].opt_fold(0, |acc, x| some(acc + x + bump), direction=Right) == some(23));
+
+    // A set folds too, from either end.
+    assert(#{1, 2, 3}.opt_fold(0, add) == some(6));
+    assert(#{1, 2, 3}.opt_fold(0, add, direction=Right) == some(6));
+})

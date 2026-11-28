@@ -14,9 +14,11 @@
 # off the work stack.
 
 import {
+    Right,
     any,
     contains,
     equal as ==,
+    fold,
     greater_than as >,
     is_nonempty,
     is_space,
@@ -27,7 +29,6 @@ import {
     logical_not as !,
     push,
     repeat,
-    right_fold,
     saturating_sub as -,
     split,
     value_or,
@@ -271,9 +272,9 @@ fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
 // ---------- helpers ----------
 
 # Prepend an array of children onto the work-list so `ds[0]` is processed first:
-# a right fold over `ds`, each frame carrying the parent's indent and mode.
+# a fold from the right over `ds`, each frame carrying the parent's indent and mode.
 fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
-    ds.right_fold(rest, |d, work| Cons(sp, flat, d, work))
+    ds.fold(rest, |work, d| { Cons(sp, flat, d, work) }, direction=Right)
 }
 
 # `prefix` and `text` filled to `width`, the first line starting at column `col` and every

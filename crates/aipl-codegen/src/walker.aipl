@@ -3097,7 +3097,7 @@ fn hugs_sole_arg(self: W) -> bool {
 #
 #     ok(ATy(node
 #         .own_tokens()
-#         .left_fold(..)))
+#         .fold(..)))
 #
 # so a chained argument keeps the ordinary broken list, where the chain breaks
 # on a line of its own.

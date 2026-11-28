@@ -81,10 +81,8 @@ variant Callee =
     | FilterMap
     | All
     | Any
-    | LeftFold
-    | RightFold
-    | OptLeftFold
-    | OptRightFold
+    | Fold
+    | OptFold
     | Zip
     | Trim
     | HeapStr
@@ -580,24 +578,14 @@ pub fn builtin_table() -> BuiltinEntry[] {
         BuiltinEntry { arm: All, callee: "__builtin_all", definition: Written("builtin_all.aipl") },
         BuiltinEntry { arm: Any, callee: "__builtin_any", definition: Written("builtin_any.aipl") },
         BuiltinEntry {
-            arm: LeftFold,
-            callee: "__builtin_left_fold",
-            definition: Written("builtin_left_fold.aipl"),
+            arm: Fold,
+            callee: "__builtin_fold",
+            definition: Written("builtin_fold.aipl"),
         },
         BuiltinEntry {
-            arm: RightFold,
-            callee: "__builtin_right_fold",
-            definition: Written("builtin_right_fold.aipl"),
-        },
-        BuiltinEntry {
-            arm: OptLeftFold,
-            callee: "__builtin_opt_left_fold",
-            definition: Written("builtin_opt_left_fold.aipl"),
-        },
-        BuiltinEntry {
-            arm: OptRightFold,
-            callee: "__builtin_opt_right_fold",
-            definition: Written("builtin_opt_right_fold.aipl"),
+            arm: OptFold,
+            callee: "__builtin_opt_fold",
+            definition: Written("builtin_opt_fold.aipl"),
         },
         BuiltinEntry { arm: Zip, callee: "__builtin_zip", definition: Written("builtin_zip.aipl") },
         BuiltinEntry { arm: Trim, callee: "__builtin_trim", definition: Declared },

@@ -308,7 +308,7 @@
           </h3>
           <pre class="signature"><code>fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -&#62; Work</code></pre>
 
-          <div class="doc"><p>Prepend an array of children onto the work-list so <code>ds[0]</code> is processed first: a right fold over <code>ds</code>, each frame carrying the parent's indent and mode.</p></div>
+          <div class="doc"><p>Prepend an array of children onto the work-list so <code>ds[0]</code> is processed first: a fold from the right over <code>ds</code>, each frame carrying the parent's indent and mode.</p></div>
 
 
 

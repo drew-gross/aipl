@@ -120,6 +120,7 @@ benchmark:
   --save/--compare option so users can monitor over time
 
 misc cleanup:
+  make fold accept a direction with default left instead of needing a separate fn for right fold
   repeat's self arg should be T*
   is_infix should be determined as a property of the call
   ByPattern is just ByCase that supports _ bindings. Lets unify.
