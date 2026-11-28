@@ -43,7 +43,9 @@ fn line_end_span(
     }
 }
 
-# The byte `Span` of the first line's trailing space/tab run in `src` as `some(span)`, or `none` if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.
+# The byte `Span` of the first line's trailing space/tab run in `src` as `some(span)`, or `none` if
+# no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not
+# content. The locator for the parser's trailing-whitespace check.
 pub fn find_trailing_whitespace(src: str) -> Span? {
     mut prev = '\n'; // byte at i-1 (sentinel '\n': line start, not ws/CR)
     mut prev2 = '\n'; // byte at i-2

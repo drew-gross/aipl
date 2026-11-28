@@ -58,6 +58,7 @@ import {
     AiplTok,
     Backtick,
     Comma,
+    DocComment,
     Import,
     Pipe,
     Quoted,
@@ -69,7 +70,7 @@ import {
     TripleQuoted,
     lex_aipl,
 } from "./lex_aipl.aipl";
-import { LexResult } from "./lexer.aipl";
+import { LexResult, Token } from "./lexer.aipl";
 import { split_test_sections } from "./split_test_sections.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 import { FmtError, format_program } from "./walker.aipl";
@@ -223,7 +224,7 @@ fn fmt_layout(
 })
 
 # Refuse unless `output` holds exactly `input`'s tokens and comments — exactly
-# as `TokenFingerprint` defines it, which is where the three things a reformat
+# as `TokenFingerprint` defines it, which is where the four things a reformat
 # is allowed to change are spelled out.
 #
 # The three parts are reported separately so the message names what moved: a
@@ -235,8 +236,8 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
         message: `formatter produced unlexable output: {e.message}`,
         span: e.span,
     })?;
-    let was = token_fingerprint(before);
-    let now = token_fingerprint(after);
+    let was = token_fingerprint(with_doc_words(before));
+    let now = token_fingerprint(with_doc_words(after));
     if (was.rest != now.rest) {
         // Name the first token that differs — the two lists agree up to it —
         // so the bug report says which literal moved rather than only that one
@@ -273,6 +274,11 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
             "import { a } from builtins;\nimport { b } from \"./b.aipl\";",
         ) == ok(),
     );
+    // A doc line refilled across two lines holds the same words; a lost or moved word does not pass.
+    assert(verify_same_tokens("# a b c\nfn f() { }", "# a b\n# c\nfn f() { }") == ok());
+    assert(verify_same_tokens("# a  b\nfn f() { }", "# a b\nfn f() { }") == ok());
+    assert(verify_same_tokens("# a b c\nfn f() { }", "# a b\nfn f() { }") != ok());
+    assert(verify_same_tokens("# a b c\nfn f() { }", "# a c b\nfn f() { }") != ok());
     // Trailing commas and leading `|`s are layout, not content.
     assert(verify_same_tokens("f(a, b)", "f(\n    a,\n    b,\n)") == ok());
     assert(verify_same_tokens("variant V = A | B", "variant V =\n    | A\n    | B") == ok());
@@ -432,7 +438,7 @@ fn first_difference(was: str[], now: str[]) -> str {
 # value-preserving whitespace edits inside a `"""` block are not flagged while
 # any change to a literal's value is.
 #
-# Three things a reformat is allowed to change, and each is why a part is shaped
+# Four things a reformat is allowed to change, and each is why a part is shaped
 # the way it is:
 #
 # - **Imports are hoisted and sorted**, both the statements and the names inside
@@ -446,10 +452,32 @@ fn first_difference(was: str[], now: str[]) -> str {
 # - **Comments move with the construct they are glued to**, which can reorder
 #   them against the tokens, so they are their own sorted multiset rather than
 #   part of `rest`.
+# - **A doc comment is refilled**: a line that runs past the width continues on the
+#   next, so a `# ..` line counts as its words, in order, wherever the lines were cut.
 #
 # Everything else is positional: `rest` catches a token the layout moved, not
 # just one it lost.
 struct TokenFingerprint { imports: str[], rest: str[], comments: str[] }
+
+# `lexed` with each doc comment split into one token per word, so a line refilled across two
+# compares
+# equal to the one it came from. A run of spaces and a bare `#` line split into nothing.
+fn with_doc_words(lexed: LexResult<AiplTok>) -> LexResult<AiplTok> {
+    ..lexed,
+    tokens: lexed.tokens.map(doc_words).join(),
+}
+
+# `t`, or its words when it is a doc comment.
+fn doc_words(t: Token<AiplTok>) -> Token<AiplTok>[] {
+    if (let DocComment(text) = t.kind) {
+        text
+            .split(" ")
+            .filter(is_nonempty)
+            .map(|word| Token { kind: DocComment(word), text: t.text })
+    } else {
+        [t]
+    }
+}
 
 fn token_fingerprint(lexed: LexResult<AiplTok>) -> TokenFingerprint {
     mut imports: str[] = [];

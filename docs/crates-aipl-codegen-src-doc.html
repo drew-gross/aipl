@@ -112,6 +112,13 @@
 
             </li>
 
+            <li id="item-Prose"><code>Prose(str, str)</code>
+
+              <div class="doc"><p>A line of prose: <code>prefix</code> and then words separated by spaces, filled to the width. When the next word would run past it the line breaks at that space and the next begins with <code>prefix</code> again, at the column the first began at. A word is never broken, so one longer than the width stays on a line of its own, and the spaces between words are kept as written.</p></div>
+
+
+            </li>
+
           </ul>
 
         </section>
@@ -303,6 +310,45 @@
 
           <div class="doc"><p>Prepend an array of children onto the work-list so <code>ds[0]</code> is processed first: a right fold over <code>ds</code>, each frame carrying the parent's indent and mode.</p></div>
 
+
+
+        </section>
+
+
+
+        <section class="item" id="item-prose_filled">
+          <h3>
+            <a class="anchor" href="#item-prose_filled">prose_filled</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn prose_filled(prefix: str, text: str, col: u64, width: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>prefix</code> and <code>text</code> filled to <code>width</code>, the first line starting at column <code>col</code> and every later one at the same column. Each word goes on the line it is on when it fits and starts the next when it does not, and a word that does not fit even on a line of its own is left to run over.</p></div>
+
+
+          <ul class="slots">
+
+            <li><code>prefix: str</code>
+
+            </li>
+
+            <li><code>text: str</code>
+
+              <div class="doc"><p>Words separated by single spaces; a run of spaces is a run of empty words, which are kept.</p></div>
+
+            </li>
+
+            <li><code>col: u64</code>
+
+              <div class="doc"><p>The column every line starts at.</p></div>
+
+            </li>
+
+            <li><code>width: u64</code>
+
+            </li>
+
+          </ul>
 
 
         </section>

@@ -14,13 +14,15 @@
 # literal form is almost unreadable.
 #
 # **Only the unordered `#{..}`.** An ordered literal is not interchangeable: `to_set` leaves its
-# order to the use site, so `#<{'z', 'a', 'm'}` where nothing pins an order — rendered straight into
+# order to the use site, so `#<{'z', 'a', 'm'}` where nothing pins an order — rendered straight
+# into
 # a template, say — would become the *unordered* set and stop sorting. A lint may not advise a
 # rewrite that changes what the program does.
 #
 # **Only a literal written on one line**, which is what keeps every hit squelchable. `#[allow]` is
 # line-scoped, and the formatter breaks a set literal too wide for one line into one element per
-# line — then relocates a trailing marker from inside the braces onto the statement's closing `};`,
+# line — then relocates a trailing marker from inside the braces onto the statement's closing
+# `};`,
 # a line the span does not start on. A literal it keeps on one line carries the marker at the end
 # of that line, where it does squelch.
 #

@@ -1,5 +1,7 @@
-# Inside the arm of a `match` the scrutinee is the case the arm names, and in a `_` arm the cases the
-# arms above it have not. That holds for a local and for a field path off a local that never changes.
+# Inside the arm of a `match` the scrutinee is the case the arm names, and in a `_` arm the cases
+# the
+# arms above it have not. That holds for a local and for a field path off a local that never
+# changes.
 
 import { equal as == } from builtins;
 

@@ -68,7 +68,8 @@ import { lone_statement } from "./loop_shape.aipl";
 import { OptionMatch, option_match, receiver_text } from "./option_match.aipl";
 import { passes_through, wraps_with } from "./result_match.aipl";
 
-# The hit for the `match` `self`, when it turns an optional into a result, in the function `function`.
+# The hit for the `match` `self`, when it turns an optional into a result, in the function
+# `function`.
 pub fn match_value_or_err(self: Match, Function { sig, name }) -> LintHit? {
     let OptionMatch { scrutinee, binder, some_body, none_body } = self.option_match()?;
 

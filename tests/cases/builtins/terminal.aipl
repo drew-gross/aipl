@@ -1,8 +1,10 @@
-# `clear_terminal`, `move_to` and the alternate screen control the terminal itself, which is what the
+# `clear_terminal`, `move_to` and the alternate screen control the terminal itself, which is what
+# the
 # `!terminal` effect means: a function that only prints cannot do it. The
 # control sequences belong to the runtime — no `str` or `char` holds one — so a
 # program cannot send the terminal anything these do not. A shim stands in for
-# every operation here and writes down what it was asked; the bytes the real ones write are pinned by
+# every operation here and writes down what it was asked; the bytes the real ones write are pinned
+# by
 # `build_cmd::terminal_operations_send_their_control_sequences`.
 
 import {

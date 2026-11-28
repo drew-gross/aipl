@@ -7,7 +7,8 @@
 # as a value, a shim binding, or a mention from a constant or a struct field's default
 # all count. A function's own body does not, so recursion does not keep one alive. A
 # `.test` or `.benchmark` block on it does, whether or not the block names it: a function
-# that exists to be tested is used, and only one with neither a caller nor a test is dead. Two functions that mention only
+# that exists to be tested is used, and only one with neither a caller nor a test is dead. Two
+# functions that mention only
 # each other are not reported.
 #
 # Unused means unreachable from the file's entry points, which are the functions that are

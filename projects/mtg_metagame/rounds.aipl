@@ -1,6 +1,7 @@
 # Where a round falls in its tournament, counted back from the end. A tournament of nine rounds and
 # one of fifteen differ in their first rounds but not in their last, so rounds are compared by how
-# far they are from the finals: the finals, the semifinals and the quarterfinals first, then the last
+# far they are from the finals: the finals, the semifinals and the quarterfinals first, then the
+# last
 # round of the main event, the one before it, and so on. A round's *slot* is that place, counted
 # from 0 for the finals.
 

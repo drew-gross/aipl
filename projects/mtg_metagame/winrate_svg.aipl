@@ -1,6 +1,7 @@
 # The winrate matrix as an SVG page: a heat map with a row and a column for each archetype, green
 # where the row's archetype wins, red where it loses. Hovering a cell lights up its row and column
-# and fills a panel beside the matrix with the pairing's record and how it did in each round, counted
+# and fills a panel beside the matrix with the pairing's record and how it did in each round,
+# counted
 # back from the end of the tournament.
 
 import {
@@ -239,7 +240,9 @@ fn deck_summary(
     assert(deck_summary(1, 4) == "1 deck · 25%");
 })
 
-# The heading of a column: a tile the width of the column whose sides lean up and to the right at 45 degrees, as the name written along its middle does, so the headings fit side by side the way the cells do and the whole tile is what a click lands on.
+# The heading of a column: a tile the width of the column whose sides lean up and to the right at 45
+# degrees, as the name written along its middle does, so the headings fit side by side the way the
+# cells do and the whole tile is what a click lands on.
 fn column_heading(
     # What the tile carries.
     attributes: str,
@@ -332,7 +335,8 @@ let STYLE = """
 # top of the page, from the cell's attributes. A line wider than the panel is wrapped at a space.
 # Clicking a cell locks the panel on it, whatever the mouse then passes over, until the Unlock
 # button, the same cell or the Escape key is clicked or pressed. Unticking an
-# archetype's checkbox (or clicking its column heading) removes it from the metagame: its row and column fade, and the Projected column is what every
+# archetype's checkbox (or clicking its column heading) removes it from the metagame: its row and
+# column fade, and the Projected column is what every
 # other archetype's overall record would be without its matches against the removed ones. The
 # removed archetypes are kept in the page's address, so a reload or a shared link has them.
 let SCRIPT = """
@@ -947,7 +951,8 @@ let HEADING_GAP: u64 = 4;
 
 let GAP: u64 = 10;
 
-# The decks that played `copies` copies of a card, and their wins and losses, as the page reads them.
+# The decks that played `copies` copies of a card, and their wins and losses, as the page reads
+# them.
 fn tally_text(self: Tally) -> str {
     `{self.copies}:{self.decks},{self.record.win},{self.record.loss}`
 }.test({

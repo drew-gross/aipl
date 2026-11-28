@@ -4,7 +4,8 @@
 
 import { RandomProvider, equal as == } from builtins;
 
-# The `random` provider that starts the generator at a seed. Used as the value of a `shim random { .. }` block; see `seeded_with_clock` for a fresh sequence each run.
+# The `random` provider that starts the generator at a seed. Used as the value of a `shim random {
+# .. }` block; see `seeded_with_clock` for a fresh sequence each run.
 pub fn seeded_with_int(
     # Where the generator starts; the same seed plays out the same numbers.
     seed: u64,

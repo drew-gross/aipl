@@ -36,7 +36,8 @@ fn arrow_ending(last: u8) -> Key {
 
 # The next key press, without waiting for Enter: `some(key)`, or `none` once input
 # is exhausted. An arrow key is the three bytes `ESC [ A`..`D` that `read_byte`
-# returns, and arrives as `UpArrow`, `DownArrow`, `RightArrow` or `LeftArrow`; any other key is `Other`
+# returns, and arrives as `UpArrow`, `DownArrow`, `RightArrow` or `LeftArrow`; any other key is
+# `Other`
 # with its first byte, and an escape sequence that is not an arrow ends at the
 # byte that breaks it. Carries `!read_stdin_raw`, like `read_byte`.
 pub fn read_key() !read_stdin_raw -> Key? {

@@ -1,5 +1,6 @@
 # `show_view` opens a window showing a view, written in the text form of a view (one element a line,
-# a child indented two spaces under its parent), and waits until it is closed. A test shims it, so no
+# a child indented two spaces under its parent), and waits until it is closed. A test shims it, so
+# no
 # window opens and the program under test hands over the text it would have drawn.
 
 import { equal as ==, push } from builtins;

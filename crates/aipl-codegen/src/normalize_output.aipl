@@ -7,7 +7,8 @@
 import { equal as ==, join, logical_or as ||, split } from builtins;
 import { trim_end_while } from "./trim_end_while.aipl";
 
-# Normalizes captured program output for the cases harness: collapses CRLF line endings to LF, then strips the trailing run of `\n`/`\r`. A lone interior CR is left untouched.
+# Normalizes captured program output for the cases harness: collapses CRLF line endings to LF, then
+# strips the trailing run of `\n`/`\r`. A lone interior CR is left untouched.
 pub fn normalize_output(self: str) -> str {
     // `split("\r\n").join(sep="\n")` is `replace("\r\n", "\n")` (non-overlapping,
     // left-to-right), then drop the trailing run of newline bytes.

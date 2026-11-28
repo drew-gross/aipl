@@ -10,7 +10,8 @@
 #
 # Operators that come in more than one flavor (`wrapping_add` and `saturating_add`) are bound by
 # import, and nothing fixes which flavor a file chose for `+`. Each flavor is a builtin of its own
-# with its own tag, so a lint that advises another spelling of the same arithmetic — `set x = x + 1;`
+# with its own tag, so a lint that advises another spelling of the same arithmetic — `set x = x +
+# 1;`
 # as `set x++;` — names the builtin of the flavor of the call it read (`WrappingAdd` advises
 # `WrappingIncrement`), and the file either has that operator or can take it.
 

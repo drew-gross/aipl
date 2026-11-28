@@ -70,7 +70,8 @@ fn fitted<T: any>(
     assert(empty.fitted(2, 7) == [7, 7]);
 })
 
-# `rows` drawn as a table, as text of one line each: a rule above, the headers of `columns` and a heavier rule
+# `rows` drawn as a table, as text of one line each: a rule above, the headers of `columns` and a
+# heavier rule
 # under them, the rows, and a rule below. Each column is as wide as its widest cell, its header
 # included, and its cells are on the side its `Column` says. A row with fewer cells than there are
 # columns has blanks for the rest, and one with more is cut off. The lines are joined by newlines,

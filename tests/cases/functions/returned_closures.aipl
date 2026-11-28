@@ -1,4 +1,5 @@
-# Closures that capture arrays and strings, returned directly: from a function, from the branches of an
+# Closures that capture arrays and strings, returned directly: from a function, from the branches of
+# an
 # `if`, from a closure, and handed on to `map`. What they hold is released with them, which the leak
 # gate checks.
 

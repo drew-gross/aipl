@@ -4,25 +4,29 @@
 #
 # The rebuild spelling says "build the longer array, then store it", and that is what it costs: a
 # fresh array of the combined length on every append, with `out`'s old buffer released afterwards.
-# `push` grows `out`'s own buffer in place when nothing else holds it — and when something does, it
+# `push` grows `out`'s own buffer in place when nothing else holds it — and when something does,
+# it
 # copies, so the two spellings agree on what any other binding sees. It is the array sibling of
 # `set_spread_field`, which says the same thing about a struct rebuilt from itself to replace a
 # field.
 #
 # A spread in the tail is an append too, of a whole array rather than one element, so it is advised
-# as `extend` — `set out = [..out, ..xs];` is `set out.extend(xs);`. A field path works the same way
+# as `extend` — `set out = [..out, ..xs];` is `set out.extend(xs);`. A field path works the same
+# way
 # as a bare name (`set self.hits = [..self.hits, x]` is `set self.hits.push(x)`), which is the whole
 # set of targets: `push` writes the grown array back into the place it was given, and only a name
 # or a field path off one is a place.
 #
 # Two shapes are left alone. The spread must be the **first** element and must be the target itself
-# — `[x, ..out]` prepends and `[..other, x]` starts from a different array, and neither is something
+# — `[x, ..out]` prepends and `[..other, x]` starts from a different array, and neither is
+# something
 # `push` can spell. And with more than one appended element the rewrite is one call per element, so
 # it is offered only when no element reads the target: `set out = [..out, out.len(), out.len()];`
 # appends the *same* index twice, where the two pushes would see the array grow between them. A
 # single element is always safe — it is computed before the append either way.
 #
-# The shape is all language syntax — an array literal with a spread in it needs no import — so the
+# The shape is all language syntax — an array literal with a spread in it needs no import — so
+# the
 # lint fires whether or not `push` and `extend` are imported. The names are only for the advice,
 # which says to import what it uses when it is missing.
 #
@@ -53,7 +57,8 @@ import { LintHit, Named, shown } from "./lint_hit.aipl";
 import { is_same_place, root_name } from "./places.aipl";
 import { Builtin } from "./spelling.aipl";
 
-# The hit for the `set` `self`, when it sets a place to an array literal that starts by spreading it.
+# The hit for the `set` `self`, when it sets a place to an array literal that starts by spreading
+# it.
 pub fn set_spread_push(self: Assign(target, value, _)) -> LintHit? {
     let ArrayLit(elements) = value.kind.as_case::<ArrayLit>()?;
     let root = target.root_name()?;

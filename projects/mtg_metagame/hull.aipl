@@ -23,7 +23,8 @@ struct Tally { copies: u64, decks: u64, record: Record }
 
 # One card of the hull: the `section` it is listed under, its `name`, and a tally for each number of
 # copies the decks played, fewest first (none of it among them, when some deck did not play it). A
-# card of the main deck is counted by its main-deck copies, and one of the sideboard by its sideboard
+# card of the main deck is counted by its main-deck copies, and one of the sideboard by its
+# sideboard
 # copies.
 struct HullCard { section: str, name: str, tallies: Tally[] }
 

@@ -45,8 +45,10 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-# `self.map(f).join(..)` — every `f(x)` flattened into one sequence with the separators between —
-# computed in a single pass into a single buffer. For a `str`-valued `f` the result is the string join;
+# `self.map(f).join(..)` — every `f(x)` flattened into one sequence with the separators between
+# —
+# computed in a single pass into a single buffer. For a `str`-valued `f` the result is the string
+# join;
 # a `str` receiver iterates its chars.
 pub fn map_join<T: any, U: any>(
     self: T[],

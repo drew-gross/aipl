@@ -317,7 +317,8 @@ fn status(self: Mark[,]) -> Status {
     assert(game.reveal((0, 0)).reveal((0, 1)).reveal((1, 0)).status() == Won);
 })
 
-# What is drawn for `cell`: `#` hidden, `F` flagged, `.` revealed with nothing around it, a digit counting the mines around it, `*` a mine.
+# What is drawn for `cell`: `#` hidden, `F` flagged, `.` revealed with nothing around it, a digit
+# counting the mines around it, `*` a mine.
 fn symbol(
     self: Mark[,],
     # The cell drawn.
@@ -689,7 +690,8 @@ fn play_typed(self: Session, typed: u8[]) -> Played {
     Played { game, moves, written }
 }
 
-# Play on the standard 8 by 8 board with 10 mines, which the first reveal places. The mines are different every
+# Play on the standard 8 by 8 board with 10 mines, which the first reveal places. The mines are
+# different every
 # game; `./aipl run -- SEED` plays the same game again for the same number. The
 # board is drawn on the terminal's second screen, which is put away when play
 # ends, so the shell's screen and prompt are as they were; the result is then

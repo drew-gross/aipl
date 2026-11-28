@@ -34,7 +34,8 @@ fn pure_slot_name() -> Pure { run: shout }
 # A function type with an effect where one without is expected.
 fn wider_than_slot(Logger { run as r }) -> Pure { run: r }
 
-# The other way round fits, and handing one to `apply_logged` from a function that declares it is fine.
+# The other way round fits, and handing one to `apply_logged` from a function that declares it is
+# fine.
 fn narrower_than_slot() -> Logger { run: |x| { x } }
 
 fn declared(x: i64) !prints -> i64 { apply_logged(shout, x) }
@@ -72,7 +73,7 @@ error: struct "Pure" field "run": expected (i64) -> i64, got (i64) !prints -> i6
    |                                                        ^
 
 error: fn "apply_logged" has effect "!prints" but the calling function does not declare it
-  --> ./tests/cases/effects/err_function_value_effects.aipl:42:39
+  --> ./tests/cases/effects/err_function_value_effects.aipl:43:39
    |
-42 | fn undeclared_caller(x: i64) -> i64 { apply_logged(shout, x) }
+43 | fn undeclared_caller(x: i64) -> i64 { apply_logged(shout, x) }
    |                                       ^^^^^^^^^^^^^^^^^^^^^^

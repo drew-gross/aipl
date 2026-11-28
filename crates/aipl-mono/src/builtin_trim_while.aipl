@@ -9,7 +9,8 @@
 
 import { count_while, equal as == } from builtins;
 
-# Drops the leading run of characters satisfying `pred`, returning everything from the first character that fails it onward.
+# Drops the leading run of characters satisfying `pred`, returning everything from the first
+# character that fails it onward.
 pub fn trim_while(
     self: str,
     # Which leading characters are dropped.

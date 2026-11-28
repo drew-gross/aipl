@@ -1,4 +1,5 @@
-# The `is_empty_longhand` lint: `!x.is_nonempty()` and `x.len() == 0` — emptiness asked the long way.
+# The `is_empty_longhand` lint: `!x.is_nonempty()` and `x.len() == 0` — emptiness asked the long
+# way.
 # `x.is_empty()` asks it directly.
 #
 # The two spellings fail differently and are both worth replacing. The negated predicate makes a
@@ -9,12 +10,15 @@
 # This is the mirror of `len_gt_zero`, which sends the opposite comparison to `is_nonempty`. Between
 # them, a length is never compared against zero.
 #
-# `!= 0` is deliberately not "is_empty_longhand": it is the *non*-empty test spelled with a comparison, so its
+# `!= 0` is deliberately not "is_empty_longhand": it is the *non*-empty test spelled with a
+# comparison, so its
 # rewrite is `is_nonempty` rather than `is_empty`, and that belongs to the sibling lint if anywhere.
-# Nor is `x.len() < 1` — true of the same values, but not an idiom anyone reaches for, and flagging
+# Nor is `x.len() < 1` — true of the same values, but not an idiom anyone reaches for, and
+# flagging
 # it would mean guessing at what an unusual spelling meant.
 #
-# What a call is to is what the file's imports make of its name, so the operators and `len` are found
+# What a call is to is what the file's imports make of its name, so the operators and `len` are
+# found
 # however the file spells them, and a file that aliases `==` or `!` to a function of its own has an
 # `x.len() == 0` that is not an equality test at all. A file's own `len` is a different function
 # answering a different question, and `is_empty` does not apply to what it takes.
@@ -30,7 +34,8 @@ import { lint_with_unfilled } from "./lint.aipl";
 import { LintHit, advice, shown } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
-# The advice for the call `self`, when it is a negated `is_nonempty` or a length compared with zero for
+# The advice for the call `self`, when it is a negated `is_nonempty` or a length compared with zero
+# for
 # equality.
 pub fn is_empty_longhand(self: Call(_, args, _, callee)) -> LintHit? {
     let receiver = if (args.len() == 1) {
@@ -119,7 +124,8 @@ fn length_equal_zero(self: Expr[], callee: Callee) -> Expr? {
     none
 }
 
-# The receiver of the call `self` when it is a call of `len`, however it was spelled: `x.len()` is the
+# The receiver of the call `self` when it is a call of `len`, however it was spelled: `x.len()` is
+# the
 # free call `len(x)`.
 fn length_receiver(self: Expr) -> Expr? {
     let Call(_, args, _, callee) = self.kind.as_case::<Call>()?;

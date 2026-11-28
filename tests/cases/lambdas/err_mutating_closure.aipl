@@ -1,7 +1,8 @@
 # A closure that mutates what it captures names the variables it takes in `[mut ..]`, sets each of
 # them in its body, and returns nothing. A variable it takes is a local `mut` variable of the
 # function that makes the closure, which shares it. What a closure's type says it does (`mut` in the
-# function type) is not accepted where a function type without it is expected. The functions that are
+# function type) is not accepted where a function type without it is expected. The functions that
+# are
 # not marked below are accepted.
 
 import { print, wrapping_increment as ++ } from builtins;
@@ -111,55 +112,55 @@ fn set_call() !prints {
 }
 --- check --compile ---
 error: `[mut x]` takes a variable the closure mutates, and "x" is not a `mut` binding
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:16:6
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:17:6
    |
-16 |     [mut x] || {
+17 |     [mut x] || {
    |      ^^^^^
 
 error: `[mut x]` is never set in the closure's body
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:24:6
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:25:6
    |
-24 |     [mut x] || {
+25 |     [mut x] || {
    |      ^^^^^
 
 error: a lambda used as a value cannot capture the `mut` binding "y": it would keep the value it has now, not the later ones (write `[mut y]` in front of it to let the closure take "y" and change it)
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:33:5
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:34:5
    |
-33 |     [mut x] || {
+34 |     [mut x] || {
    |     ^^^^^^^^^^^^
 
 error: `[mut missing]` names no variable here
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:40:6
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:41:6
    |
-40 |     [mut missing] || {
+41 |     [mut missing] || {
    |      ^^^^^^^^^^^
 
 error: "x" is captured twice
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:47:12
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:48:12
    |
-47 |     [mut x, mut x] || {
+48 |     [mut x, mut x] || {
    |            ^^^^^^
 
 error: a closure that mutates what it captures returns nothing, but its body is i64
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:56:13
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:57:13
    |
-56 |         set x++;
+57 |         set x++;
    |             ^^^
 
 error: `[mut self]` takes a local variable, and "self" is a parameter
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:64:17
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:65:17
    |
-64 |     let tick = [mut self] || {
+65 |     let tick = [mut self] || {
    |                 ^^^^^^^^
 
 error: struct "Plain" field "run": expected () -> (), got () mut -> ()
-  --> ./tests/cases/lambdas/err_mutating_closure.aipl:83:14
+  --> ./tests/cases/lambdas/err_mutating_closure.aipl:84:14
    |
-83 |         run: [mut x] || {
+84 |         run: [mut x] || {
    |              ^^^^^^^^^^^^
 
 error: set: expected () mut !prints -> (), got ()
-   --> ./tests/cases/lambdas/err_mutating_closure.aipl:110:9
+   --> ./tests/cases/lambdas/err_mutating_closure.aipl:111:9
     |
-110 |     set tick();
+111 |     set tick();
     |         ^^^^

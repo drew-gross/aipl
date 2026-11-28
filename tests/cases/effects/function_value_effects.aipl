@@ -1,4 +1,5 @@
-# A function type says which effects calling it performs: `(A) !prints -> B`. A value of the type may
+# A function type says which effects calling it performs: `(A) !prints -> B`. A value of the type
+# may
 # perform them, calling one needs them declared, and a function with fewer effects fits where one
 # with more is expected.
 

@@ -3,7 +3,8 @@
 #
 # A builtin is one of three kinds. `Written` is an ordinary AIPL file in `aipl-mono/src/`, whose
 # `pub fn` and `# ..` block are its signature and documentation. `Declared` is expanded or generated
-# by the compiler and typed by a declaration named `__builtin_<name>`. `Described` is typed by a rule
+# by the compiler and typed by a declaration named `__builtin_<name>`. `Described` is typed by a
+# rule
 # in the checker with nothing to read, so its signature and prose are written here.
 #
 # The table is in the order the arms of the Rust `Callee` list the importable builtins. Rust reads
@@ -24,7 +25,8 @@ import {
 # What a call is to. The importable builtins have a case each, named as the Rust `Callee` arm is;
 # `Some`, `Ok`, `Err` and `Assert` are the names the language reserves; a call to a name the file
 # does not import from a builtins library is `User` (`is_method` says whether the file's own
-# function it names takes `self` first, so `recv.f(..)` can call it), or `Local` where a local holding a function
+# function it names takes `self` first, so `recv.f(..)` can call it), or `Local` where a local
+# holding a function
 # hides the name. `Unresolved` is what the parser writes, before `resolve_callees` decides.
 variant Callee =
     | Print

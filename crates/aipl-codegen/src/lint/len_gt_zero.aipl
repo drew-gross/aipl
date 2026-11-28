@@ -1,4 +1,5 @@
-# The `len_gt_zero` lint: `0 < x.len()` / `x.len() > 0`, and `!x.is_empty()` — non-emptiness asked the
+# The `len_gt_zero` lint: `0 < x.len()` / `x.len() > 0`, and `!x.is_empty()` — non-emptiness asked
+# the
 # long way. `x.is_nonempty()` asks the question directly: it says what the test means rather than
 # leaving the reader to recognize the idiom (or to hold a negation), and it is the one spelling that
 # reads the same for every receiver `len` takes.
@@ -9,9 +10,12 @@
 # zero. The negated predicate is the mirror of `is_empty_longhand`'s `!x.is_nonempty()`; between
 # the two, a predicate is never negated to ask the other one.
 #
-# What a call is to is what the file's imports make of its name, so the operators and `len` are found
-# however the file spells them, and a file that aliases `<` to a function of its own has a `0 < x.len()`
-# that is not a length test at all. The same goes for `len`: a file's own `len` is a different function
+# What a call is to is what the file's imports make of its name, so the operators and `len` are
+# found
+# however the file spells them, and a file that aliases `<` to a function of its own has a `0 <
+# x.len()`
+# that is not a length test at all. The same goes for `len`: a file's own `len` is a different
+# function
 # answering a different question, and `is_nonempty` does not apply to what it takes.
 #
 # The receiver is quoted only where the rewrite is a literal splice: a call's span stops before its
@@ -41,7 +45,8 @@ import { lint_with_unfilled } from "./lint.aipl";
 import { LintHit, advice, shown } from "./lint_hit.aipl";
 import { is_zero } from "./slice_bounds.aipl";
 
-# The advice for the call `self`, when it is a comparison of a length with zero, or a negated `is_empty`.
+# The advice for the call `self`, when it is a comparison of a length with zero, or a negated
+# `is_empty`.
 pub fn len_gt_zero(self: Call(_, args, _, callee)) -> LintHit? {
     let (receiver, what) = match (args.len()) {
         1 => (args.negated_emptiness(callee)?, "a negated emptiness test"),
@@ -130,7 +135,8 @@ fn length_against_zero(self: Expr[], callee: Callee) -> Expr? {
     none
 }
 
-# The receiver of the call `self` when it is a call of `len`, however it was spelled: `x.len()` is the
+# The receiver of the call `self` when it is a call of `len`, however it was spelled: `x.len()` is
+# the
 # free call `len(x)`.
 fn length_receiver(self: Expr) -> Expr? {
     let Call(_, args, _, callee) = self.kind.as_case::<Call>()?;

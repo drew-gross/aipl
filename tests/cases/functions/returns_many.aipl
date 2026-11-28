@@ -1,5 +1,6 @@
 # A parameter written `(A) -> T*` takes a function that returns `T[]`, `T?` or a single `T`, the way
-# a `T*` parameter takes a sequence, an optional or one element. The body sees one that returns `T[]`.
+# a `T*` parameter takes a sequence, an optional or one element. The body sees one that returns
+# `T[]`.
 
 import { equal as ==, join, map, wrapping_mul as * } from builtins;
 

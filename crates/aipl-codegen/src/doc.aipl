@@ -1,7 +1,8 @@
 # A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL:
 # the formatter builds a `Doc` tree describing *possible* layouts and `print`
 # picks one — each `Group` renders on one line ("flat") when it fits within the
-# width limit, and breaks at its `Line`/`SoftLine` points otherwise. `format_source` (the formatter proper)
+# width limit, and breaks at its `Line`/`SoftLine` points otherwise. `format_source` (the formatter
+# proper)
 # builds the tree and calls `print` here.
 #
 # The printer walks a `Work` cons-list (an explicit work-stack) with a `while` loop,
@@ -17,10 +18,12 @@ import {
     contains,
     equal as ==,
     greater_than as >,
+    is_nonempty,
     is_space,
     join,
     len,
     less_than as <,
+    logical_and as &&,
     logical_not as !,
     push,
     repeat,
@@ -66,6 +69,12 @@ variant Doc =
     # A verbatim multi-line atom, re-aligned around its column by
     # `reindent_block`.
     | RawBlock(str)
+    # A line of prose: `prefix` and then words separated by spaces, filled to the width.
+    # When the next word would run past it the line breaks at that space and the next
+    # begins with `prefix` again, at the column the first began at. A word is never
+    # broken, so one longer than the width stays on a line of its own, and the spaces
+    # between words are kept as written.
+    | Prose(str, str)
 
 # The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
 # frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
@@ -89,6 +98,7 @@ pub fn group(self: Doc) -> Doc { Group(self.has_hard(), self) }
 fn has_hard(self: Doc) -> bool {
     match (self) {
         Text(s) | RawBlock(s) => s.contains("\n"),
+        Prose(..) => false,
         Concat(ds) => ds.any(has_hard),
         Line | SoftLine => false,
         IfBroken(_) => false,
@@ -139,6 +149,12 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
                     let rendered = s.reindent_block(sp);
                     set acc.push(rendered);
                     set col = col_after(col, rendered);
+                    set work = rest;
+                },
+                Prose(prefix, text) => {
+                    let filled = prose_filled(prefix, text, col, width);
+                    set acc.push(filled);
+                    set col = col_after(col, filled);
                     set work = rest;
                 },
                 Concat(ds) => {
@@ -214,6 +230,7 @@ fn fits(budget: u64, work: Work) -> bool {
         Nil => true,
         Cons(sp, flat, d, rest) => match (d) {
             Text(s) | RawBlock(s) => fits_atom(budget, s, flat, rest),
+            Prose(prefix, text) => fits_after(budget, prefix.len() + text.len(), rest),
             Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
             Line => if (flat) { fits_after(budget, 1, rest) } else { true },
             SoftLine => if (flat) { fits(budget, rest) } else { true },
@@ -258,6 +275,54 @@ fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
 fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
     ds.right_fold(rest, |d, work| Cons(sp, flat, d, work))
 }
+
+# `prefix` and `text` filled to `width`, the first line starting at column `col` and every
+# later one at the same column. Each word goes on the line it is on when it fits and
+# starts the next when it does not, and a word that does not fit even on a line of its own
+# is left to run over.
+fn prose_filled(
+    prefix: str,
+    # Words separated by single spaces; a run of spaces is a run of empty words, which
+    # are kept.
+    text: str,
+    # The column every line starts at.
+    col: u64,
+    width: u64,
+) -> str {
+    let words = text.split(" ");
+    mut lines: str[] = [];
+    mut line = prefix;
+    mut first = true;
+    for (let word : words) {
+        if (first) {
+            set line = `{prefix}{word}`;
+            set first = false;
+        } else if (word.is_nonempty() && width < col + line.len() + 1 + word.len()) {
+            set lines.push(line);
+            set line = `{prefix}{word}`;
+        } else {
+            set line = `{line} {word}`;
+        };
+    }
+    set lines.push(line);
+    lines.join(sep=newline_str(col))
+}.test({
+    assert(prose_filled("# ", "aa bb cc", 0, 80) == "# aa bb cc");
+
+    // Breaks at the space before the word that would pass the width; the line may
+    // be exactly the width.
+    assert(prose_filled("# ", "aa bb cc", 0, 7) == "# aa bb\n# cc");
+    assert(prose_filled("# ", "aa bb cc", 0, 6) == "# aa\n# bb\n# cc");
+    // A word that cannot fit is not broken, and stays alone on its line.
+    assert(prose_filled("# ", "a loooooong b", 0, 6) == "# a\n# loooooong\n# b");
+    // Later lines start at the same column as the first.
+    assert(prose_filled("# ", "aa bb cc", 4, 11) == "# aa bb\n    # cc");
+
+    // Runs of spaces are kept, not collapsed, and never broken at: a line is not left
+    // holding only its prefix.
+    assert(prose_filled("# ", "a  b", 0, 80) == "# a  b");
+    assert(prose_filled("# ", "aaaa  b", 0, 6) == "# aaaa \n# b");
+})
 
 # The column just past `text` when appended at column `col`.
 fn col_after(

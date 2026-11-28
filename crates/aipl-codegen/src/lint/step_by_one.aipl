@@ -1,12 +1,16 @@
-# The `step_by_one` lint: a step of one written the long way — `set x = x + 1;`, `set x += 1;`, and
+# The `step_by_one` lint: a step of one written the long way — `set x = x + 1;`, `set x += 1;`,
+# and
 # their `-` mirrors — where `set x++;` / `set x--;` is the form for it.
 #
 # Every spelling that adds or subtracts exactly one is the same statement, so they are one lint
-# rather than four: the plain operator with either operand order for `+` (`x + 1` and `1 + x` both add
-# one) but only the left for `-` (`set x = 1 - x;` is not a decrement), and the compound forms, whose
+# rather than four: the plain operator with either operand order for `+` (`x + 1` and `1 + x` both
+# add
+# one) but only the left for `-` (`set x = 1 - x;` is not a decrement), and the compound forms,
+# whose
 # receiver is always on the left.
 #
-# The target may be a name or a field path off one (`set p.n = p.n + 1;` is `set p.n++;`): every `set`
+# The target may be a name or a field path off one (`set p.n = p.n + 1;` is `set p.n++;`): every
+# `set`
 # form takes either, and a path's text spells it, so the advice can quote it as written.
 #
 # An operator has a step form of its own flavor (`wrapping_add` has `wrapping_increment`), and the

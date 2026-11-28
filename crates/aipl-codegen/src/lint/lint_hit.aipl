@@ -344,7 +344,8 @@ pub fn functions(self: Program) -> Function[] {
 # A lint of one function, by what it reads: the function (once), or each node of one kind in its
 # body, or each of the `match` and `if let` expressions whose value is the function's
 # (`tail_matches`). A lint of the kind reads the kind's payload; one that needs the node itself (its
-# source, or its span) is the `Node` case, and a tail match is always the node. What each says is a list of hits, which a lint that finds at most one
+# source, or its span) is the `Node` case, and a tail match is always the node. What each says is a
+# list of hits, which a lint that finds at most one
 # writes as `[..hit]`.
 variant LintRun =
     | OfFunction((Function) -> LintHit[])
@@ -363,7 +364,8 @@ variant LintRun =
 # A lint, under the name of its file.
 struct Lint { name: str, run: LintRun }
 
-# What each of `lints` says of `self`: a lint of one kind of node is run over every node of that kind
+# What each of `lints` says of `self`: a lint of one kind of node is run over every node of that
+# kind
 # in the body, and what it says points at its node unless it points somewhere in particular.
 pub fn run_lints(self: Function, lints: Lint[]) -> LintHit[] {
     let body = self.body;
@@ -504,7 +506,8 @@ pub fn unfilled_hits(self: Function[], lint: (Function) -> LintHit*) -> LintHit[
     )? == ["in f: use builtin_any, importing `any as builtin_any` from builtins"]);
 })
 
-# What `lints` report for each of `self`: each function's hits, those of a function that point nowhere
+# What `lints` report for each of `self`: each function's hits, those of a function that point
+# nowhere
 # in particular at its name. Not [`unfilled_hits`] with a lambda: a lambda cannot capture lints.
 pub fn unfilled_hits_of(self: Function[], lints: Lint[]) -> LintHit[] {
     mut hits: LintHit[] = []; #[allow]
@@ -516,7 +519,8 @@ pub fn unfilled_hits_of(self: Function[], lints: Lint[]) -> LintHit[] {
     hits
 }
 
-# What `lints` say of the program `src` parses to, as they say it: the [`LintHit`]s, before any file's
+# What `lints` say of the program `src` parses to, as they say it: the [`LintHit`]s, before any
+# file's
 # imports decide how they are written. Every builtin counts as imported.
 pub fn lint_lints_unfilled(src: str, lints: Lint[]) -> LintHit[]!ParseFailure {
     ok(

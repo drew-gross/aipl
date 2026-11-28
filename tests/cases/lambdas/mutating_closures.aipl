@@ -1,7 +1,8 @@
 # A closure that names a variable in its capture list, `[mut total]`, and the code that made it see
 # one variable: what the closure sets is what the function reads next, and what the function sets is
 # what the closure reads. A copy of the closure shares it too. State the closure starts with,
-# `[mut seen = []]`, is a variable of its own that only closures made by it can reach. Calling one is
+# `[mut seen = []]`, is a variable of its own that only closures made by it can reach. Calling one
+# is
 # an ordinary call, `f(x);`, and what a `mut` type accepts includes a function that mutates nothing.
 
 import {

@@ -1019,6 +1019,7 @@ debugging:
   add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
 
 formatting:
+  escape hatch to allow non-reflowed-docs, probably alongside removing lines in reflow.
   """
     .descendants_of_kind::<LetMut>()$kind
     $seeded_loop()
@@ -1028,6 +1029,9 @@ formatting:
   if (cond) { return; } should be able to format on one line as long as the block is a single statement.
 
 docs:
+  docs should not horizontal scroll for long signatures. Use the formatter instead.
+  render the arg docs inside the signature
+  types should be links in signatures
   make sure per-arg docs work and improve use of per arg docs
   return_loop_find_if docs are showing internal __spat name
   puts some tree structure in the generated docs that mirrors the fs hierarchy tree structure
@@ -1045,7 +1049,6 @@ docs:
   docs should do highlighting! And allow you to change color scheme. We have this cool highlighter tech lets use it.
   add concept of examples
   integrate the readme into the docs
-  reflow docs
   make docs renderer part of check
   make the types and etc. into links
   the docs are showing a mangled name for tm_json, please fix

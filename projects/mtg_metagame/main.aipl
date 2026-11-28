@@ -73,11 +73,13 @@ fn cards_listing(args: str[]) !read_files !execute_program -> str!str {
     ok(card_counts(decks)$card_line().join(sep="\n"))
 }
 
-# What `winrate` was asked: the metagame, the archetype list to classify its decks with, and where it
+# What `winrate` was asked: the metagame, the archetype list to classify its decks with, and where
+# it
 # writes its page (`none` for the default, named after the metagame).
 struct DeckOptions { metagame: str, archetypes: str, output: str? }
 
-# The options of `winrate` in `args`: one metagame, `--archetypes <config>` and `--output <file>`, in
+# The options of `winrate` in `args`: one metagame, `--archetypes <config>` and `--output <file>`,
+# in
 # any order.
 fn parse_deck_options(args: str[]) -> DeckOptions!str {
     mut metagame = "";
@@ -149,7 +151,9 @@ fn run(args: str[]) !read_files !execute_program !write_files -> str!str {
     }
 }
 
-# Run a command: `cards <metagame>` lists every card played, `winrate <metagame>` writes an SVG page of how each archetype does against each other. The metagame is a file in `data/` (without its `.json.gz`), or
+# Run a command: `cards <metagame>` lists every card played, `winrate <metagame>` writes an SVG page
+# of how each archetype does against each other. The metagame is a file in `data/` (without its
+# `.json.gz`), or
 # one of the names in `data/index.json`.
 fn main(args: str[]) !prints !read_files !execute_program !write_files -> i64 {
     match (run(args)) {

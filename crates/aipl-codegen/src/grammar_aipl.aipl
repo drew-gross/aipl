@@ -3336,7 +3336,8 @@ fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
 }
 
 # `V.A` is one name with a dot in it — the qualification is not a separate field
-# on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a `.` in second
+# on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a `.`
+# in second
 # position means this pattern was not qualified.
 fn qualified_name(toks: str[], head: str) -> str {
     match (toks) {

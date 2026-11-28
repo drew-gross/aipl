@@ -1,5 +1,6 @@
 # `read_key` takes the next key press of standard input as a `Key?`: an arrow key
-# as `UpArrow`, `DownArrow`, `LeftArrow` or `RightArrow`, any other key as `Other` with its byte, and
+# as `UpArrow`, `DownArrow`, `LeftArrow` or `RightArrow`, any other key as `Other` with its byte,
+# and
 # `none` once input is exhausted. `Key` and its cases are imported beside it, and
 # it carries `!read_stdin_raw`. The harness runs a case with no standard input, so
 # the key sequences are covered by `build_cmd::read_key_*`, which pipe input to a

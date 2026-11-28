@@ -8,7 +8,8 @@
 # (`.value_or(none)`), while `find_map` returns the `U?` that was wanted.
 #
 # The predicate has to *be* `is_some` — the name; a lambda forwarding to it is `identity_lambda`'s
-# to turn into the name — since that is what makes the chain a `find_map` rather than a search over mapped values
+# to turn into the name — since that is what makes the chain a `find_map` rather than a search
+# over mapped values
 # (`map_find_if`'s shape, which the fusion pass takes care of).
 #
 # The hit points at the whole chain.

@@ -23,8 +23,10 @@ import {
     split,
 } from builtins;
 
-# True when `self.join(..)` with these separators has any element: some piece is non-empty, or — when
-# every piece is empty — a separator that would be written between or around them is. Which separator
+# True when `self.join(..)` with these separators has any element: some piece is non-empty, or —
+# when
+# every piece is empty — a separator that would be written between or around them is. Which
+# separator
 # applies is `join`'s rule. Stops at the first non-empty piece; an empty `self` is false.
 pub fn join_is_nonempty<T: any>(
     self: T[][],

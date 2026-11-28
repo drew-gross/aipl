@@ -1,15 +1,21 @@
-# The `value_or_compare` lint: `x.value_or(' ') == '.'` — an optional compared against a literal by first
-# filling its `none` with a *second* literal, chosen only so the comparison rejects it. `x == some('.')`
-# asks the question directly: `none` fails the comparison on its own, so there is no made-up value to
+# The `value_or_compare` lint: `x.value_or(' ') == '.'` — an optional compared against a literal
+# by first
+# filling its `none` with a *second* literal, chosen only so the comparison rejects it. `x ==
+# some('.')`
+# asks the question directly: `none` fails the comparison on its own, so there is no made-up value
+# to
 # invent, and no reader has to confirm that the two literals differ. Same for `!=`.
 #
 # Only the literal-against-literal shape qualifies, and only when the two literals differ:
-# `x.value_or(0) == 0` is a genuine "none or zero" test that `x == some(0)` would answer differently, and
-# a non-literal on either side could coincide with the default at run time the same way. Both operand
+# `x.value_or(0) == 0` is a genuine "none or zero" test that `x == some(0)` would answer
+# differently, and
+# a non-literal on either side could coincide with the default at run time the same way. Both
+# operand
 # orders are matched (`'.' == x.value_or(' ')`), since the rewrite reads the same either way.
 #
 # What a call is to is what the file's imports make of its name, so `equal` and `value_or` are found
-# however the file spells them, and a function of the file's own that happens to share a spelling is not
+# however the file spells them, and a function of the file's own that happens to share a spelling is
+# not
 # one whose meaning this lint knows.
 #
 # The hit points at the default.

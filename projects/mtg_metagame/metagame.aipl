@@ -207,7 +207,8 @@ pub fn as_record(self: Result) -> Record {
     assert(Draw.as_record() == Record { draw: 1 });
 })
 
-# One round of the deck's match history: how it ended, and the match against the opponent it names, or `none` for a round with no opponent.
+# One round of the deck's match history: how it ended, and the match against the opponent it names,
+# or `none` for a round with no opponent.
 fn decode_match(
     self: Json,
     # The deck whose match history it is.

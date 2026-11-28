@@ -1,5 +1,6 @@
 # A todo list, shown in a window. `todo` opens it, with nothing to do and a button to add the first
-# item; `todo gallery` shows every element the window can draw, from constants. The list lives only as
+# item; `todo gallery` shows every element the window can draw, from constants. The list lives only
+# as
 # long as the window: nothing is saved yet. GUI_TODO_APP.md plans the rest.
 #
 # It is written the way the React version is: `todo_app` is a function of the list that answers the
@@ -99,7 +100,8 @@ fn header() -> Element[] { [Label("Todo", size=24, bold=true), Separator()] }
 # A line, and how many of the items are not done.
 fn footer(left: u64) -> Element[] { [Separator(), Label(`{left} left`, muted=true)] }
 
-# The window for the list `self`: a title, the rows and a button for another, or for the first when there is none, and how many are left.
+# The window for the list `self`: a title, the rows and a button for another, or for the first when
+# there is none, and how many are left.
 fn todo_app(
     self: Todo[],
     # The elements of the items, one each.
@@ -195,7 +197,8 @@ fn gallery() -> Element {
     );
 })
 
-# Show the empty list in a window, and keep the window to date as it is used, until the window is gone:
+# Show the empty list in a window, and keep the window to date as it is used, until the window is
+# gone:
 # it is closed when asked to close or to quit. The list is `todos`; the window is built from it, and
 # the buttons' closures change it.
 fn interact() !gui {

@@ -1,18 +1,23 @@
-# The `compound_assign` lint: `set x = x + e;` — an accumulate written the long way; `set x += e;` is the
+# The `compound_assign` lint: `set x = x + e;` — an accumulate written the long way; `set x += e;`
+# is the
 # form for it, and likewise `-=`, `*=`, `/=`.
 #
-# For the commutative operators either operand order counts (`x * k` and `k * x` both scale `x`), but
-# `-` and `/` are "compound_assign" only with the receiver on the left: `set x = k - x;` is not `set x -= k;`, and
+# For the commutative operators either operand order counts (`x * k` and `k * x` both scale `x`),
+# but
+# `-` and `/` are "compound_assign" only with the receiver on the left: `set x = k - x;` is not `set
+# x -= k;`, and
 # rewriting it that way would silently change the program.
 #
-# The target may be a name or a field path off one (`set p.n = p.n + 1;` is `set p.n += 1;`): every `set`
+# The target may be a name or a field path off one (`set p.n = p.n + 1;` is `set p.n += 1;`): every
+# `set`
 # form takes either, and a path's text spells it, so the advice can quote it as written.
 #
 # `set x = x ± 1;` is also `step_by_one`'s, which has the more specific advice; `lint()` keeps that
 # one and drops this lint's hit for the same `set`, where the step lint has advice for the file.
 #
 # The compound form advised is the one of the operator's own flavor (`wrapping_add` has
-# `wrapping_add_assign`), and one the file already binds to something else is not offered. The advice names the import to add when the file lacks it, since no
+# `wrapping_add_assign`), and one the file already binds to something else is not offered. The
+# advice names the import to add when the file lacks it, since no
 # compound operator has a bare form.
 #
 # The hit points at the `set` statement.

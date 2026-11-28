@@ -3,7 +3,8 @@
 # appended where it is produced.
 #
 # ```text
-# set v.extend(opt.map(f).value_or([]));  →  match (opt) { some(x) => set v.extend(f(x)), none => () }
+# set v.extend(opt.map(f).value_or([]));  →  match (opt) { some(x) => set v.extend(f(x)), none =>
+# () }
 # ```
 #
 # It has its own file because it is the row that found a codegen bug, and the

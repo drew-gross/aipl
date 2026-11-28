@@ -57,6 +57,7 @@ import {
     IfBroken,
     Indent,
     Line,
+    Prose,
     RawBlock,
     SoftLine,
     Text,
@@ -586,6 +587,7 @@ fn without_trailing_break(self: Doc) -> Doc {
         Concat(ds) => Concat(ds.drop_trailing_break()),
         Text(_) => self,
         RawBlock(_) => self,
+        Prose(..) => self,
         IfBroken(_) => self,
         Indent(_) => self,
         Group(_, _) => self,
@@ -999,14 +1001,31 @@ fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
     ok(WCases { w, cases: acc })
 }
 
+# A `# ..` line as a document: the words after the marker are filled to the width, so a line
+# that would run past it continues on the next, under a marker of its own. A bare `#`, and a line
+# whose text starts with a space (indented, as a code example is), are kept as written.
+fn doc_text(line: str) -> Doc {
+    let text = line[2..];
+    if (line.starts_with("# ") && text.is_nonempty() && !text.starts_with(" ")) {
+        Prose("# ", text)
+    } else {
+        Text(line)
+    }
+}.test({
+    assert(doc_text("# a b") == Prose("# ", "a b"));
+    assert(doc_text("#") == Text("#"));
+    assert(doc_text("#     let a = 1;") == Text("#     let a = 1;"));
+    assert(doc_text("#nospace") == Text("#nospace"));
+})
+
 # `# ..` lines at the cursor, one `Text` and a hard line each — the same
-# verbatim treatment `item` gives a declaration's docs.
+# treatment `item` gives a declaration's docs.
 fn doc_lines(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
     while (w.peek_is(DocTok)) {
         let line = w.bump();
-        set acc.push(Text(line.text));
+        set acc.push(doc_text(line.text));
         set acc.push(HardLine);
         set w = line.w;
     }
@@ -1164,7 +1183,7 @@ fn module_doc(self: W) -> WDoc {
     mut i: u64 = 0;
     while (i < n) {
         let line = w.bump();
-        set acc.push(Text(line.text));
+        set acc.push(doc_text(line.text));
         set acc.push(if (line.w.blank_line_follows(line.w.last_end)) {
             BlankLine
         } else {
@@ -1214,9 +1233,9 @@ fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
 
 fn item(self: W) -> WDoc!FmtError {
     // `# text` lines in front of the declaration. Tokens, not trivia, so the
-    // walker emits them itself — one per line, verbatim, above whatever they
-    // document. Nothing reflows them: a doc comment's line breaks are the
-    // author's, exactly as a `//` comment's are.
+    // walker emits them itself — one per line, above whatever they document. A line
+    // that runs past the width is filled onto the next (see `doc_text`); the author's
+    // own line breaks stay, as a `//` comment's do.
     if (self.peek_is(DocTok)) {
         let WStr { w, text } = self.bump();
         let rest = w.item()?;
@@ -1227,7 +1246,7 @@ fn item(self: W) -> WDoc!FmtError {
         // refuses below the top of a file — into one documenting that
         // declaration.
         let sep = if (w.blank_line_follows(w.last_end)) { BlankLine } else { HardLine };
-        return ok(WDoc { w: rest.w, doc: Concat([Text(text), sep, rest.doc]) });
+        return ok(WDoc { w: rest.w, doc: Concat([doc_text(text), sep, rest.doc]) });
     };
     let t = self.peek_text();
 
@@ -4126,6 +4145,29 @@ fn walker_of(src: str) -> W!FmtError {
             .rendered(
                 100,
             )? == "variant V =\n    | A(\n        # Rule.\n        str,\n        # Fewest.\n        min: u64 = 0,\n        max?: u64 = none\n    )\n",
+    );
+
+    // A doc line that runs past the width continues on the next line under a `#` of its own, at
+    // the column it started at; a word is never broken, an indented line is left alone and
+    // the author's own line breaks stay.
+    assert(
+        walker_of("# aaa bbb ccc ddd eee\nfn f ( ) { }")?
+            .item()
+            .rendered(20)? == "# aaa bbb ccc ddd\n# eee\nfn f() {}\n",
+    );
+    assert(
+        walker_of("fn f(# aaa bbb ccc ddd eee\na: i64) { }")?
+            .item()
+            .rendered(20)? == "fn f(\n    # aaa bbb ccc\n    # ddd eee\n    a: i64,\n) {}\n",
+    );
+    assert(
+        walker_of(
+            "# aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n#     indented code that is long long long\nfn f ( ) { }",
+        )?
+            .item()
+            .rendered(
+                20,
+            )? == "# aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n#     indented code that is long long long\nfn f() {}\n",
     );
 
     // A parameter's `# ..` lines sit above it inside the parentheses and break the list to a

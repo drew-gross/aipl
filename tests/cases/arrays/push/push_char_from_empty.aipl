@@ -1,5 +1,6 @@
 # `mut cs = []` that is only ever pushed `char`s is a `char[]` from the start: the pinner types the
-# empty literal from where the array ends up, so the first push is an ordinary push even inside a loop.
+# empty literal from where the array ends up, so the first push is an ordinary push even inside a
+# loop.
 
 import { equal as ==, len, less_than as <, push, wrapping_increment as ++ } from builtins;
 

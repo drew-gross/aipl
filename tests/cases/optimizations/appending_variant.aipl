@@ -26,7 +26,8 @@
 # The `functions:` list is the evidence, and it is an absence: no `styles`, no
 # `opt_styles`, no `map_join` instance. What remains is `styles$into$own0` —
 # the variant, with its receiver owned — beside `gather` itself and `deep`,
-# which builds the `Rule` tree the walk reads. Every array the producer's source describes is one the
+# which builds the `Rule` tree the walk reads. Every array the producer's source describes is one
+# the
 # compiler never emits code to build.
 #
 # The counts are checkable by hand. A `Many` contributes its own group plus

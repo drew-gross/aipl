@@ -203,7 +203,9 @@ pub fn archetype_of(self: Deck, identifiers: Identifier[]) -> Archetype!str {
     ]) == err("deck d1 (Ramp) is more than one archetype: Both, Control"));
 })
 
-# The sub-archetype that `self` is. `none` when the archetype has no sub-archetypes. A deck that matches none of them is `Other`, and one that matches more than one name is an error naming them, as for archetypes.
+# The sub-archetype that `self` is. `none` when the archetype has no sub-archetypes. A deck that
+# matches none of them is `Other`, and one that matches more than one name is an error naming them,
+# as for archetypes.
 pub fn sub_archetype_of(
     self: Deck,
     # The archetype whose sub-archetypes are asked about.

@@ -59,7 +59,7 @@
           </h3>
           <pre class="signature"><code>struct TokenFingerprint</code></pre>
 
-          <div class="doc"><p>A lexed source reduced to what a reformat must preserve: every non-import token <strong>in order</strong>, the import statements as a sorted multiset, and the comments as one too. Two sources with equal fingerprints hold the same code.</p><p>A token counts as its <em>value</em> (<code>token_value</code>), so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged while any change to a literal's value is.</p><p>Three things a reformat is allowed to change, and each is why a part is shaped the way it is:</p><ul><li><strong>Imports are hoisted and sorted</strong>, both the statements and the names inside</li></ul><p>one. So each statement collapses to its own tokens sorted and joined (<code>import_signature</code>) and the statements are then sorted among themselves — reordering is invisible, losing or changing a name is not.</p><ul><li><strong>A trailing comma is normalized</strong> (dropped when a list renders flat, added</li></ul><p>when it breaks), and a variant's <strong>leading <code>|</code></strong> is the same normalization at the other end. Both are layout, so <code>is_layout</code> drops them before anything else — which also excludes the <code>|</code> between match-pattern alternatives.</p><ul><li><strong>Comments move with the construct they are glued to</strong>, which can reorder</li></ul><p>them against the tokens, so they are their own sorted multiset rather than part of <code>rest</code>.</p><p>Everything else is positional: <code>rest</code> catches a token the layout moved, not just one it lost.</p></div>
+          <div class="doc"><p>A lexed source reduced to what a reformat must preserve: every non-import token <strong>in order</strong>, the import statements as a sorted multiset, and the comments as one too. Two sources with equal fingerprints hold the same code.</p><p>A token counts as its <em>value</em> (<code>token_value</code>), so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged while any change to a literal's value is.</p><p>Four things a reformat is allowed to change, and each is why a part is shaped the way it is:</p><ul><li><strong>Imports are hoisted and sorted</strong>, both the statements and the names inside</li></ul><p>one. So each statement collapses to its own tokens sorted and joined (<code>import_signature</code>) and the statements are then sorted among themselves — reordering is invisible, losing or changing a name is not.</p><ul><li><strong>A trailing comma is normalized</strong> (dropped when a list renders flat, added</li></ul><p>when it breaks), and a variant's <strong>leading <code>|</code></strong> is the same normalization at the other end. Both are layout, so <code>is_layout</code> drops them before anything else — which also excludes the <code>|</code> between match-pattern alternatives.</p><ul><li><strong>Comments move with the construct they are glued to</strong>, which can reorder</li></ul><p>them against the tokens, so they are their own sorted multiset rather than part of <code>rest</code>.</p><ul><li><strong>A doc comment is refilled</strong>: a line that runs past the width continues on the</li></ul><p>next, so a <code># ..</code> line counts as its words, in order, wherever the lines were cut.</p><p>Everything else is positional: <code>rest</code> catches a token the layout moved, not just one it lost.</p></div>
 
 
 
@@ -79,7 +79,7 @@
             <a class="anchor" href="#item-first_error">first_error</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn first_error(__spat$6997: ParseFailure) -&#62; FmtError</code></pre>
+          <pre class="signature"><code>fn first_error(__spat$7020: ParseFailure) -&#62; FmtError</code></pre>
 
           <div class="doc"><p>The first error of a failed parse as the formatter's own. A formatter reports one: it has nothing to say about a file it could not read, and the rest of a parse's errors are <code>aipl check</code>'s to show.</p></div>
 
@@ -140,7 +140,7 @@
           </h3>
           <pre class="signature"><code>fn verify_same_tokens(input: str, output: str) -&#62; ()!FmtError</code></pre>
 
-          <div class="doc"><p>Refuse unless <code>output</code> holds exactly <code>input</code>'s tokens and comments — exactly as <code>TokenFingerprint</code> defines it, which is where the three things a reformat is allowed to change are spelled out.</p><p>The three parts are reported separately so the message names what moved: a reordered statement is an import-hoisting bug, a reordered token is a layout bug, and they want different reading.</p></div>
+          <div class="doc"><p>Refuse unless <code>output</code> holds exactly <code>input</code>'s tokens and comments — exactly as <code>TokenFingerprint</code> defines it, which is where the four things a reformat is allowed to change are spelled out.</p><p>The three parts are reported separately so the message names what moved: a reordered statement is an import-hoisting bug, a reordered token is a layout bug, and they want different reading.</p></div>
 
 
 
@@ -231,6 +231,36 @@
           <pre class="signature"><code>fn first_difference(was: str[], now: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p>Where two token lists first disagree, as <code>&lt;before&gt; became &lt;after&gt;</code> (<code>nothing</code> for a side that ran out) — the detail a preservation failure reports.</p></div>
+
+
+
+        </section>
+
+
+
+        <section class="item" id="item-with_doc_words">
+          <h3>
+            <a class="anchor" href="#item-with_doc_words">with_doc_words</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn with_doc_words(lexed: LexResult&#60;AiplTok&#62;) -&#62; LexResult&#60;AiplTok&#62;</code></pre>
+
+          <div class="doc"><p><code>lexed</code> with each doc comment split into one token per word, so a line refilled across two compares equal to the one it came from. A run of spaces and a bare <code>#</code> line split into nothing.</p></div>
+
+
+
+        </section>
+
+
+
+        <section class="item" id="item-doc_words">
+          <h3>
+            <a class="anchor" href="#item-doc_words">doc_words</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn doc_words(t: Token&#60;AiplTok&#62;) -&#62; Token&#60;AiplTok&#62;[]</code></pre>
+
+          <div class="doc"><p><code>t</code>, or its words when it is a doc comment.</p></div>
 
 
 

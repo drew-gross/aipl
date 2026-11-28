@@ -1,4 +1,5 @@
-# A spread of a `join` — usually `xs.map(f).join()`, the shape `map_join` fuses to — appends each
+# A spread of a `join` — usually `xs.map(f).join()`, the shape `map_join` fuses to — appends
+# each
 # piece into the literal's array as it is produced. No array holds the joined result, and none
 # holds the pieces `map` would have collected first.
 #

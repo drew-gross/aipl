@@ -371,7 +371,8 @@ fn resolved_slot(self: CaseParam, imported: #{str: Callee}) -> ResolvedCaseParam
 
 variant ResolvedCallee = Callee without Unresolved
 
-# `self`, which the import table gives, as a callee that is decided: the table lists no `Unresolved`,
+# `self`, which the import table gives, as a callee that is decided: the table lists no
+# `Unresolved`,
 # so the case here only keeps the type honest.
 fn settled(self: Callee, name: str) -> ResolvedCallee {
     let callee = self;

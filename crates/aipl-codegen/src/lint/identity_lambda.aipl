@@ -1,11 +1,14 @@
-# The `identity_lambda` lint: a lambda that only forwards its arguments to one call, `|x| to_str(x)`,
+# The `identity_lambda` lint: a lambda that only forwards its arguments to one call, `|x|
+# to_str(x)`,
 # is the function itself: pass `to_str`.
 #
-# The lambda has to pass every parameter on, in order and once, to a call that is not an operator, and
+# The lambda has to pass every parameter on, in order and once, to a call that is not an operator,
+# and
 # nothing else. A lambda a `map` can say as a `$` projection is `use_field_projection`'s, and is not
 # advised on here.
 #
-# The hit points at the lambda — a short span that begins on the line the `#[allow]` would be written on.
+# The hit points at the lambda — a short span that begins on the line the `#[allow]` would be
+# written on.
 
 import {
     Span,
@@ -89,7 +92,8 @@ pub fn identity_lambda(function: Function) -> LintHit[] {
 })
 
 # A hit for `self` when it is a lambda that only forwards its argument(s) to one call, outside
-# a `map` that `use_field_projection` handles (`advised` is the lambdas it covered). An operator is left alone deliberately: the language does
+# a `map` that `use_field_projection` handles (`advised` is the lambdas it covered). An operator is
+# left alone deliberately: the language does
 # accept `+` as a value, but `xs.fold(0, +)` is a different reading from `|acc, x| acc + x`
 # rather than an obviously better one, and this lint's job is the case where the lambda adds
 # *nothing* — `|x| to_str(x)` against `to_str`.

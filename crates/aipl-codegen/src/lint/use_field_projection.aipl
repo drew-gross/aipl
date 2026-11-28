@@ -11,7 +11,8 @@
 # appear nowhere else (`|x| x.f(x)` needs the name), it has to be unannotated, since `$` has
 # no place to write a type, and every call in the chain has to be one `$` can make — a
 # function of this file whose first parameter is named `self`, which is what method-call
-# syntax is defined by, a builtin, or a call already written as a method. A function from another file is not known here — its parameters are not in view
+# syntax is defined by, a builtin, or a call already written as a method. A function from another
+# file is not known here — its parameters are not in view
 # when a file is linted — so it is never advised. An operator is never a step: `|x| x + 1`
 # does something with `x`.
 #

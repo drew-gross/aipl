@@ -683,7 +683,7 @@
             <a class="anchor" href="#item-take_comment">take_comment</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn take_comment(self: W, __spat$14556: Span) -&#62; W</code></pre>
+          <pre class="signature"><code>fn take_comment(self: W, __spat$14567: Span) -&#62; W</code></pre>
 
           <div class="doc"><p>Consume comment <code>c</code>: step past it and mark it as the last thing emitted. The Rust <code>pop_front</code> + <code>last_end</code> update, as one move.</p></div>
 
@@ -1313,6 +1313,21 @@
 
 
 
+        <section class="item" id="item-doc_text">
+          <h3>
+            <a class="anchor" href="#item-doc_text">doc_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn doc_text(line: str) -&#62; Doc</code></pre>
+
+          <div class="doc"><p>A <code># ..</code> line as a document: the words after the marker are filled to the width, so a line that would run past it continues on the next, under a marker of its own. A bare <code>#</code>, and a line whose text starts with a space (indented, as a code example is), are kept as written.</p></div>
+
+
+
+        </section>
+
+
+
         <section class="item" id="item-doc_lines">
           <h3>
             <a class="anchor" href="#item-doc_lines">doc_lines</a>
@@ -1320,7 +1335,7 @@
           </h3>
           <pre class="signature"><code>fn doc_lines(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
 
-          <div class="doc"><p><code># ..</code> lines at the cursor, one <code>Text</code> and a hard line each — the same verbatim treatment <code>item</code> gives a declaration's docs.</p></div>
+          <div class="doc"><p><code># ..</code> lines at the cursor, one <code>Text</code> and a hard line each — the same treatment <code>item</code> gives a declaration's docs.</p></div>
 
 
 
@@ -1783,7 +1798,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$64375: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$65151: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
